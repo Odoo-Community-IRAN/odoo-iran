@@ -4,15 +4,9 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 {
     'name': "Persian Calendar",
-
-    'summary': """
-        Persian Calendar""",
-
-    'description': """
-       Persian Calendar
-    """,
-
-    'author': "https://odoo-community.ir/",
+    'summary': """Persian Calendar""",
+    'description': """Persian Calendar""",
+    'author': "Odoo Community Iran",
     'website': "https://odoo-community.ir/",
     'category': 'Localization/Iran',
     'version': '1.0.1',

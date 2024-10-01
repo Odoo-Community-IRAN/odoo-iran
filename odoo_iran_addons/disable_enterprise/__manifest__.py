@@ -6,7 +6,7 @@
     'name': "Disable Enterprise",
     'summary': """Disable Enterprise Code""",
     'description': """Disable Enterprise Code""",
-    'author': "odoo-community-iran",
+    'author': "Odoo Community Iran",
     'website': "https://odoo-community.ir/",
     'category': 'Technical',
     'version': '1.0',

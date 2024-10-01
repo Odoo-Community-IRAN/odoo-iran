@@ -7,10 +7,10 @@
     "summary": """
         Short (1 phrase/line) summary of the module's purpose, used as
         subtitle on modules listing or apps.openerp.com""",
-    "author": "Odoo Community Association (OCA), Fadoo",
+    "author": "Odoo Community Iran",
     "license": "AGPL-3",
-    "website": "https://github.com/OCA/l10n-iran",
-    "category": "Uncategorized",
+    "website": "https://odoo-community.ir/",
+    "category": "Technical",
     "version": "1.0.0",
     "depends": ["base"],
     "data": [
