@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- 
+Copyright (C) 2024-Today: Odoo Community Iran
+@author: Odoo Community Iran (https://odoo-community.ir/
+License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html). 
+-->
+<odoo>
+    <record id="ir_cron_module_disable_update_notification" model="ir.cron">
+        <field name="name">Publisher: disable Update Notification</field>
+        <field name="model_id" ref="model_publisher_warranty_contract"/>
+        <field name="state">code</field>
+        <field name="code">model.update_notification()</field>
+        <field name="user_id" ref="base.user_root" />
+        <field name="interval_number">1</field>
+        <field name="interval_type">weeks</field>
+        <field name="numbercall">-1</field>
+        <field name="nextcall" eval="(DateTime.now() + timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')" />
+        <field name="doall" eval="False"/>
+        <field name="priority">1000</field>
+    </record>
+</odoo>
+
+
