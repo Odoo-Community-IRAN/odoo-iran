@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- 
+Copyright (C) 2024-Today: Odoo Community Iran
+@author: Odoo Community Iran (https://odoo-community.ir/
+License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html). 
+-->
+<templates xml:space="preserve">
+
+    <t t-inherit="res_config_edition" t-inherit-mode="extension">
+
+        <xpath expr="//h5" position="replace">
+            <t t-if="expirationDate">
+                <h5>Database expiration: Forever!</h5>
+            </t>
+        </xpath>
+
+    </t>
+
+</templates>
