@@ -3,16 +3,15 @@
 # 	* iap_mail
 # 
 # Translators:
-# Wil Odoo, 2023
-# Rasareeyar Lappiam, 2024
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:55+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Rasareeyar Lappiam, 2024\n"
+"POT-Creation-Date: 2024-09-26 08:55+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Thai (https://app.transifex.com/odoo/teams/41243/th/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -96,10 +95,8 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:iap_mail.enrich_company
 msgid ""
 "<i class=\"fa fa-fw me-2 fa-twitter text-primary\"/>\n"
-"                    <b>Twitter</b>"
+"                    <b>X</b>"
 msgstr ""
-"<i class=\"fa fa-fw me-2 fa-twitter text-primary\"/>\n"
-"                    <b>Twitter</b>"
 
 #. module: iap_mail
 #: model_terms:ir.ui.view,arch_db:iap_mail.enrich_company
@@ -116,16 +113,100 @@ msgid "<span> per year</span>"
 msgstr "<span>ต่อปี</span>"
 
 #. module: iap_mail
+#: model:ir.model.fields,field_description:iap_mail.field_iap_account__message_needaction
+msgid "Action Needed"
+msgstr "จำเป็นต้องดำเนินการ"
+
+#. module: iap_mail
+#: model:ir.model.fields,field_description:iap_mail.field_iap_account__message_attachment_count
+msgid "Attachment Count"
+msgstr "จำนวนสิ่งที่แนบมา"
+
+#. module: iap_mail
 #. odoo-javascript
 #: code:addons/iap_mail/static/src/js/services/iap_notification_service.js:0
-#, python-format
 msgid "Buy more credits"
 msgstr "ซื้อเครดิตเพิ่ม"
+
+#. module: iap_mail
+#: model:ir.model.fields,field_description:iap_mail.field_iap_account__company_ids
+msgid "Company"
+msgstr "บริษัท"
+
+#. module: iap_mail
+#: model:ir.model.fields,field_description:iap_mail.field_iap_account__warning_user_ids
+msgid "Email Alert Recipients"
+msgstr ""
+
+#. module: iap_mail
+#: model:ir.model.fields,field_description:iap_mail.field_iap_account__warning_threshold
+msgid "Email Alert Threshold"
+msgstr ""
+
+#. module: iap_mail
+#: model:ir.model.fields,field_description:iap_mail.field_iap_account__message_follower_ids
+msgid "Followers"
+msgstr "ผู้ติดตาม"
+
+#. module: iap_mail
+#: model:ir.model.fields,field_description:iap_mail.field_iap_account__message_partner_ids
+msgid "Followers (Partners)"
+msgstr "ผู้ติดตาม (พาร์ทเนอร์)"
+
+#. module: iap_mail
+#: model:ir.model.fields,field_description:iap_mail.field_iap_account__has_message
+msgid "Has Message"
+msgstr "มีข้อความ"
 
 #. module: iap_mail
 #: model:ir.model,name:iap_mail.model_iap_account
 msgid "IAP Account"
 msgstr "บัญชี IAP"
+
+#. module: iap_mail
+#: model:ir.model.fields,help:iap_mail.field_iap_account__message_needaction
+msgid "If checked, new messages require your attention."
+msgstr "ถ้าเลือก ข้อความใหม่จะต้องการความสนใจจากคุณ"
+
+#. module: iap_mail
+#: model:ir.model.fields,help:iap_mail.field_iap_account__message_has_error
+msgid "If checked, some messages have a delivery error."
+msgstr "ถ้าเลือก ข้อความบางข้อความมีข้อผิดพลาดในการส่ง"
+
+#. module: iap_mail
+#: model:ir.model.fields,field_description:iap_mail.field_iap_account__message_is_follower
+msgid "Is Follower"
+msgstr "เป็นผู้ติดตาม"
+
+#. module: iap_mail
+#: model:ir.model.fields,field_description:iap_mail.field_iap_account__message_has_error
+msgid "Message Delivery error"
+msgstr "เกิดข้อผิดพลาดในการส่งข้อความ"
+
+#. module: iap_mail
+#: model:ir.model.fields,field_description:iap_mail.field_iap_account__message_ids
+msgid "Messages"
+msgstr "ข้อความ"
+
+#. module: iap_mail
+#: model:ir.model.fields,field_description:iap_mail.field_iap_account__message_needaction_counter
+msgid "Number of Actions"
+msgstr "จํานวนการดําเนินการ"
+
+#. module: iap_mail
+#: model:ir.model.fields,field_description:iap_mail.field_iap_account__message_has_error_counter
+msgid "Number of errors"
+msgstr "จํานวนข้อผิดพลาด"
+
+#. module: iap_mail
+#: model:ir.model.fields,help:iap_mail.field_iap_account__message_needaction_counter
+msgid "Number of messages requiring action"
+msgstr "จำนวนข้อความที่ต้องดำเนินการ"
+
+#. module: iap_mail
+#: model:ir.model.fields,help:iap_mail.field_iap_account__message_has_error_counter
+msgid "Number of messages with delivery error"
+msgstr "จํานวนข้อความที่มีข้อผิดพลาดในการส่ง"
 
 #. module: iap_mail
 #: model_terms:ir.ui.view,arch_db:iap_mail.enrich_company

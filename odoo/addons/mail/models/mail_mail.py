@@ -2,21 +2,21 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import ast
-import base64
 import datetime
+import json
 import logging
 import psycopg2
+import pytz
+import re
 import smtplib
 import threading
-import re
-import pytz
-
 from collections import defaultdict
+
 from dateutil.parser import parse
 
-from odoo import _, api, fields, models
-from odoo import tools
+from odoo import _, api, fields, models, modules, SUPERUSER_ID, tools
 from odoo.addons.base.models.ir_mail_server import MailDeliveryException
+from odoo.modules.registry import Registry
 
 _logger = logging.getLogger(__name__)
 _UNFOLLOW_REGEX = re.compile(r'<span id="mail_unfollow".*?<\/span>', re.DOTALL)
@@ -215,12 +215,12 @@ class MailMail(models.Model):
         return self.write({'state': 'cancel'})
 
     @api.model
-    def process_email_queue(self, ids=None):
+    def process_email_queue(self, ids=None, batch_size=1000):
         """Send immediately queued messages, committing after each
            message is sent - this is not transactional and should
            not be called during another transaction!
 
-        A maximum of 10K MailMail (configurable using 'mail.mail.queue.batch.size'
+        A maximum of 1K MailMail (configurable using 'mail.mail.queue.batch.size'
         optional ICP) are fetched in order to keep time under control.
 
         :param list ids: optional list of emails ids to send. If given only
@@ -241,17 +241,27 @@ class MailMail(models.Model):
         ]
         if 'filters' in self._context:
             domain.extend(self._context['filters'])
-        batch_size = int(self.env['ir.config_parameter'].sudo().get_param('mail.mail.queue.batch.size', 10000))
-        send_ids = self.search(domain, limit=batch_size).ids
-        if ids:
+        batch_size = int(self.env['ir.config_parameter'].sudo().get_param('mail.mail.queue.batch.size', batch_size))
+        send_ids = self.search(domain, limit=batch_size if not ids else batch_size * 10).ids
+        if not ids:
+            ids_done = set()
+            total = len(send_ids) if len(send_ids) < batch_size else self.search_count(domain)
+
+            def post_send_callback(ids):
+                """ Track mail ids that have been sent, and notify cron progress accordingly. """
+                ids_done.update(send_ids)
+                self.env['ir.cron']._notify_progress(done=len(ids_done), remaining=total - len(ids_done))
+        else:
             send_ids = list(set(send_ids) & set(ids))
+            post_send_callback = None
+
         send_ids.sort()
 
         res = None
         try:
             # auto-commit except in testing mode
             auto_commit = not getattr(threading.current_thread(), 'testing', False)
-            res = self.browse(send_ids).send(auto_commit=auto_commit)
+            res = self.browse(send_ids).send(auto_commit=auto_commit, post_send_callback=post_send_callback)
         except Exception:
             _logger.exception("Failed processing mail queue")
 
@@ -337,6 +347,21 @@ class MailMail(models.Model):
     # mail_mail formatting, tools and send mechanism
     # ------------------------------------------------------
 
+    @api.model
+    def _estimate_email_size(self, headers, body, attachments_size):
+        """ Estimate the email size, incorporating a small added security margin.
+
+        :param dict headers: email headers
+        :param str body: email body
+        :param list attachments_size: list of attachment size in bytes
+        """
+        return (
+                len(json.dumps(headers or {}, ensure_ascii=False).encode(errors='ignore')) +
+                len((body or '').encode(errors='ignore')) +
+                sum(attachments_size) * 8 / 6 +  # 8 / 6 factor because base 64 are 6 bits coded in 8 bits
+                10 * 1024  # adding 10Ko as security
+        )
+
     def _prepare_outgoing_body(self):
         """Return a specific ir_email body. The main purpose of this method
         is to be inherited to add custom content depending on some module."""
@@ -368,11 +393,13 @@ class MailMail(models.Model):
             body = re.sub(_UNFOLLOW_REGEX, '', body)
         return body
 
-    def _prepare_outgoing_list(self, recipients_follower_status=None):
+    def _prepare_outgoing_list(self, mail_server=False, recipients_follower_status=None):
         """ Return a list of emails to send based on current mail.mail. Each
         is a dictionary for specific email values, depending on a partner, or
         generic to the whole recipients given by mail.email_to.
 
+        :param mail_server: <ir.mail_server> mail server that will be used to send the mails,
+          False if it is the default one
         :param set recipients_follower_status: see ``Followers._get_mail_recipients_follower_status()``
         :return list: list of dicts used in IrMailServer.build_email()
         """
@@ -404,7 +431,7 @@ class MailMail(models.Model):
         # used in post-processing to know failures, like missing recipients
         email_list = []
         if self.email_to:
-            email_to = tools.email_split_and_format(self.email_to)
+            email_to = tools.mail.email_split_and_format(self.email_to)
             email_list.append({
                 'email_cc': [],
                 'email_to': email_to,
@@ -443,23 +470,36 @@ class MailMail(models.Model):
                 'partner_id': partner,
             })
 
-        # prepare attachments: remove attachments if user send the link with the
-        # access_token.
         attachments = self.attachment_ids
-        if attachments:
-            if body:
-                link_ids = {int(link) for link in re.findall(r'/web/(?:content|image)/([0-9]+)', body)}
-                if link_ids:
-                    attachments = attachments - self.env['ir.attachment'].browse(list(link_ids))
-            # load attachment binary data with a separate read(), as prefetching all
-            # `datas` (binary field) could bloat the browse cache, triggering
-            # soft/hard mem limits with temporary data.
-            email_attachments = [
-                (a['name'], base64.b64decode(a['datas']), a['mimetype'])
-                for a in attachments.sudo().read(['name', 'datas', 'mimetype']) if a['datas'] is not False
-            ]
-        else:
-            email_attachments = []
+        # Prepare attachments:
+        # Remove attachments if user send the link with the access_token.
+        if body and attachments:
+            link_ids = {int(link) for link in re.findall(r'/web/(?:content|image)/([0-9]+)', body)}
+            if link_ids:
+                attachments = attachments - self.env['ir.attachment'].browse(list(link_ids))
+        # Turn remaining attachments into links if they are too heavy and
+        # their ownership are business models (i.e. something != mail.message,
+        # otherwise they will be deleted along with the mail message leading to a 404)
+        if record_owned_attachments := attachments.sudo().filtered(
+                lambda a: a.res_model and a.res_id and a.res_model != 'mail.message'):
+            estimated_email_size_bytes = self._estimate_email_size(
+                headers, body, [a.file_size for a in attachments.sudo()])
+            max_email_size_bytes = (mail_server or self.env['ir.mail_server']
+                                    ).sudo()._get_max_email_size() * 1024 * 1024
+            if estimated_email_size_bytes > max_email_size_bytes:
+                # Remove attachments and prepare downloadable links to be added in the body
+                record_owned_attachments.sudo().generate_access_token()
+                attachments_links = self.env['ir.qweb']._render('mail.mail_attachment_links',
+                                                                {'attachments': record_owned_attachments})
+                body = tools.mail.append_content_to_html(body, attachments_links, plaintext=False)
+                attachments -= record_owned_attachments
+        # Prepare the remaining attachment (those not embedded as link)
+        # load attachment binary data with a separate read(), as prefetching all
+        # `datas` (binary field) could bloat the browse cache, triggering
+        # soft/hard mem limits with temporary data.
+        email_attachments = [(a['name'], a['raw'], a['mimetype'])
+                             for a in attachments.sudo().read(['name', 'raw', 'mimetype'])
+                             if a['raw'] is not False]
 
         # Build final list of email values with personalized body for recipient
         results = []
@@ -535,7 +575,29 @@ class MailMail(models.Model):
             for batch_ids in tools.split_every(batch_size, record_ids):
                 yield mail_server_id, alias_domain_id, smtp_from, batch_ids
 
-    def send(self, auto_commit=False, raise_exception=False):
+    def send_after_commit(self):
+        """Queues the email to be sent after the commit of the current cursor.
+
+        Useful to send an email only if a transaction is successful.
+        """
+        # send immediately on same cursor when testing as we don't want
+        # to actually commit during tests
+        if getattr(threading.current_thread(), 'testing', False):
+            self.send()
+            return
+
+        email_ids = self.ids
+        dbname = self.env.cr.dbname
+        _context = self.env.context
+
+        @self.env.cr.postcommit.add
+        def send_emails_with_new_cursor():
+            db_registry = Registry(dbname)
+            with db_registry.cursor() as cr:
+                env = api.Environment(cr, SUPERUSER_ID, _context)
+                env['mail.mail'].browse(email_ids).send()
+
+    def send(self, auto_commit=False, raise_exception=False, post_send_callback=None):
         """ Sends the selected emails immediately, ignoring their current
             state (mails that have already been sent should not be passed
             unless they should actually be re-sent).
@@ -548,6 +610,9 @@ class MailMail(models.Model):
                 should never be True during normal transactions (default: False)
             :param bool raise_exception: whether to raise an exception if the
                 email sending process has failed
+            :param post_send_callback: an optional function, called as ``post_send_callback(ids, force=False)``,
+                with the mail ids that have been sent; calls with redundant ids
+                are possible
             :return: True
         """
         for mail_server_id, alias_domain_id, smtp_from, batch_ids in self._split_by_mail_configuration():
@@ -561,23 +626,28 @@ class MailMail(models.Model):
                     raise MailDeliveryException(_('Unable to connect to SMTP Server'), exc)
                 else:
                     batch = self.browse(batch_ids)
-                    batch.write({'state': 'exception', 'failure_reason': exc})
+                    batch.write({'state': 'exception', 'failure_reason': tools.exception_to_unicode(exc)})
                     batch._postprocess_sent_message(success_pids=[], failure_type="mail_smtp")
             else:
+                mail_server = self.env['ir.mail_server'].browse(mail_server_id)
                 self.browse(batch_ids)._send(
                     auto_commit=auto_commit,
                     raise_exception=raise_exception,
                     smtp_session=smtp_session,
                     alias_domain_id=alias_domain_id,
+                    mail_server=mail_server,
+                    post_send_callback=post_send_callback,
                 )
-                _logger.info(
-                    'Sent batch %s emails via mail server ID #%s',
-                    len(batch_ids), mail_server_id)
+                if not modules.module.current_test:
+                    _logger.info(
+                        'Sent batch %s emails via mail server ID #%s',
+                        len(batch_ids), mail_server_id)
             finally:
                 if smtp_session:
                     smtp_session.quit()
 
-    def _send(self, auto_commit=False, raise_exception=False, smtp_session=None, alias_domain_id=False):
+    def _send(self, auto_commit=False, raise_exception=False, smtp_session=None, alias_domain_id=False,
+              mail_server=False, post_send_callback=None):
         IrMailServer = self.env['ir.mail_server']
         # Only retrieve recipient followers of the mails if needed
         mails_with_unfollow_link = self.filtered(lambda m: m.body_html and '/mail/unfollow' in m.body_html)
@@ -590,7 +660,6 @@ class MailMail(models.Model):
             success_pids = []
             failure_reason = None
             failure_type = None
-            processing_pid = None
             mail = None
             try:
                 mail = self.browse(mail_id)
@@ -624,14 +693,17 @@ class MailMail(models.Model):
                     notifs.flush_recordset(['notification_status', 'failure_type', 'failure_reason'])
 
                 # protect against ill-formatted email_from when formataddr was used on an already formatted email
-                emails_from = tools.email_split_and_format(mail.email_from)
+                emails_from = tools.mail.email_split_and_format(mail.email_from)
                 email_from = emails_from[0] if emails_from else mail.email_from
 
                 # build an RFC2822 email.message.Message object and send it without queuing
                 res = None
                 # TDE note: could be great to pre-detect missing to/cc and skip sending it
                 # to go directly to failed state update
-                email_list = mail._prepare_outgoing_list(recipients_follower_status)
+                email_list = mail._prepare_outgoing_list(
+                    mail_server=mail_server or mail.mail_server_id,
+                    recipients_follower_status=recipients_follower_status,
+                )
 
                 # send each sub-email
                 for email in email_list:
@@ -684,7 +756,8 @@ class MailMail(models.Model):
                             raise
                 if res:  # mail has been sent at least once, no major exception occurred
                     mail.write({'state': 'sent', 'message_id': res, 'failure_reason': False})
-                    _logger.info('Mail with ID %r and Message-Id %r successfully sent', mail.id, mail.message_id)
+                    if not modules.module.current_test:
+                        _logger.info('Mail with ID %r and Message-Id %r successfully sent', mail.id, mail.message_id)
                     # /!\ can't use mail.state here, as mail.refresh() will cause an error
                     # see revid:odo@openerp.com-20120622152536-42b2s28lvdv3odyr in 6.1
                 mail._postprocess_sent_message(success_pids=success_pids, failure_type=failure_type)
@@ -711,7 +784,7 @@ class MailMail(models.Model):
                     error_code = e.args[0]
                     if len(e.args) > 1 and error_code == IrMailServer.NO_VALID_FROM:
                         # log failing email in additional arguments message
-                        failure_reason = tools.ustr(e.args[1])
+                        failure_reason = str(e.args[1])
                     else:
                         failure_reason = error_code
                     if error_code == IrMailServer.NO_VALID_FROM:
@@ -720,7 +793,7 @@ class MailMail(models.Model):
                         failure_type = "mail_from_missing"
                 # generic (unknown) error as fallback
                 if not failure_reason:
-                    failure_reason = tools.ustr(e)
+                    failure_reason = tools.exception_to_unicode(e)
                 if not failure_type:
                     failure_type = "unknown"
 
@@ -742,7 +815,10 @@ class MailMail(models.Model):
                             value = '. '.join(e.args)
                         raise MailDeliveryException(value)
                     raise
-
             if auto_commit is True:
+                if post_send_callback:
+                    post_send_callback([mail_id])
                 self._cr.commit()
+        if post_send_callback:
+            post_send_callback(self.ids)
         return True

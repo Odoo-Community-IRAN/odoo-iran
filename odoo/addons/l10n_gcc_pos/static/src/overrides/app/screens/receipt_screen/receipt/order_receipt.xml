@@ -14,10 +14,10 @@
             </t>
         </xpath>
 
-        <xpath expr="//t[@t-esc='props.data.cashier']/.." position="attributes">
+        <xpath expr="//div[@t-esc='props.data.cashier']/.." position="attributes">
             <attribute name="t-if">!props.data.is_gcc_country</attribute>
         </xpath>
-        <xpath expr="//t[@t-esc='props.data.cashier']/.." position="after">
+        <xpath expr="//div[@t-esc='props.data.cashier']/.." position="after">
             <div t-if="props.data.is_gcc_country" t-translation="off">
                 <div>Served by / خدم بواسطة <t t-esc="props.data.cashier"/></div>
             </div>
@@ -30,7 +30,7 @@
         </xpath>
         <xpath expr="//span[@t-esc='props.formatCurrency(props.data.amount_total)']/.." position="after">
             <div t-if="props.data.is_gcc_country" class="pos-receipt-amount pos-receipt-amount-arabic" t-translation="off">
-                TOTAL / الإجمالي
+                TOTAL / اﻹجمالي
                 <span t-esc="props.formatCurrency(props.data.amount_total)" class="pos-receipt-right-align"/>
             </div>
         </xpath>
@@ -69,21 +69,6 @@
                 Discounts / الخصومات
                 <span t-esc="props.formatCurrency(props.data.total_discount)" class="pos-receipt-right-align"/>
             </div>
-        </xpath>
-
-        <xpath expr="//div[hasclass('pos-receipt-taxes')]/span[text()='Total']" position="after">
-            <t t-if="props.data.is_gcc_country">
-                <span/>
-                <span t-translation="off">النسبة</span>
-                <span t-translation="off">مبلغ الضريبة</span>
-                <span t-translation="off">قبل الضريبة</span>
-                <span t-translation="off">الإجمالي</span>
-            </t>
-        </xpath>
-        <xpath expr="//Orderline">
-            <t t-if="props.data.is_gcc_country">
-                <div style="display: inline-flex;" t-translation="off">Taxes / الضرائب</div>:<span t-esc="line.tax " style="margin-left: 5px"/>
-            </t>
         </xpath>
     </t>
 </templates>

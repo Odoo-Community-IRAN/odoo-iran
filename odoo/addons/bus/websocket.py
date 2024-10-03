@@ -20,17 +20,18 @@ from urllib.parse import urlparse
 from weakref import WeakSet
 
 from werkzeug.local import LocalStack
+from werkzeug.datastructures import ImmutableMultiDict, MultiDict
 from werkzeug.exceptions import BadRequest, HTTPException, ServiceUnavailable
 
 import odoo
-from odoo import api
+from odoo import api, modules
 from .models.bus import dispatch
 from odoo.http import root, Request, Response, SessionExpiredException, get_default_session
 from odoo.modules.registry import Registry
 from odoo.service import model as service_model
 from odoo.service.server import CommonServer
 from odoo.service.security import check_session
-from odoo.tools import config
+from odoo.tools import config, lazy_property
 
 _logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ def acquire_cursor(db):
     """ Try to acquire a cursor up to `MAX_TRY_ON_POOL_ERROR` """
     for tryno in range(1, MAX_TRY_ON_POOL_ERROR + 1):
         with suppress(PoolError):
-            return odoo.registry(db).cursor()
+            return Registry(db).cursor()
         time.sleep(random.uniform(DELAY_ON_POOL_ERROR, DELAY_ON_POOL_ERROR * tryno))
     raise PoolError('Failed to acquire cursor after %s retries' % MAX_TRY_ON_POOL_ERROR)
 
@@ -654,7 +655,8 @@ class Websocket:
         if not self.__event_callbacks[event_type]:
             return
         with closing(acquire_cursor(self._db)) as cr:
-            env = api.Environment(cr, self._session.uid, self._session.context)
+            lang = api.Environment(cr, self._session.uid, {})['res.lang']._get_code(self._session.context.get('lang'))
+            env = api.Environment(cr, self._session.uid, dict(self._session.context, lang=lang))
             for callback in self.__event_callbacks[event_type]:
                 try:
                     service_model.retrying(functools.partial(callback, env, self), env)
@@ -676,7 +678,7 @@ class Websocket:
         if not session:
             raise SessionExpiredException()
         with acquire_cursor(session.db) as cr:
-            env = api.Environment(cr, session.uid, session.context)
+            env = api.Environment(cr, session.uid, dict(session.context, lang=None))
             if session.uid is not None and not check_session(session, env):
                 raise SessionExpiredException()
             # Mark the notification request as processed.
@@ -826,7 +828,8 @@ class WebsocketRequest:
             raise InvalidDatabaseException() from exc
 
         with closing(acquire_cursor(self.db)) as cr:
-            self.env = api.Environment(cr, self.session.uid, self.session.context)
+            lang = api.Environment(cr, self.session.uid, {})['res.lang']._get_code(self.session.context.get('lang'))
+            self.env = api.Environment(cr, self.session.uid, dict(self.session.context, lang=lang))
             threading.current_thread().uid = self.env.uid
             service_model.retrying(
                 functools.partial(self._serve_ir_websocket, event_name, data),
@@ -866,6 +869,13 @@ class WebsocketRequest:
         """
         self.update_env(context=dict(self.env.context, **overrides))
 
+    @lazy_property
+    def cookies(self):
+        cookies = MultiDict(self.httprequest.cookies)
+        if self.registry:
+            self.registry['ir.http']._sanitize_cookies(cookies)
+        return ImmutableMultiDict(cookies)
+
 
 class WebsocketConnectionHandler:
     SUPPORTED_VERSIONS = {'13'}
@@ -879,11 +889,11 @@ class WebsocketConnectionHandler:
     # Latest version of the websocket worker. This version should be incremented
     # every time `websocket_worker.js` is modified to force the browser to fetch
     # the new worker bundle.
-    _VERSION = "17.0-1"
+    _VERSION = "18.0-1"
 
     @classmethod
     def websocket_allowed(cls, request):
-        return not request.registry.in_test_mode()
+        return not modules.module.current_test
 
     @classmethod
     def open_connection(cls, request, version):

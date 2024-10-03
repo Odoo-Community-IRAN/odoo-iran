@@ -6,10 +6,12 @@ import calendar
 
 from odoo import fields, models, api, _, Command
 from odoo.exceptions import ValidationError, UserError, RedirectWarning
+from odoo.osv import expression
+from odoo.tools import format_list, SQL
 from odoo.tools.mail import is_html_empty
 from odoo.tools.misc import format_date
-from odoo.tools.float_utils import float_round, float_is_zero
 from odoo.addons.account.models.account_move import MAX_HASH_VERSION
+from odoo.addons.base_vat.models.res_partner import _ref_vat
 
 
 MONTH_SELECTION = [
@@ -33,31 +35,64 @@ PEPPOL_LIST = [
     'MK', 'MT', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SI', 'SK', 'SM', 'TR', 'VA',
 ]
 
+INTEGRITY_HASH_BATCH_SIZE = 1000
+
+SOFT_LOCK_DATE_FIELDS = [
+    'fiscalyear_lock_date',
+    'tax_lock_date',
+    'sale_lock_date',
+    'purchase_lock_date',
+]
+
+LOCK_DATE_FIELDS = [
+    *SOFT_LOCK_DATE_FIELDS,
+    'hard_lock_date',
+]
+
+
 class ResCompany(models.Model):
     _name = "res.company"
     _inherit = ["res.company", "mail.thread"]
 
-    #TODO check all the options/fields are in the views (settings + company form view)
     fiscalyear_last_day = fields.Integer(default=31, required=True)
     fiscalyear_last_month = fields.Selection(MONTH_SELECTION, default='12', required=True)
-    period_lock_date = fields.Date(
-        string="Journals Entries Lock Date",
-        tracking=True,
-        help="Only users with the 'Adviser' role can edit accounts prior to and inclusive of this"
-             " date. Use it for period locking inside an open fiscal year, for example.")
     fiscalyear_lock_date = fields.Date(
-        string="All Users Lock Date",
+        string="Global Lock Date",
         tracking=True,
-        help="No users, including Advisers, can edit accounts prior to and inclusive of this date."
+        help="No users can edit accounts prior to and inclusive of this date."
              " Use it for fiscal year locking for example.")
     tax_lock_date = fields.Date(
         string="Tax Return Lock Date",
         tracking=True,
         help="No users can edit journal entries related to a tax prior and inclusive of this date.")
-    max_tax_lock_date = fields.Date(compute='_compute_max_tax_lock_date', recursive=True)  # TODO maybe store
+    sale_lock_date = fields.Date(
+        string='Sales Lock Date',
+        tracking=True,
+        help='Prevents creation and modification of entries in sales journals up to the defined date inclusive.'
+    )
+    purchase_lock_date = fields.Date(
+        string='Purchase Lock date',
+        tracking=True,
+        help='Prevents creation and modification of entries in purchase journals up to the defined date inclusive.'
+    )
+    hard_lock_date = fields.Date(
+        string='Hard Lock Date',
+        tracking=True,
+        help='Like the "Global Lock Date", but no exceptions are possible.'
+    )
+    # The user lock date fields are explicitly invalidated when
+    #   * writing the corresponding lock date field on any company
+    #   * an exception for that field is created (for any company)
+    #   * an exception for that field is revoked (for any company)
+    # A `@api.depends` is necessary for the `@api.depends_context` to work correctly
+    user_fiscalyear_lock_date = fields.Date(compute='_compute_user_fiscalyear_lock_date')
+    user_tax_lock_date = fields.Date(compute='_compute_user_tax_lock_date')
+    user_sale_lock_date = fields.Date(compute='_compute_user_sale_lock_date')
+    user_purchase_lock_date = fields.Date(compute='_compute_user_purchase_lock_date')
+    user_hard_lock_date = fields.Date(compute='_compute_user_hard_lock_date')
     transfer_account_id = fields.Many2one('account.account',
         check_company=True,
-        domain="[('reconcile', '=', True), ('account_type', '=', 'asset_current'), ('deprecated', '=', False)]", string="Inter-Banks Transfer Account", help="Intermediary account used when moving money from a liqity account to another")
+        domain="[('reconcile', '=', True), ('account_type', '=', 'asset_current'), ('deprecated', '=', False)]", string="Inter-Banks Transfer Account", help="Intermediary account used when moving money from a liquidity account to another")
     expects_chart_of_accounts = fields.Boolean(string='Expects a Chart of Accounts', default=True)
     chart_template = fields.Selection(selection='_chart_template_selection')
     bank_account_code_prefix = fields.Char(string='Prefix of the bank accounts')
@@ -65,8 +100,6 @@ class ResCompany(models.Model):
     default_cash_difference_income_account_id = fields.Many2one('account.account', string="Cash Difference Income", check_company=True)
     default_cash_difference_expense_account_id = fields.Many2one('account.account', string="Cash Difference Expense", check_company=True)
     account_journal_suspense_account_id = fields.Many2one('account.account', string='Journal Suspense Account', check_company=True)
-    account_journal_payment_debit_account_id = fields.Many2one('account.account', string='Journal Outstanding Receipts', check_company=True)
-    account_journal_payment_credit_account_id = fields.Many2one('account.account', string='Journal Outstanding Payments', check_company=True)
     account_journal_early_pay_discount_gain_account_id = fields.Many2one(comodel_name='account.account', string='Cash Discount Write-Off Gain Account', check_company=True)
     account_journal_early_pay_discount_loss_account_id = fields.Many2one(comodel_name='account.account', string='Cash Discount Write-Off Loss Account', check_company=True)
     transfer_account_code_prefix = fields.Char(string='Prefix of the transfer accounts')
@@ -96,11 +129,27 @@ class ResCompany(models.Model):
 
     qr_code = fields.Boolean(string='Display QR-code on invoices')
 
-    invoice_is_email = fields.Boolean('Email by default', default=True)
-    invoice_is_download = fields.Boolean('Download by default', default=True)
     display_invoice_amount_total_words = fields.Boolean(string='Total amount of invoice in letters')
+    display_invoice_tax_company_currency = fields.Boolean(
+        string="Taxes in company currency",
+        default=True,
+    )
     account_use_credit_limit = fields.Boolean(
         string='Sales Credit Limit', help='Enable the use of credit limit on partners.')
+
+    batch_payment_sequence_id = fields.Many2one(
+        comodel_name='ir.sequence',
+        readonly=True,
+        copy=False,
+        default=lambda self: self.env['ir.sequence'].sudo().create({
+            'name': _("Batch Payment Number Sequence"),
+            'implementation': 'no_gap',
+            'padding': 5,
+            'use_date_range': True,
+            'company_id': self.id,
+            'prefix': 'BATCH/%(year)s/',
+        }),
+    )
 
     #Fields of the setup step for opening move
     account_opening_move_id = fields.Many2one(string='Opening Journal Entry', comodel_name='account.move', help="The journal entry containing the initial balance of all this company's accounts.")
@@ -132,9 +181,6 @@ class ResCompany(models.Model):
         check_company=True,
         help="Journal used by default for moving the period of an entry",
     )
-
-    # Technical field to hide country specific fields in company form view
-    country_code = fields.Char(related='country_id.code', depends=['country_id'])
 
     # Taxes
     account_fiscal_country_id = fields.Many2one(
@@ -190,6 +236,30 @@ class ResCompany(models.Model):
     account_discount_income_allocation_id = fields.Many2one(comodel_name='account.account', string='Separate account for income discount')
     account_discount_expense_allocation_id = fields.Many2one(comodel_name='account.account', string='Separate account for expense discount')
 
+    # Audit trail
+    check_account_audit_trail = fields.Boolean(string='Audit Trail')
+
+    # Autopost Wizard
+    autopost_bills = fields.Boolean(string='Auto-validate bills', default=True)
+
+    # Tax ex/included in prices
+    account_price_include = fields.Selection(
+        selection=[('tax_included', 'Tax Included'), ('tax_excluded', 'Tax Excluded')],
+        string='Default Sales Price Include',
+        default='tax_excluded',
+        required=True,
+        help="Default on whether the sales price used on the product and invoices with this Company includes its taxes."
+    )
+    company_vat_placeholder = fields.Char(compute='_compute_company_vat_placeholder')
+
+    def get_next_batch_payment_communication(self):
+        '''
+        When in need of a batch payment communication reference (several invoices paid at the same time)
+        use batch_payment_sequence_id to get it (eventually create it first): e.g BATCH/2024/00001
+        '''
+        self.ensure_one()
+        return self.sudo().batch_payment_sequence_id.next_by_id()
+
     def _get_company_root_delegated_field_names(self):
         return super()._get_company_root_delegated_field_names() + [
             'fiscalyear_last_day',
@@ -197,6 +267,17 @@ class ResCompany(models.Model):
             'account_storno',
             'tax_exigibility',
         ]
+
+    def cache_invalidation_fields(self):
+        # EXTENDS base
+        invalidation_fields = super().cache_invalidation_fields()
+        invalidation_fields.add('check_account_audit_trail')
+        return invalidation_fields
+
+    @api.constrains("account_price_include")
+    def _check_set_account_price_include(self):
+        if any(company.sudo()._existing_accounting() for company in self):
+            raise ValidationError("Cannot change Price Tax computation method on a company that has already started invoicing.")
 
     @api.constrains('account_opening_move_id', 'fiscalyear_last_day', 'fiscalyear_last_month')
     def _check_fiscalyear_last_day(self):
@@ -214,6 +295,13 @@ class ResCompany(models.Model):
             max_day = calendar.monthrange(year, int(rec.fiscalyear_last_month))[1]
             if rec.fiscalyear_last_day > max_day:
                 raise ValidationError(_("Invalid fiscal year last day"))
+
+    @api.constrains('check_account_audit_trail')
+    def _check_audit_trail_records(self):
+        if not self.check_account_audit_trail:
+            move_count = self.env['account.move'].search_count([('company_id', '=', self.id)], limit=1)
+            if move_count:
+                raise UserError(_("Can't disable audit trail when there are existing records."))
 
     @api.depends('fiscal_position_ids.foreign_vat')
     def _compute_multi_vat_foreign_country(self):
@@ -259,10 +347,46 @@ class ResCompany(models.Model):
             if html:
                 company.invoice_terms_html = html
 
-    @api.depends('tax_lock_date', 'parent_id.max_tax_lock_date')
-    def _compute_max_tax_lock_date(self):
+    @api.depends('fiscalyear_lock_date')
+    @api.depends_context('uid', 'ignore_exceptions')
+    def _compute_user_fiscalyear_lock_date(self):
+        ignore_exceptions = bool(self.env.context.get('ignore_exceptions', False))
         for company in self:
-            company.max_tax_lock_date = max(company.tax_lock_date or date.min, company.parent_id.sudo().max_tax_lock_date or date.min)
+            company.user_fiscalyear_lock_date = company._get_user_lock_date('fiscalyear_lock_date', ignore_exceptions)
+
+    @api.depends('tax_lock_date')
+    @api.depends_context('uid', 'ignore_exceptions')
+    def _compute_user_tax_lock_date(self):
+        ignore_exceptions = bool(self.env.context.get('ignore_exceptions', False))
+        for company in self:
+            company.user_tax_lock_date = company._get_user_lock_date('tax_lock_date', ignore_exceptions)
+
+    @api.depends('sale_lock_date')
+    @api.depends_context('uid', 'ignore_exceptions')
+    def _compute_user_sale_lock_date(self):
+        ignore_exceptions = bool(self.env.context.get('ignore_exceptions', False))
+        for company in self:
+            company.user_sale_lock_date = company._get_user_lock_date('sale_lock_date', ignore_exceptions)
+
+    @api.depends('purchase_lock_date')
+    @api.depends_context('uid', 'ignore_exceptions')
+    def _compute_user_purchase_lock_date(self):
+        ignore_exceptions = bool(self.env.context.get('ignore_exceptions', False))
+        for company in self:
+            company.user_purchase_lock_date = company._get_user_lock_date('purchase_lock_date', ignore_exceptions)
+
+    @api.depends('hard_lock_date')
+    def _compute_user_hard_lock_date(self):
+        for company in self:
+            company.user_hard_lock_date = max(c.hard_lock_date or date.min for c in company.sudo().parent_ids)
+
+    def _initiate_account_onboardings(self):
+        account_onboarding_routes = [
+            'account_dashboard',
+        ]
+        onboardings = self.env['onboarding.onboarding'].sudo().search([('route_name', 'in', account_onboarding_routes)])
+        for company in self:
+            onboardings.with_company(company)._search_or_create_progress()
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -285,7 +409,7 @@ class ResCompany(models.Model):
     def reflect_code_prefix_change(self, old_code, new_code):
         if not old_code or new_code == old_code:
             return
-        accounts = self.env['account.account'].search([
+        accounts = self.env['account.account'].with_company(self).search([
             *self.env['account.account']._check_company_domain(self),
             ('code', '=like', old_code + '%'),
             ('account_type', 'in', ('asset_cash', 'liability_credit_card')),
@@ -293,9 +417,9 @@ class ResCompany(models.Model):
         for account in accounts:
             account.write({'code': self.get_new_account_code(account.code, old_code, new_code)})
 
-    def _get_fiscalyear_lock_statement_lines_redirect_action(self, unreconciled_statement_lines):
-        """ Get the action redirecting to the statement lines that are not already reconciled when setting a fiscal
-        year lock date.
+    def _get_unreconciled_statement_lines_redirect_action(self, unreconciled_statement_lines):
+        """ Get the action redirecting to the statement lines that are not already reconciled.
+        It can i.e. be used when setting a fiscal year lock date or hashing all entries until a certain date.
 
         :param unreconciled_statement_lines: The statement lines.
         :return: A dictionary representing a window action.
@@ -319,68 +443,207 @@ class ResCompany(models.Model):
             })
         return action
 
-    def _validate_fiscalyear_lock(self, values):
-        if values.get('fiscalyear_lock_date'):
+    def _get_unreconciled_statement_lines_domain(self, last_date):
+        return [
+            ('company_id', 'child_of', self.ids),
+            ('is_reconciled', '=', False),
+            ('date', '<=', last_date),
+            ('move_id.state', 'in', ('draft', 'posted')),
+        ]
 
+    def _validate_locks(self, values):
+        """Check that the lock date changes are valid.
+        * Check that we do not decrease or remove the hard lock dates.
+        * Check there are no unreconciled bank statement lines in the period we want to lock.
+        * Check there are no unhashed journal entires in the period we want to lock.
+        :param vals: The values passed to the write method.
+        """
+        new_locks = {field: fields.Date.to_date(values[field])for field in LOCK_DATE_FIELDS if field in values}
+
+        fiscalyear_lock_date = new_locks.get('fiscalyear_lock_date')
+        hard_lock_date = new_locks.get('hard_lock_date')
+        sale_lock_date = new_locks.get('sale_lock_date')
+        purchase_lock_date = new_locks.get('purchase_lock_date')
+        fiscal_lock_date = None
+        if fiscalyear_lock_date or hard_lock_date:
+            fiscal_lock_date = max(fiscalyear_lock_date or date.min, hard_lock_date or date.min)
+
+        if 'hard_lock_date' in new_locks:
+            for company in self:
+                if not company.hard_lock_date:
+                    continue
+                if not hard_lock_date:
+                    raise UserError(_("The Hard Lock Date cannot be removed."))
+                if hard_lock_date < company.hard_lock_date:
+                    raise UserError(_("A new Hard Lock Date must be posterior (or equal) to the previous one."))
+
+        if hard_lock_date:
             draft_entries = self.env['account.move'].search([
                 ('company_id', 'child_of', self.ids),
                 ('state', '=', 'draft'),
-                ('date', '<=', values['fiscalyear_lock_date'])])
+                ('date', '<=', hard_lock_date)])
             if draft_entries:
-                error_msg = _('There are still unposted entries in the period you want to lock. You should either post or delete them.')
+                error_msg = _('There are still draft entries in the period you want to hard lock. You should either post or delete them.')
                 action_error = {
-                    'view_mode': 'tree',
-                    'name': _('Unposted Entries'),
+                    'view_mode': 'list',
+                    'name': _('Draft Entries'),
                     'res_model': 'account.move',
                     'type': 'ir.actions.act_window',
                     'domain': [('id', 'in', draft_entries.ids)],
                     'search_view_id': [self.env.ref('account.view_account_move_filter').id, 'search'],
-                    'views': [[self.env.ref('account.view_move_tree').id, 'list'], [self.env.ref('account.view_move_form').id, 'form']],
+                    'views': [[self.env.ref('account.view_move_tree_multi_edit').id, 'list'], [self.env.ref('account.view_move_form').id, 'form']],
                 }
-                raise RedirectWarning(error_msg, action_error, _('Show unposted entries'))
+                raise RedirectWarning(error_msg, action_error, _('Show draft entries'))
 
-            unreconciled_statement_lines = self.env['account.bank.statement.line'].search([
-                ('company_id', 'child_of', self.ids),
-                ('is_reconciled', '=', False),
-                ('date', '<=', values['fiscalyear_lock_date']),
-                ('move_id.state', 'in', ('draft', 'posted')),
-            ])
+        # Check for unreconciled bank statement lines
+        if fiscal_lock_date:
+            unreconciled_statement_lines = self.env['account.bank.statement.line'].search(
+                self._get_unreconciled_statement_lines_domain(fiscal_lock_date)
+            )
             if unreconciled_statement_lines:
                 error_msg = _("There are still unreconciled bank statement lines in the period you want to lock."
                             "You should either reconcile or delete them.")
-                action_error = self._get_fiscalyear_lock_statement_lines_redirect_action(unreconciled_statement_lines)
+                action_error = self._get_unreconciled_statement_lines_redirect_action(unreconciled_statement_lines)
                 raise RedirectWarning(error_msg, action_error, _('Show Unreconciled Bank Statement Line'))
 
-    def _get_user_fiscal_lock_date(self):
-        """Get the fiscal lock date for this company depending on the user"""
-        lock_date = max(self.period_lock_date or date.min, self.fiscalyear_lock_date or date.min)
-        if self.user_has_groups('account.group_account_manager'):
-            lock_date = self.fiscalyear_lock_date or date.min
-        if self.parent_id:
-            # We need to use sudo, since we might not have access to a parent company.
-            lock_date = max(lock_date, self.sudo().parent_id._get_user_fiscal_lock_date())
-        return lock_date
+    def _get_user_lock_date(self, soft_lock_date_field, ignore_exceptions=False):
+        """Get the lock date called `soft_lock_date_field` for this company depending on the user.
+        We consider the field and exceptions (except if `ignore_exceptions`) for it in this company and the parent companies.
+        :param str soft_lock_date_field: One of the lock date fields (except 'hard_lock_date'; see SOFT_LOCK_DATE_FIELDS)
+        :param bool ignore_exceptions: Whether we ignore exceptions or not
+        :return the user lock date
+        """
+        self.ensure_one()
+        soft_lock_date = date.min
+        # We need to use sudo, since we might not have access to a parent company.
+        for company in self.sudo().parent_ids:
+            if company[soft_lock_date_field]:
+                if ignore_exceptions:
+                    exception = None
+                else:
+                    exception = self.env['account.lock_exception'].search(
+                        [
+                          ('state', '=', 'active'),  # checks the datetime
+                          '|',
+                              ('user_id', '=', None),
+                              ('user_id', '=', self.env.user.id),
+                          (soft_lock_date_field, '<', company[soft_lock_date_field]),
+                          ('company_id', '=', company.id),
+                        ],
+                        order='lock_date asc NULLS FIRST',
+                        limit=1,
+                    )
+                if exception:
+                    # The search domain of the exception ensures `exception[soft_lock_date_field] < company[soft_lock_date_field]`
+                    # or `exception[soft_lock_date_field] is False`
+                    soft_lock_date = max(soft_lock_date, exception[soft_lock_date_field] or date.min)
+                else:
+                    soft_lock_date = max(soft_lock_date, company[soft_lock_date_field])
+        return soft_lock_date
 
-    def _get_violated_lock_dates(self, accounting_date, has_tax):
+    def _get_user_fiscal_lock_date(self, journal, ignore_exceptions=False):
+        """Get the fiscal lock date for this company (depending on the affected journal) accounting for potential user exceptions
+        :param bool ignore_exceptions: Whether we ignore exceptions or not
+        :return the lock date
+        """
+        self.ensure_one()
+        company = self.with_context(ignore_exceptions=ignore_exceptions)
+        lock = max(company.user_fiscalyear_lock_date, company.user_hard_lock_date)
+        if journal.type == 'sale':
+            lock = max(company.user_sale_lock_date, lock)
+        elif journal.type == 'purchase':
+            lock = max(company.user_purchase_lock_date, lock)
+        return lock
+
+    def _get_violated_soft_lock_date(self, soft_lock_date_field, date):
+        """
+        Check whether `date` violates the lock date called `soft_lock_date_field`.
+        :param str soft_lock_date_field: One of the lock date fields (except 'hard_lock_date'; see SOFT_LOCK_DATE_FIELDS)
+        :param date: We check whether this date is prior or equal to the lock date.
+        :return the violated lock date as a date (or `None`)
+        """
+        violated_date = None
+        if not self:
+            return violated_date
+        self.ensure_one()
+        user_lock_date_field = f'user_{soft_lock_date_field}'
+        regular_lock_date = self.with_context(ignore_exceptions=True)[user_lock_date_field]
+        if date <= regular_lock_date:
+            violated_date = regular_lock_date
+            user_lock_date = self.with_context(ignore_exceptions=False)[user_lock_date_field]
+            violated_date = None if date > user_lock_date else user_lock_date
+        return violated_date
+
+    def _get_lock_date_violations(self, accounting_date, fiscalyear=True, sale=True, purchase=True, tax=True, hard=True):
         """Get all the lock dates affecting the current accounting_date.
-        :param accoutiaccounting_dateng_date: The accounting date
-        :param has_tax: If any taxes are involved in the lines of the invoice
-        :return: a list of tuples containing the lock dates ordered chronologically.
+        :param accounting_date:      The accounting date
+        :param bool fiscalyear:      Whether we should check the `fiscalyear_lock_date`
+        :param bool sale:            Whether we should check the `sale_lock_date`
+        :param bool purchase:        Whether we should check the `purchase_lock_date`
+        :param bool tax:             Whether we should check the `tax_lock_date`
+        :param bool hard:            Whether we should check the `hard_lock_date`
+        :return: a list of tuples containing the lock dates (not ordered chronologically).
         """
         self.ensure_one()
         locks = []
-        user_lock_date = self._get_user_fiscal_lock_date()
-        if accounting_date and user_lock_date and accounting_date <= user_lock_date:
-            locks.append((user_lock_date, _('user')))
-        tax_lock_date = self.max_tax_lock_date
-        if accounting_date and tax_lock_date and has_tax and accounting_date <= tax_lock_date:
-            locks.append((tax_lock_date, _('tax')))
+
+        if not accounting_date:
+            return locks
+
+        soft_lock_date_fields_to_check = [
+            # (field, "to check")
+            ('fiscalyear_lock_date', fiscalyear),
+            ('sale_lock_date', sale),
+            ('purchase_lock_date', purchase),
+            ('tax_lock_date', tax),
+        ]
+        for field, to_check in soft_lock_date_fields_to_check:
+            if not to_check:
+                continue
+            violated_date = self._get_violated_soft_lock_date(field, accounting_date)
+            if violated_date:
+                locks.append((violated_date, field))
+
+        if hard:
+            hard_lock_date = self.user_hard_lock_date
+            if accounting_date <= hard_lock_date:
+                locks.append((hard_lock_date, 'hard_lock_date'))
+
+        return locks
+
+    @api.model
+    def _format_lock_dates(self, lock_dates):
+        """Format a list of lock dates as a string.
+        :param lock_date_violations: list of tuple (lock_date, lock_date_field)
+        :return: a (localized) string listing all the lock date fields and their values
+        """
+        return format_list(self.env, [
+            f"{self.fields_get([field])[field]['string']} ({format_date(self.env, lock_date)})"
+            for lock_date, field in sorted(lock_dates)
+        ])
+
+    def _get_violated_lock_dates(self, accounting_date, has_tax, journal):
+        """Get all the lock dates affecting the current accounting_date.
+        :param accounting_date: The accounting date
+        :param has_tax: If any taxes are involved in the lines of the invoice
+        :param journal: The affected journal
+        :return: a list of tuples containing the lock dates ordered chronologically.
+        """
+        locks = self._get_lock_date_violations(
+            accounting_date,
+            fiscalyear=True,
+            sale=(journal and journal.type == 'sale'),
+            purchase=(journal and journal.type == 'purchase'),
+            tax=has_tax,
+            hard=True,
+        )
         locks.sort()
         return locks
 
     def write(self, values):
-        #restrict the closing of FY if there are still unposted entries
-        self._validate_fiscalyear_lock(values)
+        self._validate_locks(values)
+
+        self.env['res.company'].invalidate_model(fnames=[f'user_{field}' for field in LOCK_DATE_FIELDS if field in values])
 
         # Reflect the change on accounts
         for company in self:
@@ -397,19 +660,31 @@ class ResCompany(models.Model):
                 if company.root_id._existing_accounting():
                     raise UserError(_('You cannot change the currency of the company since some journal items already exist'))
 
-        return super(ResCompany, self).write(values)
+        companies = super().write(values)
+
+        # We revoke all active exceptions affecting the changed lock dates and recreate them (with the updated lock dates)
+        changed_soft_lock_fields = [field for field in SOFT_LOCK_DATE_FIELDS if field in values]
+        for company in self:
+            active_exceptions = self.env['account.lock_exception'].search(
+                self.env['account.lock_exception']._get_active_exceptions_domain(company, changed_soft_lock_fields),
+            )
+            active_exceptions._recreate()
+
+        return companies
 
     @api.model
     def setting_init_bank_account_action(self):
         """ Called by the 'Bank Accounts' button of the setup bar or from the Financial configuration menu."""
         view_id = self.env.ref('account.setup_bank_account_wizard').id
+        context = {'dialog_size': 'medium', **self.env.context}
         return {
             'type': 'ir.actions.act_window',
-            'name': _('Create a Bank Account'),
+            'name': _('Setup Bank Account'),
             'res_model': 'account.setup.bank.manual.config',
             'target': 'new',
             'view_mode': 'form',
             'views': [[view_id, 'form']],
+            'context': context,
         }
 
     @api.model
@@ -437,16 +712,6 @@ class ResCompany(models.Model):
             'date': self.account_opening_date - timedelta(days=1),
         }
 
-    def create_op_move_if_non_existant(self):
-        """ Creates an empty opening move in 'draft' state for the current company
-        if there wasn't already one defined. For this, the function needs at least
-        one journal of type 'general' to exist (required by account.move).
-        """
-        # TO BE REMOVED IN MASTER
-        self.ensure_one()
-        if not self.account_opening_move_id:
-            self.account_opening_move_id = self.env['account.move'].create(self._get_default_opening_move_values())
-
     def opening_move_posted(self):
         """ Returns true if this company has an opening account move and this move is posted."""
         return bool(self.account_opening_move_id) and self.account_opening_move_id.state == 'posted'
@@ -456,19 +721,19 @@ class ResCompany(models.Model):
         if none has yet been defined.
         """
         unaffected_earnings_type = "equity_unaffected"
-        account = self.env['account.account'].search([
+        account = self.env['account.account'].with_company(self).search([
             *self.env['account.account']._check_company_domain(self),
             ('account_type', '=', unaffected_earnings_type),
-        ])
+        ], limit=1)
         if account:
-            return account[0]
+            return account
         # Do not assume '999999' doesn't exist since the user might have created such an account
         # manually.
         code = 999999
-        while self.env['account.account'].search([
+        while self.env['account.account'].with_company(self).search_count([
             *self.env['account.account']._check_company_domain(self),
             ('code', '=', str(code)),
-        ]):
+        ], limit=1):
             code -= 1
         return self.env['account.account']._load_records([
             {
@@ -477,64 +742,11 @@ class ResCompany(models.Model):
                               'code': str(code),
                               'name': _('Undistributed Profits/Losses'),
                               'account_type': unaffected_earnings_type,
-                              'company_id': self.id,
+                              'company_ids': [Command.link(self.id)],
                           },
                 'noupdate': True,
             }
         ])
-
-    def get_opening_move_differences(self, opening_move_lines):
-        # TO BE REMOVED IN MASTER
-        currency = self.currency_id
-        balancing_move_line = opening_move_lines.filtered(lambda x: x.account_id == self.get_unaffected_earnings_account())
-
-        debits_sum = credits_sum = 0.0
-        for line in opening_move_lines:
-            if line != balancing_move_line:
-                #skip the autobalancing move line
-                debits_sum += line.debit
-                credits_sum += line.credit
-
-        difference = abs(debits_sum - credits_sum)
-        debit_diff = (debits_sum > credits_sum) and float_round(difference, precision_rounding=currency.rounding) or 0.0
-        credit_diff = (debits_sum < credits_sum) and float_round(difference, precision_rounding=currency.rounding) or 0.0
-        return debit_diff, credit_diff
-
-    def _auto_balance_opening_move(self):
-        """ Checks the opening_move of this company. If it has not been posted yet
-        and is unbalanced, balances it with a automatic account.move.line in the
-        current year earnings account.
-        """
-        # TO BE REMOVED IN MASTER
-        if self.account_opening_move_id and self.account_opening_move_id.state == 'draft':
-            balancing_account = self.get_unaffected_earnings_account()
-            currency = self.currency_id
-
-            balancing_move_line = self.account_opening_move_id.line_ids.filtered(lambda x: x.account_id == balancing_account)
-            # There could be multiple lines if we imported the balance from unaffected earnings account too
-            if len(balancing_move_line) > 1:
-                self.account_opening_move_id.line_ids -= balancing_move_line[1:]
-                balancing_move_line = balancing_move_line[0]
-
-            debit_diff, credit_diff = self.get_opening_move_differences(self.account_opening_move_id.line_ids)
-
-            if float_is_zero(debit_diff + credit_diff, precision_rounding=currency.rounding):
-                if balancing_move_line:
-                    # zero difference and existing line : delete the line
-                    self.account_opening_move_id.line_ids -= balancing_move_line
-            else:
-                if balancing_move_line:
-                    # Non-zero difference and existing line : edit the line
-                    balancing_move_line.write({'debit': credit_diff, 'credit': debit_diff})
-                else:
-                    # Non-zero difference and no existing line : create a new line
-                    self.env['account.move.line'].create({
-                        'name': _('Automatic Balancing Line'),
-                        'move_id': self.account_opening_move_id.id,
-                        'account_id': balancing_account.id,
-                        'debit': credit_diff,
-                        'credit': debit_diff,
-                    })
 
     def _update_opening_move(self, to_update):
         """ Create or update the opening move for the accounts passed as parameter.
@@ -627,6 +839,13 @@ class ResCompany(models.Model):
         """ Set the onboarding step as done """
         self.env['onboarding.onboarding.step'].action_validate_step('account.onboarding_onboarding_step_sales_tax')
 
+    def action_save_onboarding_company_data(self):
+        self.ensure_one()
+        if self.street:
+            ref = 'account.onboarding_onboarding_step_company_data'
+            self.env['onboarding.onboarding.step'].with_company(self).action_validate_step(ref)
+        return {'type': 'ir.actions.client', 'tag': 'soft_reload'}
+
     def get_chart_of_accounts_or_fail(self):
         account = self.env['account.account'].search(self.env['account.account']._check_company_domain(self), limit=1)
         if len(account) == 0:
@@ -636,6 +855,22 @@ class ResCompany(models.Model):
                 "Please go to Account Configuration and select or install a fiscal localization.")
             raise RedirectWarning(msg, action.id, _("Go to the configuration panel"))
         return account
+
+    def install_l10n_modules(self):
+        if res := super().install_l10n_modules():
+            self.env.flush_all()
+            self.env.reset()     # clear the set of environments
+            env = self.env()     # get an environment that refers to the new registry
+            for company in self.filtered(lambda c: c.country_id and not c.chart_template):
+                template_code = company.parent_id.chart_template or self.env['account.chart.template']._guess_chart_template(company.country_id)
+                if template_code != 'generic_coa':
+                    @self.env.cr.precommit.add
+                    def try_loading(template_code=template_code, company=company):
+                        env['account.chart.template'].try_loading(
+                            template_code,
+                            env['res.company'].browse(company.id),
+                        )
+        return res
 
     def _existing_accounting(self) -> bool:
         """Return True iff some accounting entries have already been made for the current company."""
@@ -650,93 +885,100 @@ class ResCompany(models.Model):
         return self.env.ref('account.action_report_account_hash_integrity').report_action(self.id)
 
     def _check_hash_integrity(self):
-        """Checks that all posted moves have still the same data as when they were posted
+        """Checks that all hashed moves have still the same data as when they were hashed
         and raises an error with the result.
         """
         if not self.env.user.has_group('account.group_account_user'):
             raise UserError(_('Please contact your accountant to print the Hash integrity result.'))
 
-        def build_move_info(move):
-            return(move.name, move.inalterable_hash, fields.Date.to_string(move.date))
-
         journals = self.env['account.journal'].search(self.env['account.journal']._check_company_domain(self))
-        results_by_journal = {
-            'results': [],
-            'printing_date': format_date(self.env, fields.Date.to_string(fields.Date.context_today(self)))
-        }
+        results = []
 
         for journal in journals:
-            rslt = {
-                'journal_name': journal.name,
-                'journal_code': journal.code,
-                'restricted_by_hash_table': journal.restrict_mode_hash_table and 'V' or 'X',
-                'msg_cover': '',
-                'first_hash': 'None',
-                'first_move_name': 'None',
-                'first_move_date': 'None',
-                'last_hash': 'None',
-                'last_move_name': 'None',
-                'last_move_date': 'None',
-            }
-            if not journal.restrict_mode_hash_table:
-                rslt.update({'msg_cover': _('This journal is not in strict mode.')})
-                results_by_journal['results'].append(rslt)
-                continue
-
+            restricted_by_hash_table_flag = 'V' if journal.restrict_mode_hash_table else 'X'
             # We need the `sudo()` to ensure that all the moves are searched, no matter the user's access rights.
-            # This is required in order to generate consistent hashs.
+            # This is required in order to generate consistent hashes.
             # It is not an issue, since the data is only used to compute a hash and not to return the actual values.
-            all_moves_count = self.env['account.move'].sudo().search_count([('state', '=', 'posted'), ('journal_id', '=', journal.id)])
-            moves = self.env['account.move'].sudo().search([('state', '=', 'posted'), ('journal_id', '=', journal.id),
-                                            ('secure_sequence_number', '!=', 0)], order="secure_sequence_number ASC")
-            if not moves:
-                rslt.update({
-                    'msg_cover': _('There isn\'t any journal entry flagged for data inalterability yet for this journal.'),
-                })
-                results_by_journal['results'].append(rslt)
-                continue
-
-            previous_hash = u''
-            start_move_info = []
-            hash_corrupted = False
-            current_hash_version = 1
-            for move in moves:
-                computed_hash = move.with_context(hash_version=current_hash_version)._compute_hash(previous_hash=previous_hash)
-                while move.inalterable_hash != computed_hash and current_hash_version < MAX_HASH_VERSION:
-                    current_hash_version += 1
-                    computed_hash = move.with_context(hash_version=current_hash_version)._compute_hash(previous_hash=previous_hash)
-                if move.inalterable_hash != computed_hash:
-                    rslt.update({'msg_cover': _('Corrupted data on journal entry with id %s.', move.id)})
-                    results_by_journal['results'].append(rslt)
-                    hash_corrupted = True
-                    break
-                if not previous_hash:
-                    #save the date and sequence number of the first move hashed
-                    start_move_info = build_move_info(move)
-                previous_hash = move.inalterable_hash
-            end_move_info = build_move_info(move)
-
-            if hash_corrupted:
-                continue
-
-            rslt.update({
-                        'first_move_name': start_move_info[0],
-                        'first_hash': start_move_info[1],
-                        'first_move_date': format_date(self.env, start_move_info[2]),
-                        'last_move_name': end_move_info[0],
-                        'last_hash': end_move_info[1],
-                        'last_move_date': format_date(self.env, end_move_info[2]),
+            query = self.env['account.move'].sudo()._search(
+                domain=[
+                    ('journal_id', '=', journal.id),
+                    ('inalterable_hash', '!=', False),
+                ],
+                order="secure_sequence_number ASC NULLS LAST, sequence_prefix, sequence_number ASC",
+            )
+            prefix2result = defaultdict(lambda: {
+                'first_move': self.env['account.move'],
+                'last_move': self.env['account.move'],
+                'corrupted_move': self.env['account.move'],
+            })
+            last_move = self.env['account.move']
+            self.env.execute_query(SQL("DECLARE hashed_moves CURSOR FOR %s", query.select()))
+            while move_ids := self.env.execute_query(SQL("FETCH %s FROM hashed_moves", INTEGRITY_HASH_BATCH_SIZE)):
+                self.env.invalidate_all()
+                moves = self.env['account.move'].browse(move_id[0] for move_id in move_ids)
+                if not moves and not last_move:
+                    results.append({
+                        'journal_name': journal.name,
+                        'restricted_by_hash_table': restricted_by_hash_table_flag,
+                        'status': 'no_data',
+                        'msg_cover': _('There is no journal entry flagged for accounting data inalterability yet.'),
                     })
-            if len(moves) == all_moves_count:
-                rslt['msg_cover'] = _('All entries are hashed.')
-            else:
-                rslt['msg_cover'] = _('Entries are hashed from %s (%s)', start_move_info[0], format_date(self.env, start_move_info[2]))
-            results_by_journal['results'].append(rslt)
+                    continue
 
-        return results_by_journal
+                current_hash_version = 1
+                for move in moves:
+                    prefix_result = prefix2result[move.sequence_prefix]
+                    if prefix_result['corrupted_move']:
+                        continue
+                    previous_move = prefix_result['last_move'] if not move.secure_sequence_number else last_move
+                    previous_hash = previous_move.inalterable_hash or ""
+                    computed_hash = move.with_context(hash_version=current_hash_version)._calculate_hashes(previous_hash)[move]
+                    while move.inalterable_hash != computed_hash and current_hash_version < MAX_HASH_VERSION:
+                        current_hash_version += 1
+                        computed_hash = move.with_context(hash_version=current_hash_version)._calculate_hashes(previous_hash)[move]
+                    if move.inalterable_hash != computed_hash:
+                        prefix_result['corrupted_move'] = move
+                        continue
+                    if not prefix_result['first_move']:
+                        prefix_result['first_move'] = move
+                    prefix_result['last_move'] = move
+                    last_move = move
+
+            self.env.execute_query(SQL("CLOSE hashed_moves"))
+
+            for prefix, prefix_result in prefix2result.items():
+                if corrupted_move := prefix_result['corrupted_move']:
+                    results.append({
+                        'restricted_by_hash_table': restricted_by_hash_table_flag,
+                        'journal_name': f"{journal.name} ({prefix}...)",
+                        'status': 'corrupted',
+                        'msg_cover': _(
+                            "Corrupted data on journal entry with id %(id)s (%(name)s).",
+                            id=corrupted_move.id,
+                            name=corrupted_move.name,
+                        ),
+                    })
+                else:
+                    results.append({
+                        'restricted_by_hash_table': restricted_by_hash_table_flag,
+                        'journal_name': f"{journal.name} ({prefix}...)",
+                        'status': 'verified',
+                        'msg_cover': _("Entries are correctly hashed"),
+                        'first_move_name': prefix_result['first_move'].name,
+                        'first_hash': prefix_result['first_move'].inalterable_hash,
+                        'first_move_date': format_date(self.env, prefix_result['first_move'].date),
+                        'last_move_name': prefix_result['last_move'].name,
+                        'last_hash': prefix_result['last_move'].inalterable_hash,
+                        'last_move_date': format_date(self.env, prefix_result['last_move'].date),
+                    })
+
+        return {
+            'results': results,
+            'printing_date': format_date(self.env, fields.Date.context_today(self)),
+        }
 
     @api.model
-    def _with_locked_records(self, records):
+    def _with_locked_records(self, records, allow_raising=True):
         """ To avoid sending the same records multiple times from different transactions,
         we use this generic method to lock the records passed as parameter.
 
@@ -744,8 +986,11 @@ class ResCompany(models.Model):
         """
         self._cr.execute(f'SELECT * FROM {records._table} WHERE id IN %s FOR UPDATE SKIP LOCKED', [tuple(records.ids)])
         available_ids = {r[0] for r in self._cr.fetchall()}
-        if available_ids != set(records.ids):
+        all_locked = available_ids == set(records.ids)
+        if not all_locked and allow_raising:
             raise UserError(_("Some documents are being sent by another process already."))
+        else:
+            return all_locked
 
     def compute_fiscalyear_dates(self, current_date):
         """
@@ -759,3 +1004,16 @@ class ResCompany(models.Model):
 
         return {'date_from': datetime(year=current_date.year, month=1, day=1).date(),
                 'date_to': datetime(year=current_date.year, month=12, day=31).date()}
+
+    @api.depends('country_id', 'account_fiscal_country_id')
+    def _compute_company_vat_placeholder(self):
+        for company in self:
+            placeholder = _("/ if not applicable")
+            if company.country_id or company.account_fiscal_country_id:
+                expected_vat = _ref_vat.get(
+                    company.country_id.code.lower() or company.account_fiscal_country_id.code.lower()
+                )
+                if expected_vat:
+                    placeholder = _("%s, or / if not applicable", expected_vat)
+
+            company.company_vat_placeholder = placeholder

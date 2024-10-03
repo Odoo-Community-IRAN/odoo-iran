@@ -2,17 +2,20 @@
 
 import { AutoComplete } from "@web/core/autocomplete/autocomplete";
 import { delay } from "@web/core/utils/concurrency";
-import { getDataURLFromFile } from "@web/core/utils/urls";
+import { getDataURLFromFile, redirect } from "@web/core/utils/urls";
 import weUtils from '@web_editor/js/common/utils';
 import { _t } from "@web/core/l10n/translation";
 import { svgToPNG, webpToPNG } from "@website/js/utils";
 import { useService } from "@web/core/utils/hooks";
 import { registry } from "@web/core/registry";
+import { rpc } from "@web/core/network/rpc";
 import { mixCssColors } from '@web/core/utils/colors';
+import { router } from "@web/core/browser/router";
 import {
     Component,
     onMounted,
     reactive,
+    useEffect,
     useEnv,
     useRef,
     useState,
@@ -20,15 +23,17 @@ import {
     onWillStart,
     useExternalListener,
 } from "@odoo/owl";
+import { standardActionServiceProps } from "@web/webclient/actions/action_service";
+import { addLoadingEffect as addButtonLoadingEffect } from "@web/core/utils/ui";
 
-const ROUTES = {
+export const ROUTES = {
     descriptionScreen: 2,
     paletteSelectionScreen: 3,
     featuresSelectionScreen: 4,
     themeSelectionScreen: 5,
 };
 
-const WEBSITE_TYPES = {
+export const WEBSITE_TYPES = {
     1: {id: 1, label: _t("a business website"), name: 'business'},
     2: {id: 2, label: _t("an online store"), name: 'online_store'},
     3: {id: 3, label: _t("a blog"), name: 'blog'},
@@ -36,7 +41,7 @@ const WEBSITE_TYPES = {
     5: {id: 5, label: _t("an elearning platform"), name: 'elearning'},
 };
 
-const WEBSITE_PURPOSES = {
+export const WEBSITE_PURPOSES = {
     1: {id: 1, label: _t("get leads"), name: 'get_leads'},
     2: {id: 2, label: _t("develop the brand"), name: 'develop_brand'},
     3: {id: 3, label: _t("sell more"), name: 'sell_more'},
@@ -44,41 +49,93 @@ const WEBSITE_PURPOSES = {
     5: {id: 5, label: _t("schedule appointments"), name: 'schedule_appointments'},
 };
 
-const PALETTE_NAMES = [
-    'default-1',
-    'default-2',
-    'default-3',
-    'default-4',
-    'default-5',
+export const PALETTE_NAMES = [
+    'default-light-1',
+    'default-light-2',
+    'default-light-4',
+    'default-light-3',
+    'default-light-5',
+    'default-24',
+    'default-light-7',
+    'default-light-6',
+    'default-light-11',
+    'default-light-14',
+    'default-light-8',
     'default-6',
     'default-7',
     'default-8',
     'default-9',
-    'default-10',
-    'default-11',
+    'default-23',
+    'default-25',
     'default-12',
-    'default-13',
     'default-14',
+    'default-22',
     'default-15',
     'default-16',
     'default-17',
-    'default-18',
+    'default-light-10',
     'default-19',
     'default-20',
+    'default-5',
+    'default-4',
+    'default-light-9',
+    'default-2',
+    'default-light-13',
+    'default-27',
+    'default-light-12',
+    'default-1',
+    'default-28',
+    'default-21',
 ];
 
 // Attributes for which background color should be retrieved
 // from CSS and added in each palette.
-const CUSTOM_BG_COLOR_ATTRS = ['menu', 'footer'];
+export const CUSTOM_BG_COLOR_ATTRS = ["menu", "footer"];
+
+const MAX_NBR_DISPLAY_MAIN_THEMES = 3;
+
+/**
+ * Returns a list of maximum "resultNbrMax" themes that depends on the wanted
+ * industry and the color palette.
+ *
+ * @param {Object} orm - The orm used for the server call.
+ * @param {Object} state - The state that contains the wanted industry and color
+ * palette.
+ * @param {Number} resultNbrMax - The number of different wanted themes.
+ * @returns {Promise<Array>} A list of objects that contains the different
+ * theme names and their related text svgs (as result of a Promise). The length
+ * of the list is at most 'resultNbrMax'.
+ */
+async function getRecommendedThemes(orm, state, resultNbrMax = MAX_NBR_DISPLAY_MAIN_THEMES) {
+    return orm.call("website",
+        "configurator_recommended_themes",
+        [],
+        {
+            "industry_id": state.selectedIndustry.id,
+            "palette": state.selectedPalette,
+            "result_nbr_max": resultNbrMax,
+        },
+    );
+}
 
 //------------------------------------------------------------------------------
 // Components
 //------------------------------------------------------------------------------
 
-class SkipButton extends Component {}
-SkipButton.template = 'website.Configurator.SkipButton';
+export class SkipButton extends Component {
+    static template = "website.Configurator.SkipButton";
+    static props = {
+        skip: Function,
+    };
+}
 
-class WelcomeScreen extends Component {
+export class WelcomeScreen extends Component {
+    static template = "website.Configurator.WelcomeScreen";
+    static components = { SkipButton };
+    static props = {
+        skip: Function,
+        navigate: Function,
+    };
     setup() {
         this.state = useStore();
     }
@@ -88,27 +145,28 @@ class WelcomeScreen extends Component {
     }
 }
 
-Object.assign(WelcomeScreen, {
-    components: {SkipButton},
-    template: 'website.Configurator.WelcomeScreen',
-});
-
-class IndustrySelectionAutoComplete extends AutoComplete {
+export class IndustrySelectionAutoComplete extends AutoComplete {
     static timeout = 400;
 
     get dropdownOptions() {
         return {
             ...super.dropdownOptions,
             position: "bottom-fit",
-        }
+        };
     }
 
     get ulDropdownClass() {
-        return `${super.ulDropdownClass} custom-ui-autocomplete shadow-lg border-0 o_configurator_show_fast o_configurator_industry_dropdown`
+        return `${super.ulDropdownClass} custom-ui-autocomplete shadow-lg border-0 o_configurator_show_fast o_configurator_industry_dropdown`;
     }
 }
 
-class DescriptionScreen extends Component {
+export class DescriptionScreen extends Component {
+    static template = 'website.Configurator.DescriptionScreen';
+    static components = { SkipButton, AutoComplete: IndustrySelectionAutoComplete };
+    static props = {
+        navigate: Function,
+        skip: Function,
+    };
     setup() {
         this.industrySelection = useRef('industrySelection');
         this.state = useStore();
@@ -211,17 +269,17 @@ class DescriptionScreen extends Component {
     }
 }
 
-Object.assign(DescriptionScreen, {
-    components: { SkipButton, AutoComplete: IndustrySelectionAutoComplete },
-    template: 'website.Configurator.DescriptionScreen',
-});
-
-class PaletteSelectionScreen extends Component {
+export class PaletteSelectionScreen extends Component {
+    static components = {SkipButton};
+    static template = 'website.Configurator.PaletteSelectionScreen';
+    static props = {
+        navigate: Function,
+        skip: Function,
+    };
     setup() {
         this.state = useStore();
         this.logoInputRef = useRef('logoSelectionInput');
         this.notification = useService("notification");
-        this.rpc = useService("rpc");
         this.orm = useService('orm');
 
         onMounted(() => {
@@ -258,7 +316,7 @@ class PaletteSelectionScreen extends Component {
             const previousLogoAttachmentId = this.state.logoAttachmentId;
             const file = logoSelectInput.files[0];
             const data = await getDataURLFromFile(file);
-            const attachment = await this.rpc('/web_editor/attachment/add_data', {
+            const attachment = await rpc('/web_editor/attachment/add_data', {
                 'name': 'logo',
                 'data': data.split(',')[1],
                 'is_image': true,
@@ -309,16 +367,13 @@ class PaletteSelectionScreen extends Component {
      * @param {Array<number>} ids the attachment ids to remove
      */
     async _removeAttachments(ids) {
-        this.rpc("/web_editor/attachment/remove", { ids: ids });
+        rpc("/web_editor/attachment/remove", { ids: ids });
     }
 }
 
-Object.assign(PaletteSelectionScreen, {
-    components: {SkipButton},
-    template: 'website.Configurator.PaletteSelectionScreen',
-});
-
-class ApplyConfiguratorScreen extends Component {
+export class ApplyConfiguratorScreen extends Component {
+    static template = "";
+    static props = ["*"];
     setup() {
         this.websiteService = useService('website');
     }
@@ -385,12 +440,14 @@ class ApplyConfiguratorScreen extends Component {
             // Here the website service goToWebsite method is not used because
             // the web client needs to be reloaded after the new modules have
             // been installed.
-            window.location.replace(`/web#action=website.website_preview&website_id=${encodeURIComponent(resp.website_id)}`);
+            redirect(`/odoo/action-website.website_preview?website_id=${encodeURIComponent(resp.website_id)}`);
         }
     }
 }
 
 export class FeaturesSelectionScreen extends ApplyConfiguratorScreen {
+    static components = {SkipButton};
+    static template = 'website.Configurator.FeatureSelection';
     setup() {
         super.setup();
 
@@ -403,14 +460,7 @@ export class FeaturesSelectionScreen extends ApplyConfiguratorScreen {
         if (!industryId) {
             return this.props.navigate(ROUTES.descriptionScreen);
         }
-        const themes = await this.orm.call('website',
-            'configurator_recommended_themes',
-            [],
-            {
-                'industry_id': industryId,
-                'palette': this.state.selectedPalette,
-            },
-        );
+        const themes = await getRecommendedThemes(this.orm, this.state);
 
         if (!themes.length) {
             await this.applyConfigurator('theme_default');
@@ -421,60 +471,110 @@ export class FeaturesSelectionScreen extends ApplyConfiguratorScreen {
     }
 }
 
-Object.assign(FeaturesSelectionScreen, {
-    components: {SkipButton},
-    template: 'website.Configurator.FeatureSelection',
-});
-
-class ThemeSelectionScreen extends ApplyConfiguratorScreen {
+export class ThemeSelectionScreen extends ApplyConfiguratorScreen {
+    static template = "website.Configurator.ThemeSelectionScreen";
     setup() {
         super.setup();
 
         this.uiService = useService('ui');
         this.orm = useService('orm');
-        this.state = useStore();
+        this.maxNbrDisplayExtraThemes = 100;
+        const env = useEnv();
+        env.store["extraThemesLoaded"] = false;
+        env.store["extraThemes"] = [];
+        this.state = useState(env.store);
         this.themeSVGPreviews = [useRef('ThemePreview1'), useRef('ThemePreview2'), useRef('ThemePreview3')];
-        const proms = [];
+        this.extraThemesButtonRef = useRef("extraThemesButton");
+        this.extraThemeSVGPreviews = [];
+        for (let i = 0; i < this.maxNbrDisplayExtraThemes; i++) {
+            this.extraThemeSVGPreviews.push(useRef(`ExtraThemePreview${i}`));
+        }
 
-        onMounted(async () => {
-            // Add a loading effect during the loading of the images inside the
-            // svgs.
-            this.uiService.block();
-            this.state.themes.forEach((theme, idx) => {
-                // Transform the text svg into a svg element.
-                const svgEl = new DOMParser().parseFromString(theme.svg, 'image/svg+xml').documentElement;
-                for (const imgEl of svgEl.querySelectorAll('image')) {
-                    proms.push(new Promise((resolve, reject) => {
-                        imgEl.addEventListener('load', () => {
-                            resolve(imgEl);
-                        }, {once: true});
-                        imgEl.addEventListener('error', () => {
-                            reject(imgEl);
-                        }, {once: true});
-                    }));
-                }
-                $(this.themeSVGPreviews[idx].el).append(svgEl);
-            });
-            // When all the images inside the svgs are loaded then remove the
-            // loading effect.
-            Promise.allSettled(proms).then(() => {
-                this.uiService.unblock();
-            });
+        onMounted(() => {
+            this.blockUiDuringImageLoading(this.state.themes, this.themeSVGPreviews);
+        });
+
+        useEffect(
+            () => this.blockUiDuringImageLoading(this.state.extraThemes, this.extraThemeSVGPreviews),
+            () => [this.state.extraThemes]
+        );
+    }
+
+    /**
+     * The button should be shown if we never tried to load the extra themes and
+     * if they are enough main themes already displayed. If this last condition
+     * is not fulfilled, there is no need to display the button as no more will
+     * be displayed.
+     */
+    get showViewMoreThemesButton() {
+        return !this.state.extraThemesLoaded
+            && this.state.themes.length === MAX_NBR_DISPLAY_MAIN_THEMES;
+    }
+
+    /**
+     * Transforms text svgs into svg elements and adds a loading effect that
+     * blocks the UI during the loading of the images inside those svg elements.
+     *
+     * @param {Array<Object>} themes - The text svgs.
+     * @param {Array} themeSVGPreviews - A reference to the svg elements.
+     */
+    blockUiDuringImageLoading(themes, themeSVGPreviews) {
+        if (!themes.length) {
+            // There is no svg to transform
+            return;
+        }
+        const proms = [];
+        this.uiService.block({delay: 700});
+        themes.forEach((theme, idx) => {
+            const svgEl = new DOMParser().parseFromString(theme.svg, "image/svg+xml").documentElement;
+            for (const imgEl of svgEl.querySelectorAll("image")) {
+                proms.push(new Promise((resolve, reject) => {
+                    imgEl.addEventListener("load", () => {
+                        resolve(imgEl);
+                    }, {once: true});
+                    imgEl.addEventListener("error", () => {
+                        reject(imgEl);
+                    }, {once: true});
+                }));
+            }
+            themeSVGPreviews[idx].el.appendChild(svgEl);
+        });
+        // When all the images inside the svgs are loaded then remove the
+        // loading effect.
+        Promise.allSettled(proms).then(() => {
+            this.uiService.unblock();
         });
     }
 
     async chooseTheme(themeName) {
         await this.applyConfigurator(themeName);
     }
-}
 
-ThemeSelectionScreen.template = 'website.Configurator.ThemeSelectionScreen';
+    async getMoreThemes() {
+        const removeLoadingEffect = addButtonLoadingEffect(this.extraThemesButtonRef.el);
+        const themes = await getRecommendedThemes(
+            this.orm,
+            this.state,
+            this.maxNbrDisplayExtraThemes
+        );
+        // Filter the extra themes to not propose a theme that is already
+        // present in the main themes.
+        const mainThemeNames = this.state.themes.map((theme) => theme.name);
+        this.state.extraThemes = themes.filter((extraTheme) => !mainThemeNames.includes(extraTheme.name));
+        this.state.extraThemesLoaded = true;
+        removeLoadingEffect();
+    }
+
+    getExtraThemeName(idx) {
+        return this.state.extraThemes.length > idx && this.state.extraThemes[idx].name;
+    }
+}
 
 //------------------------------------------------------------------------------
 // Store
 //------------------------------------------------------------------------------
 
-class Store {
+export class Store {
     async start(getInitialState) {
         Object.assign(this, await getInitialState());
     }
@@ -594,7 +694,7 @@ class Store {
     }
 
     updateRecommendedThemes(themes) {
-        this.themes = themes.slice(0, 3);
+        this.themes = themes.slice(0, MAX_NBR_DISPLAY_MAIN_THEMES);
     }
 }
 
@@ -604,17 +704,28 @@ function useStore() {
 }
 
 export class Configurator extends Component {
+    static components = {
+        WelcomeScreen,
+        DescriptionScreen,
+        PaletteSelectionScreen,
+        FeaturesSelectionScreen,
+        ThemeSelectionScreen,
+    };
+    static template = 'website.Configurator.Configurator';
+    static props = { ...standardActionServiceProps };
+
     setup() {
         this.orm = useService('orm');
         this.action = useService('action');
-        this.router = useService('router');
 
         // Using the back button must update the router state.
-        useExternalListener(window, "popstate", () => {
-            const match = window.location.pathname.match(/\/website\/configurator\/(.*)$/);
-            const step = parseInt(match && match[1], 10) || 1;
-            // Do not use navigate because URL is already updated.
-            this.state.currentStep = step;
+        useExternalListener(window, "popstate", (ev) => {
+            // FIXME: this doesn't work unless this component is already mounted so navigating through
+            // history from a different client action will not work.
+            if (ev.state && "configuratorStep" in ev.state) {
+                // Do not use navigate because URL is already updated.
+                this.state.currentStep = ev.state.configuratorStep;
+            }
         });
 
         const initialStep = this.props.action.context.params && this.props.action.context.params.step;
@@ -641,7 +752,7 @@ export class Configurator extends Component {
         // service would let us push a state with a new pathname.
         onMounted(() => {
             setTimeout(() => {
-                this.router.cancelPushes();
+                router.cancelPushes();
                 this.updateBrowserUrl();
             });
         });
@@ -656,12 +767,16 @@ export class Configurator extends Component {
     }
 
     updateBrowserUrl() {
-        history.pushState({}, '', this.pathname);
+        history.pushState({ skipRouteChange: true, configuratorStep: this.state.currentStep }, '', this.pathname);
     }
 
-    navigate(step) {
+    navigate(step, reload = false) {
         this.state.currentStep = step;
-        this.updateBrowserUrl();
+        if (reload) {
+            redirect(this.pathname);
+        } else {
+            this.updateBrowserUrl();
+        }
     }
 
     clearStorage() {
@@ -702,10 +817,7 @@ export class Configurator extends Component {
         if (localState) {
             let themes = [];
             if (localState.selectedIndustry && localState.selectedPalette) {
-                themes = await this.orm.call('website', 'configurator_recommended_themes', [], {
-                    'industry_id': localState.selectedIndustry.id,
-                    'palette': localState.selectedPalette,
-                });
+                themes = await getRecommendedThemes(this.orm, localState);
             }
             return Object.assign(r, {...localState, palettes, themes});
         }
@@ -766,16 +878,5 @@ export class Configurator extends Component {
         });
     }
 }
-
-Object.assign(Configurator, {
-    components: {
-        WelcomeScreen,
-        DescriptionScreen,
-        PaletteSelectionScreen,
-        FeaturesSelectionScreen,
-        ThemeSelectionScreen,
-    },
-    template: 'website.Configurator.Configurator',
-});
 
 registry.category('actions').add('website_configurator', Configurator);

@@ -1,18 +1,28 @@
 /** @odoo-module */
 
+import { rpc } from "@web/core/network/rpc";
+import { user } from "@web/core/user";
 import { useBus, useService } from "@web/core/utils/hooks";
 import { Many2XAutocomplete } from "@web/views/fields/relational_utils";
+import { DateTimeInput } from '@web/core/datetime/datetime_input';
 import { Component, useState, onWillStart, markup, xml } from "@odoo/owl";
 
 export class LunchCurrency extends Component {
+    static template = "lunch.LunchCurrency";
+    static props = ["currency", "amount"];
+
     get amount() {
         return parseFloat(this.props.amount).toFixed(2);
     }
 }
-LunchCurrency.template = 'lunch.LunchCurrency';
-LunchCurrency.props = ["currency", "amount"];
 
 export class LunchOrderLine extends Component {
+    static template = "lunch.LunchOrderLine";
+    static props = ["line", "currency", "onUpdateQuantity", "openOrderLine", "infos"];
+    static components = {
+        LunchCurrency,
+    };
+
     setup() {
         super.setup();
         this.orm = useService('orm');
@@ -21,6 +31,13 @@ export class LunchOrderLine extends Component {
 
     get line() {
         return this.props.line;
+    }
+
+    get canAdd(){
+        let price = this.line.product[3]
+        this.line.toppings.forEach((line) => price += line[3])
+        const unpaid = parseFloat(this.props.infos.unpaid_subtotal)
+        return this.canEdit && (this.props.infos.wallet - unpaid) > price;
     }
 
     get canEdit() {
@@ -45,56 +62,61 @@ export class LunchOrderLine extends Component {
         await this.props.onUpdateQuantity();
     }
 }
-LunchOrderLine.template = 'lunch.LunchOrderLine';
-LunchOrderLine.props = ["line", "currency", "onUpdateQuantity", "openOrderLine"];
-LunchOrderLine.components = {
-    LunchCurrency,
-};
 
 export class LunchAlert extends Component {
+    static props = ["message"];
+    static template = xml`<t t-out="message"/>`;
     get message() {
         return markup(this.props.message);
     }
 }
-LunchAlert.props = ["message"];
-LunchAlert.template = xml`<t t-out="message"/>`
 
-export class LunchAlerts extends Component {}
-LunchAlerts.components = {
-    LunchAlert,
+export class LunchAlerts extends Component {
+    static components = {
+        LunchAlert,
+    };
+    static props = ["alerts"];
+    static template = "lunch.LunchAlerts";
 }
-LunchAlerts.props = ["alerts"];
-LunchAlerts.template = 'lunch.LunchAlerts';
 
 export class LunchUser extends Component {
+    static components = {
+        Many2XAutocomplete,
+    };
+    static props = ["username", "isManager", "onUpdateUser"];
+    static template = "lunch.LunchUser";
     getDomain() {
         return [['share', '=', false]];
     }
 }
-LunchUser.components = {
-    Many2XAutocomplete,
-}
-LunchUser.props = ["username", "isManager", "onUpdateUser"];
-LunchUser.template = "lunch.LunchUser";
 
 export class LunchLocation extends Component {
+    static components = {
+        Many2XAutocomplete,
+    };
+    static props = ["location", "onUpdateLunchLocation"];
+    static template = "lunch.LunchLocation";
     getDomain() {
         return [];
     }
 }
-LunchLocation.components = {
-    Many2XAutocomplete,
-}
-LunchLocation.props = ["location", "onUpdateLunchLocation"];
-LunchLocation.template = "lunch.LunchLocation";
 
 export class LunchDashboard extends Component {
+    static components = {
+        LunchAlerts,
+        LunchCurrency,
+        LunchLocation,
+        LunchOrderLine,
+        LunchUser,
+        Many2XAutocomplete,
+    };
+    static props = ["openOrderLine"];
+    static template = "lunch.LunchDashboard";
     setup() {
         super.setup();
-        this.rpc = useService("rpc");
-        this.user = useService("user");
         this.state = useState({
             infos: {},
+            date: new Date(),
         });
 
         useBus(this.env.bus, 'lunch_update_dashboard', () => this._fetchLunchInfos());
@@ -105,9 +127,9 @@ export class LunchDashboard extends Component {
     }
 
     async lunchRpc(route, args = {}) {
-        return await this.rpc(route, {
+        return await rpc(route, {
             ...args,
-            context: this.user.context,
+            context: user.context,
             user_id: this.env.searchModel.lunchState.userId,
         })
     }
@@ -165,7 +187,18 @@ export class LunchDashboard extends Component {
         await this._fetchLunchInfos();
         this.env.searchModel.updateLocationId(value[0].id);
     }
+
+    async onUpdateLunchTime(value) {
+        if (value) {
+            // Set time at 12:00
+            this.state.date.setTime(value + 12 * 60 * 60 * 1000);
+        } else {
+            this.state.date.setTime(new Date());
+        }
+        this.env.searchModel.updateDate(this.state.date);
+    }
 }
+
 LunchDashboard.components = {
     LunchAlerts,
     LunchCurrency,
@@ -173,6 +206,7 @@ LunchDashboard.components = {
     LunchOrderLine,
     LunchUser,
     Many2XAutocomplete,
+    DateTimeInput,
 };
 LunchDashboard.props = ["openOrderLine"];
 LunchDashboard.template = 'lunch.LunchDashboard';

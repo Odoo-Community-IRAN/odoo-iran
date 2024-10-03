@@ -15,6 +15,7 @@ import logging
 from operator import getitem
 import requests
 import json
+import re
 import contextlib
 
 from pytz import timezone
@@ -55,9 +56,12 @@ class IrActions(models.Model):
     _order = 'name'
     _allow_sudo_commands = False
 
+    _sql_constraints = [('path_unique', 'unique(path)', "Path to show in the URL must be unique! Please choose another one.")]
+
     name = fields.Char(string='Action Name', required=True, translate=True)
     type = fields.Char(string='Action Type', required=True)
     xml_id = fields.Char(compute='_compute_xml_id', string="External ID")
+    path = fields.Char(string="Path to show in the URL")
     help = fields.Html(string='Action Description',
                        help='Optional help text for the users with a description of the target view, such as its usage and purpose.',
                        translate=True)
@@ -67,6 +71,30 @@ class IrActions(models.Model):
                                      ('report', 'Report')],
                                     required=True, default='action')
     binding_view_types = fields.Char(default='list,form')
+
+    @api.constrains('path')
+    def _check_path(self):
+        for action in self:
+            if action.path:
+                if not re.fullmatch(r'[a-z][a-z0-9_-]*', action.path):
+                    raise ValidationError(_('The path should contain only lowercase alphanumeric characters, underscore, and dash, and it should start with a letter.'))
+                if action.path.startswith("m-"):
+                    raise ValidationError(_("'m-' is a reserved prefix."))
+                if action.path.startswith("action-"):
+                    raise ValidationError(_("'action-' is a reserved prefix."))
+                if action.path == "new":
+                    raise ValidationError(_("'new' is reserved, and can not be used as path."))
+                # Tables ir_act_window, ir_act_report_xml, ir_act_url, ir_act_server and ir_act_client
+                # inherit from table ir_actions (see base_data.sql). The path must be unique across
+                # all these tables. The unique constraint is not enough because a big limitation of
+                # the inheritance feature is that unique indexes only apply to single tables, and
+                # not accross all the tables. So we need to check the uniqueness of the path manually.
+                # For more information, see: https://www.postgresql.org/docs/14/ddl-inherit.html#DDL-INHERIT-CAVEATS
+
+                # Note that, we leave the unique constraint in place to check the uniqueness of the path
+                # within the same table before checking the uniqueness across all the tables.
+                if (self.env['ir.actions.actions'].search_count([('path', '=', action.path)]) > 1):
+                    raise ValidationError(_("Path to show in the URL must be unique! Please choose another one."))
 
     def _compute_xml_id(self):
         res = self.get_external_id()
@@ -132,7 +160,7 @@ class IrActions(models.Model):
             for action in all_actions:
                 action = dict(action)
                 groups = action.pop('groups_id', None)
-                if groups and not self.user_has_groups(groups):
+                if groups and not any(self.env.user.has_group(ext_id) for ext_id in groups):
                     # the user may not perform this action
                     continue
                 res_model = action.pop('res_model', None)
@@ -167,13 +195,16 @@ class IrActions(models.Model):
             try:
                 action = self.env[action_model].sudo().browse(action_id)
                 fields = ['name', 'binding_view_types']
-                for field in ('groups_id', 'res_model', 'sequence'):
+                for field in ('groups_id', 'res_model', 'sequence', 'domain'):
                     if field in action._fields:
                         fields.append(field)
                 action = action.read(fields)[0]
                 if action.get('groups_id'):
+                    # transform the list of ids into a list of xml ids
                     groups = self.env['res.groups'].browse(action['groups_id'])
-                    action['groups_id'] = ','.join(ext_id for ext_id in groups._ensure_xml_id().values())
+                    action['groups_id'] = list(groups._ensure_xml_id().values())
+                if 'domain' in action and not action.get('domain'):
+                    action.pop('domain')
                 result[binding_type].append(frozendict(action))
             except (MissingError):
                 continue
@@ -217,6 +248,7 @@ class IrActions(models.Model):
         return {
             "binding_model_id", "binding_type", "binding_view_types",
             "display_name", "help", "id", "name", "type", "xml_id",
+            "path",
         }
 
 
@@ -232,9 +264,9 @@ class IrActionsActWindow(models.Model):
     def _check_model(self):
         for action in self:
             if action.res_model not in self.env:
-                raise ValidationError(_('Invalid model name %r in action definition.', action.res_model))
+                raise ValidationError(_('Invalid model name “%s” in action definition.', action.res_model))
             if action.binding_model_id and action.binding_model_id.model not in self.env:
-                raise ValidationError(_('Invalid model name %r in action definition.', action.binding_model_id.model))
+                raise ValidationError(_('Invalid model name “%s” in action definition.', action.binding_model_id.model))
 
     @api.depends('view_ids.view_mode', 'view_mode', 'view_id.type')
     def _compute_views(self):
@@ -265,7 +297,7 @@ class IrActionsActWindow(models.Model):
             if len(modes) != len(set(modes)):
                 raise ValidationError(_('The modes in view_mode must not be duplicated: %s', modes))
             if ' ' in modes:
-                raise ValidationError(_('No spaces allowed in view_mode: %r', modes))
+                raise ValidationError(_('No spaces allowed in view_mode: “%s”', modes))
 
     type = fields.Char(default="ir.actions.act_window")
     view_id = fields.Many2one('ir.ui.view', string='View Ref.', ondelete='set null')
@@ -277,8 +309,8 @@ class IrActionsActWindow(models.Model):
     res_model = fields.Char(string='Destination Model', required=True,
                             help="Model name of the object to open in the view window")
     target = fields.Selection([('current', 'Current Window'), ('new', 'New Window'), ('inline', 'Inline Edit'), ('fullscreen', 'Full Screen'), ('main', 'Main action of Current Window')], default="current", string='Target Window')
-    view_mode = fields.Char(required=True, default='tree,form',
-                            help="Comma-separated list of allowed view modes, such as 'form', 'tree', 'calendar', etc. (Default: tree,form)")
+    view_mode = fields.Char(required=True, default='list,form',
+                            help="Comma-separated list of allowed view modes, such as 'form', 'list', 'calendar', etc. (Default: list,form)")
     mobile_view_mode = fields.Char(default="kanban", help="First view mode in mobile and small screen environments (default='kanban'). If it can't be found among available view modes, the same mode as for wider screens is used)")
     usage = fields.Char(string='Action Usage',
                         help="Used to filter menu and home actions from the user form.")
@@ -291,7 +323,13 @@ class IrActionsActWindow(models.Model):
     groups_id = fields.Many2many('res.groups', 'ir_act_window_group_rel',
                                  'act_id', 'gid', string='Groups')
     search_view_id = fields.Many2one('ir.ui.view', string='Search View Ref.')
+    embedded_action_ids = fields.One2many('ir.embedded.actions', compute="_compute_embedded_actions")
     filter = fields.Boolean()
+
+    def _compute_embedded_actions(self):
+        embedded_actions = self.env["ir.embedded.actions"].search([('parent_action_id', 'in', self.ids)]).filtered(lambda x: x.is_visible)
+        for action in self:
+            action.embedded_action_ids = embedded_actions.filtered(lambda rec: rec.parent_action_id == action)
 
     def read(self, fields=None, load='_classic_read'):
         """ call the method get_empty_list_help of the model and set the window action help message
@@ -336,20 +374,33 @@ class IrActionsActWindow(models.Model):
     def _get_readable_fields(self):
         return super()._get_readable_fields() | {
             "context", "mobile_view_mode", "domain", "filter", "groups_id", "limit",
-            "res_id", "res_model", "search_view_id", "target", "view_id", "view_mode", "views",
+            "res_id", "res_model", "search_view_id", "target", "view_id", "view_mode", "views", "embedded_action_ids",
             # `flags` is not a real field of ir.actions.act_window but is used
             # to give the parameters to generate the action
-            "flags"
+            "flags",
+            # this is used by frontend, with the document layout wizard before send and print
+            "close_on_report_download",
         }
+
+    def _get_action_dict(self):
+        """ Override to return action content with detailed embedded actions data if available.
+
+            :return: A dict with updated action dictionary including embedded actions information.
+        """
+        result = super()._get_action_dict()
+        if embedded_action_ids := result["embedded_action_ids"]:
+            EmbeddedActions = self.env["ir.embedded.actions"]
+            embedded_fields = EmbeddedActions._get_readable_fields()
+            result["embedded_action_ids"] = EmbeddedActions.browse(embedded_action_ids).read(embedded_fields)
+        return result
 
 
 VIEW_TYPES = [
-    ('tree', 'Tree'),
+    ('list', 'List'),
     ('form', 'Form'),
     ('graph', 'Graph'),
     ('pivot', 'Pivot'),
     ('calendar', 'Calendar'),
-    ('gantt', 'Gantt'),
     ('kanban', 'Kanban'),
 ]
 
@@ -463,6 +514,7 @@ class IrActionsServer(models.Model):
 #  - records: recordset of all records on which the action is triggered in multi-mode; may be void
 #  - time, datetime, dateutil, timezone: useful Python libraries
 #  - float_compare: utility function to compare floats based on specific precision
+#  - b64encode, b64decode: functions to encode/decode binary data
 #  - log: log(message, level='info'): logging function to record debug information in ir.logging table
 #  - _logger: _logger.info(message): logger to emit messages in server logs
 #  - UserError: exception class for raising user-facing warning messages
@@ -721,8 +773,8 @@ class IrActionsServer(models.Model):
                 raise ValidationError(msg)
 
     @api.constrains('child_ids')
-    def _check_recursion(self):
-        if not self._check_m2m_recursion('child_ids'):
+    def _check_child_recursion(self):
+        if self._has_cycle('child_ids'):
             raise ValidationError(_('Recursion found in child server actions'))
 
     def _get_readable_fields(self):
@@ -763,7 +815,7 @@ class IrActionsServer(models.Model):
 
     def unlink_action(self):
         """ Remove the contextual actions created for the server actions. """
-        self.check_access_rights('write', raise_exception=True)
+        self.check_access('write')
         self.filtered('binding_model_id').write({'binding_model_id': False})
         return True
 
@@ -911,7 +963,7 @@ class IrActionsServer(models.Model):
             else:
                 model_name = action.model_id.model
                 try:
-                    self.env[model_name].check_access_rights("write")
+                    self.env[model_name].check_access("write")
                 except AccessError:
                     _logger.warning("Forbidden server action %r executed while the user %s does not have access to %s.",
                         action.name, self.env.user.login, model_name,
@@ -925,7 +977,7 @@ class IrActionsServer(models.Model):
                 # check access rules on real records only; base automations of
                 # type 'onchange' can run server actions on new records
                 try:
-                    records.check_access_rule('write')
+                    records.check_access('write')
                 except AccessError:
                     _logger.warning("Forbidden server action %r executed while the user %s does not have access to %s.",
                         action.name, self.env.user.login, records,

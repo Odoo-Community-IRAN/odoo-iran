@@ -4,13 +4,14 @@ import { patch } from "@web/core/utils/patch";
 
 import { HrPresenceStatus, hrPresenceStatus } from "@hr/components/hr_presence_status/hr_presence_status";
 import { HrPresenceStatusPrivate, hrPresenceStatusPrivate } from "@hr/components/hr_presence_status_private/hr_presence_status_private";
+import { _t } from "@web/core/l10n/translation";
 
 const patchHrPresenceStatus = () => ({
     get color() {
         if (this.location) {
             let color = "text-muted";
-            if (this.props.record.data.hr_presence_state !== "to_define") {
-                color = this.props.record.data.hr_presence_state === "present" ?  "text-success" : "text-warning";
+            if (this.props.record.data.hr_presence_state !== "out_of_working_hour") {
+                color = this.props.record.data.hr_presence_state === "present" ?  "text-success" : "o_icon_employee_absent";
             }
             return color;
         }
@@ -41,7 +42,7 @@ const patchHrPresenceStatus = () => ({
 
     get label() {
         if (this.location) {
-            return this.props.record.data.name_work_location_display;
+            return this.props.record.data.work_location_name || _t("Unspecified");
         }
         return super.label;
     },
@@ -53,7 +54,7 @@ patch(HrPresenceStatusPrivate.prototype, patchHrPresenceStatus());
 
 const additionalFieldDependencies = [
     { name: "hr_presence_state", type: "selection" },
-    { name: "name_work_location_display", type: "char" }
+    { name: "work_location_name", type: "char" },
 ];
 if (typeof hrPresenceStatus.fieldDependencies === "function") {
     const oldFieldDependencies = hrPresenceStatus.fieldDependencies;

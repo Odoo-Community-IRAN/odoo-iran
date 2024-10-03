@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+import base64
 import datetime
 from dateutil.relativedelta import relativedelta
 import os.path
@@ -14,40 +15,9 @@ from odoo.tools import (
     merge_sequences,
     misc,
     remove_accents,
-    validate_url,
 )
+from odoo.tools.mail import validate_url
 from odoo.tests.common import TransactionCase, BaseCase
-
-
-class TestCountingStream(BaseCase):
-    def test_empty_stream(self):
-        s = misc.CountingStream(iter([]))
-        self.assertEqual(s.index, -1)
-        self.assertIsNone(next(s, None))
-        self.assertEqual(s.index, 0)
-
-    def test_single(self):
-        s = misc.CountingStream(range(1))
-        self.assertEqual(s.index, -1)
-        self.assertEqual(next(s, None), 0)
-        self.assertIsNone(next(s, None))
-        self.assertEqual(s.index, 1)
-
-    def test_full(self):
-        s = misc.CountingStream(range(42))
-        for _ in s:
-            pass
-        self.assertEqual(s.index, 42)
-
-    def test_repeated(self):
-        """ Once the CountingStream has stopped iterating, the index should not
-        increase anymore (the internal state should not be allowed to change)
-        """
-        s = misc.CountingStream(iter([]))
-        self.assertIsNone(next(s, None))
-        self.assertEqual(s.index, 0)
-        self.assertIsNone(next(s, None))
-        self.assertEqual(s.index, 0)
 
 
 class TestMergeSequences(BaseCase):
@@ -628,3 +598,35 @@ class TestUrlValidate(BaseCase):
         self.assertEqual(validate_url('/index.html'), 'http:///index.html')
         self.assertEqual(validate_url('?debug=1'), 'http://?debug=1')
         self.assertEqual(validate_url('#model=project.task&id=3603607'), 'http://#model=project.task&id=3603607')
+
+
+class TestMiscToken(TransactionCase):
+
+    def test_expired_token(self):
+        payload = {'test': True, 'value': 123456, 'some_string': 'hello', 'some_dict': {'name': 'New Dict'}}
+        expiration = datetime.datetime.now() - datetime.timedelta(days=1)
+        token = misc.hash_sign(self.env, 'test', payload, expiration=expiration)
+        self.assertIsNone(misc.verify_hash_signed(self.env, 'test', token))
+
+    def test_long_payload(self):
+        payload = {'test': True, 'value':123456, 'some_string': 'hello', 'some_dict': {'name': 'New Dict'}}
+        token = misc.hash_sign(self.env, 'test', payload, expiration_hours=24)
+        self.assertEqual(misc.verify_hash_signed(self.env, 'test', token), payload)
+
+    def test_None_payload(self):
+        with self.assertRaises(Exception):
+            misc.hash_sign(self.env, 'test', None, expiration_hours=24)
+
+    def test_list_payload(self):
+        payload = ["str1", "str2", "str3", 4, 5]
+        token = misc.hash_sign(self.env, 'test', payload, expiration_hours=24)
+        self.assertEqual(misc.verify_hash_signed(self.env, 'test', token), payload)
+
+    def test_modified_payload(self):
+        payload = ["str1", "str2", "str3", 4, 5]
+        token = base64.urlsafe_b64decode(misc.hash_sign(self.env, 'test', payload, expiration_hours=24) + '===')
+        new_timestamp = datetime.datetime.now() + datetime.timedelta(days=7)
+        new_timestamp = int(new_timestamp.timestamp())
+        new_timestamp = new_timestamp.to_bytes(8, byteorder='little')
+        token = base64.urlsafe_b64encode(token[:1] + new_timestamp + token[9:]).decode()
+        self.assertIsNone(misc.verify_hash_signed(self.env, 'test', token))

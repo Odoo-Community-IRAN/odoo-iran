@@ -42,7 +42,6 @@
             <field name="name">Vendors</field>
             <field name="location_id" ref="stock_location_locations_partner"/>
             <field name="usage">supplier</field>
-            <field name="return_location">True</field>
             <field name="company_id"></field>
         </record>
         <record id="stock_location_customers" model="stock.location">
@@ -51,8 +50,8 @@
             <field name="usage">customer</field>
             <field name="company_id"></field>
         </record>
-        
-        <record id="stock_location_inter_wh" model="stock.location">
+
+        <record id="stock_location_inter_company" model="stock.location">
             <field name="name">Inter-company transit</field>
             <field name="location_id" ref="stock_location_locations_virtual"/>
             <field name="usage">transit</field>
@@ -69,16 +68,8 @@
         </record>
 
         <!-- Properties -->
-        <record forcecreate="True" id="property_stock_supplier" model="ir.property">
-            <field name="name">property_stock_supplier</field>
-            <field name="fields_id" search="[('model','=','res.partner'),('name','=','property_stock_supplier')]"/>
-            <field eval="'stock.location,'+str(stock_location_suppliers)" name="value"/>
-        </record>
-        <record forcecreate="True" id="property_stock_customer" model="ir.property">
-            <field name="name">property_stock_customer</field>
-            <field name="fields_id" search="[('model','=','res.partner'),('name','=','property_stock_customer')]"/>
-            <field eval="'stock.location,'+str(stock_location_customers)" name="value"/>
-        </record>
+        <function model="ir.default" name="set" eval="('res.partner', 'property_stock_supplier', obj().env.ref('stock.stock_location_suppliers').id)"/>
+        <function model="ir.default" name="set" eval="('res.partner', 'property_stock_customer', obj().env.ref('stock.stock_location_customers').id)"/>
 
         <!-- Resource: stock.warehouse -->
         <record id="warehouse0" model="stock.warehouse">
@@ -126,5 +117,10 @@
         <function model="res.company" name="create_missing_production_location"/>
         <function model="res.company" name="create_missing_scrap_location"/>
         <function model="res.company" name="create_missing_scrap_sequence"/>
+
+        <record model="ir.config_parameter" id="barcode_separator" forcecreate="False">
+            <field name="key">stock.barcode_separator</field>
+            <field name="value">,</field>
+        </record>
     </data>
 </odoo>

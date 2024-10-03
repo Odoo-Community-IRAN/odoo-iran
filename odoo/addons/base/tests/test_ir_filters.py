@@ -15,8 +15,9 @@ def noid(seq):
     for d in seq:
         d.pop('id', None)
         d.pop('action_id', None)
+        d.pop('embedded_action_id', None)
+        d.pop('embedded_parent_res_id', None)
     return seq
-
 
 class FiltersCase(TransactionCaseWithUserDemo):
     def setUp(self):
@@ -26,8 +27,7 @@ class FiltersCase(TransactionCaseWithUserDemo):
 
     def build(self, model, *args):
         Model = self.env[model].with_user(ADMIN_USER_ID)
-        for vals in args:
-            Model.create(vals)
+        Model.create(args)
 
 
 class TestGetFilters(FiltersCase):
@@ -101,7 +101,7 @@ class TestOwnDefaults(FiltersCase):
 
         self.assertItemsEqual(noid(filters), [
             dict(name='a', user_id=self.USER_NG, is_default=True,
-                 domain='[]', context='{}', sort='[]')
+                 domain='[]', context='{}', sort='[]'),
         ])
 
     def test_new_filter_not_default(self):
@@ -277,25 +277,6 @@ class TestGlobalDefaults(FiltersCase):
         ])
 
 
-class TestReadGroup(TransactionCase):
-    """Test function read_group with groupby on a many2one field to a model
-    (in test, "user_id" to "res.users") which is ordered by an inherited not stored field (in
-    test, "name" inherited from "res.partners").
-    """
-    def test_read_group_1(self):
-        Users = self.env['res.users']
-        self.assertEqual(Users._order, "name, login", "Model res.users must be ordered by name, login")
-        self.assertFalse(Users._fields['name'].store, "Field name is not stored in res.users")
-
-        Filters = self.env['ir.filters']
-        filter_a = Filters.create(dict(name="Filter_A", model_id="ir.filters"))
-        filter_b = Filters.create(dict(name="Filter_B", model_id="ir.filters"))
-        filter_b.write(dict(user_id=False))
-
-        res = Filters.read_group([], ['name', 'user_id'], ['user_id'])
-        self.assertTrue(any(val['user_id'] == False for val in res), "At least one group must contain val['user_id'] == False.")
-
-
 @tagged('post_install', '-at_install', 'migration')
 class TestAllFilters(TransactionCase):
     def check_filter(self, name, model, domain, fields, groupby, order, context):
@@ -328,3 +309,89 @@ class TestAllFilters(TransactionCase):
                     order=','.join(ast.literal_eval(filter_.sort)),
                     context=context,
                 )
+
+
+class TestEmbeddedFilters(FiltersCase):
+
+    def setUp(self):
+        super(FiltersCase, self).setUp()
+        self.USER_NG = self.env['res.users'].name_search('demo')[0]
+        self.USER_ID = self.USER_NG[0]
+        self.parent_action = self.env['ir.actions.act_window'].create({
+            'name': 'ParentAction',
+            'res_model': 'res.partner',
+        })
+        self.action_1 = self.env['ir.actions.act_window'].create({
+            'name': 'Action1',
+            'res_model': 'res.partner',
+        })
+        self.embedded_action_1 = self.env['ir.embedded.actions'].create({
+            'name': 'EmbeddedAction1',
+            'parent_res_model': 'res.partner',
+            'parent_action_id': self.parent_action.id,
+            'action_id': self.action_1.id,
+        })
+        self.embedded_action_2 = self.env['ir.embedded.actions'].create({
+            'name': 'EmbeddedAction2',
+            'parent_res_model': 'res.partner',
+            'parent_action_id': self.parent_action.id,
+            'action_id': self.action_1.id,
+        })
+
+    def test_global_filters_with_embedded_action(self):
+        Filters = self.env['ir.filters'].with_user(self.USER_ID)
+        Filters.create_or_replace({
+            'name': 'a',
+            'model_id': 'ir.filters',
+            'user_id': False,
+            'is_default': True,
+            'embedded_action_id': self.embedded_action_1.id,
+            'embedded_parent_res_id': 1
+        })
+        Filters.create_or_replace({
+            'name': 'b',
+            'model_id': 'ir.filters',
+            'user_id': self.USER_ID,
+            'is_default': False,
+            'embedded_action_id': self.embedded_action_2.id,
+            'embedded_parent_res_id': 1
+        })
+
+        # If embedded_action_id and embedded_parent_res_id are set, should return the corresponding filter
+        filters = self.env['ir.filters'].with_user(self.USER_ID).get_filters('ir.filters', embedded_action_id=self.embedded_action_1.id, embedded_parent_res_id=1)
+        self.assertItemsEqual(noid(filters), [dict(name='a', is_default=True, user_id=False, domain='[]', context='{}', sort='[]')])
+
+        # Check that the filter is correctly linked to one embedded_parent_res_id and is not returned if another one is set
+        filters = self.env['ir.filters'].with_user(self.USER_ID).get_filters('ir.filters', embedded_action_id=self.embedded_action_1.id, embedded_parent_res_id=2)
+        self.assertItemsEqual(noid(filters), [])
+
+        # Check that a shared filter can be fetched with another user
+        filters = self.env['ir.filters'].with_user(ADMIN_USER_ID).get_filters('ir.filters', embedded_action_id=self.embedded_action_1.id, embedded_parent_res_id=1)
+        self.assertItemsEqual(noid(filters), [dict(name='a', is_default=True, user_id=False, domain='[]', context='{}', sort='[]')])
+
+        # If embedded_action_id and embedded_parent_res_id are not set, should return no filters
+        filters = self.env['ir.filters'].with_user(self.USER_ID).get_filters('ir.filters')
+        self.assertItemsEqual(noid(filters), [])
+
+    def test_global_filters_with_no_embedded_action(self):
+        Filters = self.env['ir.filters'].with_user(self.USER_ID)
+        filter_a = Filters.create_or_replace({
+            'name': 'a',
+            'model_id': 'ir.filters',
+            'user_id': False,
+            'is_default': True,
+            'embedded_action_id': False,
+            'embedded_parent_res_id': 0,
+        })
+        filter_b = Filters.create_or_replace({
+            'name': 'b',
+            'model_id': 'ir.filters',
+            'user_id': self.USER_ID,
+            'is_default': True,
+            'embedded_action_id': False,
+            'embedded_parent_res_id': 1,
+        })
+        self.assertFalse(filter_a.embedded_action_id)
+        self.assertFalse(filter_a.embedded_parent_res_id)
+        self.assertFalse(filter_b.embedded_action_id)
+        self.assertFalse(filter_b.embedded_parent_res_id)

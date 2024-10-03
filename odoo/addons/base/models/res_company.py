@@ -3,10 +3,12 @@
 
 import base64
 import logging
+import threading
 import warnings
 
 from odoo import api, fields, models, tools, _, Command, SUPERUSER_ID
 from odoo.exceptions import ValidationError, UserError
+from odoo.osv import expression
 from odoo.tools import html2plaintext, file_open, ormcache
 
 _logger = logging.getLogger(__name__)
@@ -16,6 +18,7 @@ class Company(models.Model):
     _name = "res.company"
     _description = 'Companies'
     _order = 'sequence, name'
+    _inherit = ['format.address.mixin', 'format.vat.label.mixin']
     _parent_store = True
 
     def copy(self, default=None):
@@ -31,10 +34,10 @@ class Company(models.Model):
     name = fields.Char(related='partner_id.name', string='Company Name', required=True, store=True, readonly=False)
     active = fields.Boolean(default=True)
     sequence = fields.Integer(help='Used to order Companies in the company switcher', default=10)
-    parent_id = fields.Many2one('res.company', string='Parent Company', index=True)
+    parent_id = fields.Many2one('res.company', string='Parent Company', index=True, ondelete='restrict')
     child_ids = fields.One2many('res.company', 'parent_id', string='Branches')
     all_child_ids = fields.One2many('res.company', 'parent_id', context={'active_test': False})
-    parent_path = fields.Char(index=True, unaccent=False)
+    parent_path = fields.Char(index=True)
     parent_ids = fields.Many2many('res.company', compute='_compute_parent_ids', compute_sudo=True)
     root_id = fields.Many2one('res.company', compute='_compute_parent_ids', compute_sudo=True)
     partner_id = fields.Many2one('res.partner', string='Partner', required=True)
@@ -59,6 +62,8 @@ class Company(models.Model):
     )
     bank_ids = fields.One2many(related='partner_id.bank_ids', readonly=False)
     country_id = fields.Many2one('res.country', compute='_compute_address', inverse='_inverse_country', string="Country")
+    # Technical field to hide country specific fields in company form view
+    country_code = fields.Char(related='country_id.code', depends=['country_id'])
     email = fields.Char(related='partner_id.email', store=True, readonly=False)
     phone = fields.Char(related='partner_id.phone', store=True, readonly=False)
     mobile = fields.Char(related='partner_id.mobile', store=True, readonly=False)
@@ -67,12 +72,13 @@ class Company(models.Model):
     company_registry = fields.Char(related='partner_id.company_registry', string="Company ID", readonly=False)
     paperformat_id = fields.Many2one('report.paperformat', 'Paper format', default=lambda self: self.env.ref('base.paperformat_euro', raise_if_not_found=False))
     external_report_layout_id = fields.Many2one('ir.ui.view', 'Document Template')
-    font = fields.Selection([("Lato", "Lato"), ("Roboto", "Roboto"), ("Open_Sans", "Open Sans"), ("Montserrat", "Montserrat"), ("Oswald", "Oswald"), ("Raleway", "Raleway"), ('Tajawal', 'Tajawal')], default="Lato")
+    font = fields.Selection([("Lato", "Lato"), ("Roboto", "Roboto"), ("Open_Sans", "Open Sans"), ("Montserrat", "Montserrat"), ("Oswald", "Oswald"), ("Raleway", "Raleway"), ('Tajawal', 'Tajawal'), ('Fira_Mono', 'Fira Mono')], default="Lato")
     primary_color = fields.Char()
     secondary_color = fields.Char()
     color = fields.Integer(compute='_compute_color', inverse='_inverse_color')
-    layout_background = fields.Selection([('Blank', 'Blank'), ('Geometric', 'Geometric'), ('Custom', 'Custom')], default="Blank", required=True)
+    layout_background = fields.Selection([('Blank', 'Blank'), ('Demo logo', 'Demo logo'), ('Custom', 'Custom')], default="Blank", required=True)
     layout_background_image = fields.Binary("Background Image")
+    uninstalled_l10n_module_ids = fields.Many2many('ir.module.module', compute='_compute_uninstalled_l10n_module_ids')
     _sql_constraints = [
         ('name_uniq', 'unique (name)', 'The company name must be unique!')
     ]
@@ -111,8 +117,7 @@ class Company(models.Model):
             company.parent_ids = self.browse(int(id) for id in company.parent_path.split('/') if id) if company.parent_path else company
             company.root_id = company.parent_ids[0]
 
-    # TODO @api.depends(): currently now way to formulate the dependency on the
-    # partner's contact address
+    @api.depends(lambda self: [f'partner_id.{fname}' for fname in self._get_company_address_field_names()])
     def _compute_address(self):
         for company in self.filtered(lambda company: company.partner_id):
             address_data = company.partner_id.sudo().address_get(adr_pref=['contact'])
@@ -182,35 +187,79 @@ class Company(models.Model):
                 if self[fname] != self.parent_id[fname]:
                     self[fname] = self.parent_id[fname]
 
+    @api.depends('country_id')
+    def _compute_uninstalled_l10n_module_ids(self):
+        # This will only compute uninstalled modules with auto-install without recursion,
+        # the rest will eventually be handled by `button_install`
+        self.env['ir.module.module'].flush_model(['auto_install', 'country_ids', 'dependencies_id'])
+        self.env['ir.module.module.dependency'].flush_model()
+        self.env.cr.execute("""
+            SELECT country.id,
+                   ARRAY_AGG(module.id)
+              FROM ir_module_module module,
+                   res_country country
+             WHERE module.auto_install
+               AND state NOT IN %(install_states)s
+               AND NOT EXISTS (
+                       SELECT 1
+                         FROM ir_module_module_dependency d
+                         JOIN ir_module_module mdep ON (d.name = mdep.name)
+                        WHERE d.module_id = module.id
+                          AND d.auto_install_required
+                          AND mdep.state NOT IN %(install_states)s
+                   )
+               AND EXISTS (
+                       SELECT 1
+                         FROM module_country mc
+                        WHERE mc.module_id = module.id
+                          AND mc.country_id = country.id
+                   )
+               AND country.id = ANY(%(country_ids)s)
+          GROUP BY country.id
+        """, {
+            'country_ids': self.country_id.ids,
+            'install_states': ('installed', 'to install', 'to upgrade'),
+        })
+        mapping = dict(self.env.cr.fetchall())
+        for company in self:
+            company.uninstalled_l10n_module_ids = self.env['ir.module.module'].browse(mapping.get(company.country_id.id))
+
+    def install_l10n_modules(self):
+        uninstalled_modules = self.uninstalled_l10n_module_ids
+        is_ready_and_not_test = (
+            not tools.config['test_enable']
+            and (self.env.registry.ready or not self.env.registry._init)
+            and not getattr(threading.current_thread(), 'testing', False)
+        )
+        if uninstalled_modules and is_ready_and_not_test:
+            return uninstalled_modules.button_immediate_install()
+        return is_ready_and_not_test
+
     @api.model
     def _get_view(self, view_id=None, view_type='form', **options):
-        def make_delegated_fields_readonly(node):
-            for child in node.iterchildren():
-                if child.tag == 'field' and child.get('name') in delegated_fnames:
-                    child.set('readonly', "parent_id != False")
-                else:
-                    make_delegated_fields_readonly(child)
-            return node
-
         delegated_fnames = set(self._get_company_root_delegated_field_names())
         arch, view = super()._get_view(view_id, view_type, **options)
-        arch = make_delegated_fields_readonly(arch)
+        for f in arch.iter("field"):
+            if f.get('name') in delegated_fnames:
+                f.set('readonly', "parent_id != False")
         return arch, view
 
     @api.model
-    def _name_search(self, name, domain=None, operator='ilike', limit=None, order=None):
+    def _search_display_name(self, operator, value):
         context = dict(self.env.context)
         newself = self
+        constraint = []
         if context.pop('user_preference', None):
             # We browse as superuser. Otherwise, the user would be able to
             # select only the currently visible companies (according to rules,
             # which are probably to allow to see the child companies) even if
             # she belongs to some other companies.
             companies = self.env.user.company_ids
-            domain = (domain or []) + [('id', 'in', companies.ids)]
+            constraint = [('id', 'in', companies.ids)]
             newself = newself.sudo()
-        self = newself.with_context(context)
-        return super()._name_search(name, domain, operator, limit, order)
+        newself = newself.with_context(context)
+        domain = super(Company, newself)._search_display_name(operator, value)
+        return expression.AND([domain, constraint])
 
     @api.model
     @api.returns('self', lambda value: value.id)
@@ -274,6 +323,10 @@ class Company(models.Model):
         # Make sure that the selected currencies are enabled
         companies.currency_id.sudo().filtered(lambda c: not c.active).active = True
 
+        companies_needs_l10n = companies.filtered('country_id')
+        if companies_needs_l10n:
+            companies_needs_l10n.install_l10n_modules()
+
         return companies
 
     def cache_invalidation_fields(self):
@@ -283,14 +336,15 @@ class Company(models.Model):
             'sequence', # user._get_company_ids and other potential cached search
         }
 
-    @api.ondelete(at_uninstall=False)
-    def _unlink_if_company_has_no_children(self):
-        if any(company.child_ids for company in self):
-            raise UserError(_("Companies that have associated branches cannot be deleted. Consider archiving them instead."))
-
     def write(self, values):
         invalidation_fields = self.cache_invalidation_fields()
         asset_invalidation_fields = {'font', 'primary_color', 'secondary_color', 'external_report_layout_id'}
+
+        companies_needs_l10n = (
+            values.get('country_id')
+            and self.filtered(lambda company: not company.country_id)
+            or self.browse()
+        )
         if not invalidation_fields.isdisjoint(values):
             self.env.registry.clear_cache()
 
@@ -322,6 +376,9 @@ class Company(models.Model):
                 ])
                 for fname in sorted(changed):
                     branches[fname] = company[fname]
+
+        if companies_needs_l10n:
+            companies_needs_l10n.install_l10n_modules()
 
         # invalidate company cache to recompute address based on updated partner
         company_address_fields = self._get_company_address_field_names()
@@ -355,22 +412,6 @@ class Company(models.Model):
                     if company[fname] != company.parent_id[fname]:
                         description = self.env['ir.model.fields']._get("res.company", fname).field_description
                         raise ValidationError(_("The %s of a subsidiary must be the same as it's root company.", description))
-
-    def open_company_edit_report(self):
-        warnings.warn("Since 17.0.", DeprecationWarning, 2)
-        self.ensure_one()
-        return self.env['res.config.settings'].open_company()
-
-    def write_company_and_print_report(self):
-        warnings.warn("Since 17.0.", DeprecationWarning, 2)
-        context = self.env.context
-        report_name = context.get('default_report_name')
-        active_ids = context.get('active_ids')
-        active_model = context.get('active_model')
-        if report_name and active_ids and active_model:
-            docids = self.env[active_model].browse(active_ids)
-            return (self.env['ir.actions.report'].search([('report_name', '=', report_name)], limit=1)
-                        .report_action(docids))
 
     @api.model
     def _get_main_company(self):
@@ -424,5 +465,5 @@ class Company(models.Model):
                 'active_test': False,
                 'default_parent_id': self.id,
             },
-            'views': [[False, 'tree'], [False, 'kanban'], [False, 'form']],
+            'views': [[False, 'list'], [False, 'kanban'], [False, 'form']],
         }

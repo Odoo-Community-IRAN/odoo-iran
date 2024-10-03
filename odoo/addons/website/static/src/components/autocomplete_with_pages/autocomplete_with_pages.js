@@ -4,6 +4,12 @@ import { AutoComplete } from "@web/core/autocomplete/autocomplete";
 import { useEffect } from "@odoo/owl";
 
 export class AutoCompleteWithPages extends AutoComplete {
+    static props = {
+        ...AutoComplete.props,
+        targetDropdown: { type: HTMLElement },
+        dropdownClass: { type: String, optional: true },
+        dropdownOptions: { type: Object, optional: true },
+    };
     static template = "website.AutoCompleteWithPages";
 
     setup() {
@@ -144,21 +150,4 @@ export class AutoCompleteWithPages extends AutoComplete {
         this.targetDropdown.setSelectionRange(0, this.targetDropdown.value.length);
         this.props.onFocus(ev);
     }
-
-    /**
-     * @override
-     */
-    close() {
-        this.props.onInput({
-            inputValue: this.inputRef.el.value,
-        });
-        super.close();
-    }
 }
-
-AutoCompleteWithPages.props = {
-    ...AutoComplete.props,
-    targetDropdown: { type: HTMLElement },
-    dropdownClass: { type: String, optional: true },
-    dropdownOptions: { type: Object, optional: true },
-};

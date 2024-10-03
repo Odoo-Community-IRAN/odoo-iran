@@ -2,7 +2,7 @@
 <odoo>
     <data>
         <record id="product_template_tree_view" model="ir.ui.view">
-            <field name="name">product.template.tree.inherit.stock.account</field>
+            <field name="name">product.template.list.inherit.stock.account</field>
             <field name="model">product.template</field>
             <field name="inherit_id" ref="product.product_template_tree_view"/>
             <field name="arch" type="xml">
@@ -19,7 +19,7 @@
             <field name="arch" type="xml">
                 <group name="logistics" position="after">
                     <group string="Inventory Valuation">
-                        <field name="property_cost_method"/>
+                        <field name="property_cost_method" required="True"/>
                         <label for="property_valuation" groups="stock_account.group_stock_accounting_automatic"/>
                         <div groups="stock_account.group_stock_accounting_automatic">
                             <field name="property_valuation" groups="account.group_account_readonly,stock.group_stock_manager"/>
@@ -36,7 +36,7 @@
             <field name="arch" type="xml">
                 <group name="account_property" position="inside">
                     <group name="account_stock_property" string="Account Stock Properties" groups="account.group_account_readonly" invisible="property_valuation == 'manual_periodic'">
-                        <field name="property_valuation" invisible="1"/>
+                        <field name="property_valuation" invisible="True" required="True"/>
                         <field name="property_stock_valuation_account_id" options="{'no_create': True}" required="property_valuation == 'real_time'"/>
                         <field name="property_stock_journal" required="property_valuation == 'real_time'" />
                         <field name="property_stock_account_input_categ_id" options="{'no_create': True}" required="property_valuation == 'real_time'" />
@@ -50,8 +50,19 @@
         </record>
 
         <!-- Stock Report View -->
+        <record model="ir.ui.view" id="view_template_property_form_stock_account">
+            <field name="name">view.template.property.form.stock.account</field>
+            <field name="model">product.template</field>
+            <field name="inherit_id" ref="stock.view_template_property_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='product_tooltip']" position="after">
+                    <field name="lot_valuated" invisible="tracking == 'none'" widget="confirm_boolean"/>
+                </xpath>
+            </field>
+        </record>
+
         <record model="ir.ui.view" id="product_product_stock_tree_inherit_stock_account">
-            <field name="name">product.product.stock.tree.inherit.stock.account</field>
+            <field name="name">product.product.stock.list.inherit.stock.account</field>
             <field name="model">product.product</field>
             <field name="inherit_id" ref="stock.product_product_stock_tree"/>
             <field name="arch" type="xml">

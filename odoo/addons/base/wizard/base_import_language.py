@@ -19,7 +19,7 @@ class BaseLanguageImport(models.TransientModel):
     _description = "Language Import"
 
     name = fields.Char('Language Name', required=True)
-    code = fields.Char('ISO Code', size=6, required=True,
+    code = fields.Char('ISO Code', required=True,
                        help="ISO Language and Country code, e.g. en_US")
     data = fields.Binary('File', required=True, attachment=False)
     filename = fields.Char('File Name', required=True)
@@ -43,9 +43,9 @@ class BaseLanguageImport(models.TransientModel):
                 except Exception as e:
                     _logger.warning('Could not import the file due to a format mismatch or it being malformed.')
                     raise UserError(
-                        _('File %r not imported due to format mismatch or a malformed file.'
-                          ' (Valid formats are .csv, .po)\n\nTechnical Details:\n%s',
-                          base_lang_import.filename, tools.ustr(e))
+                        _('File "%(file_name)s" not imported due to format mismatch or a malformed file.'
+                          ' (Valid formats are .csv, .po)\n\nTechnical Details:\n%(error_message)s',
+                          file_name=base_lang_import.filename, error_message=e),
                     )
             translation_importer.save(overwrite=overwrite)
         return True

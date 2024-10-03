@@ -3,16 +3,16 @@
 # 	* microsoft_outlook
 # 
 # Translators:
-# Wil Odoo, 2023
-# Daye Jeong, 2023
+# Wil Odoo, 2024
+# Daye Jeong, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-01-29 10:45+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Daye Jeong, 2023\n"
+"POT-Creation-Date: 2024-09-26 08:55+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Daye Jeong, 2024\n"
 "Language-Team: Korean (https://app.transifex.com/odoo/teams/41243/ko/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -61,7 +61,6 @@ msgstr ""
 #. module: microsoft_outlook
 #. odoo-python
 #: code:addons/microsoft_outlook/models/microsoft_outlook_mixin.py:0
-#, python-format
 msgid "An error occurred when fetching the access token. %s"
 msgstr "액세스 토큰을 가져오는 중 오류가 발생했습니다. %s"
 
@@ -85,7 +84,6 @@ msgstr "환경 설정"
 #. module: microsoft_outlook
 #. odoo-python
 #: code:addons/microsoft_outlook/models/ir_mail_server.py:0
-#, python-format
 msgid ""
 "Connect your Outlook account with the OAuth Authentication process.  \n"
 "By default, only a user with a matching email address will be able to use this server. To extend its use, you should set a \"mail.default.from\" system parameter."
@@ -96,7 +94,6 @@ msgstr ""
 #. module: microsoft_outlook
 #. odoo-python
 #: code:addons/microsoft_outlook/models/fetchmail_server.py:0
-#, python-format
 msgid ""
 "Connect your personal Outlook account using OAuth. \n"
 "You will be redirected to the Outlook login page to accept the permissions."
@@ -127,11 +124,10 @@ msgstr "수신 메일 서버"
 #. module: microsoft_outlook
 #. odoo-python
 #: code:addons/microsoft_outlook/models/ir_mail_server.py:0
-#, python-format
 msgid ""
-"Incorrect Connection Security for Outlook mail server %r. Please set it to "
-"\"TLS (STARTTLS)\"."
-msgstr "Outlook 메일 서버 %r에 대한 연결 보안이 잘못되었습니다. \"TLS (STARTTLS)\"로 설정하시기 바랍니다."
+"Incorrect Connection Security for Outlook mail server “%s”. Please set it to"
+" \"TLS (STARTTLS)\"."
+msgstr "Outlook 메일 서버 “%s”에 대한 연결 보안이 잘못되었습니다. \"TLS (STARTTLS)\"로 설정하시기 바랍니다."
 
 #. module: microsoft_outlook
 #: model:ir.model.fields,field_description:microsoft_outlook.field_fetchmail_server__is_microsoft_outlook_configured
@@ -153,7 +149,6 @@ msgstr "Microsoft Outlook 믹스인"
 #. module: microsoft_outlook
 #. odoo-python
 #: code:addons/microsoft_outlook/models/microsoft_outlook_mixin.py:0
-#, python-format
 msgid "Only the administrator can link an Outlook mail server."
 msgstr "관리자만 Outlook 메일 서버를 연결할 수 있습니다."
 
@@ -197,21 +192,18 @@ msgstr "Outlook 새로고침 토큰"
 #. module: microsoft_outlook
 #. odoo-python
 #: code:addons/microsoft_outlook/models/microsoft_outlook_mixin.py:0
-#, python-format
 msgid "Please configure your Outlook credentials."
 msgstr "Outlook 자격 증명을 구성하십시오."
 
 #. module: microsoft_outlook
 #. odoo-python
 #: code:addons/microsoft_outlook/models/microsoft_outlook_mixin.py:0
-#, python-format
 msgid "Please connect with your Outlook account before using it."
 msgstr "사용 전에 Outlook 계정에 연결하세요."
 
 #. module: microsoft_outlook
 #. odoo-python
 #: code:addons/microsoft_outlook/models/ir_mail_server.py:0
-#, python-format
 msgid ""
 "Please fill the \"Username\" field with your Outlook/Office365 username "
 "(your email address). This should be the same account as the one used for "
@@ -223,11 +215,10 @@ msgstr ""
 #. module: microsoft_outlook
 #. odoo-python
 #: code:addons/microsoft_outlook/models/ir_mail_server.py:0
-#, python-format
 msgid ""
-"Please leave the password field empty for Outlook mail server %r. The OAuth "
-"process does not require it"
-msgstr "Outlook 메일 서버 %r에서 비밀번호 필드를 비워두세요. OAuth 프로세스에는 비밀번호가 필요하지 않습니다."
+"Please leave the password field empty for Outlook mail server “%s”. The "
+"OAuth process does not require it"
+msgstr "OAuth 프로세스에는 암호가 필요하지 않습니다. Outlook 메일 서버 “%s”의 암호 필드를 비워 두세요."
 
 #. module: microsoft_outlook
 #: model_terms:ir.ui.view,arch_db:microsoft_outlook.ir_mail_server_view_form
@@ -237,9 +228,8 @@ msgstr "더 읽기"
 #. module: microsoft_outlook
 #. odoo-python
 #: code:addons/microsoft_outlook/models/fetchmail_server.py:0
-#, python-format
-msgid "SSL is required for the server %r."
-msgstr "%r 서버에 SSL이 있어야 합니다."
+msgid "SSL is required for server “%s”."
+msgstr "서버 “%s”에 SSL이 필요합니다."
 
 #. module: microsoft_outlook
 #: model_terms:ir.ui.view,arch_db:microsoft_outlook.res_config_settings_view_form
@@ -274,6 +264,5 @@ msgstr "Outlook에서 인증 코드를 생성하기 위한 URL."
 #. module: microsoft_outlook
 #. odoo-python
 #: code:addons/microsoft_outlook/models/microsoft_outlook_mixin.py:0
-#, python-format
 msgid "Unknown error."
 msgstr "알 수 없는 오류"

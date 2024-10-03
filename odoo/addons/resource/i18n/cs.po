@@ -3,18 +3,15 @@
 # 	* resource
 # 
 # Translators:
-# Jaroslav Helemik Nemec <nemec@helemik.cz>, 2023
-# Ivana Bartonkova, 2023
-# Jakub Smolka, 2023
-# Wil Odoo, 2023
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:55+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Wil Odoo, 2023\n"
+"POT-Creation-Date: 2024-09-26 08:56+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Czech (https://app.transifex.com/odoo/teams/41243/cs/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -26,7 +23,6 @@ msgstr ""
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
 #: code:addons/resource/models/resource_resource.py:0
-#, python-format
 msgid "%s (copy)"
 msgstr "%s (kopie)"
 
@@ -39,6 +35,11 @@ msgstr "<span class=\"o_stat_text\">Volno</span>"
 #: model_terms:ir.ui.view,arch_db:resource.resource_calendar_form
 msgid "<span class=\"o_stat_text\">Work Resources</span>"
 msgstr ""
+
+#. module: resource
+#: model_terms:ir.ui.view,arch_db:resource.resource_calendar_form
+msgid "<span> hours/week</span>"
+msgstr "<span> hodin / týden</span>"
 
 #. module: resource
 #: model:ir.model.fields,field_description:resource.field_resource_calendar__active
@@ -62,23 +63,27 @@ msgstr "Archivováno"
 #. module: resource
 #: model_terms:ir.ui.view,arch_db:resource.resource_calendar_form
 msgid ""
-"Are you sure you want to switch this calendar to 1 week calendar? All "
-"entries will be lost"
+"Are you sure you want to switch to a 1-week calendar? All work entries will "
+"be lost."
 msgstr ""
 
 #. module: resource
 #: model_terms:ir.ui.view,arch_db:resource.resource_calendar_form
 msgid ""
-"Are you sure you want to switch this calendar to 2 weeks calendar? All "
-"entries will be lost"
+"Are you sure you want to switch to a 2-week calendar? All work entries will "
+"be lost."
 msgstr ""
 
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "Attendances can't overlap."
 msgstr "Docházka se nesmí překrývat."
+
+#. module: resource
+#: model:ir.model.fields,field_description:resource.field_resource_resource__avatar_128
+msgid "Avatar 128"
+msgstr "Avatar 128"
 
 #. module: resource
 #: model:ir.model.fields,field_description:resource.field_resource_calendar__hours_per_day
@@ -123,6 +128,11 @@ msgid "Company"
 msgstr "Společnost"
 
 #. module: resource
+#: model:ir.model.fields,field_description:resource.field_resource_calendar__full_time_required_hours
+msgid "Company Full Time"
+msgstr ""
+
+#. module: resource
 #: model:ir.model.fields,field_description:resource.field_resource_calendar__create_uid
 #: model:ir.model.fields,field_description:resource.field_resource_calendar_attendance__create_uid
 #: model:ir.model.fields,field_description:resource.field_resource_calendar_leaves__create_uid
@@ -158,6 +168,15 @@ msgstr "Den v týdnu"
 #: model:ir.model.fields,field_description:resource.field_res_users__resource_calendar_id
 msgid "Default Working Hours"
 msgstr "Výchozí pracovní doba"
+
+#. module: resource
+#: model:ir.model.fields,help:resource.field_res_users__resource_calendar_id
+#: model:ir.model.fields,help:resource.field_resource_mixin__resource_calendar_id
+#: model:ir.model.fields,help:resource.field_resource_resource__calendar_id
+msgid ""
+"Define the working schedule of the resource. If not set, the resource will "
+"have fully flexible working hours."
+msgstr ""
 
 #. module: resource
 #: model_terms:ir.actions.act_window,help:resource.action_resource_calendar_form
@@ -196,6 +215,11 @@ msgid "Efficiency Factor"
 msgstr "Činitel účinnosti"
 
 #. module: resource
+#: model:ir.model.fields,field_description:resource.field_resource_resource__email
+msgid "Email"
+msgstr "Email "
+
+#. module: resource
 #: model:ir.model.fields,field_description:resource.field_resource_calendar_attendance__date_to
 #: model:ir.model.fields,field_description:resource.field_resource_calendar_leaves__date_to
 msgid "End Date"
@@ -207,6 +231,15 @@ msgid "Explanation"
 msgstr "Vysvětlení"
 
 #. module: resource
+#: model:ir.model.fields,help:resource.field_resource_resource__share
+msgid ""
+"External user with limited access, created only for the purpose of sharing "
+"data."
+msgstr ""
+"Externí uživatel s omezeným přístupem, vytvořený pouze za účelem sdílení "
+"dat."
+
+#. module: resource
 #: model:ir.model.fields.selection,name:resource.selection__resource_calendar_attendance__week_type__0
 msgid "First"
 msgstr "První"
@@ -214,9 +247,13 @@ msgstr "První"
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar_attendance.py:0
-#, python-format
 msgid "First week"
 msgstr "První týden"
+
+#. module: resource
+#: model:ir.model.fields,field_description:resource.field_resource_calendar__flexible_hours
+msgid "Flexible Hours"
+msgstr "Flexibilní pracovní doba"
 
 #. module: resource
 #: model:ir.model.fields.selection,name:resource.selection__resource_calendar_attendance__dayofweek__4
@@ -226,23 +263,25 @@ msgstr "Pátek"
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "Friday Afternoon"
 msgstr "Pátek odpoledne"
 
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "Friday Lunch"
 msgstr ""
 
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "Friday Morning"
 msgstr "Páteční ráno"
+
+#. module: resource
+#: model_terms:ir.ui.view,arch_db:resource.resource_resource_form
+msgid "Fully Flexible"
+msgstr ""
 
 #. module: resource
 #: model:ir.model.fields,help:resource.field_resource_calendar_attendance__sequence
@@ -264,6 +303,11 @@ msgstr "Seskupit podle"
 #: model_terms:ir.ui.view,arch_db:resource.view_resource_calendar_attendance_form
 msgid "Hours"
 msgstr "Hodiny"
+
+#. module: resource
+#: model_terms:ir.ui.view,arch_db:resource.resource_calendar_form
+msgid "Hours per Week"
+msgstr "Hodiny za týden"
 
 #. module: resource
 #: model:ir.model.fields.selection,name:resource.selection__resource_resource__resource_type__user
@@ -309,7 +353,6 @@ msgstr ""
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid ""
 "In a calendar with 2 weeks mode, all periods need to be in the sections."
 msgstr "V kalendáři s režimem 2 týdnů musí být všechna období v sekcích."
@@ -344,21 +387,18 @@ msgstr "Pondělí"
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "Monday Afternoon"
 msgstr "Pondělí odpoledne"
 
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "Monday Lunch"
 msgstr ""
 
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "Monday Morning"
 msgstr "Pondělní ráno"
 
@@ -375,6 +415,13 @@ msgid "Name"
 msgstr "Název"
 
 #. module: resource
+#: model:ir.model.fields,help:resource.field_resource_calendar__full_time_required_hours
+msgid ""
+"Number of hours to work on the company schedule to be considered as "
+"fulltime."
+msgstr ""
+
+#. module: resource
 #: model:ir.model.fields.selection,name:resource.selection__resource_calendar_leaves__time_type__other
 msgid "Other"
 msgstr "Ostatní"
@@ -383,6 +430,11 @@ msgstr "Ostatní"
 #: model_terms:ir.ui.view,arch_db:resource.view_resource_calendar_leaves_search
 msgid "Period"
 msgstr "Období"
+
+#. module: resource
+#: model:ir.model.fields,field_description:resource.field_resource_resource__phone
+msgid "Phone"
+msgstr "Telefon"
 
 #. module: resource
 #: model:ir.model.fields,field_description:resource.field_resource_calendar_leaves__name
@@ -489,7 +541,6 @@ msgstr "Vteřina"
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar_attendance.py:0
-#, python-format
 msgid "Second week"
 msgstr "Druhý týden"
 
@@ -504,9 +555,13 @@ msgid "Sequence"
 msgstr "Sekvence"
 
 #. module: resource
+#: model:ir.model.fields,field_description:resource.field_resource_resource__share
+msgid "Share User"
+msgstr "Sdílet uživatele"
+
+#. module: resource
 #. odoo-python
 #: code:addons/resource/models/res_company.py:0
-#, python-format
 msgid "Standard 40 hours/week"
 msgstr "Standardní 40 hodin týdně"
 
@@ -557,14 +612,14 @@ msgstr "Technické pole pro účel uživatelské zkušenosti."
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
-msgid "The current week (from %s to %s) correspond to the  %s one."
-msgstr "Aktuální týden (od %s do %s) koresponduje s %s."
+msgid ""
+"The current week (from %(first_day)s to %(last_day)s) corresponds to week "
+"number %(number)s."
+msgstr ""
 
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar_leaves.py:0
-#, python-format
 msgid "The start date of the time off must be earlier than the end date."
 msgstr "Datum začátku volna musí být dřívější než datum jeho konce."
 
@@ -600,21 +655,18 @@ msgstr "Čtvrtek"
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "Thursday Afternoon"
 msgstr "Čtvrtek odpoledne"
 
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "Thursday Lunch"
 msgstr ""
 
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "Thursday Morning"
 msgstr "Čtvrteční ráno"
 
@@ -660,21 +712,18 @@ msgstr "Úterý"
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "Tuesday Afternoon"
 msgstr "Úterý odpoledne"
 
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "Tuesday Lunch"
 msgstr ""
 
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "Tuesday Morning"
 msgstr "Úterní ráno"
 
@@ -699,21 +748,18 @@ msgstr "Středa"
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "Wednesday Afternoon"
 msgstr "Středa odpoledne"
 
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "Wednesday Lunch"
 msgstr ""
 
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "Wednesday Morning"
 msgstr "Středeční ráno"
 
@@ -721,6 +767,13 @@ msgstr "Středeční ráno"
 #: model:ir.model.fields,field_description:resource.field_resource_calendar_attendance__week_type
 msgid "Week Number"
 msgstr "Číslo týdne"
+
+#. module: resource
+#: model:ir.model.fields,help:resource.field_resource_calendar__flexible_hours
+msgid ""
+"When enabled, it will allow employees to work flexibly, without relying on "
+"the company's working schedule (working hours)."
+msgstr ""
 
 #. module: resource
 #: model:ir.model.fields,help:resource.field_resource_calendar_leaves__time_type
@@ -757,7 +810,6 @@ msgstr "Pracovní doba"
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "Working Hours of %s"
 msgstr "Pracovní doba %s"
 
@@ -782,34 +834,29 @@ msgstr "Pracovní čas"
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "You can't delete section between weeks."
 msgstr "Sekci nemůžete mazat mezi týdny."
 
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "first"
 msgstr "první"
 
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar_attendance.py:0
-#, python-format
 msgid "other week"
 msgstr "další týden"
 
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar.py:0
-#, python-format
 msgid "second"
 msgstr "druhý"
 
 #. module: resource
 #. odoo-python
 #: code:addons/resource/models/resource_calendar_attendance.py:0
-#, python-format
 msgid "this week"
 msgstr "tento týden"

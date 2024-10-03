@@ -2,8 +2,8 @@
 
     import {ReCaptcha} from "@google_recaptcha/js/recaptcha";
     import { session } from "@web/session";
+    import { user } from "@web/core/user";
     import publicWidget from "@web/legacy/js/public/public_widget";
-    import dom from "@web/legacy/js/core/dom";
     import { delay } from "@web/core/utils/concurrency";
     import { debounce } from "@web/core/utils/timing";
     import { _t } from "@web/core/l10n/translation";
@@ -18,6 +18,9 @@ import {
     serializeDate,
     serializeDateTime,
 } from "@web/core/l10n/dates";
+import { addLoadingEffect } from "@web/core/utils/ui";
+import { scrollTo } from "@web_editor/js/common/scrolling";
+const DEBOUNCE = 400;
 const { DateTime } = luxon;
 import wUtils from '@website/js/utils';
 
@@ -75,10 +78,10 @@ import wUtils from '@website/js/utils';
             }
             // fetch user data (required by fill-with behavior)
             this.preFillValues = {};
-            if (session.user_id) {
+            if (user.userId) {
                 this.preFillValues = (await this.orm.read(
                     "res.users",
-                    [session.user_id],
+                    [user.userId],
                     this._getUserPreFillFields()
                 ))[0] || {};
             }
@@ -108,19 +111,22 @@ import wUtils from '@website/js/utils';
             this.$el.on('input.s_website_form', '.s_website_form_field', this._onFieldInputDebounced);
 
             this.$allDates = this.$el.find('.s_website_form_datetime, .o_website_form_datetime, .s_website_form_date, .o_website_form_date');
-            for (const field of this.$allDates) {
-                const input = field.querySelector("input");
-                const defaultValue = input.getAttribute("value");
-                this.call("datetime_picker", "create", {
-                    target: input,
-                    onChange: () => input.dispatchEvent(new Event("input", { bubbles: true })),
-                    pickerProps: {
-                        type: field.matches('.s_website_form_date, .o_website_form_date') ? 'date' : 'datetime',
-                        value: defaultValue && DateTime.fromSeconds(parseInt(defaultValue)),
-                    },
-                }).enable();
+            this.disableDateTimePickers = [];
+            if (!this.editableMode) {
+                for (const field of this.$allDates) {
+                    const input = field.querySelector("input");
+                    const defaultValue = input.getAttribute("value");
+                    this.disableDateTimePickers.push(this.call("datetime_picker", "create", {
+                        target: input,
+                        onChange: () => input.dispatchEvent(new Event("input", { bubbles: true })),
+                        pickerProps: {
+                            type: field.matches('.s_website_form_date, .o_website_form_date') ? 'date' : 'datetime',
+                            value: defaultValue && DateTime.fromSeconds(parseInt(defaultValue)),
+                        },
+                    }).enable());
+                }
+                this.$allDates.addClass('s_website_form_datepicker_initialized');
             }
-            this.$allDates.addClass('s_website_form_datepicker_initialized');
 
             // Display form values from tag having data-for attribute
             // It's necessary to handle field values generated on server-side
@@ -203,6 +209,9 @@ import wUtils from '@website/js/utils';
             return this._super(...arguments).then(() => this.__startResolve());
         },
 
+        /**
+         * @override
+         */
         destroy: function () {
             this._super.apply(this, arguments);
             this.$el.find('button').off('click');
@@ -257,6 +266,9 @@ import wUtils from '@website/js/utils';
             }
 
             this.$el.off('.s_website_form');
+            for (const disableDateTimePicker of this.disableDateTimePickers) {
+                disableDateTimePicker();
+            }
         },
 
         send: async function (e) {
@@ -265,7 +277,7 @@ import wUtils from '@website/js/utils';
             const $button = this.$el.find('.s_website_form_send, .o_website_form_send');
             $button.addClass('disabled') // !compatibility
                    .attr('disabled', 'disabled');
-            this.restoreBtnLoading = dom.addButtonLoadingEffect($button[0]);
+            this.restoreBtnLoading = addLoadingEffect($button[0]);
 
             var self = this;
 
@@ -278,9 +290,8 @@ import wUtils from '@website/js/utils';
                             this.fileInputError.limit
                         )
                         : _t(
-                            "Please fill in the form correctly. The file \"%s\" is too big. (Maximum %s MB)", 
-                            this.fileInputError.fileName,
-                            this.fileInputError.limit
+                            "Please fill in the form correctly. The file “%(file name)s” is too large. (Maximum %(max)s MB)", 
+                            { "file name": this.fileInputError.fileName, max:this.fileInputError.limit }
                         );
                     this.update_status("error", errorMessage);
                     delete this.fileInputError;
@@ -415,7 +426,7 @@ import wUtils from '@website/js/utils';
                                         // popup.
                                         window.location.href = successPage;
                                     } else {
-                                        await dom.scrollTo(successAnchorEl, {
+                                        await scrollTo(successAnchorEl, {
                                             duration: 500,
                                             extraOffset: 0,
                                         });
@@ -430,7 +441,7 @@ import wUtils from '@website/js/utils';
                             // Prevent double-clicking on the send button and
                             // add a upload loading effect (delay before success
                             // message)
-                            await delay(dom.DEBOUNCE);
+                            await delay(DEBOUNCE);
 
                             self.el.classList.add('d-none');
                             self.el.parentElement.querySelector('.s_website_form_end_message').classList.remove('d-none');
@@ -440,7 +451,7 @@ import wUtils from '@website/js/utils';
                             // Prevent double-clicking on the send button and
                             // add a upload loading effect (delay before success
                             // message)
-                            await delay(dom.DEBOUNCE);
+                            await delay(DEBOUNCE);
 
                             self.update_status('success');
                             break;

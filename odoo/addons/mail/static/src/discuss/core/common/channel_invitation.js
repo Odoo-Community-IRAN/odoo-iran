@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { ImStatus } from "@mail/core/common/im_status";
 import { ActionPanel } from "@mail/discuss/core/common/action_panel";
 
@@ -16,11 +14,11 @@ export class ChannelInvitation extends Component {
     static template = "discuss.ChannelInvitation";
 
     setup() {
+        super.setup();
         this.discussCoreCommonService = useState(useService("discuss.core.common"));
         this.orm = useService("orm");
         this.store = useState(useService("mail.store"));
         this.notification = useService("notification");
-        this.threadService = useState(useService("mail.thread"));
         this.suggestionService = useService("mail.suggestion");
         this.ui = useService("ui");
         this.inputRef = useRef("input");
@@ -32,12 +30,12 @@ export class ChannelInvitation extends Component {
             searchResultCount: 0,
         });
         onWillStart(() => {
-            if (this.store.user) {
+            if (this.store.self.type === "partner") {
                 this.fetchPartnersToInvite();
             }
         });
         onMounted(() => {
-            if (this.store.user) {
+            if (this.store.self.type === "partner") {
                 this.inputRef.el.focus();
             }
         });
@@ -53,7 +51,7 @@ export class ChannelInvitation extends Component {
         if (!results) {
             return;
         }
-        const selectablePartners = this.store.Persona.insert(results.partners);
+        const { Persona: selectablePartners = [] } = this.store.insert(results.data);
         this.state.selectablePartners = this.suggestionService.sortPartnerSuggestions(
             selectablePartners,
             this.searchStr,
@@ -93,11 +91,12 @@ export class ChannelInvitation extends Component {
     }
 
     async onClickInvite() {
-        if (this.props.thread.type === "chat") {
-            await this.discussCoreCommonService.startChat([
-                this.props.thread.chatPartner?.id,
-                ...this.state.selectedPartners.map((partner) => partner.id),
-            ]);
+        if (this.props.thread.channel_type === "chat") {
+            const partnerIds = this.state.selectedPartners.map((partner) => partner.id);
+            if (this.props.thread.correspondent) {
+                partnerIds.unshift(this.props.thread.correspondent.persona.id);
+            }
+            await this.discussCoreCommonService.startChat(partnerIds);
         } else {
             await this.orm.call("discuss.channel", "add_members", [[this.props.thread.id]], {
                 partner_ids: this.state.selectedPartners.map((partner) => partner.id),
@@ -107,18 +106,18 @@ export class ChannelInvitation extends Component {
     }
 
     get invitationButtonText() {
-        if (this.props.thread.type === "channel") {
+        if (this.props.thread.channel_type === "channel") {
             return _t("Invite to Channel");
-        } else if (this.props.thread.type === "group") {
+        } else if (this.props.thread.channel_type === "group") {
             return _t("Invite to Group Chat");
-        } else if (this.props.thread.type === "chat") {
-            if (this.props.thread.chatPartner?.eq(this.store.self)) {
+        } else if (this.props.thread.channel_type === "chat") {
+            if (this.props.thread.correspondent?.persona.eq(this.store.self)) {
                 if (this.state.selectedPartners.length === 0) {
                     return _t("Invite");
                 }
                 if (this.state.selectedPartners.length === 1) {
                     const alreadyChat = Object.values(this.store.Thread.records).some((thread) =>
-                        thread.chatPartner?.eq(this.state.selectedPartners[0])
+                        thread.correspondent?.persona.eq(this.state.selectedPartners[0])
                     );
                     if (alreadyChat) {
                         return _t("Go to conversation");
@@ -129,9 +128,5 @@ export class ChannelInvitation extends Component {
             return _t("Create Group Chat");
         }
         return _t("Invite");
-    }
-
-    get title() {
-        return _t("Invite people");
     }
 }

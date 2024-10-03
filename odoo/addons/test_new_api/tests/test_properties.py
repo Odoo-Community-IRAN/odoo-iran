@@ -12,7 +12,7 @@ from odoo import Command
 
 from odoo.exceptions import AccessError, UserError
 from odoo.osv import expression
-from odoo.tests.common import Form, TransactionCase, users
+from odoo.tests import Form, TransactionCase, users
 from odoo.tools import mute_logger, get_lang
 
 
@@ -400,7 +400,7 @@ class PropertiesCase(TestPropertiesMixin):
             }])
             self.env.invalidate_all()
 
-        with self.assertQueryCount(8):
+        with self.assertQueryCount(7):
             messages = self.env['test_new_api.message'].create([{
                 'name': 'Test Message',
                 'discussion': self.discussion_1.id,
@@ -1308,7 +1308,14 @@ class PropertiesCase(TestPropertiesMixin):
         with self.assertQueryCount(0, msg='Must read value from cache'):
             self.message_1.attributes
 
-        expected = ['UPDATE "test_new_api_message" SET "attributes" = %s, "write_date" = %s, "write_uid" = %s WHERE id IN %s']
+        expected = ["""
+            UPDATE "test_new_api_message"
+            SET "attributes" = "__tmp"."attributes"::jsonb,
+                "write_date" = "__tmp"."write_date"::timestamp,
+                "write_uid" = "__tmp"."write_uid"::int4
+            FROM (VALUES %s) AS "__tmp"("id", "attributes", "write_date", "write_uid")
+            WHERE "test_new_api_message"."id" = "__tmp"."id"
+        """]
         with self.assertQueryCount(1), self.assertQueries(expected):
             self.message_1.attributes = [
                 {
@@ -1619,12 +1626,10 @@ class PropertiesCase(TestPropertiesMixin):
     @users('test')
     def test_properties_field_security(self):
         """Check the access right related to the Properties fields."""
-        def _mocked_check_access_rights(records, operation, raise_exception=True):
-            if records.env.su:  # called with SUDO
-                return True
-            if raise_exception:
-                raise AccessError('')
-            return False
+        def _mocked_check_access(records, operation):
+            if records.env.su:
+                return
+            raise AccessError('')
 
         message = self.message_1.with_user(self.test_user)
 
@@ -1641,14 +1646,14 @@ class PropertiesCase(TestPropertiesMixin):
         values = message.read(['attributes'])[0]['attributes'][0]
         self.assertEqual(values['value'], (tag.id, 'Test Tag'))
         self.env.invalidate_all()
-        with patch('odoo.addons.test_new_api.models.test_new_api.MultiTag.check_access_rights', _mocked_check_access_rights):
+        with patch('odoo.addons.test_new_api.models.test_new_api.MultiTag.check_access', _mocked_check_access):
             values = message.read(['attributes'])[0]['attributes'][0]
         self.assertEqual(values['value'], (tag.id, None))
 
         # a user read a properties with a many2one to a record
         # but doesn't have access to its parent
         self.env.invalidate_all()
-        with patch('odoo.addons.test_new_api.models.test_new_api.Discussion.check_access_rights', _mocked_check_access_rights):
+        with patch('odoo.addons.test_new_api.models.test_new_api.Discussion.check_access', _mocked_check_access):
             values = message.read(['attributes'])[0]['attributes'][0]
         self.assertEqual(values['value'], (tag.id, 'Test Tag'))
 
@@ -1662,15 +1667,13 @@ class PropertiesCase(TestPropertiesMixin):
         should have the right schema and should be populated with the default
         values stored on the property definition.
         """
-        def _mocked_check_access_rights(records, operation, raise_exception=True):
+        def _mocked_check_access(records, operation):
             if records.env.su:
-                return True
-            if raise_exception:
-                raise AccessError('')
-            return False
+                return
+            raise AccessError('')
 
         self.env.invalidate_all()
-        with patch('odoo.addons.test_new_api.models.test_new_api.Discussion.check_access_rights', _mocked_check_access_rights):
+        with patch('odoo.addons.test_new_api.models.test_new_api.Discussion.check_access', _mocked_check_access):
             message = self.env['test_new_api.message'].create({
                 'name': 'Test Message',
                 'discussion': self.discussion_1.id,
@@ -2248,7 +2251,7 @@ class PropertiesGroupByCase(TestPropertiesMixin):
 
     @mute_logger('odoo.fields')
     def test_properties_field_read_progress_bar(self):
-        """Test the fallback of "_read_progress_bar" when we read a field non-stored."""
+        """Test "_read_progress_bar" with a properties field."""
         Model = self.env['test_new_api.message']
 
         self.messages.discussion = self.discussion_1
@@ -2264,7 +2267,7 @@ class PropertiesGroupByCase(TestPropertiesMixin):
         result = Model.read_progress_bar(
             domain=[],
             group_by='attributes.myinteger',
-            progress_bar={'field': 'size', 'colors': [0]},
+            progress_bar={'field': 'priority', 'colors': [0]},
         )
         self.assertEqual(result, {'1337': {0: 2}, '5': {0: 1}, 'False': {0: 1}})
 
@@ -2541,6 +2544,12 @@ class PropertiesGroupByCase(TestPropertiesMixin):
                 orderby='attributes.myinteger DESC'
             )
 
+        with self.assertRaises(ValueError), self.assertQueryCount(0):
+            Model._read_group(
+                domain=[],
+                aggregates=['attributes.myinteger:sum'],  # Aggregate is not supported
+            )
+
     @mute_logger('odoo.fields', 'odoo.models.unlink')
     def test_properties_field_read_group_many2many(self):
         Model = self.env['test_new_api.message']
@@ -2636,7 +2645,7 @@ class PropertiesGroupByCase(TestPropertiesMixin):
             )  # bypass the ORM to set an invalid model name
             definition = self._get_sql_definition(self.discussion_1)
             self.assertEqual(definition[0]['comodel'], invalid_model_name)
-            error_message = f"You cannot use 'Partners' because the linked {invalid_model_name!r} model doesn't exist or is invalid"
+            error_message = f"You cannot use “Partners” because the linked “{invalid_model_name}” model doesn't exist or is invalid"
             with self.assertRaisesRegex(UserError, error_message):
                 result = Model.read_group(
                     domain=[('discussion', '!=', self.wrong_discussion_id)],
@@ -2736,7 +2745,7 @@ class PropertiesGroupByCase(TestPropertiesMixin):
             )  # bypass the ORM to set an invalid model name
             definition = self._get_sql_definition(self.discussion_1)
             self.assertEqual(definition[0]['comodel'], invalid_model_name)
-            error_message = f"You cannot use 'My Partner' because the linked {invalid_model_name!r} model doesn't exist or is invalid"
+            error_message = f"You cannot use “My Partner” because the linked “{invalid_model_name}” model doesn't exist or is invalid"
             with self.assertRaisesRegex(UserError, error_message):
                 result = Model.read_group(
                     domain=[('discussion', '!=', self.wrong_discussion_id)],

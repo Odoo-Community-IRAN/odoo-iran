@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo import Command
@@ -11,11 +10,23 @@ from odoo.addons.sale_purchase.tests.common import TestCommonSalePurchaseNoChart
 class TestSalePurchase(TestCommonSalePurchaseNoChart):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref=None):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
+
+        cls.company_data_2 = cls.setup_other_company()
 
         # create a generic Sale Order with 2 classical products and a purchase service
-        SaleOrder = cls.env['sale.order'].with_context(tracking_disable=True)
+        SaleOrder = cls.env['sale.order']
+        cls.analytic_plan = cls.env['account.analytic.plan'].create({'name': 'Plan Test'})
+        cls.test_analytic_account_1, cls.test_analytic_account_2 = cls.env['account.analytic.account'].create([
+            {
+                'name': 'analytic_account_test_1',
+                'plan_id': cls.analytic_plan.id,
+            }, {
+                'name': 'analytic_account_test_2',
+                'plan_id': cls.analytic_plan.id,
+            },
+        ])
         cls.sale_order_1 = SaleOrder.create({
             'partner_id': cls.partner_a.id,
             'partner_invoice_id': cls.partner_a.id,

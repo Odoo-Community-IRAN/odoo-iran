@@ -6,7 +6,6 @@ import werkzeug
 
 from odoo import api, fields, Command, models, _
 from odoo.exceptions import UserError, ValidationError
-from odoo.tools.misc import format_date
 from odoo.tools import email_split, float_repr, float_round, is_html_empty
 
 
@@ -108,6 +107,7 @@ class HrExpense(models.Model):
     approved_by = fields.Many2one(comodel_name='res.users', string="Approved By", related='sheet_id.user_id', tracking=False)
     approved_on = fields.Datetime(string="Approved On", related='sheet_id.approval_date')
     duplicate_expense_ids = fields.Many2many(comodel_name='hr.expense', compute='_compute_duplicate_expense_ids')  # Used to trigger warnings
+    same_receipt_expense_ids = fields.Many2many(comodel_name='hr.expense', compute='_compute_same_receipt_expense_ids')  # Used to trigger warnings
 
     # Amount fields
     tax_amount_currency = fields.Monetary(
@@ -173,8 +173,10 @@ class HrExpense(models.Model):
         ],
         string="Paid By",
         default='own_account',
+        required=True,
         tracking=True,
     )
+    vendor_id = fields.Many2one(comodel_name='res.partner', string="Vendor")
     account_id = fields.Many2one(
         comodel_name='account.account',
         string="Account",
@@ -235,6 +237,15 @@ class HrExpense(models.Model):
         for expense in self:
             expense.name = expense.name or expense.product_id.display_name
 
+    def _set_expense_currency_rate(self, date_today):
+        for expense in self:
+            expense.currency_rate = expense.env['res.currency']._get_conversion_rate(
+                from_currency=expense.currency_id,
+                to_currency=expense.company_currency_id,
+                company=expense.company_id,
+                date=expense.date or date_today,
+            )
+
     @api.depends('currency_id', 'total_amount_currency', 'date')
     def _compute_currency_rate(self):
         """
@@ -253,12 +264,7 @@ class HrExpense(models.Model):
                         or expense.total_amount_currency != expense._origin.total_amount_currency
                         or expense.date != expense._origin.date
                 ):
-                    expense.currency_rate = self.env['res.currency']._get_conversion_rate(
-                        from_currency=expense.currency_id,
-                        to_currency=expense.company_currency_id,
-                        company=expense.company_id,
-                        date=expense.date or date_today,
-                    )
+                    expense._set_expense_currency_rate(date_today=date_today)
                 else:
                     expense.currency_rate = expense.total_amount / expense.total_amount_currency if expense.total_amount_currency else 1.0
             else:  # Mono-currency case computation shortcut, no need for the label if there is no conversion
@@ -278,14 +284,11 @@ class HrExpense(models.Model):
         for expense in self:
             expense.is_multiple_currency = expense.currency_id != expense.company_currency_id
 
-    @api.depends('product_id.standard_price')
+    @api.depends('product_id')
     def _compute_from_product(self):
         for expense in self:
             expense.product_has_cost = expense.product_id and not expense.company_currency_id.is_zero(expense.product_id.standard_price)
-            tax_ids = expense.product_id.supplier_taxes_id.filtered_domain(self.env['account.tax']._check_company_domain(expense.company_id))
-            expense.product_has_tax = bool(tax_ids)
-            if not expense.product_has_cost and expense.state in {'draft', 'reported'} and expense.quantity != 1:
-                expense.quantity = 1
+            expense.product_has_tax = bool(expense.product_id.supplier_taxes_id.filtered_domain(self.env['account.tax']._check_company_domain(expense.company_id)))
 
     @api.depends('product_id.uom_id')
     def _compute_uom_id(self):
@@ -310,10 +313,12 @@ class HrExpense(models.Model):
 
     @api.depends('quantity', 'price_unit', 'tax_ids')
     def _compute_total_amount_currency(self):
+        AccountTax = self.env['account.tax']
         for expense in self.filtered('product_has_cost'):
-            base_lines = [expense._convert_to_tax_base_line_dict(price_unit=expense.price_unit, quantity=expense.quantity)]
-            taxes_totals = self.env['account.tax']._compute_taxes(base_lines)['totals'][expense.currency_id]
-            expense.total_amount_currency = taxes_totals['amount_untaxed'] + taxes_totals['amount_tax']
+            base_line = expense._prepare_base_line_for_taxes_computation(price_unit=expense.price_unit, quantity=expense.quantity)
+            AccountTax._add_tax_details_in_base_line(base_line, expense.company_id)
+            AccountTax._round_base_lines_tax_details([base_line], expense.company_id)
+            expense.total_amount_currency = base_line['tax_details']['total_included_currency']
 
     @api.onchange('total_amount_currency')
     def _inverse_total_amount_currency(self):
@@ -334,27 +339,35 @@ class HrExpense(models.Model):
         'quantity',
     )
     def _compute_total_amount(self):
+        AccountTax = self.env['account.tax']
         for expense in self:
             if expense.is_multiple_currency:
-                base_lines = [expense._convert_to_tax_base_line_dict(
+                base_line = expense._prepare_base_line_for_taxes_computation(
                     price_unit=expense.total_amount_currency * expense.currency_rate,
-                    currency=expense.company_currency_id,
-                )]
-                taxes_totals = self.env['account.tax']._compute_taxes(base_lines)['totals'][expense.company_currency_id]
-                expense.total_amount = taxes_totals['amount_untaxed'] + taxes_totals['amount_tax']
+                    quantity=1.0,
+                    currency_id=expense.company_currency_id,
+                    rate=1.0,
+                )
+                AccountTax._add_tax_details_in_base_line(base_line, expense.company_id)
+                AccountTax._round_base_lines_tax_details([base_line], expense.company_id)
+                expense.total_amount = base_line['tax_details']['total_included_currency']
             else:  # Mono-currency case computation shortcut
                 expense.total_amount = expense.total_amount_currency
 
     def _inverse_total_amount(self):
         """ Allows to set a custom rate on the expense, and avoid the override when it makes no sense """
+        AccountTax = self.env['account.tax']
         for expense in self:
             if expense.is_multiple_currency:
-                base_lines = [expense._convert_to_tax_base_line_dict(
+                base_line = expense._prepare_base_line_for_taxes_computation(
                     price_unit=expense.total_amount,
+                    quantity=1.0,
                     currency=expense.company_currency_id,
-                )]
-                taxes_totals = self.env['account.tax']._compute_taxes(base_lines)['totals'][expense.company_currency_id]
-                expense.tax_amount = taxes_totals['amount_tax']
+                )
+                AccountTax._add_tax_details_in_base_line(base_line, expense.company_id)
+                AccountTax._round_base_lines_tax_details([base_line], expense.company_id)
+                tax_details = base_line['tax_details']
+                expense.tax_amount = tax_details['total_included_currency'] - tax_details['total_excluded_currency']
             else:
                 expense.total_amount_currency = expense.total_amount
                 expense.tax_amount = expense.tax_amount_currency
@@ -374,11 +387,17 @@ class HrExpense(models.Model):
              Note: as total_amount_currency can be set directly by the user (for product without cost)
              or needs to be computed (for product with cost), `untaxed_amount_currency` can't be computed in the same method as `total_amount_currency`.
         """
+        AccountTax = self.env['account.tax']
         for expense in self:
-            base_lines = [expense._convert_to_tax_base_line_dict(price_unit=expense.total_amount_currency)]
-            taxes_totals = self.env['account.tax']._compute_taxes(base_lines)['totals'][expense.currency_id]
-            expense.tax_amount_currency = taxes_totals['amount_tax']
-            expense.untaxed_amount_currency = taxes_totals['amount_untaxed']
+            base_line = expense._prepare_base_line_for_taxes_computation(
+                price_unit=expense.total_amount_currency,
+                quantity=1.0,
+            )
+            AccountTax._add_tax_details_in_base_line(base_line, expense.company_id)
+            AccountTax._round_base_lines_tax_details([base_line], expense.company_id)
+            tax_details = base_line['tax_details']
+            expense.tax_amount_currency = tax_details['total_included_currency'] - tax_details['total_excluded_currency']
+            expense.untaxed_amount_currency = tax_details['total_excluded_currency']
 
     @api.depends('total_amount', 'currency_rate', 'tax_ids', 'is_multiple_currency')
     def _compute_tax_amount(self):
@@ -386,14 +405,18 @@ class HrExpense(models.Model):
              Note: as total_amount can be set directly by the user when the currency_rate is overriden,
              the tax must be computed after the total_amount.
         """
+        AccountTax = self.env['account.tax']
         for expense in self:
             if expense.is_multiple_currency:
-                base_lines = [expense._convert_to_tax_base_line_dict(
+                base_line = expense._prepare_base_line_for_taxes_computation(
                     price_unit=expense.total_amount,
+                    quantity=1.0,
                     currency=expense.company_currency_id,
-                )]
-                taxes_totals = self.env['account.tax']._compute_taxes(base_lines)['totals'][expense.company_currency_id]
-                expense.tax_amount = taxes_totals['amount_tax']
+                )
+                AccountTax._add_tax_details_in_base_line(base_line, expense.company_id)
+                AccountTax._round_base_lines_tax_details([base_line], expense.company_id)
+                tax_details = base_line['tax_details']
+                expense.tax_amount = tax_details['total_included_currency'] - tax_details['total_excluded_currency']
             else:  # Mono-currency case computation shortcut
                 expense.tax_amount = expense.tax_amount_currency
 
@@ -424,10 +447,11 @@ class HrExpense(models.Model):
 
     @api.depends('product_id', 'company_id')
     def _compute_account_id(self):
+        property_field = self.env['product.category']._fields['property_account_expense_categ_id']
         for _expense in self:
             expense = _expense.with_company(_expense.company_id)
             if not expense.product_id:
-                expense.account_id = self.env['ir.property']._get('property_account_expense_categ_id', 'product.category')
+                expense.account_id = property_field.get_company_dependent_fallback(self.env['product.category'])
                 continue
             account = expense.product_id.product_tmpl_id._get_product_accounts()['expense']
             if account:
@@ -438,6 +462,29 @@ class HrExpense(models.Model):
         if not self.env.context.get('default_employee_id'):
             for expense in self:
                 expense.employee_id = self.env.user.with_company(expense.company_id).employee_id
+
+    @api.depends('attachment_ids')
+    def _compute_same_receipt_expense_ids(self):
+        self.same_receipt_expense_ids = [Command.clear()]
+
+        expenses_with_attachments = self.filtered(lambda expense: expense.attachment_ids)
+        if not expenses_with_attachments:
+            return
+
+        expenses_groupby_checksum = dict(self.env['ir.attachment']._read_group(domain=[
+            ('res_model', '=', 'hr.expense'),
+            ('checksum', 'in', expenses_with_attachments.attachment_ids.mapped('checksum'))],
+            groupby=['checksum'],
+            aggregates=['res_id:array_agg'],
+        ))
+
+        for expense in expenses_with_attachments:
+            same_receipt_ids = set()
+            for attachment in expense.attachment_ids:
+                same_receipt_ids.update(expenses_groupby_checksum[attachment.checksum])
+            same_receipt_ids.remove(expense.id)
+
+            expense.same_receipt_expense_ids = [Command.set(list(same_receipt_ids))]
 
     @api.depends('employee_id', 'product_id', 'total_amount_currency')
     def _compute_duplicate_expense_ids(self):
@@ -465,12 +512,14 @@ class HrExpense(models.Model):
                 expenses_duplicates.duplicate_expense_ids = [Command.set(duplicates_ids)]
                 expenses = expenses - expenses_duplicates
 
-    @api.depends('product_id', 'account_id')
+    @api.depends('product_id', 'account_id', 'employee_id')
     def _compute_analytic_distribution(self):
         for expense in self:
             distribution = self.env['account.analytic.distribution.model']._get_distribution({
                 'product_id': expense.product_id.id,
                 'product_categ_id': expense.product_id.categ_id.id,
+                'partner_id': expense.employee_id.work_contact_id.id,
+                'partner_category_id': expense.employee_id.work_contact_id.category_id.ids,
                 'account_prefix': expense.account_id.code,
                 'company_id': expense.company_id.id,
             })
@@ -490,29 +539,28 @@ class HrExpense(models.Model):
     def _check_payment_mode(self):
         self.sheet_id._check_payment_mode()
 
-    def _convert_to_tax_base_line_dict(self, base_line=None, currency=None, price_unit=None, quantity=None):
+    def _prepare_base_line_for_taxes_computation(self, **kwargs):
         self.ensure_one()
-        return self.env['account.tax']._convert_to_tax_base_line_dict(
-            base_line,
-            currency=currency or self.currency_id,
-            product=self.product_id,
-            taxes=self.tax_ids,
-            price_unit=price_unit or self.total_amount,
-            quantity=quantity if quantity is not None else 1,
-            account=self.account_id,
-            analytic_distribution=self.analytic_distribution,
-            extra_context={'force_price_include': True},
+        return self.env['account.tax']._prepare_base_line_for_taxes_computation(
+            self,
+            **{
+                'partner_id': self.vendor_id,
+                'special_mode': 'total_included',
+                'rate': self.currency_rate,
+                **kwargs,
+            },
         )
 
     def attach_document(self, **kwargs):
         """When an attachment is uploaded as a receipt, set it as the main attachment."""
-        self.message_main_attachment_id = kwargs['attachment_ids'][-1]
+        self._message_set_main_attachment_id(self.env["ir.attachment"].browse(kwargs['attachment_ids'][-1:]), force=True)
 
+    @api.model
     def create_expense_from_attachments(self, attachment_ids=None, view_type='list'):
         """
             Create the expenses from files.
 
-            :return: An action redirecting to hr.expense tree view.
+            :return: An action redirecting to hr.expense list view.
         """
         if not attachment_ids:
             raise UserError(_("No attachment was provided"))
@@ -533,21 +581,22 @@ class HrExpense(models.Model):
             vals = {
                 'name': attachment_name,
                 'price_unit': 0,
-                'product_id': self.env.company.expense_product_id.id or product.id,
+                'product_id': product.id,
             }
             if product.property_account_expense_id:
                 vals['account_id'] = product.property_account_expense_id.id
             expense = self.env['hr.expense'].create(vals)
             attachment.write({'res_model': 'hr.expense', 'res_id': expense.id})
 
-            attachment.register_as_main_attachment()
+            expense._message_set_main_attachment_id(attachment, force=True)
             expenses += expense
         return {
             'name': _('Generate Expenses'),
             'res_model': 'hr.expense',
             'type': 'ir.actions.act_window',
             'views': [[False, view_type], [False, "form"]],
-            'context': {'search_default_my_expenses': 1, 'search_default_no_report': 1},
+            'domain': [('id', 'in', expenses.ids)],
+            'context': self.env.context,
         }
 
     # ----------------------------------------
@@ -563,13 +612,34 @@ class HrExpense(models.Model):
     def write(self, vals):
         expense_to_previous_sheet = {}
         if 'sheet_id' in vals:
-            self.env['hr.expense.sheet'].browse(vals['sheet_id']).check_access_rule('write')
+            # Check access rights on the sheet
+            self.env['hr.expense.sheet'].browse(vals['sheet_id']).check_access('write')
+
+            # Store the previous sheet of the expenses to unlink the attachments later if needed
             for expense in self:
                 expense_to_previous_sheet[expense] = expense.sheet_id
+
+            # If the sheet_id is modified, we need to check that the expenses are not set to 0,
+            # unless it's to unlink the sheet
+            enforced_non_zero_expenses = self.env['hr.expense']
+            if vals.get('sheet_id'):  # If sheet is linked, we need to check all the newly linked expenses in self
+                enforced_non_zero_expenses = self
+        else:  # If sheet_id is not modified, we need to check all the expenses in self linked to a sheet
+            enforced_non_zero_expenses = self.filtered('sheet_id')
+
         if 'tax_ids' in vals or 'analytic_distribution' in vals or 'account_id' in vals:
             if any(not expense.is_editable for expense in self):
                 raise UserError(_('You are not authorized to edit this expense report.'))
+
+        if enforced_non_zero_expenses:
+            enforced_non_zero_expenses.check_amount_not_zero(vals)
+
         res = super().write(vals)
+
+        if 'currency_id' in vals:
+            self._set_expense_currency_rate(date_today=fields.Date.context_today(self))
+            for expense in self:
+                expense.total_amount = expense.total_amount_currency * expense.currency_rate
 
         if 'employee_id' in vals:
             # In case expense has sheet which has only one expense_line_ids,
@@ -602,6 +672,14 @@ class HrExpense(models.Model):
             attachments_to_unlink.with_context(sync_attachment=False).unlink()
         return res
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        expenses = super().create(vals_list)
+        if self.env.context.get('check_total_amount_not_zero'):
+            for expense, vals in zip(expenses, vals_list):
+                expense.check_amount_not_zero(vals)
+        return expenses
+
     def unlink(self):
         attachments_to_unlink = self.env['ir.attachment']
         for sheet in self.sheet_id:
@@ -622,17 +700,37 @@ class HrExpense(models.Model):
             # encode, but force %20 encoding for space instead of a + (URL / mailto difference)
             params = werkzeug.urls.url_encode({'subject': _("Lunch with customer $12.32")}).replace('+', '%20')
             return Markup(
-                """<p>%(send_string)s <a href="mailto:%(alias_email)s?%(params)s">%(alias_email)s</a></p>"""
+                """<div class="text-muted mt-4">%(send_string)s <a class="text-body" href="mailto:%(alias_email)s?%(params)s">%(alias_email)s</a></div>"""
             ) % {
                 'alias_email': expense_alias.display_name,
                 'params': params,
-                'send_string': _("Or send your receipts at"),
+                'send_string': _("Tip: try sending receipts by email"),
             }
         return ""
+
+    def get_expense_attachments(self):
+        return self.attachment_ids.mapped('image_src')
+
+    def check_amount_not_zero(self, vals):
+        error_msgs = []
+        if 'total_amount' in vals:
+            if any(expense.company_currency_id.is_zero(vals['total_amount']) for expense in self):
+                error_msgs.append(_("You cannot set the expense total to 0 if it's linked to a report."))
+        if 'total_amount_currency' in vals:
+            if any(expense.currency_id.is_zero(vals['total_amount_currency']) for expense in self):
+                error_msgs.append(_("You cannot set the expense total in currency to 0 if it's linked to a report."))
+        if error_msgs:
+            raise UserError("\n".join(error_msgs))
 
     # ----------------------------------------
     # Actions
     # ----------------------------------------
+
+    def action_show_same_receipt_expense_ids(self):
+        self.ensure_one()
+        return self.same_receipt_expense_ids._get_records_action(
+            name=_("Expenses with a similar receipt to %(other_expense_name)s", other_expense_name=self.name),
+        )
 
     def action_view_sheet(self):
         self.ensure_one()
@@ -676,19 +774,9 @@ class HrExpense(models.Model):
         # else we use the form view required name to force the user to set a name
         for todo in sheets:
             paid_by = 'company' if todo[0].payment_mode == 'company_account' else 'employee'
-            sheet_name = _("New Expense Report, paid by %(paid_by)s", paid_by=paid_by) if len(sheets) > 1 else False
-            if len(todo) == 1:
-                sheet_name = todo.name
-            else:
-                dates = todo.mapped('date')
-                if False not in dates:  # If at least one date isn't set, we don't set a default name
-                    min_date = format_date(self.env, min(dates))
-                    max_date = format_date(self.env, max(dates))
-                    if min_date == max_date:
-                        sheet_name = min_date
-                    else:
-                        sheet_name = _("%(date_from)s - %(date_to)s", date_from=min_date, date_to=max_date)
-
+            sheet_name = self.env['hr.expense.sheet']._get_default_sheet_name(todo)
+            if not sheet_name and len(sheets) > 1:
+                sheet_name = _("New Expense Report, paid by %(paid_by)s", paid_by=paid_by)
             values.append({
                 'company_id': self.company_id.id,
                 'employee_id': self[0].employee_id.id,
@@ -713,10 +801,14 @@ class HrExpense(models.Model):
             raise UserError(_('You have no expense to report'))
         return expenses.action_submit_expenses()
 
-    def action_submit_expenses(self):
+    def _create_sheets_from_expense(self):
         if self.filtered(lambda expense: not expense.is_editable):
             raise UserError(_('You are not authorized to edit this expense.'))
         sheets = self.env['hr.expense.sheet'].create(self._get_default_expense_sheet_values())
+        return sheets
+
+    def action_submit_expenses(self):
+        sheets = self._create_sheets_from_expense()
         return {
             'name': _('New Expense Reports'),
             'type': 'ir.actions.act_window',
@@ -785,6 +877,12 @@ class HrExpense(models.Model):
     # Business
     # ----------------------------------------
 
+    def _get_move_line_name(self):
+        """ Helper to get the name of the account move lines related to an expense """
+        self.ensure_one()
+        expense_name = self.name.split("\n")[0][:64]
+        return _('%(employee_name)s: %(expense_name)s', employee_name=self.employee_id.name, expense_name=expense_name)
+
     def _prepare_payments_vals(self):
         self.ensure_one()
 
@@ -792,83 +890,120 @@ class HrExpense(models.Model):
         payment_method_line = self.sheet_id.payment_method_line_id
         if not payment_method_line:
             raise UserError(_("You need to add a manual payment method on the journal (%s)", journal.name))
-        move_lines = []
-        tax_data = self.env['account.tax']._compute_taxes(
-            [self._convert_to_tax_base_line_dict(price_unit=self.total_amount_currency, currency=self.currency_id)],
-            include_caba_tags=(self.payment_mode == 'company_account')
+
+        AccountTax = self.env['account.tax']
+        rate = abs(self.total_amount_currency / self.total_amount) if self.total_amount else 0.0
+        base_line = self._prepare_base_line_for_taxes_computation(
+            price_unit=self.total_amount_currency,
+            quantity=1.0,
+            account_id=self._get_base_account(),
+            rate=rate,
         )
-        rate = abs(self.total_amount_currency / self.total_amount) if self.total_amount else 1.0
-        base_line_data, to_update = tax_data['base_lines_to_update'][0]  # Add base line
-        amount_currency = to_update['price_subtotal']
-        expense_name = self.name.split("\n")[0][:64]
-        base_move_line = {
-            'name': f'{self.employee_id.name}: {expense_name}',
-            'account_id': base_line_data['account'].id,
-            'product_id': base_line_data['product'].id,
-            'analytic_distribution': base_line_data['analytic_distribution'],
-            'expense_id': self.id,
-            'tax_ids': [Command.set(self.tax_ids.ids)],
-            'tax_tag_ids': to_update['tax_tag_ids'],
-            'amount_currency': amount_currency,
-            'currency_id': self.currency_id.id,
-        }
-        move_lines.append(base_move_line)
-        total_tax_line_balance = 0.0
-        for tax_line_data in tax_data['tax_lines_to_add']:  # Add tax lines
-            tax_line_balance = self.company_currency_id.round(tax_line_data['tax_amount'] / rate)
-            total_tax_line_balance += tax_line_balance
-            tax_line = {
-                'name': self.env['account.tax'].browse(tax_line_data['tax_id']).name,
-                'account_id': tax_line_data['account_id'],
-                'analytic_distribution': tax_line_data['analytic_distribution'],
+        base_lines = [base_line]
+        AccountTax._add_tax_details_in_base_lines(base_lines, self.company_id)
+        AccountTax._round_base_lines_tax_details(base_lines, self.company_id)
+        AccountTax._add_accounting_data_in_base_lines_tax_details(base_lines, self.company_id, include_caba_tags=self.payment_mode == 'company_account')
+        tax_results = AccountTax._prepare_tax_lines(base_lines, self.company_id)
+
+        # Base line.
+        move_lines = []
+        for base_line, to_update in tax_results['base_lines_to_update']:
+            base_move_line = {
+                'name': self._get_move_line_name(),
+                'account_id': base_line['account_id'].id,
+                'product_id': base_line['product_id'].id,
+                'analytic_distribution': base_line['analytic_distribution'],
                 'expense_id': self.id,
-                'tax_tag_ids': tax_line_data['tax_tag_ids'],
-                'balance': tax_line_balance,
-                'amount_currency': tax_line_data['tax_amount'],
-                'tax_base_amount': self.company_currency_id.round(tax_line_data['base_amount'] / rate),
-                'currency_id': self.currency_id.id,
-                'tax_repartition_line_id': tax_line_data['tax_repartition_line_id'],
+                'tax_ids': [Command.set(base_line['tax_ids'].ids)],
+                'tax_tag_ids': to_update['tax_tag_ids'],
+                'amount_currency': to_update['amount_currency'],
+                'balance': to_update['balance'],
+                'currency_id': base_line['currency_id'].id,
+                'partner_id': self.vendor_id.id,
             }
+            move_lines.append(base_move_line)
+
+        # Tax lines.
+        total_tax_line_balance = 0.0
+        for tax_line in tax_results['tax_lines_to_add']:
+            total_tax_line_balance += tax_line['balance']
             move_lines.append(tax_line)
         base_move_line['balance'] = self.total_amount - total_tax_line_balance
-        expense_name = self.name.split("\n")[0][:64]
-        move_lines.append({  # Add outstanding payment line
-            'name': f'{self.employee_id.name}: {expense_name}',
+
+        # Outstanding payment line.
+        move_lines.append({
+            'name': self._get_move_line_name(),
             'account_id': self.sheet_id._get_expense_account_destination(),
             'balance': -self.total_amount,
             'amount_currency': self.currency_id.round(-self.total_amount_currency),
             'currency_id': self.currency_id.id,
+            'partner_id': self.vendor_id.id,
         })
-        return {
-            **self.sheet_id._prepare_move_vals(),
-            'date': self.date,  # Overidden from self.sheet_id._prepare_move_vals() so we can use the expense date for the account move date
-            'ref': self.name,
+        payment_vals = {
+            'date': self.date,
+            'memo': self.name,
             'journal_id': journal.id,
-            'move_type': 'entry',
             'amount': self.total_amount_currency,
             'payment_type': 'outbound',
             'partner_type': 'supplier',
+            'partner_id': self.vendor_id.id,
+            'currency_id': self.currency_id.id,
             'payment_method_line_id': payment_method_line.id,
+        }
+        move_vals = {
+            **self.sheet_id._prepare_move_vals(),
+            'ref': self.name,
+            'date': self.date,  # Overidden from self.sheet_id._prepare_move_vals() so we can use the expense date for the account move date
+            'journal_id': journal.id,
+            'partner_id': self.vendor_id.id,
             'currency_id': self.currency_id.id,
             'line_ids': [Command.create(line) for line in move_lines],
             'attachment_ids': [
                 Command.create(attachment.copy_data({'res_model': 'account.move', 'res_id': False, 'raw': attachment.raw})[0])
                 for attachment in self.message_main_attachment_id]
         }
+        return move_vals, payment_vals
+
+    def _get_base_account(self):
+        """
+        Returns the expense account or forces default values if none was found
+        We need to do this as the installation process may delete the original account, and it doesn't recompute properly after
+        Returned expense accounts are the first expense account encountered in the following list:
+        1. expense account of the expense itself
+        2. expense account of the product
+        3. expense account of the product category
+        4. expense account on the purchase journal for employee expense
+        """
+
+        # expense account of the expense itself
+        account = self.account_id
+
+        if account:
+            return account
+
+        # expense account of the product then the product category
+        if self.product_id:
+            account = self.product_id.product_tmpl_id._get_product_accounts()['expense']
+        else:
+            field = self.env['property.category']._fields['property_account_expense_categ_id']
+            account = field.get_company_dependent_fallback(self.env['property.category'])
+
+        if account:
+            return account
+
+        # expense account on the purchase journal for employee expense
+        journal = self.sheet_id.journal_id
+        if journal.type == 'purchase':
+            account = journal.default_account_id
+
+        return account
 
     def _prepare_move_lines_vals(self):
         self.ensure_one()
-        account = self.account_id
-        if not account:
-            # We need to do this as the installation process may delete the original account, and it doesn't recompute properly after.
-            # This forces the default values if none is found
-            if self.product_id:
-                account = self.product_id.product_tmpl_id._get_product_accounts()['expense']
-            else:
-                account = self.env['ir.property']._get('property_account_expense_categ_id', 'product.category')
-        expense_name = self.name.split('\n')[0][:64]
+        account = self._get_base_account()
+
         return {
-            'name': f'{self.employee_id.name}: {expense_name}',
+            'name': self._get_move_line_name(),
             'account_id': account.id,
             'quantity': self.quantity or 1,
             'price_unit': self.price_unit,
@@ -886,19 +1021,16 @@ class HrExpense(models.Model):
             'to_submit': {
                 'description': _('to submit'),
                 'amount': 0.0,
-                'tooltip': _("Expenses that need to be submitted to the approver."),
                 'currency': self.env.company.currency_id.id,
             },
             'submitted': {
                 'description': _('under validation'),
                 'amount': 0.0,
-                'tooltip': _("Expenses from which the report has been submitted to the approver and is waiting for approval."),
                 'currency': self.env.company.currency_id.id,
             },
             'approved': {
                 'description': _('to be reimbursed'),
                 'amount': 0.0,
-                'tooltip': _("Expenses paid by employee that are approved but not paid yet."),
                 'currency': self.env.company.currency_id.id,
             }
         }

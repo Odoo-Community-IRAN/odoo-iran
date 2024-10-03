@@ -428,14 +428,9 @@ class RecurrenceRule(models.Model):
             data['month_by'] = 'day'
             data['rrule_type'] = 'monthly'
 
-        if rule._bymonthday:
+        if rule._bymonthday and data['rrule_type'] == 'monthly':
             data['day'] = list(rule._bymonthday)[0]
             data['month_by'] = 'date'
-            data['rrule_type'] = 'monthly'
-
-        # Repeat yearly but for odoo it's monthly, take same information as monthly but interval is 12 times
-        if rule._bymonth:
-            data['interval'] *= 12
 
         if data.get('until'):
             data['end_type'] = 'end_date'
@@ -446,7 +441,7 @@ class RecurrenceRule(models.Model):
         return data
 
     def _get_lang_week_start(self):
-        lang = self.env['res.lang']._lang_get(self.env.user.lang)
+        lang = self.env['res.lang']._get_data(code=self.env.user.lang)
         week_start = int(lang.week_start)  # lang.week_start ranges from '1' to '7'
         return rrule.weekday(week_start - 1) # rrule expects an int from 0 to 6
 

@@ -5,8 +5,16 @@ import { useBus, useService } from "@web/core/utils/hooks";
 import { ControlPanel } from "@web/search/control_panel/control_panel";
 import { ReceptionReportTable } from "../reception_report_table/stock_reception_report_table";
 import { Component, onWillStart, useState } from "@odoo/owl";
+import { standardActionServiceProps } from "@web/webclient/actions/action_service";
 
 export class ReceptionReportMain extends Component {
+    static template = "stock.ReceptionReportMain";
+    static components = {
+        ControlPanel,
+        ReceptionReportTable,
+    };
+    static props = { ...standardActionServiceProps };
+
     setup() {
         this.controlPanelDisplay = {};
         this.ormService = useService("orm");
@@ -138,11 +146,5 @@ export class ReceptionReportMain extends Component {
         return Object.values(this.state.sourcesToLines).every(lines => lines.every(line => !line.is_assigned));
     }
 }
-
-ReceptionReportMain.components = {
-    ControlPanel,
-    ReceptionReportTable,
-};
-ReceptionReportMain.template = "stock.ReceptionReportMain";
 
 registry.category("actions").add("reception_report", ReceptionReportMain);

@@ -1,5 +1,6 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 from odoo import Command
+from odoo.addons.account.tests.common import AccountTestMockOnlineSyncCommon
 from odoo.tools import mute_logger
 
 import logging
@@ -8,7 +9,7 @@ import odoo.tests
 _logger = logging.getLogger(__name__)
 
 
-class BaseTestUi(odoo.tests.HttpCase):
+class BaseTestUi(AccountTestMockOnlineSyncCommon):
 
     def main_flow_tour(self):
         # Enable Make to Order
@@ -43,12 +44,12 @@ class BaseTestUi(odoo.tests.HttpCase):
             'account_type': 'asset_cash',
         })
 
-        Property = self.env['ir.property']
-        Property._set_default('property_account_receivable_id', 'res.partner', a_recv, self.env.company)
-        Property._set_default('property_account_payable_id', 'res.partner', a_pay, self.env.company)
-        Property._set_default('property_account_position_id', 'res.partner', False, self.env.company)
-        Property._set_default('property_account_expense_categ_id', 'product.category', a_expense, self.env.company)
-        Property._set_default('property_account_income_categ_id', 'product.category', a_sale, self.env.company)
+        IrDefault = self.env['ir.default']
+        IrDefault.set('res.partner', 'property_account_receivable_id', a_recv.id, company_id=self.env.company.id)
+        IrDefault.set('res.partner', 'property_account_payable_id', a_pay.id, company_id=self.env.company.id)
+        IrDefault.set('res.partner', 'property_account_position_id', False, company_id=self.env.company.id)
+        IrDefault.set('product.category', 'property_account_expense_categ_id', a_expense.id, company_id=self.env.company.id)
+        IrDefault.set('product.category', 'property_account_income_categ_id', a_sale.id, company_id=self.env.company.id)
 
         self.expenses_journal = self.env['account.journal'].create({
             'name': 'Vendor Bills - Test',
@@ -70,7 +71,7 @@ class BaseTestUi(odoo.tests.HttpCase):
             'refund_sequence': True,
         })
 
-        self.start_tour("/web", 'main_flow_tour', login="admin", timeout=180)
+        self.start_tour("/odoo", 'main_flow_tour', login="admin", timeout=180)
 
 @odoo.tests.tagged('post_install', '-at_install')
 class TestUi(BaseTestUi):
@@ -101,7 +102,68 @@ class TestUi(BaseTestUi):
         act_window = self.env["ir.actions.act_window"].create({
             "name": "model_multicompany_action",
             "res_model": "test.model_multicompany",
-            "view_ids": [Command.create({"view_mode": "tree"}), Command.create({"view_mode": "form"})]
+            "view_ids": [Command.create({"view_mode": "list"}), Command.create({"view_mode": "form"})]
+        })
+
+        self.env["ir.ui.menu"].create({
+            "name": "model_multicompany_menu",
+            "action": f"ir.actions.act_window,{act_window.id}",
+        })
+
+        with mute_logger("odoo.http"):
+            self.start_tour(f"/odoo/action-{act_window.id}", "test_company_switch_access_error", login="admin", cookies={"cids": f"{company1.id}-{company2.id}"})
+
+    def test_company_access_error_redirect(self):
+        company1 = self.env.company
+        company2 = self.env["res.company"].create({"name": "second company"})
+        self.env["res.users"].browse(2).write({
+            "company_ids": [Command.clear(), Command.link(company1.id), Command.link(company2.id)]
+        })
+
+        self.env["ir.rule"].create({
+            "name": "multiCompany rule",
+            "domain_force": '["|", ("company_id", "=", False), ("company_id", "in", company_ids)]',
+            "model_id": self.env["ir.model"]._get("test.model_multicompany").id
+        })
+
+        self.env["test.model_multicompany"].create({"name": "p1"})
+        record_p2 = self.env["test.model_multicompany"].create({"name": "p2", "company_id": company2.id})
+
+        act_window = self.env["ir.actions.act_window"].create({
+            "name": "model_multicompany_action",
+            "res_model": "test.model_multicompany",
+            "view_ids": [Command.create({"view_mode": "list"}), Command.create({"view_mode": "form"})]
+        })
+
+        self.env["ir.ui.menu"].create({
+            "name": "model_multicompany_menu",
+            "action": f"ir.actions.act_window,{act_window.id}",
+        })
+
+        with mute_logger("odoo.http"):
+            self.start_tour(f"/odoo/action-{act_window.id}/{record_p2.id}", "test_company_access_error_redirect", login="admin", cookies={"cids": f"{company1.id}"})
+
+    def test_company_switch_access_error_debug(self):
+        # This test is identical to test_company_switch_access_error, but with debug mode enabled
+        company1 = self.env.company
+        company2 = self.env["res.company"].create({"name": "second company"})
+        self.env["res.users"].browse(2).write({
+            "company_ids": [Command.clear(), Command.link(company1.id), Command.link(company2.id)]
+        })
+
+        self.env["ir.rule"].create({
+            "name": "multiCompany rule",
+            "domain_force": '["|", ("company_id", "=", False), ("company_id", "in", company_ids)]',
+            "model_id": self.env["ir.model"]._get("test.model_multicompany").id
+        })
+
+        self.env["test.model_multicompany"].create({"name": "p1"})
+        self.env["test.model_multicompany"].create({"name": "p2", "company_id": company2.id})
+
+        act_window = self.env["ir.actions.act_window"].create({
+            "name": "model_multicompany_action",
+            "res_model": "test.model_multicompany",
+            "view_ids": [Command.create({"view_mode": "list"}), Command.create({"view_mode": "form"})]
         })
 
         self.env["ir.ui.menu"].create({
@@ -111,7 +173,7 @@ class TestUi(BaseTestUi):
 
         current_companies = "%s-%s" % (company1.id, company2.id)
         with mute_logger("odoo.http"):
-            self.start_tour(f"/web#action={act_window.id}&cids={current_companies}", "test_company_switch_access_error", login="admin")
+            self.start_tour(f"/odoo/action-{act_window.id}?debug=assets&cids={current_companies}", "test_company_switch_access_error", login="admin")
 
 
 @odoo.tests.tagged('post_install', '-at_install')

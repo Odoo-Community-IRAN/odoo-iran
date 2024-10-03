@@ -3,6 +3,7 @@
 
 import logging
 import platform
+
 try:
     import pylint
 except ImportError:
@@ -11,9 +12,10 @@ import subprocess
 import os
 from os.path import join
 
-from odoo.tests.common import TransactionCase
 from odoo import tools
 from odoo.modules import get_modules, get_module_path
+from odoo.tests import TransactionCase
+from odoo.tools.which import which
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 
@@ -32,6 +34,8 @@ class TestPyLint(TransactionCase):
         # custom checkers
         'sql-injection',
         'gettext-variable',
+        'gettext-placeholders',
+        'gettext-repr',
         'raise-unlink-override',
     ]
 
@@ -52,9 +56,7 @@ class TestPyLint(TransactionCase):
     def test_pylint(self):
         if pylint is None:
             self._skip_test('please install pylint')
-        required_pylint_version = tools.parse_version('1.6.4')
-        if self._python_version >= (3, 6):
-            required_pylint_version = tools.parse_version('1.7.0')
+        required_pylint_version = tools.parse_version('1.7.0')
         if tools.parse_version(getattr(pylint, '__version__', '0.0.1')) < required_pylint_version:
             self._skip_test('please upgrade pylint to >= %s' % required_pylint_version)
 
@@ -88,7 +90,7 @@ class TestPyLint(TransactionCase):
             preexec = None
 
         try:
-            pylint_bin = tools.which('pylint')
+            pylint_bin = which('pylint')
             process = subprocess.Popen(
                 [pylint_bin] + options + paths,
                 stdout=subprocess.PIPE,

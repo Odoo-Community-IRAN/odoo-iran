@@ -1,36 +1,38 @@
 /** @odoo-module **/
 
-import wTourUtils from '@website/js/tours/tour_utils';
+import { clickOnSave, insertSnippet, registerWebsitePreviewTour } from '@website/js/tours/tour_utils';
 
-wTourUtils.registerWebsitePreviewTour('website_multi_edition', {
+registerWebsitePreviewTour('website_multi_edition', {
     test: true,
     url: '/',
     edition: true,
 }, () => [
     {
         content: 'Check the current page has not the elements that will be added',
-        trigger: 'iframe body:not(:has(.s_text_image)):not(:has(.s_hr))',
-        run: () => null,
+        trigger: ':iframe body:not(:has(.s_text_image)):not(:has(.s_hr))',
     },
     // Edit the main element of the page
-    wTourUtils.dragNDrop({
+    ...insertSnippet({
         id: 's_text_image',
         name: 'Text - Image',
+        groupName: "Content",
     }),
     // Edit another part in the page, like the footer
-    wTourUtils.dragNDrop({
-        id: 's_hr',
-        name: 'Separator',
-    }),
-    ...wTourUtils.clickOnSave(),
+    {
+        trigger: ".o_website_preview.editor_enable.editor_has_snippets",
+    },
+    {
+        trigger: `#oe_snippets .oe_snippet[name="Separator"].o_we_draggable .oe_snippet_thumbnail:not(.o_we_ongoing_insertion)`,
+        content: "Drag the Separator building block and drop it at the bottom of the page.",
+        run: "drag_and_drop :iframe .oe_drop_zone:last",
+    },
+    ...clickOnSave(),
     {
         content: 'Check that the main element of the page was properly saved',
-        trigger: 'iframe main .s_text_image',
-        run: () => null,
+        trigger: ':iframe main .s_text_image',
     },
     {
         content: 'Check that the footer was properly saved',
-        trigger: 'iframe footer .s_hr',
-        run: () => null,
+        trigger: ':iframe footer .s_hr',
     },
 ]);

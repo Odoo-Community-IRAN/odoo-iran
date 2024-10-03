@@ -3,17 +3,16 @@
 # 	* payment_demo
 # 
 # Translators:
-# Jolien De Paepe, 2023
-# Wil Odoo, 2024
 # Manon Rondou, 2024
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-08-13 10:28+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Manon Rondou, 2024\n"
+"POT-Creation-Date: 2024-09-26 08:56+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: French (https://app.transifex.com/odoo/teams/41243/fr/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -31,8 +30,8 @@ msgid ""
 "                    <option value=\"pending\" title=\"Payment processing\">\n"
 "                        Pending\n"
 "                    </option>\n"
-"                    <option value=\"cancel\" title=\"Payment canceled by customer\">\n"
-"                        Canceled\n"
+"                    <option value=\"cancel\" title=\"Payment cancelled by customer\">\n"
+"                        Cancelled\n"
 "                    </option>\n"
 "                    <option value=\"error\" title=\"Processing error\">\n"
 "                        Error\n"
@@ -40,16 +39,16 @@ msgid ""
 "                </select>"
 msgstr ""
 "<select id=\"simulated_payment_state\" class=\"form-select\">\n"
-"                    <option value=\"done\" title=\"Paiement réussi\">\n"
+"                    <option value=\"done\" title=\"Successful payment\">\n"
 "                        Réussi\n"
 "                    </option>\n"
-"                    <option value=\"pending\" title=\"Paiement en cours\">\n"
+"                    <option value=\"pending\" title=\"Payment processing\">\n"
 "                        En attente\n"
 "                    </option>\n"
-"                    <option value=\"cancel\" title=\"Paiement annulé par le client\">\n"
+"                    <option value=\"cancel\" title=\"Payment cancelled by customer\">\n"
 "                        Annulé\n"
 "                    </option>\n"
-"                    <option value=\"error\" title=\"Erreur de traitement\">\n"
+"                    <option value=\"error\" title=\"Processing error\">\n"
 "                        Erreur\n"
 "                    </option>\n"
 "                </select>"
@@ -152,6 +151,7 @@ msgstr "Confirmé"
 
 #. module: payment_demo
 #: model:ir.model.fields.selection,name:payment_demo.selection__payment_provider__code__demo
+#: model:payment.method,name:payment_demo.payment_method_demo
 msgid "Demo"
 msgstr "Démo"
 
@@ -163,7 +163,6 @@ msgstr "Démo paiement rapide"
 #. module: payment_demo
 #. odoo-python
 #: code:addons/payment_demo/models/payment_provider.py:0
-#, python-format
 msgid "Demo providers should never be enabled."
 msgstr "Les fournisseurs démo ne devraient jamais être activés."
 
@@ -175,14 +174,12 @@ msgstr "Erreur"
 #. module: payment_demo
 #. odoo-javascript
 #: code:addons/payment_demo/static/src/js/express_checkout_form.js:0
-#, python-format
 msgid "No delivery method is available."
 msgstr "Aucun mode de livraison n'est disponible."
 
 #. module: payment_demo
 #. odoo-python
 #: code:addons/payment_demo/models/payment_transaction.py:0
-#, python-format
 msgid "No transaction found matching reference %s."
 msgstr "Aucune transaction ne correspond à la référence %s."
 
@@ -214,7 +211,6 @@ msgstr "Transaction de paiement"
 #. module: payment_demo
 #. odoo-javascript
 #: code:addons/payment_demo/static/src/js/payment_demo_mixin.js:0
-#, python-format
 msgid "Payment processing failed"
 msgstr "Échec du traitement du paiement"
 
@@ -228,7 +224,7 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:payment_demo.token_inline_form
 msgid ""
 "Payments made with this payment method will be automatically "
-"<b>canceled</b>."
+"<b>cancelled</b>."
 msgstr ""
 "Les paiements effectués avec ce mode de paiement seront automatiquement "
 "<b>annulés</b>."
@@ -284,7 +280,6 @@ msgstr "Le code technique de ce fournisseur de paiement."
 #. module: payment_demo
 #. odoo-python
 #: code:addons/payment_demo/models/payment_transaction.py:0
-#, python-format
 msgid "The transaction is not linked to a token."
 msgstr "La transaction n'est pas liée à un jeton."
 
@@ -296,7 +291,6 @@ msgstr "Non publié"
 #. module: payment_demo
 #. odoo-javascript
 #: code:addons/payment_demo/static/src/js/express_checkout_form.js:0
-#, python-format
 msgid "Validation Error"
 msgstr "Erreur de validation"
 
@@ -308,6 +302,5 @@ msgstr "XXXX XXXX XXXX XXXX"
 #. module: payment_demo
 #. odoo-python
 #: code:addons/payment_demo/models/payment_transaction.py:0
-#, python-format
 msgid "You selected the following demo payment status: %s"
 msgstr "Vous avez sélectionné le statut de paiement démo suivant : %s"

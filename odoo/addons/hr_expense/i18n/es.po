@@ -3,17 +3,15 @@
 # 	* hr_expense
 # 
 # Translators:
-# Pedro M. Baeza <pedro.baeza@tecnativa.com>, 2024
-# Patricia Gutiérrez Capetillo <pagc@odoo.com>, 2024
 # Wil Odoo, 2024
 # Larissa Manderfeld, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-08-13 10:26+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
+"POT-Creation-Date: 2024-09-25 08:39+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
 "Last-Translator: Larissa Manderfeld, 2024\n"
 "Language-Team: Spanish (https://app.transifex.com/odoo/teams/41243/es/)\n"
 "MIME-Version: 1.0\n"
@@ -44,15 +42,19 @@ msgstr "600,00 €"
 
 #. module: hr_expense
 #. odoo-python
-#: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
+#: code:addons/hr_expense/models/hr_expense_sheet.py:0
 msgid "%(date_from)s - %(date_to)s"
 msgstr "%(date_from)s - %(date_to)s"
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
+msgid "%(employee_name)s: %(expense_name)s"
+msgstr "%(employee_name)s: %(expense_name)s"
+
+#. module: hr_expense
+#. odoo-python
+#: code:addons/hr_expense/models/hr_expense.py:0
 msgid ""
 "%(user)s confirms this expense is not a duplicate with similar expense."
 msgstr ""
@@ -61,21 +63,18 @@ msgstr ""
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense_sheet.py:0
-#, python-format
 msgid "%s: It is not from your department"
 msgstr "%s: No es de su departamento "
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense_sheet.py:0
-#, python-format
 msgid "%s: It is your own expense"
 msgstr "%s: Son sus propios gastos "
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense_sheet.py:0
-#, python-format
 msgid "%s: Your are not a Manager or HR Officer"
 msgstr "%s: No es gerente o encargado de RR. HH."
 
@@ -89,9 +88,13 @@ msgstr ""
 "''))"
 
 #. module: hr_expense
+#: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_view_form
+msgid "(incl"
+msgstr "(incl."
+
+#. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "1 %(exp_cur)s = %(rate)s %(comp_cur)s"
 msgstr "1 %(exp_cur)s = %(rate)s %(comp_cur)s"
 
@@ -101,15 +104,15 @@ msgid "2023-08-11"
 msgstr "11-08-2023"
 
 #. module: hr_expense
-#: model_terms:ir.ui.view,arch_db:hr_expense.product_product_expense_form_view
-msgid ""
-"<span class=\"d-inline-block\">\n"
-"                                        <i class=\"text-muted\">Use this reference as a subject prefix when submitting by email.</i>\n"
-"                                    </span>"
+#. odoo-javascript
+#: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
+msgid "<b>Wasting time recording your receipts?</b> Let’s try a better way."
 msgstr ""
-"<span class=\"d-inline-block\">\n"
-"                                        <i class=\"text-muted\">Utilice esta referencia como prefijo del asunto al enviar por correo electrónico.</i>\n"
-"                                    </span>"
+
+#. module: hr_expense
+#: model_terms:ir.ui.view,arch_db:hr_expense.res_config_settings_view_form
+msgid "<i class=\"oi oi-arrow-right\"/> Setup your alias domain"
+msgstr ""
 
 #. module: hr_expense
 #: model_terms:ir.ui.view,arch_db:hr_expense.view_move_form_inherit_expense
@@ -148,19 +151,22 @@ msgid "<span>Paid by:</span>"
 msgstr "<span>Pagado por:</span>"
 
 #. module: hr_expense
+#: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_split
+msgid "<span>The total amount doesn't match the original amount.</span>"
+msgstr ""
+
+#. module: hr_expense
 #: model:ir.model.fields,field_description:hr_expense.field_hr_expense__account_id
 msgid "Account"
 msgstr "Cuenta"
 
 #. module: hr_expense
-#: model_terms:ir.ui.view,arch_db:hr_expense.product_product_expense_form_view
 #: model_terms:ir.ui.view,arch_db:hr_expense.res_config_settings_view_form
 msgid "Accounting"
 msgstr "Contabilidad"
 
 #. module: hr_expense
 #: model:ir.model.fields,field_description:hr_expense.field_hr_expense__accounting_date
-#: model:ir.model.fields,field_description:hr_expense.field_hr_expense_sheet__accounting_date
 msgid "Accounting Date"
 msgstr "Fecha contable"
 
@@ -228,7 +234,6 @@ msgstr "Todos los informes"
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense_sheet.py:0
-#, python-format
 msgid "All expenses in an expense report must have the same \"paid by\" criteria."
 msgstr ""
 "Todos los gastos en un informe de gastos deben tener el mismo criterio "
@@ -245,9 +250,13 @@ msgid "Amount Due"
 msgstr "Importe adeudado"
 
 #. module: hr_expense
+#: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_view_form
+msgid "An"
+msgstr "Un"
+
+#. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/mixins/document_upload.js:0
-#, python-format
 msgid "An error occurred during the upload"
 msgstr "Ocurrió un error durante la subida"
 
@@ -259,14 +268,12 @@ msgstr "Se espera una cuenta de gastos"
 #. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/views/expense_form_view.js:0
-#, python-format
 msgid "An expense of same category, amount and date already exists."
 msgstr "Un gasto de la misma categoría, el importe y la fecha ya existen."
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense_sheet.py:0
-#, python-format
 msgid "An expense report must contain only lines from the same company."
 msgstr "Un informe de gastos debe contener solo líneas de la misma compañía."
 
@@ -282,12 +289,6 @@ msgid "Analytic Distribution"
 msgstr "Distribución analítica"
 
 #. module: hr_expense
-#: model:ir.model.fields,field_description:hr_expense.field_hr_expense__analytic_distribution_search
-#: model:ir.model.fields,field_description:hr_expense.field_hr_expense_split__analytic_distribution_search
-msgid "Analytic Distribution Search"
-msgstr "Búsqueda de distribución analítica"
-
-#. module: hr_expense
 #: model:ir.model,name:hr_expense.model_account_analytic_applicability
 msgid "Analytic Plan's Applicabilities"
 msgstr "Aplicabilidad del plan analítico"
@@ -297,11 +298,6 @@ msgstr "Aplicabilidad del plan analítico"
 #: model:ir.model.fields,field_description:hr_expense.field_hr_expense_split__analytic_precision
 msgid "Analytic Precision"
 msgstr "Precisión analítica"
-
-#. module: hr_expense
-#: model_terms:ir.actions.act_window,help:hr_expense.hr_expense_actions_my_all
-msgid "Apple App Store"
-msgstr "Apple App Store"
 
 #. module: hr_expense
 #: model:ir.model.fields,field_description:hr_expense.field_hr_expense_sheet__approval_date
@@ -318,14 +314,12 @@ msgstr "Estado de aprobación "
 #: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_approve_duplicate_view_form
 #: model_terms:ir.ui.view,arch_db:hr_expense.view_hr_expense_sheet_form
-#, python-format
 msgid "Approve"
 msgstr "Aprobar"
 
 #. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/views/list.xml:0
-#, python-format
 msgid "Approve Report"
 msgstr "Aprobar informe"
 
@@ -356,14 +350,12 @@ msgstr "Archivado"
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_view_form
-#, python-format
 msgid "Attach Receipt"
 msgstr "Adjuntar recibo"
 
 #. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
-#, python-format
 msgid "Attach a receipt - usually an image or a PDF file."
 msgstr "Adjuntar un recibo - normalmente una imagen o un archivo en PDF."
 
@@ -423,13 +415,6 @@ msgid "Can Reset"
 msgstr "Puede restablecer"
 
 #. module: hr_expense
-#: model:ir.model.fields,field_description:hr_expense.field_product_product__can_be_expensed
-#: model:ir.model.fields,field_description:hr_expense.field_product_template__can_be_expensed
-#: model_terms:ir.ui.view,arch_db:hr_expense.product_template_search_view_inherit_hr_expense
-msgid "Can be Expensed"
-msgstr "Puede ser un gasto"
-
-#. module: hr_expense
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_approve_duplicate_view_form
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_refuse_wizard_view_form
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_split
@@ -449,6 +434,7 @@ msgstr "Categorías"
 #. module: hr_expense
 #: model:ir.model.fields,field_description:hr_expense.field_hr_expense__product_id
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_view_search
+#: model_terms:ir.ui.view,arch_db:hr_expense.product_product_expense_form_view
 msgid "Category"
 msgstr "Categoría"
 
@@ -517,7 +503,6 @@ msgstr "Coste:"
 #: code:addons/hr_expense/static/src/views/kanban.xml:0
 #: code:addons/hr_expense/static/src/views/list.xml:0
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_view_form
-#, python-format
 msgid "Create Report"
 msgstr "Crear informe"
 
@@ -530,7 +515,6 @@ msgstr "Crear nuevo informe de gastos"
 #. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
-#, python-format
 msgid "Create a report to submit one or more expenses to your manager."
 msgstr "Cree un informe para enviar uno o más gastos a su gerente."
 
@@ -599,17 +583,6 @@ msgid "Default Alias Name for Expenses"
 msgstr "Nombre de alias por defecto para gastos"
 
 #. module: hr_expense
-#: model_terms:ir.ui.view,arch_db:hr_expense.res_config_settings_view_form
-msgid "Default Category"
-msgstr "Categoría por defecto"
-
-#. module: hr_expense
-#: model:ir.model.fields,field_description:hr_expense.field_res_company__expense_product_id
-#: model:ir.model.fields,field_description:hr_expense.field_res_config_settings__expense_product_id
-msgid "Default Expense Category"
-msgstr "Categoría de gastos por defecto"
-
-#. module: hr_expense
 #: model:ir.model.fields,field_description:hr_expense.field_res_company__expense_journal_id
 #: model:ir.model.fields,field_description:hr_expense.field_res_config_settings__expense_journal_id
 msgid "Default Expense Journal"
@@ -622,8 +595,8 @@ msgstr "Diario contable por defecto para gastos pagados por empleados."
 
 #. module: hr_expense
 #: model_terms:ir.ui.view,arch_db:hr_expense.res_config_settings_view_form
-msgid "Default expense categories for uploaded expenses"
-msgstr "Categorías de gastos por defecto para gastos subidos"
+msgid "Default outstanding account for expenses paid by employees."
+msgstr ""
 
 #. module: hr_expense
 #: model:ir.model,name:hr_expense.model_hr_department
@@ -639,11 +612,6 @@ msgid "Description"
 msgstr "Descripción"
 
 #. module: hr_expense
-#: model_terms:ir.actions.act_window,help:hr_expense.hr_expense_actions_my_all
-msgid "Did you try the mobile app?"
-msgstr "¿Ha probado la aplicación móvil?"
-
-#. module: hr_expense
 #: model_terms:ir.ui.view,arch_db:hr_expense.res_config_settings_view_form
 msgid "Digitalize your receipts with OCR and Artificial Intelligence"
 msgstr "Digitalice sus recibos con OCR e Inteligencia Artificial"
@@ -657,6 +625,12 @@ msgstr "Digitalice sus recibos con OCR e Inteligencia Artificial"
 #: model:ir.model.fields,field_description:hr_expense.field_hr_expense_split_wizard__display_name
 msgid "Display Name"
 msgstr "Nombre mostrado"
+
+#. module: hr_expense
+#: model:ir.model.fields,field_description:hr_expense.field_hr_expense__distribution_analytic_account_ids
+#: model:ir.model.fields,field_description:hr_expense.field_hr_expense_split__distribution_analytic_account_ids
+msgid "Distribution Analytic Account"
+msgstr ""
 
 #. module: hr_expense
 #: model_terms:digest.tip,tip_description:hr_expense.digest_tip_hr_expense_0
@@ -676,7 +650,7 @@ msgid ""
 "from the partner to fix the configuration. Cancel this invoice and start "
 "again."
 msgstr ""
-"¿Desea facturar a su propia empresa? Elimine el nombre de la empresa del "
+"¿Desea facturar a su propia compañía? Elimine el nombre de la compañía del "
 "contacto para solucionar la configuración. Cancele esta factura y comience "
 "de nuevo."
 
@@ -694,7 +668,6 @@ msgstr "Hecho"
 #. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/mixins/qrcode.js:0
-#, python-format
 msgid "Download our App"
 msgstr "Descargue nuestra aplicación"
 
@@ -704,15 +677,9 @@ msgid "Draft"
 msgstr "Borrador"
 
 #. module: hr_expense
-#: model_terms:ir.actions.act_window,help:hr_expense.hr_expense_actions_my_all
-msgid "Drag and drop files to create expenses"
-msgstr "Arrastre y suelte archivos para crear gastos"
-
-#. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/wizard/hr_expense_approve_duplicate.py:0
 #: model:ir.model.fields,field_description:hr_expense.field_hr_expense__duplicate_expense_ids
-#, python-format
 msgid "Duplicate Expense"
 msgstr "Duplicar gasto"
 
@@ -737,24 +704,19 @@ msgid "Employee Expense Journal"
 msgstr "Diario de gastos del empleado "
 
 #. module: hr_expense
+#: model_terms:ir.ui.view,arch_db:hr_expense.res_config_settings_view_form
+msgid "Employee Expense Oustanding Account"
+msgstr ""
+
+#. module: hr_expense
 #: model:ir.actions.act_window,name:hr_expense.action_hr_expense_account
 #: model:ir.ui.menu,name:hr_expense.menu_hr_expense_account_employee_expenses
 msgid "Employee Expenses"
 msgstr "Gastos del empleado"
 
 #. module: hr_expense
-#: model_terms:ir.ui.view,arch_db:hr_expense.res_config_settings_view_form
-msgid ""
-"Enable users to choose default category for automatically generated "
-"expenses."
-msgstr ""
-"Permita a los usuarios escoger la categoría por defecto para gastos "
-"generados automáticamente."
-
-#. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
-#, python-format
 msgid ""
 "Enter a name then choose a category and configure the amount of your "
 "expense."
@@ -845,6 +807,11 @@ msgid "Expense Report"
 msgstr "Informe de gastos"
 
 #. module: hr_expense
+#: model:ir.model.fields,field_description:hr_expense.field_hr_expense_sheet__accounting_date
+msgid "Expense Report Date"
+msgstr "Fecha del informe de gastos"
+
+#. module: hr_expense
 #: model:ir.actions.report,name:hr_expense.action_report_expense_sheet_img
 msgid "Expense Report Image"
 msgstr "Imagen del informe de gastos"
@@ -907,7 +874,6 @@ msgstr "Las categorías de gastos se pueden refacturar a sus clientes."
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/account_move.py:0
-#, python-format
 msgid "Expense entry created from: %s"
 msgstr "Gasto creado desde: %s"
 
@@ -918,8 +884,8 @@ msgstr "Motivo de rechazo del gasto"
 
 #. module: hr_expense
 #: model:mail.message.subtype,description:hr_expense.mt_expense_approved
-msgid "Expense report approved"
-msgstr "Informe de gastos aprobado"
+msgid "Expense report approved, entry created for accountant"
+msgstr "Informe de gastos aprobado, asiento creado para el asesor fiscal"
 
 #. module: hr_expense
 #: model:mail.message.subtype,description:hr_expense.mt_expense_paid
@@ -947,22 +913,24 @@ msgstr ""
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "Expense split"
 msgstr "División de gasto"
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense_sheet.py:0
+#: model:ir.model.fields,field_description:hr_expense.field_product_product__can_be_expensed
+#: model:ir.model.fields,field_description:hr_expense.field_product_template__can_be_expensed
 #: model:ir.ui.menu,name:hr_expense.menu_hr_expense_root
+#: model:product.template,name:hr_expense.product_product_no_cost_product_template
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_department_view_kanban
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_sheet_view_activity
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_view_activity
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_view_expenses_analysis_tree
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_view_form
+#: model_terms:ir.ui.view,arch_db:hr_expense.product_template_search_view_inherit_hr_expense
 #: model_terms:ir.ui.view,arch_db:hr_expense.res_config_settings_view_form
 #: model_terms:ir.ui.view,arch_db:hr_expense.view_hr_expense_sheet_form
-#, python-format
 msgid "Expenses"
 msgstr "Gastos"
 
@@ -993,17 +961,6 @@ msgid "Expenses by Date"
 msgstr "Gastos por fecha"
 
 #. module: hr_expense
-#. odoo-python
-#: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
-msgid ""
-"Expenses from which the report has been submitted to the approver and is "
-"waiting for approval."
-msgstr ""
-"Gastos cuyo informe se ha enviado al aprobador y está a la espera de "
-"aprobación."
-
-#. module: hr_expense
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_sheet_view_search
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_view_search
 msgid "Expenses of Your Team Member"
@@ -1012,22 +969,8 @@ msgstr "Gastos de los miembros de su equipo"
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
-msgid "Expenses paid by employee that are approved but not paid yet."
-msgstr ""
-"Gastos pagados por el empleado que están aprobados pero aún no pagados."
-
-#. module: hr_expense
-#. odoo-python
-#: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
-msgid "Expenses that need to be submitted to the approver."
-msgstr "Gastos que necesitan enviarse a la persona responsable de aprobar. "
-
-#. module: hr_expense
-#: model_terms:ir.ui.view,arch_db:hr_expense.account_journal_dashboard_kanban_view_inherit_hr_expense
-msgid "Expenses to Process"
-msgstr "Gastos a procesar"
+msgid "Expenses with a similar receipt to %(other_expense_name)s"
+msgstr "Gastos con un recibo similar a %(other_expense_name)s"
 
 #. module: hr_expense
 #: model:ir.model.fields,field_description:hr_expense.field_hr_employee__filter_for_expense
@@ -1072,14 +1015,8 @@ msgid "Future Activities"
 msgstr "Actividades futuras"
 
 #. module: hr_expense
-#: model_terms:ir.ui.view,arch_db:hr_expense.product_product_expense_form_view
-msgid "General Information"
-msgstr "Información general"
-
-#. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "Generate Expenses"
 msgstr "Generar gastos"
 
@@ -1094,15 +1031,15 @@ msgid "Gifts to customers or vendors"
 msgstr "Regalos a clientes o proveedores"
 
 #. module: hr_expense
-#: model_terms:ir.actions.act_window,help:hr_expense.hr_expense_actions_my_all
-msgid "Google Play Store"
-msgstr "Google Play Store"
-
-#. module: hr_expense
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_sheet_view_search
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_view_search
 msgid "Group By"
 msgstr "Agrupar por"
+
+#. module: hr_expense
+#: model_terms:ir.ui.view,arch_db:hr_expense.product_product_expense_form_view
+msgid "Guideline"
+msgstr "Pauta"
 
 #. module: hr_expense
 #: model:ir.model.fields,field_description:hr_expense.field_hr_expense_sheet__is_multiple_currency
@@ -1172,11 +1109,6 @@ msgid "Incoming Emails"
 msgstr "Correos electrónicos entrantes"
 
 #. module: hr_expense
-#: model_terms:ir.ui.view,arch_db:hr_expense.product_product_expense_categories_tree_view
-msgid "Internal Note"
-msgstr "Nota interna"
-
-#. module: hr_expense
 #: model:ir.model.fields,field_description:hr_expense.field_hr_expense__description
 msgid "Internal Notes"
 msgstr "Notas internas"
@@ -1184,7 +1116,6 @@ msgstr "Notas internas"
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "Invalid attachments!"
 msgstr "¡Archivos adjuntos no válidos!"
 
@@ -1212,13 +1143,10 @@ msgstr "¿Se selecciona el producto con coste distinto de cero?"
 #. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
-#: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
-#, python-format
 msgid "It all begins here - let's go!"
 msgstr "Todo comienza aquí. ¡Vamos!"
 
 #. module: hr_expense
-#: model:ir.model,name:hr_expense.model_account_journal
 #: model:ir.model.fields,field_description:hr_expense.field_hr_expense_sheet__employee_journal_id
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_sheet_view_search
 msgid "Journal"
@@ -1240,6 +1168,11 @@ msgid "Journal Entry Deleted"
 msgstr "Asiento contable eliminado"
 
 #. module: hr_expense
+#: model:mail.message.subtype,name:hr_expense.mt_expense_entry_draft
+msgid "Journal Entry Reset to Draft"
+msgstr "Restablecer asiento contable a borrador"
+
+#. module: hr_expense
 #: model:ir.model,name:hr_expense.model_account_move_line
 msgid "Journal Item"
 msgstr "Apunte contable"
@@ -1247,7 +1180,6 @@ msgstr "Apunte contable"
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense_sheet.py:0
-#, python-format
 msgid "Journal entries"
 msgstr "Asientos contables"
 
@@ -1255,6 +1187,11 @@ msgstr "Asientos contables"
 #: model:mail.message.subtype,description:hr_expense.mt_expense_entry_delete
 msgid "Journal entry deleted"
 msgstr "Asiento contable eliminado"
+
+#. module: hr_expense
+#: model:mail.message.subtype,description:hr_expense.mt_expense_entry_draft
+msgid "Journal entry reset to draft"
+msgstr "Restablecer asiento contable a borrador"
 
 #. module: hr_expense
 #: model:ir.model.fields,field_description:hr_expense.field_hr_expense__label_currency_rate
@@ -1295,21 +1232,18 @@ msgstr "Permita que sus empleados registren sus gastos por correo electrónico"
 #. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
-#, python-format
 msgid "Let's check out where you can manage all your employees expenses"
 msgstr "Veamos dónde puede gestionar todos los gastos de sus empleados."
 
 #. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
-#, python-format
 msgid "Let's go back to your expenses."
 msgstr "Volvamos a sus gastos."
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "Lunch with customer $12.32"
 msgstr "Comida con cliente 12,32 €"
 
@@ -1327,7 +1261,6 @@ msgstr "Gerente"
 #. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
-#, python-format
 msgid ""
 "Managers can approve the report here, then an accountant can post the "
 "accounting entries."
@@ -1338,8 +1271,6 @@ msgstr ""
 #. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
-#: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
-#, python-format
 msgid "Managers can inspect all expenses from here."
 msgstr "Los gerentes pueden inspeccionar todos los gastos aquí."
 
@@ -1408,16 +1339,21 @@ msgid "Name"
 msgstr "Nombre"
 
 #. module: hr_expense
+#. odoo-javascript
+#: code:addons/hr_expense/static/src/views/kanban.xml:0
+#: code:addons/hr_expense/static/src/views/list.xml:0
+msgid "New"
+msgstr "Nuevo"
+
+#. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "New Expense Report, paid by %(paid_by)s"
 msgstr "Nuevo informe de gastos, pagado por %(paid_by)s"
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "New Expense Reports"
 msgstr "Nuevos informes de gastos"
 
@@ -1448,7 +1384,6 @@ msgstr "Tipo de la siguiente actividad"
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "No attachment was provided"
 msgstr "No se proporcionó ningún archivo adjunto"
 
@@ -1476,7 +1411,6 @@ msgstr "No se encontraron informes de gastos. ¡Creemos uno!"
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense_sheet.py:0
-#, python-format
 msgid "No work contact found for the employee %s, please configure one."
 msgstr ""
 "No se encontró un contacto de trabajo para el empleado %s, configure uno."
@@ -1485,6 +1419,11 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_sheet_view_search
 msgid "Not Refused"
 msgstr "No rechazado "
+
+#. module: hr_expense
+#: model_terms:ir.ui.view,arch_db:hr_expense.product_product_expense_categories_tree_view
+msgid "Note"
+msgstr "Nota"
 
 #. module: hr_expense
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_view_form
@@ -1533,7 +1472,6 @@ msgstr "Número de mensajes con error de envío"
 #. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/components/expense_dashboard.xml:0
-#, python-format
 msgid "Numbers computed from your personal expenses."
 msgstr "Números calculados a partir de sus gastos personales."
 
@@ -1554,7 +1492,6 @@ msgstr "Cuando haya creado su gasto, envíelo a su gerente para que lo valide."
 #. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
-#, python-format
 msgid ""
 "Once your <b>Expense Report</b> is ready, you can submit it to your manager "
 "and wait for approval."
@@ -1565,23 +1502,16 @@ msgstr ""
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense_sheet.py:0
-#, python-format
 msgid "Only HR Officers or the concerned employee can reset to draft."
 msgstr ""
 "Solo un encargado de RR. HH. o el propio empleado pueden restablecer al "
 "estado de borrador."
 
 #. module: hr_expense
-#: model_terms:ir.actions.act_window,help:hr_expense.hr_expense_actions_my_all
-msgid "Or"
-msgstr "O"
-
-#. module: hr_expense
-#. odoo-python
-#: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
-msgid "Or send your receipts at"
-msgstr "O envíe sus recibos a"
+#. odoo-javascript
+#: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
+msgid "Open bugger menu."
+msgstr "Abrir el menú de desarrollador."
 
 #. module: hr_expense
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_split
@@ -1589,9 +1519,10 @@ msgid "Original Amount"
 msgstr "Importe original"
 
 #. module: hr_expense
-#: model:product.template,name:hr_expense.product_product_no_cost_product_template
-msgid "Others"
-msgstr "Otros"
+#: model:ir.model.fields,field_description:hr_expense.field_res_company__expense_outstanding_account_id
+#: model:ir.model.fields,field_description:hr_expense.field_res_config_settings__expense_outstanding_account_id
+msgid "Outstanding Account"
+msgstr "Cuenta pendiente"
 
 #. module: hr_expense
 #: model:mail.message.subtype,name:hr_expense.mt_expense_paid
@@ -1611,6 +1542,14 @@ msgid "Partial"
 msgstr "Parcial"
 
 #. module: hr_expense
+#. odoo-javascript
+#: code:addons/hr_expense/static/src/views/list.xml:0
+#: model:ir.model,name:hr_expense.model_account_payment_register
+#: model_terms:ir.ui.view,arch_db:hr_expense.view_hr_expense_sheet_form
+msgid "Pay"
+msgstr "Pagar"
+
+#. module: hr_expense
 #: model:ir.model.fields,field_description:hr_expense.field_hr_expense_sheet__payment_method_line_id
 msgid "Payment Method"
 msgstr "Método de pago"
@@ -1623,7 +1562,6 @@ msgstr "Estado de pago"
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/account_payment.py:0
-#, python-format
 msgid "Payment created for: %s"
 msgstr "Pago creado para: %s"
 
@@ -1654,9 +1592,16 @@ msgid "Phone bills, postage, etc."
 msgstr "Cuenta de teléfono, correo postal, etc."
 
 #. module: hr_expense
+#. odoo-python
+#: code:addons/hr_expense/models/hr_expense_sheet.py:0
+msgid ""
+"Please specify if the expenses for this report were paid by the company, or "
+"the employee"
+msgstr ""
+
+#. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/views/list.xml:0
-#, python-format
 msgid "Post Entries"
 msgstr "Registrar asientos"
 
@@ -1731,7 +1676,6 @@ msgstr "Calificaciones"
 #. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
-#, python-format
 msgid ""
 "Ready? You can save it manually or discard modifications from here. You "
 "don't <em>need to save</em> - Odoo will save eveyrthing for you when you "
@@ -1742,18 +1686,25 @@ msgstr ""
 
 #. module: hr_expense
 #: model:ir.model.fields,field_description:hr_expense.field_hr_expense_refuse_wizard__reason
+#: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_refuse_wizard_view_form
 msgid "Reason"
 msgstr "Motivo"
-
-#. module: hr_expense
-#: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_refuse_wizard_view_form
-msgid "Reason to refuse Expense"
-msgstr "Motivo para rechazar el gasto"
 
 #. module: hr_expense
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_template_refuse_reason
 msgid "Reason:"
 msgstr "Motivo:"
+
+#. module: hr_expense
+#: model_terms:ir.ui.view,arch_db:hr_expense.product_product_expense_categories_tree_view
+#: model_terms:ir.ui.view,arch_db:hr_expense.product_product_expense_form_view
+msgid "Reference"
+msgstr "Referencia"
+
+#. module: hr_expense
+#: model_terms:ir.ui.view,arch_db:hr_expense.res_config_settings_view_form
+msgid "Refund employees via their payslips."
+msgstr ""
 
 #. module: hr_expense
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_approve_duplicate_view_form
@@ -1782,22 +1733,8 @@ msgid "Refused Expenses"
 msgstr "Gastos rechazados"
 
 #. module: hr_expense
-#. odoo-javascript
-#: code:addons/hr_expense/static/src/views/list.xml:0
-#: model:ir.model,name:hr_expense.model_account_payment_register
-#: model_terms:ir.ui.view,arch_db:hr_expense.view_hr_expense_sheet_form
-#, python-format
-msgid "Register Payment"
-msgstr "Registrar pago"
-
-#. module: hr_expense
 #: model:ir.model.fields,field_description:hr_expense.field_res_config_settings__module_hr_payroll_expense
 msgid "Reimburse Expenses in Payslip"
-msgstr "Reembolsar gastos en el recibo de nómina"
-
-#. module: hr_expense
-#: model_terms:ir.ui.view,arch_db:hr_expense.res_config_settings_view_form
-msgid "Reimburse expenses in payslips"
 msgstr "Reembolsar gastos en el recibo de nómina"
 
 #. module: hr_expense
@@ -1849,17 +1786,20 @@ msgid "Sales Price"
 msgstr "Precio de venta"
 
 #. module: hr_expense
+#: model:ir.model.fields,field_description:hr_expense.field_hr_expense__same_receipt_expense_ids
+msgid "Same Receipt Expense"
+msgstr "Mismo recibo de gastos"
+
+#. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/views/kanban.xml:0
 #: code:addons/hr_expense/static/src/views/list.xml:0
-#, python-format
 msgid "Scan"
 msgstr "Escanear"
 
 #. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/components/qrcode_action.xml:0
-#, python-format
 msgid "Scan this QR code to get the Odoo app:"
 msgstr "Escanee este código QR para obtener la aplicación de Odoo:"
 
@@ -1906,11 +1846,6 @@ msgid "Settings"
 msgstr "Ajustes"
 
 #. module: hr_expense
-#: model_terms:ir.ui.view,arch_db:hr_expense.res_config_settings_view_form
-msgid "Setup your alias domain"
-msgstr "Configure su alias de dominio"
-
-#. module: hr_expense
 #: model:ir.model.fields,field_description:hr_expense.field_hr_expense_approve_duplicate__sheet_ids
 #: model:ir.model.fields,field_description:hr_expense.field_hr_expense_refuse_wizard__sheet_ids
 msgid "Sheet"
@@ -1919,7 +1854,6 @@ msgstr "Hoja"
 #. module: hr_expense
 #: model:ir.model.fields,field_description:hr_expense.field_account_bank_statement_line__show_commercial_partner_warning
 #: model:ir.model.fields,field_description:hr_expense.field_account_move__show_commercial_partner_warning
-#: model:ir.model.fields,field_description:hr_expense.field_account_payment__show_commercial_partner_warning
 msgid "Show Commercial Partner Warning"
 msgstr "Mostrar advertencia de contacto comercial"
 
@@ -1934,25 +1868,20 @@ msgstr ""
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense_sheet.py:0
-#, python-format
 msgid "Show missing work email employees"
 msgstr "Mostrar los empleados de correo electrónico de trabajo que faltan"
 
 #. module: hr_expense
-#: model_terms:ir.actions.act_window,help:hr_expense.hr_expense_actions_my_all
-msgid ""
-"Snap pictures of your receipts and let Odoo<br> automatically create "
-"expenses for you."
-msgstr ""
-"Tome fotos de sus recibos y deje que Odoo<br> cree automáticamente los "
-"gastos por usted."
-
-#. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense_sheet.py:0
-#, python-format
 msgid "Specify expense journal to generate accounting entries."
 msgstr "Especifique el diario de gastos para generar los asientos contables."
+
+#. module: hr_expense
+#: model:ir.model.fields,help:hr_expense.field_hr_expense__accounting_date
+#: model:ir.model.fields,help:hr_expense.field_hr_expense_sheet__accounting_date
+msgid "Specify the bill date of the related vendor bill."
+msgstr "Especifique la fecha de la factura del proveedor relacionado."
 
 #. module: hr_expense
 #: model:ir.model.fields,help:hr_expense.field_product_product__can_be_expensed
@@ -1969,7 +1898,6 @@ msgstr "Dividir gasto"
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/wizard/hr_expense_split_wizard.py:0
-#, python-format
 msgid "Split Expenses"
 msgstr "Dividir gastos"
 
@@ -2008,7 +1936,6 @@ msgstr ""
 #. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/views/list.xml:0
-#, python-format
 msgid "Submit"
 msgstr "Enviar"
 
@@ -2016,7 +1943,6 @@ msgstr "Enviar"
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
 #: model_terms:ir.ui.view,arch_db:hr_expense.view_hr_expense_sheet_form
-#, python-format
 msgid "Submit to Manager"
 msgstr "Enviar al gerente"
 
@@ -2090,6 +2016,13 @@ msgid "Team Approver"
 msgstr "Aprobador de equipo"
 
 #. module: hr_expense
+#: model:ir.model.fields,help:hr_expense.field_res_company__expense_outstanding_account_id
+#: model:ir.model.fields,help:hr_expense.field_res_config_settings__expense_outstanding_account_id
+msgid ""
+"The account used to record the outstanding amount of the employee expenses."
+msgstr ""
+
+#. module: hr_expense
 #: model:ir.model.fields,help:hr_expense.field_res_company__expense_journal_id
 #: model:ir.model.fields,help:hr_expense.field_res_config_settings__expense_journal_id
 msgid ""
@@ -2101,7 +2034,6 @@ msgstr ""
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "The current user has no related employee. Please, create one."
 msgstr "El usuario actual no tiene empleados relacionados. Crea uno."
 
@@ -2137,6 +2069,14 @@ msgid "The journal used when the expense is paid by employee."
 msgstr "El diario se utiliza cuando los gastos son pagados por el empleado."
 
 #. module: hr_expense
+#. odoo-python
+#: code:addons/hr_expense/models/hr_expense_sheet.py:0
+msgid ""
+"The payment method %(method)s needs an account, or a default outstanding "
+"account must be defined in the settings."
+msgstr ""
+
+#. module: hr_expense
 #: model:ir.model.fields,help:hr_expense.field_hr_expense_sheet__payment_method_line_id
 msgid "The payment method used when the expense is paid by the company."
 msgstr "El método de pago que se utiliza cuando la empresa paga el gasto."
@@ -2144,7 +2084,6 @@ msgstr "El método de pago que se utiliza cuando la empresa paga el gasto."
 #. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
-#, python-format
 msgid "The status of all your current expenses is visible from here."
 msgstr "Puede ver el estado de todos sus gastos actuales aquí."
 
@@ -2156,7 +2095,6 @@ msgstr "La suma posterior a la división debe ser la misma."
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense_sheet.py:0
-#, python-format
 msgid ""
 "The work email of some employees is missing. Please add it on the employee "
 "form"
@@ -2167,7 +2105,6 @@ msgstr ""
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/product_product.py:0
-#, python-format
 msgid ""
 "There are unsubmitted expenses linked to this category. Updating the "
 "category cost will change expense amounts. Make sure it is what you want to "
@@ -2178,25 +2115,31 @@ msgstr ""
 "desea hacer. "
 
 #. module: hr_expense
-#. odoo-javascript
-#: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
-#, python-format
+#: model_terms:web_tour.tour,rainbow_man_message:hr_expense.hr_expense_tour
 msgid "There you go - expense management in a nutshell!"
 msgstr "¡Y así de fácil es la gestión de gastos!"
 
 #. module: hr_expense
-#: model_terms:ir.ui.view,arch_db:hr_expense.product_product_expense_form_view
+#. odoo-python
+#: code:addons/hr_expense/models/hr_expense_sheet.py:0
 msgid ""
-"This note will be shown to users when they select this expense product."
+"This expense report is empty. You cannot submit or approve an empty expense "
+"report."
 msgstr ""
-"Se le mostrará esta nota a los usuarios cuando seleccionen su producto de "
-"gasto."
+"Este informe de gastos está vacío. No puede enviar ni aprobar informes de "
+"gastos vacíos."
 
 #. module: hr_expense
 #: model:digest.tip,name:hr_expense.digest_tip_hr_expense_0
 #: model_terms:digest.tip,tip_description:hr_expense.digest_tip_hr_expense_0
 msgid "Tip: Snap pictures of your receipts with the remote app"
 msgstr "Consejo: tome una foto de sus recibos con la aplicación remota"
+
+#. module: hr_expense
+#. odoo-python
+#: code:addons/hr_expense/models/hr_expense.py:0
+msgid "Tip: try sending receipts by email"
+msgstr "Consejo: intente enviar los recibos por correo electrónico"
 
 #. module: hr_expense
 #: model:ir.model.fields.selection,name:hr_expense.selection__hr_expense__state__draft
@@ -2207,8 +2150,14 @@ msgstr "A informar"
 #. module: hr_expense
 #: model:ir.model.fields.selection,name:hr_expense.selection__hr_expense__state__reported
 #: model:ir.model.fields.selection,name:hr_expense.selection__hr_expense_sheet__state__draft
+#: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_view_search
 msgid "To Submit"
 msgstr "A enviar"
+
+#. module: hr_expense
+#: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_view_search
+msgid "To be Reimbursed"
+msgstr "A reembolsar"
 
 #. module: hr_expense
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_sheet_view_search
@@ -2269,6 +2218,11 @@ msgid "Type of the exception activity on record."
 msgstr "Tipo de actividad de excepción en el registro."
 
 #. module: hr_expense
+#: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_view_search
+msgid "Under Validation"
+msgstr "En validación"
+
+#. module: hr_expense
 #: model:ir.model.fields,field_description:hr_expense.field_hr_expense__price_unit
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_view_expenses_analysis_tree
 #: model_terms:ir.ui.view,arch_db:hr_expense.report_expense_sheet
@@ -2295,14 +2249,17 @@ msgstr "Categoría de UdM"
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/views/kanban.xml:0
 #: code:addons/hr_expense/static/src/views/list.xml:0
-#, python-format
 msgid "Upload"
 msgstr "Subir"
 
 #. module: hr_expense
+#: model_terms:ir.actions.act_window,help:hr_expense.hr_expense_actions_my_all
+msgid "Upload or drop an expense receipt"
+msgstr "Suba o arrastre un recibo de gastos"
+
+#. module: hr_expense
 #. odoo-javascript
 #: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
-#, python-format
 msgid "Use the breadcrumbs to go back to the list of expenses."
 msgstr "Utilice las migas de pan para volver a la lista de gastos."
 
@@ -2315,6 +2272,11 @@ msgstr "Usuario"
 #: model:ir.actions.act_window,name:hr_expense.hr_expense_approve_duplicate_action
 msgid "Validate Duplicate Expenses"
 msgstr "Validar gastos duplicados"
+
+#. module: hr_expense
+#: model:ir.model.fields,field_description:hr_expense.field_hr_expense__vendor_id
+msgid "Vendor"
+msgstr "Proveedor"
 
 #. module: hr_expense
 #: model_terms:ir.ui.view,arch_db:hr_expense.view_hr_expense_sheet_form
@@ -2332,15 +2294,6 @@ msgid "View Report"
 msgstr "Ver informe"
 
 #. module: hr_expense
-#. odoo-javascript
-#: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
-#: code:addons/hr_expense/static/src/js/tours/hr_expense.js:0
-#, python-format
-msgid "Wasting time recording your receipts? Let’s try a better way."
-msgstr ""
-"¿Registrar sus recibos le toma mucho tiempo? Probemos una mejor forma."
-
-#. module: hr_expense
 #: model:ir.model.fields,field_description:hr_expense.field_hr_expense__website_message_ids
 #: model:ir.model.fields,field_description:hr_expense.field_hr_expense_sheet__website_message_ids
 msgid "Website Messages"
@@ -2356,12 +2309,13 @@ msgstr "Historial de comunicación del sitio web"
 #: model_terms:ir.ui.view,arch_db:hr_expense.product_product_expense_form_view
 msgid ""
 "When the cost of an expense product is different than 0, then the user"
-"                                         using this product won't be able to"
-" change the amount of the expense,                                         "
-"only the quantity. Use a cost different than 0 for expense categories funded"
-" by                                         the company at fixed cost like "
+"                                             using this product won't be "
+"able to change the amount of the expense,"
+"                                             only the quantity. Use a cost "
+"different than 0 for expense categories funded by"
+"                                             the company at fixed cost like "
 "allowances for mileage, per diem, accommodation"
-"                                         or meal."
+"                                             or meal."
 msgstr ""
 "Cuando el coste de un producto de gasto no es 0, el usuario que utiliza"
 "                                             este producto no podrá cambiar "
@@ -2385,22 +2339,18 @@ msgstr "Asistente"
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "You are not authorized to edit this expense report."
 msgstr "No tiene autorización para editar este informe de gastos."
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "You are not authorized to edit this expense."
 msgstr "No tiene autorización para editar este gasto."
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "You can not create report without category."
 msgstr "No puede crear un informe sin categoría."
 
@@ -2412,21 +2362,18 @@ msgstr "Ahora puede enviarlo al gerente desde el siguiente enlace."
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense_sheet.py:0
-#, python-format
-msgid "You can only generate accounting entry for approved expense(s)."
+msgid "You can only generate an accounting entry for approved expense(s)."
 msgstr "Solo puede generar asientos contables para los gastos aprobados."
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense_sheet.py:0
-#, python-format
 msgid "You cannot add expenses of another employee."
 msgstr "No puede agregar gastos de otro empleado."
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense_sheet.py:0
-#, python-format
 msgid ""
 "You cannot approve:\n"
 " %s"
@@ -2437,35 +2384,39 @@ msgstr ""
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense_sheet.py:0
-#, python-format
-msgid "You cannot cancel an expense sheet linked to a journal entry"
-msgstr "No puede cancelar una hoja de gastos vinculada a un asiento contable"
+msgid "You cannot cancel an expense sheet linked to a posted journal entry"
+msgstr ""
+"No puede cancelar una hoja de gastos vinculada a un asiento contable "
+"publicado"
+
+#. module: hr_expense
+#. odoo-python
+#: code:addons/hr_expense/models/hr_expense_sheet.py:0
+msgid ""
+"You cannot create accounting entries for an expense report without expenses."
+msgstr "No puede crear asientos contables para un informe de gastos vacío."
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "You cannot delete a posted or approved expense."
 msgstr "No puede eliminar un gasto registrado o aprobado."
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense_sheet.py:0
-#, python-format
 msgid "You cannot delete a posted or paid expense."
 msgstr "No puede eliminar un gasto registrado o pagado."
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/analytic.py:0
-#, python-format
 msgid "You cannot delete an analytic account that is used in an expense."
 msgstr "No puede eliminar una cuenta analítica que se utiliza en un gasto."
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/account_move.py:0
-#, python-format
 msgid ""
 "You cannot delete only some entries linked to an expense report. All entries"
 " must be deleted at the same time."
@@ -2476,7 +2427,6 @@ msgstr ""
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/account_payment.py:0
-#, python-format
 msgid ""
 "You cannot delete only some payments linked to an expense report. All "
 "payments must be deleted at the same time."
@@ -2487,7 +2437,6 @@ msgstr ""
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/account_payment.py:0
-#, python-format
 msgid ""
 "You cannot do this modification since the payment is linked to an expense "
 "report."
@@ -2498,7 +2447,6 @@ msgstr ""
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense_sheet.py:0
-#, python-format
 msgid ""
 "You cannot refuse:\n"
 " %s"
@@ -2508,15 +2456,23 @@ msgstr ""
 
 #. module: hr_expense
 #. odoo-python
+#: code:addons/hr_expense/models/hr_expense_sheet.py:0
+msgid ""
+"You cannot remove all expenses from a submitted, approved or paid expense "
+"report."
+msgstr ""
+"No puede eliminar todos los gastos de un informe de gastos enviado, aprobado"
+" o pagado."
+
+#. module: hr_expense
+#. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "You cannot report expenses for different companies in the same report."
 msgstr "No puede incluir gastos de diferentes compañías en el mismo informe."
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "You cannot report expenses for different employees in the same report."
 msgstr ""
 "No puede informar de los gastos de diferentes empleados en el mismo informe."
@@ -2524,35 +2480,57 @@ msgstr ""
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "You cannot report the expenses without amount!"
 msgstr "¡No puede informar de los gastos sin un importe!"
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "You cannot report twice the same line!"
 msgstr "¡No puede incluir dos veces la misma línea!"
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
+msgid ""
+"You cannot set the expense total in currency to 0 if it's linked to a "
+"report."
+msgstr ""
+"No puede establecer el total del gasto en moneda como 0 si está vinculado a "
+"un informe."
+
+#. module: hr_expense
+#. odoo-python
+#: code:addons/hr_expense/models/hr_expense.py:0
+msgid "You cannot set the expense total to 0 if it's linked to a report."
+msgstr ""
+"No puede establecer el gasto total como 0 si está vinculado a un informe."
+
+#. module: hr_expense
+#. odoo-python
+#: code:addons/hr_expense/models/hr_expense_sheet.py:0
+msgid ""
+"You do not have the rights to add or remove any expenses on an approved or "
+"paid expense report."
+msgstr ""
+"No cuenta con los permisos para agregar o eliminar gastos de un informe de "
+"gastos aprobado o pagado."
+
+#. module: hr_expense
+#. odoo-python
+#: code:addons/hr_expense/models/hr_expense.py:0
 msgid "You have no expense to report"
 msgstr "No tiene gastos a informar"
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "You need to add a manual payment method on the journal (%s)"
 msgstr "Debe agregar un método de pago manual en el diario (%s)"
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid ""
 "You need to have at least one category that can be expensed in your database"
 " to proceed!"
@@ -2571,6 +2549,11 @@ msgid "Your expense has been successfully registered."
 msgstr "Su gasto ha sido registrado con éxito."
 
 #. module: hr_expense
+#: model_terms:ir.ui.view,arch_db:hr_expense.res_config_settings_view_form
+msgid "alias"
+msgstr "alias"
+
+#. module: hr_expense
 #: model_terms:ir.ui.view,arch_db:hr_expense.product_product_expense_form_view
 msgid "e.g. Lunch"
 msgstr "p. ej. Comida"
@@ -2581,14 +2564,24 @@ msgid "e.g. Lunch with Customer"
 msgstr "p. ej. Comida con cliente"
 
 #. module: hr_expense
+#: model_terms:ir.ui.view,arch_db:hr_expense.product_product_expense_form_view
+msgid "e.g. Restaurants: only week days, for lunch"
+msgstr "p. ej. Restaurantes: solo entre semana para la comida"
+
+#. module: hr_expense
 #: model_terms:ir.ui.view,arch_db:hr_expense.view_hr_expense_sheet_form
 msgid "e.g. Trip to NY"
 msgstr "p. ej. Viaje a Nueva York"
 
 #. module: hr_expense
 #: model_terms:ir.ui.view,arch_db:hr_expense.res_config_settings_view_form
-msgid "e.g. domain.com"
-msgstr "p. ej. dominio.com"
+msgid "e.g. mycompany.com"
+msgstr "p. ej. micompañía.com"
+
+#. module: hr_expense
+#: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_view_form
+msgid "expense"
+msgstr "gasto"
 
 #. module: hr_expense
 #: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_template_refuse_reason
@@ -2596,23 +2589,35 @@ msgid "has been refused"
 msgstr "ha sido rechazado"
 
 #. module: hr_expense
+#: model_terms:ir.ui.view,arch_db:hr_expense.product_product_expense_form_view
+msgid "no taxes"
+msgstr "sin impuestos"
+
+#. module: hr_expense
+#: model_terms:ir.ui.view,arch_db:hr_expense.product_product_expense_form_view
+msgid "per"
+msgstr "por"
+
+#. module: hr_expense
+#: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_view_form
+msgid "tax)"
+msgstr "impuesto)"
+
+#. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "to be reimbursed"
 msgstr "a ser reembolsado"
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "to submit"
 msgstr "a enviar"
 
 #. module: hr_expense
 #. odoo-python
 #: code:addons/hr_expense/models/hr_expense.py:0
-#, python-format
 msgid "under validation"
 msgstr "en validación"
 
@@ -2621,3 +2626,8 @@ msgstr "en validación"
 msgid "use OCR to fill data from a picture of the bill"
 msgstr ""
 "use el OCR para completar los datos a partir de una foto de la factura"
+
+#. module: hr_expense
+#: model_terms:ir.ui.view,arch_db:hr_expense.hr_expense_view_form
+msgid "with the same receipt already exists."
+msgstr "con el mismo recibo ya existe."

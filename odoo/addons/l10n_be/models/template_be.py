@@ -79,38 +79,4 @@ class AccountChartTemplate(models.AbstractModel):
                 'name@nl': 'Bankkosten (Geen BTW)',
                 'name@de': 'Bankgebühren (Ohne MwSt.)',
             },
-            'frais_bancaires_tva21_template': {
-                'name': 'Bank Fees (21% VAT)',
-                'line_ids': [
-                    Command.create({
-                        'account_id': 'a6560',
-                        'amount_type': 'percentage',
-                        'tax_ids': [
-                            Command.set([
-                                'attn_TVA-21-inclus-dans-prix',
-                            ]),
-                        ],
-                        'amount_string': '100',
-                        'label': 'Bank Fees (21% VAT)',
-                    }),
-                ],
-                'name@fr': 'Frais bancaires (21% TVA)',
-                'name@nl': 'Bankkosten (21% BTW)',
-                'name@de': 'Bankgebühren (21 % MwSt.)',
-            },
-            'virements_internes_template': {
-                'name': 'Internal Transfers',
-                'to_check': False,
-                'line_ids': [
-                    Command.create({
-                        'account_id': 'a58',
-                        'amount_type': 'percentage',
-                        'amount_string': '100',
-                        'label': 'Internal Transfers',
-                    }),
-                ],
-                'name@fr': 'Virements internes',
-                'name@nl': 'Interne overboekingen',
-                'name@de': 'Interne Überweisungen',
-            },
         }

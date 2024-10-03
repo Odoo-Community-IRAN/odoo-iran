@@ -33,7 +33,7 @@ VariantMixin._onChangeCombinationStock = function (ev, $parent, combination) {
         product_id = $parent.find('.product_id').val();
     }
     const isMainProduct = combination.product_id &&
-        ($parent.is('.js_main_product') || $parent.is('.main_product')) &&
+        $parent.is('.js_main_product') &&
         combination.product_id === parseInt(product_id);
 
     if (!this.isWebsite || !isMainProduct) {
@@ -46,7 +46,7 @@ VariantMixin._onChangeCombinationStock = function (ev, $parent, combination) {
     ctaWrapper.classList.replace('d-none', 'd-flex');
     ctaWrapper.classList.remove('out_of_stock');
 
-    if (combination.product_type === 'product' && !combination.allow_out_of_stock_order) {
+    if (combination.is_storable && !combination.allow_out_of_stock_order) {
         combination.free_qty -= parseInt(combination.cart_qty);
         $addQtyInput.data('max', combination.free_qty || 1);
         if (combination.free_qty < 0) {

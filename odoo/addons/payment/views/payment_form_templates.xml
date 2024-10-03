@@ -51,7 +51,7 @@
         <t t-set="submit_button_label"
            t-value="submit_button_label or (pay_label if mode == 'payment' else save_label)"
         />
-        <form id="o_payment_form"
+        <form t-if="payment_methods_sudo or tokens_sudo" id="o_payment_form"
               class="o_payment_form"
               t-att-data-mode="mode"
               t-att-data-reference-prefix="reference_prefix"
@@ -95,6 +95,7 @@
                     <h4 class="fs-6 small text-uppercase fw-bolder">
                         <t t-if="not collapse_payment_methods">Choose a payment method</t>
                         <t t-else="">Other payment methods</t>
+                        <t t-call="payment.availability_report_button"/>
                     </h4>
                     <!-- === Body === -->
                     <ul class="list-group">
@@ -126,7 +127,10 @@
                 <!-- === Submit button === -->
                 <t t-if="display_submit_button" t-call="payment.submit_button"/>
             </div>
+            <!-- === Availability report === -->
+            <t t-call="payment.availability_report"/>
         </form>
+        <t t-else="" t-call="payment.no_pms_available_warning"/>
     </template>
 
     <template id="payment.token_form" name="Payment Token Form">
@@ -144,7 +148,7 @@
             <!-- === Delete button === -->
             <button t-if="allow_token_deletion"
                     name="o_payment_delete_token"
-                    t-att-class="'btn btn-link px-2 py-0 lh-lg z-index-1'
+                    t-att-class="'btn btn-link px-2 py-0 lh-lg z-1'
                                  + (' d-none' if mode != 'validation' else '')"
                     t-attf-data-linked-radio="o_payment_token_{{token_sudo.id}}"
             >
@@ -205,10 +209,11 @@
                     />
                 </div>
                 <!-- === Provider name (only for desktop and tablet) === -->
+                <t t-set="hide_secured_by" t-value="False"/>
                 <div class="col d-none d-md-block">
                     <p name="o_payment_secured_by_desktop" t-att-class="'mb-0 small text-600'
                                     + (' ms-4 ms-md-0' if allow_token_selection else '')
-                                    + (' d-none' if provider_sudo.code == 'custom' else '')"
+                                    + (' d-none' if hide_secured_by else '')"
                     >
                         <span><i class="fa fa-lock"/> Secured by</span>
                         <span t-out="dict(provider_sudo._fields['code']._description_selection(
@@ -234,7 +239,7 @@
         <!-- === Provider name (only for mobile) === -->
         <p name="o_payment_secured_by_mobile"
            t-att-class="'align-self-end d-block d-md-none mb-0 small text-600'
-                        + (' d-none' if provider_sudo.code == 'custom' else '')"
+                        + (' d-none' if hide_secured_by else '')"
         >
             <span><i class="fa fa-lock"/> Secured by</span>
             <span t-out="dict(provider_sudo._fields['code']._description_selection(
@@ -343,9 +348,10 @@
                     </label>
                 </div>
                 <!-- === Provider name === -->
+                <t t-set="hide_secured_by" t-value="False"/>
                 <p name="o_payment_secured_by"
                    t-att-class="'align-self-end mb-0 ms-auto small text-600'
-                    + (' d-none' if provider_sudo.code == 'custom' else '')"
+                                + (' d-none' if hide_secured_by else '')"
                 >
                     <span><i class="fa fa-lock"/> Secured by</span>
                     <span t-out="dict(provider_sudo._fields['code']._description_selection(
@@ -364,7 +370,7 @@
             - color_name: The class name of the color (`warning`, `danger`...).
             - title: The title to display on hover.
         -->
-        <i t-attf-class="fa fa-{{icon_name}} text-{{color_name}} position-relative z-index-1"
+        <i t-attf-class="fa fa-{{icon_name}} text-{{color_name}} position-relative z-1"
            t-att-title="title"
            data-bs-toggle="tooltip"
            data-bs-placement="top"
@@ -379,7 +385,7 @@
         -->
         <span t-field="logo_pm_sudo.image_payment_form"
               t-options="{'widget': 'image', 'alt-field': 'name'}"
-              class="position-relative d-block rounded overflow-hidden z-index-1 shadow-sm"
+              class="position-relative d-block rounded overflow-hidden z-1 shadow-sm"
               t-att-title="logo_pm_sudo.name"
               data-bs-toggle="tooltip"
               data-bs-placement="top"
@@ -397,6 +403,139 @@
                 class="btn btn-primary w-100 w-md-auto ms-auto px-5"
                 disabled="true"
         />
+    </template>
+
+    <template id="payment.no_pms_available_warning">
+        <div class="alert alert-warning mt-2">
+            <div>
+                <strong>No payment method available</strong>
+            </div>
+            <div t-if="request.env.is_system()" class="mt-2">
+                <p t-if="providers_sudo">
+                    None is configured for:
+                    <t t-out="request.env.company.country_id.name"/>,
+                    <t t-out="request.env.company.currency_id.name"/>.
+                </p>
+                <p t-else="">
+                    No payment providers are configured.
+                </p>
+                <a
+                    t-if="request.env.company.country_id.is_stripe_supported_country
+                          and not providers_sudo"
+                    name="activate_stripe"
+                    href="/odoo/action-payment.action_activate_stripe"
+                    role="button"
+                    class="btn btn-primary me-2"
+                > ACTIVATE STRIPE </a>
+                <a
+                    t-if="availability_report"
+                    role="button"
+                    class="btn-link alert-warning me-2"
+                    data-bs-toggle="collapse"
+                    href="#payment_availability_report"
+                >
+                    <strong><i class="fa fa-file-text"/> Show availability report</strong>
+                </a>
+                <a
+                    t-if="not providers_sudo"
+                    role="button"
+                    type="action"
+                    class="btn-link alert-warning me-2"
+                    href="/odoo/action-payment.action_payment_provider"
+                >
+                    <strong><i class="oi oi-arrow-right"/> Payment Providers</strong>
+                </a>
+                <a
+                    t-else=""
+                    role="button"
+                    type="action"
+                    class="btn-link alert-warning"
+                    href="/odoo/action-payment.action_payment_method"
+                >
+                    <strong><i class="oi oi-arrow-right"/> Payment Methods</strong>
+                </a>
+            </div>
+            <div t-else="" class="mt-2">
+                If you believe that it is an error, please contact the website administrator.
+            </div>
+        </div>
+        <!-- === Availability report === -->
+        <t t-call="payment.availability_report"/>
+    </template>
+
+    <template id="payment.availability_report_button">
+        <a
+            t-if="request.env.user._is_system() and availability_report"
+            role="button"
+            data-bs-toggle="collapse"
+            href="#payment_availability_report"
+            aria-expanded="false"
+            aria-controls="payment_availability_report"
+        >
+            <i class="fa fa-bug"/>
+        </a>
+    </template>
+
+    <template id="payment.availability_report">
+        <div
+            t-if="request.env.user._is_system() and availability_report"
+            id="payment_availability_report"
+            class="collapse"
+        >
+            <h4 class="fs-6 text-uppercase fw-bolder"> Availability report </h4>
+                <h6 class="mt-3 text-uppercase fw-normal fs-6"> Payment providers </h6>
+                <t t-call="payment.availability_report_records">
+                    <t t-set="records" t-value="availability_report.get('providers')"/>
+                </t>
+                <h6 class="mt-3 text-uppercase fw-normal fs-6"> Payment methods </h6>
+                <t t-call="payment.availability_report_records">
+                    <t t-set="records" t-value="availability_report.get('payment_methods')"/>
+                </t>
+        </div>
+    </template>
+
+    <template id="availability_report_records">
+        <!-- Parameters description:
+            - records: The records to list in the availability report, as a dict with the structure
+                       {record: {'available': bool, 'reason': str, supported_providers: list}}.
+        -->
+        <ul class="list-group">
+            <t t-foreach="records" t-as="r">
+                <t t-set="available" t-value="records[r]['available']"/>
+                <li class="list-group-item ps-0">
+                    <div class="d-flex gap-2">
+                        <div class="ms-2">
+                            <i
+                                t-attf-class="fa fa-fw fa-{{'check-circle' if available else 'times-circle'}}"
+                                t-attf-style="color: {{'green' if available else 'red'}};"
+                            />
+                        </div>
+                        <div>
+                            <p class="lead mb-0">
+                                <span class="fw-normal"><t t-out="r.name"/></span>
+                                <span class="text-muted">(ID: <t t-out="r.id"/>)</span>
+                            </p>
+                            <t t-if="not available">
+                                <p class="mb-0 fw-light">
+                                    Reason: <t t-out="records[r]['reason']"/>
+                                </p>
+                            </t>
+                            <t t-if="r._name == 'payment.method' and 'supported_providers' in records[r]">
+                                <p class="mb-0 fw-light">
+                                    Supported providers:
+                                     <t t-foreach="records[r]['supported_providers']" t-as="p">
+                                        <span t-attf-class="text-{{'success' if p[1] else 'danger'}}">
+                                            <t t-out="p[0].name"/>
+                                        </span>
+                                        <t t-if="records[r]['supported_providers'][-1] != p">,</t>
+                                    </t>
+                                </p>
+                            </t>
+                        </div>
+                    </div>
+                </li>
+            </t>
+        </ul>
     </template>
 
 </odoo>

@@ -1,8 +1,8 @@
 /** @odoo-module **/
 
 import { Component, useState, markup, onWillDestroy, status } from "@odoo/owl";
-import { useService } from "@web/core/utils/hooks";
 import { Dialog } from "@web/core/dialog/dialog";
+import { rpc } from "@web/core/network/rpc";
 import { escape } from "@web/core/utils/strings";
 import { _t } from "@web/core/l10n/translation";
 
@@ -10,6 +10,7 @@ import { _t } from "@web/core/l10n/translation";
  * General component for common logic between different dialogs.
  */
 export class ChatGPTDialog extends Component {
+    static template = "";
     static components = { Dialog };
     static props = {
         close: Function,
@@ -17,7 +18,6 @@ export class ChatGPTDialog extends Component {
     };
 
     setup() {
-        this.rpc = useService('rpc');
         this.state = useState({ selectedMessageId: null });
         onWillDestroy(() => this.pendingRpcPromise?.abort());
     }
@@ -107,7 +107,7 @@ export class ChatGPTDialog extends Component {
                 return callback(...args);
             }
         }
-        this.pendingRpcPromise = this.rpc('/web_editor/generate_text', {
+        this.pendingRpcPromise = rpc('/web_editor/generate_text', {
             prompt,
             conversation_history: this.state.conversationHistory,
         }, { shadow: true });

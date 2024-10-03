@@ -2,11 +2,27 @@
 <templates xml:space="preserve">
 
     <t t-name="web.ControlPanel">
-        <div class="o_control_panel d-flex flex-column gap-3 gap-lg-1 px-3 pt-2 pb-3" t-ref="root" data-command-category="actions">
-            <div class="o_control_panel_main d-flex flex-wrap flex-lg-nowrap justify-content-between align-items-lg-start gap-3 flex-grow-1">
+        <div class="o_control_panel d-flex flex-column gap-3 px-3 pt-2 pb-3" t-ref="root" data-command-category="actions">
+            <Transition t-if="!env.isSmall" visible="state.embeddedInfos.showEmbedded" name="'o-fade'" t-slot-scope="transition" leaveDuration="500">
+                <div class="o_embedded_actions overflow-hidden d-flex flex-wrap w-100 align-items-center justify-content-center gap-2" t-att-class="transition.className">
+                    <t t-foreach="state.embeddedInfos.embeddedActions" t-as="action" t-key="action.id">
+                        <t t-if="_checkValueLocalStorage(action)">
+                            <button class="btn btn-secondary o_draggable"
+                                    t-att-class="{ 'active': state.embeddedInfos.currentEmbeddedAction?.id === action.id}"
+                                    t-on-click="() => this.onEmbeddedActionClick(action)"
+                                    t-att-data-id="action.id"
+                            >
+                                <span t-out="action.name"/>
+                            </button>
+                        </t>
+                    </t>
+                    <t t-call="web.embeddedActionsDropdown" />
+                </div>
+            </Transition>
+            <div class="o_control_panel_main d-flex flex-wrap flex-lg-nowrap justify-content-between align-items-lg-start gap-1 gap-lg-3 flex-grow-1">
                 <div class="o_control_panel_breadcrumbs d-flex align-items-center gap-1 order-0 h-lg-100">
                     <div class="o_control_panel_main_buttons d-flex gap-1 d-empty-none d-print-none" t-ref="mainButtons" t-on-keydown="onMainButtonsKeydown">
-                        <div class="btn-group d-xl-none o_control_panel_collapsed_create">
+                        <div t-if="env.isSmall" class="btn-group o_control_panel_collapsed_create">
                             <t t-slot="control-panel-create-button"/>
                             <button t-att-class="{invisible: display.disableDropdown}" type="button" class="btn btn-primary dropdown-toggle dropdown-toggle-split o_control_panel_collapsed_create" data-bs-toggle="dropdown" aria-expanded="false">
                                  <span class="visually-hidden">Toggle Dropdown</span>
@@ -16,24 +32,46 @@
                                 <t t-slot="control-panel-always-buttons"/>
                             </ul>
                         </div>
-                        <div class="d-none d-xl-inline-flex gap-1">
+                        <div t-else="" class="d-inline-flex gap-1">
                             <t t-slot="control-panel-create-button"/>
                             <t t-slot="layout-buttons"/>
                             <t t-slot="control-panel-always-buttons"/>
                         </div>
                     </div>
                     <t t-if="env.config.noBreadcrumbs">
+                        <section class="o_control_panel_breadcrumbs_actions d-contents d-print-none">
+                            <t t-slot="control-panel-additional-actions"/>
+                            <t t-slot="control-panel-status-indicator" />
+                        </section>
+                    </t>
+                    <t t-elif="env.isSmall">
+                        <!--
+                            Here be dragons...
+                            REFACTORME: this `t-portal` introduces an implicit
+                            dependency between the ControlPanel and the NavBar,
+                            which the impact is only mitigated by the fallback
+                            below. This is a call to refactor the breadcrumbs
+                            management to allow the proper instanciation of the
+                            Breadcrumbs component in the NavBar.
+                        -->
+                        <div class="o_fallback_breadcrumbs d-contents"/>
+                        <Breadcrumbs breadcrumbs="breadcrumbs" t-portal="'.o_navbar_breadcrumbs, .o_fallback_breadcrumbs'"/>
                         <section class="o_control_panel_breadcrumbs_actions d-contents">
                             <t t-slot="control-panel-additional-actions"/>
                             <t t-slot="control-panel-status-indicator" />
                         </section>
                     </t>
                     <t t-else="">
-                        <t t-slot="control-panel-breadcrumb">
-                            <t t-call="web.Breadcrumbs"/>
-                        </t>
+                        <Breadcrumbs breadcrumbs="breadcrumbs">
+                            <t t-set-slot="breadcrumb-status-indicator">
+                                <t t-slot="control-panel-status-indicator" />
+                            </t>
+                            <t t-set-slot="breadcrumb-additional-actions">
+                                <t t-slot="control-panel-additional-actions"/>
+                            </t>
+                        </Breadcrumbs>
                     </t>
-                    <span class="d-none d-xl-block me-auto"/> <!-- Spacer -->
+                    <div t-if="!env.isSmall" class="me-auto"/> <!-- Spacer -->
                 </div>
 
                 <div class="o_control_panel_actions d-empty-none d-flex align-items-center justify-content-start justify-content-lg-around order-2 order-lg-1 w-100 w-lg-auto">
@@ -41,29 +79,41 @@
                     <t t-slot="control-panel-selection-actions"/>
                 </div>
 
-                <div class="o_control_panel_navigation d-flex flex-wrap flex-md-nowrap justify-content-end gap-3 gap-lg-1 gap-xl-3 order-1 order-lg-2 flex-grow-1">
+                <div class="o_control_panel_navigation d-flex flex-wrap flex-md-nowrap justify-content-end gap-1 gap-xl-3 order-1 order-lg-2 flex-grow-1">
+                    <t t-if="state.embeddedInfos.embeddedActions?.length and env.isSmall">
+                        <t t-call="web.embeddedActionsDropdown" />
+                    </t>
                     <div t-if="pagerProps and pagerProps.total > 0" class="o_cp_pager text-nowrap " role="search">
                         <Pager t-props="pagerProps"/>
                     </div>
+                    <button t-if="state.embeddedInfos.embeddedActions?.length and !env.isSmall" class="btn btn-secondary"
+                            t-att-class="{active: state.embeddedInfos.showEmbedded}"
+                            t-on-click="onClickShowEmbedded">
+                        <i class="fa fa-sliders" />
+                    </button>
                     <t t-if="env.config.viewSwitcherEntries?.length > 1">
-                        <Dropdown class="'o_cp_switch_buttons d-xl-none btn-group'" togglerClass="'btn btn-secondary'" showCaret="true">
-                            <t t-set-slot="toggler">
-                                <t t-set="activeView" t-value="env.config.viewSwitcherEntries.find((view) => view.active)"/>
-                                <i class="oi-fw" t-att-class="activeView.icon"/>
-                            </t>
-                            <t t-foreach="env.config.viewSwitcherEntries" t-as="view" t-key="view.type">
-                                <DropdownItem onSelected="() => this.onViewClicked(view.type)" class="view.active ? 'selected' : ''">
-                                    <i class="oi-fw" t-att-class="view.icon"/>
-                                    <span class="ms-1" t-out="view.name"/>
-                                </DropdownItem>
-                            </t>
-                        </Dropdown>
-                        <nav class="o_cp_switch_buttons d-print-none d-none d-xl-inline-flex btn-group">
+                        <div t-if="env.isSmall" class="o_cp_switch_buttons btn-group d-print-none">
+                            <Dropdown>
+                                <button class="btn btn-secondary o-dropdown-caret">
+                                    <t t-set="activeView" t-value="env.config.viewSwitcherEntries.find((view) => view.active)"/>
+                                    <i class="oi-fw" t-att-class="activeView.icon"/>
+                                </button>
+                                <t t-set-slot="content">
+                                    <t t-foreach="env.config.viewSwitcherEntries" t-as="view" t-key="view.type">
+                                        <DropdownItem onSelected="() => this.switchView(view.type)" class="view.active ? 'selected' : ''">
+                                            <i class="oi-fw" t-att-class="view.icon"/>
+                                            <span class="ms-1" t-out="view.name"/>
+                                        </DropdownItem>
+                                    </t>
+                                </t>
+                            </Dropdown>
+                        </div>
+                        <nav t-else="" class="o_cp_switch_buttons d-print-none d-inline-flex btn-group">
                             <t t-foreach="env.config.viewSwitcherEntries" t-as="view" t-key="view.type">
                                 <button class="btn btn-secondary o_switch_view "
                                     t-attf-class="o_{{view.type}} {{view.active ? 'active' : ''}}"
                                     t-att-data-tooltip="view.name"
-                                    t-on-click="() => this.onViewClicked(view.type)"
+                                    t-on-click="() => this.switchView(view.type)"
                                 >
                                     <i t-att-class="view.icon" />
                                 </button>
@@ -76,68 +126,44 @@
         </div>
     </t>
 
-    <t t-name="web.Breadcrumbs">
-        <t t-set="currentBreadcrumbs" t-value="breadcrumbs.slice(-1)"/>
-        <t t-set="visiblePathBreadcrumbs" t-value="breadcrumbs.slice(-3, -1)"/>
-        <t t-set="collapsedBreadcrumbs" t-value="breadcrumbs.slice(0, -3).reverse()"/>
-        <t t-set="breadcrumb" t-value="currentBreadcrumbs[0] || {}"/>
-
-        <div t-if="collapsedBreadcrumbs.length || visiblePathBreadcrumbs.length" class="o_breadcrumb d-flex flex-row flex-md-column align-self-stretch justify-content-between min-w-0">
-            <t t-if="env.isSmall">
-                <t t-set="previousBreadcrumb" t-value="visiblePathBreadcrumbs.slice(-1)"/>
-                <button class="o_back_button btn btn-link px-1" t-on-click.prevent="() => this.onBreadcrumbClicked(previousBreadcrumb.jsId)">
-                    <i class="oi oi-fw oi-arrow-left"/>
-                </button>
+    <t t-name="web.embeddedActionsDropdown">
+        <Dropdown menuClass="'o_embedded_actions_dropdown_menu'">
+            <button class="btn btn-secondary">
+                <i class="fa fa-sliders"/>
+            </button>
+            <t t-set-slot="content">
+                <t t-foreach="state.embeddedInfos.embeddedActions" t-as="action" t-key="action.id">
+                    <DropdownItem 
+                        class="this.getDropdownClass(action)"
+                        onSelected="() => this.env.isSmall ? this.onEmbeddedActionClick(action) : this._setVisibility(action.id)"
+                        closingMode="'none'"
+                    >
+                        <div class="d-flex p-0 pe-1 align-items-center justify-content-between">
+                            <span t-out="action.name"/>
+                            <i t-if="action.is_deletable" class="o_icon_right btn btn-link text-danger p-0 position-absolute end-0 fa fa-trash-o" title="Delete item" t-on-click.stop="() => this.openConfirmationDialog(action)" />
+                        </div>
+                    </DropdownItem>
+                </t>
+                <div role="separator" class="dropdown-divider"/>
+                <AccordionItem class="'o_save_current_view'" description.translate="Save View">
+                    <div class="px-2 py-2">
+                        <input type="text"
+                            t-ref="newActionNameRef"
+                            class="o_input mb-2"
+                            t-model.trim="state.embeddedInfos.newActionName"
+                        />
+                        <CheckBox value="state.embeddedInfos.newActionIsShared" onChange.bind="_onShareCheckboxChange">
+                            <span data-tooltip="Make this embedded action available to other users">Shared</span>
+                        </CheckBox>
+                    </div>
+                    <div class="px-3 py-2">
+                        <button class="o_save_favorite btn btn-primary w-100" t-on-click="_saveNewAction">
+                            Save
+                        </button>
+                    </div>
+                </AccordionItem>
             </t>
-            <t t-else="">
-                <ol class="breadcrumb flex-nowrap text-nowrap small lh-sm">
-                    <li t-if="collapsedBreadcrumbs.length" class="breadcrumb-item d-inline-flex min-w-0">
-                        <Dropdown togglerClass="'btn btn-light btn-sm px-1 p-0'">
-                            <t t-set-slot="toggler">
-                                <i class="fa fa-ellipsis-h"/>
-                            </t>
-                            <t t-foreach="collapsedBreadcrumbs" t-as="breadcrumb" t-key="breadcrumb.jsId">
-                                <DropdownItem onSelected="() => this.onBreadcrumbClicked(breadcrumb.jsId)">
-                                    <t t-call="web.Breadcrumb.Name"/>
-                                </DropdownItem>
-                            </t>
-                        </Dropdown>
-                    </li>
-                    <t t-foreach="visiblePathBreadcrumbs" t-as="breadcrumb" t-key="breadcrumb.jsId">
-                        <li class="breadcrumb-item d-inline-flex min-w-0" t-att-class="{ o_back_button: breadcrumb_last }" t-att-data-hotkey="breadcrumb_last and 'b'" t-on-click.prevent="() => this.onBreadcrumbClicked(breadcrumb.jsId)">
-                            <a href="#" class="fw-bold text-truncate" t-att-data-tooltip="'Back to &quot;' + breadcrumb.name + '&quot;'"><t t-call="web.Breadcrumb.Name"/></a>
-                        </li>
-                    </t>
-                </ol>
-            </t>
-            <div class="d-flex gap-1 text-truncate">
-                <div class="o_last_breadcrumb_item active d-flex gap-2 align-items-center min-w-0 lh-sm">
-                    <span class="min-w-0 text-truncate" t-call="web.Breadcrumb.Name"/>
-                </div>
-                <t t-call="web.Breadcrumb.Actions"/>
-            </div>
-        </div>
-
-        <div t-else="" class="o_breadcrumb d-flex gap-1 text-truncate">
-            <div class="o_last_breadcrumb_item active d-flex fs-4 min-w-0 align-items-center">
-                <span class="min-w-0 text-truncate" t-call="web.Breadcrumb.Name"/>
-            </div>
-            <t t-call="web.Breadcrumb.Actions"/>
-        </div>
-
-        <t t-slot="control-panel-status-indicator" />
-    </t>
-
-    <t t-name="web.Breadcrumb.Actions">
-        <div class="o_control_panel_breadcrumbs_actions d-inline-flex">
-            <t t-slot="control-panel-additional-actions"/>
-        </div>
-    </t>
-
-    <t t-name="web.Breadcrumb.Name">
-        <t t-if="breadcrumb.name" t-out="breadcrumb.name"/>
-        <em t-else="" class="text-warning">Unnamed</em>
-        <t t-slot="control-panel-additional-breadcrums"/>
+        </Dropdown>
     </t>
 
 </templates>

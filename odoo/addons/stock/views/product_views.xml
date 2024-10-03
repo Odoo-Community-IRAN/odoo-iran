@@ -17,7 +17,7 @@
                     <group>
                         <group name="logistics" string="Logistics">
                             <field name="route_ids" widget="many2many_tags" groups="stock.group_adv_location"/>
-                            <field name="total_route_ids" widget="many2many_tags" groups="stock.group_adv_location" invisible="not parent_id"/>
+                            <field name="parent_route_ids" widget="many2many_tags" groups="stock.group_adv_location" invisible="not parent_route_ids"/>
                             <field name="removal_strategy_id" options="{'no_create': True}"/>
                             <field name="packaging_reserve_method" widget="radio" groups="product.group_stock_packaging"/>
                         </group>
@@ -37,19 +37,19 @@
         </record>
 
         <record id="view_stock_product_tree" model="ir.ui.view">
-            <field name="name">product.stock.tree.inherit</field>
+            <field name="name">product.stock.list.inherit</field>
             <field name="model">product.product</field>
             <field name="inherit_id" ref="product.product_product_tree_view"/>
             <field name="arch" type="xml">
                 <field name="type" position="after">
-                    <field name="qty_available" invisible="type != 'product'" string="On Hand" optional="show" decoration-danger="virtual_available &lt; 0" decoration-warning="virtual_available == 0" decoration-bf="1" groups="stock.group_stock_user"/>
-                    <field name="virtual_available" invisible="type != 'product'" string="Forecasted" optional="show" decoration-danger="virtual_available &lt; 0" decoration-warning="virtual_available == 0" groups="stock.group_stock_user"/>
+                    <field name="qty_available" invisible="not is_storable" string="On Hand" optional="show" decoration-danger="virtual_available &lt; 0" decoration-warning="virtual_available == 0" decoration-bf="1" groups="stock.group_stock_user"/>
+                    <field name="virtual_available" invisible="not is_storable" string="Forecasted" optional="show" decoration-danger="virtual_available &lt; 0" decoration-warning="virtual_available == 0" groups="stock.group_stock_user"/>
                 </field>
             </field>
         </record>
 
         <record id="view_stock_product_template_tree" model="ir.ui.view">
-            <field name="name">product.template.stock.tree.inherit</field>
+            <field name="name">product.template.stock.list.inherit</field>
             <field name="model">product.template</field>
             <field name="inherit_id" ref="product.product_template_tree_view"/>
             <field name="arch" type="xml">
@@ -75,11 +75,22 @@
                 <xpath expr="//field[@name='attribute_line_ids']" position="after">
                     <separator/>
                     <field name="location_id" context="{'location': self}" filter_domain="[]"/>
-                    <field name="warehouse_id" context="{'warehouse': self}" filter_domain="[]"/>
+                    <field name="warehouse_id" context="{'warehouse_id': self}" filter_domain="[]"/>
                     <separator/>
                     <filter name="real_stock_available" string="Available Products" domain="[('qty_available','&gt;',0)]"/>
                     <filter name="real_stock_negative" string="Negative Forecasted Quantity" domain="[('virtual_available','&lt;',0)]"/>
                 </xpath>
+            </field>
+        </record>
+
+        <record id="product_template_search_view_inherit_stock" model="ir.ui.view">
+            <field name="name">product.template.search.inherit.stock</field>
+            <field name="model">product.template</field>
+            <field name="inherit_id" ref="product.product_template_search_view"/>
+            <field name="arch" type="xml">
+                <filter name="combo" position="after">
+                    <filter name="is_storable" string="Inventory Management" domain="[('is_storable','=',True)]"/>
+                </filter>
             </field>
         </record>
 
@@ -103,6 +114,13 @@
             <field name="model">product.template</field>
             <field name="inherit_id" ref="product.product_template_form_view"/>
             <field name="arch" type="xml">
+                <xpath expr="//field[@name='type']" position="after">
+                    <label for="is_storable" class="oe_inline" invisible="type != 'consu'"/>
+                    <div class="o_row w-100" invisible="type != 'consu'">
+                        <field name="is_storable"/>
+                        <field name="tracking" invisible="not is_storable" groups="stock.group_production_lot"/>
+                    </div>
+                </xpath>
                 <xpath expr="//group[@name='group_lots_and_weight']" position="inside">
                     <label for="sale_delay" invisible="not sale_ok"/>
                     <div invisible="not sale_ok">
@@ -116,16 +134,14 @@
                         <div>
                             <field name="route_ids" class="mb-0" widget="many2many_checkboxes" invisible="not has_available_route_ids or type == 'service'"/>
                             <button id="stock.view_diagram_button" string="View Diagram" type="action" name="%(action_open_routes)d" icon="oi-arrow-right"
-                                 invisible="type not in ['product', 'consu']"
+                                 invisible="type != 'consu'"
                                  class="btn btn-link pt-0" context="{'default_product_tmpl_id': id}"/>
                         </div>
                         <field name="route_from_categ_ids" widget="many2many_tags" invisible="not route_from_categ_ids"/>
                     </group>
                 </xpath>
                 <xpath expr="//group[@name='group_lots_and_weight']" position="after">
-                    <group string="Traceability" name="traceability" groups="stock.group_production_lot"
-                           invisible="type == 'consu'">
-                        <field name="tracking" widget="radio" invisible="type == 'service'"/>
+                    <group string="Traceability" name="traceability" groups="stock.group_production_lot" invisible="1">
                     </group>
                      <group string="Counterpart Locations" name="stock_property" groups="base.group_no_one">
                         <field name="property_stock_production"/>
@@ -135,13 +151,13 @@
                 <page name="inventory" position="inside">
                     <group>
                         <group string="Description for Receipts">
-                            <field name="description_pickingin" colspan="2" nolabel="1" placeholder="This note is added to receipt orders (e.g. where to store the product in the warehouse)."/>
+                            <field name="description_pickingin" nolabel="1" placeholder="This note is added to receipt orders (e.g. where to store the product in the warehouse)."/>
                         </group>
                         <group string="Description for Delivery Orders">
-                            <field name="description_pickingout" colspan="2" nolabel="1" placeholder="This note is added to delivery orders."/>
+                            <field name="description_pickingout" nolabel="1" placeholder="This note is added to delivery orders."/>
                         </group>
                         <group string="Description for Internal Transfers" groups="stock.group_stock_multi_locations">
-                            <field name="description_picking" colspan="2" placeholder="This note is added to internal transfer orders (e.g. where to pick the product in the warehouse)." nolabel="1"/>
+                            <field name="description_picking" nolabel="1" placeholder="This note is added to internal transfer orders (e.g. where to pick the product in the warehouse)."/>
                         </group>
                     </group>
                 </page>
@@ -157,19 +173,18 @@
             <field name="inherit_id" ref="product.product_template_kanban_view"/>
             <field name="arch" type="xml">
                 <xpath expr="//kanban" position="inside">
-                    <field name="type"/>
                     <field name="show_on_hand_qty_status_button" groups="stock.group_stock_user"/>
                 </xpath>
-                <xpath expr="//div[@name='product_lst_price']" position="after">
-                    <t groups="stock.group_stock_user">
-                    <div t-if="record.show_on_hand_qty_status_button.raw_value">On hand: <field name="qty_available"/> <field name="uom_id"/></div>
-                    </t>
+                <xpath expr="//field[@name='product_properties']" position="before">
+                    <div groups="stock.group_stock_user" t-if="record.show_on_hand_qty_status_button.raw_value">
+                        On hand: <field name="qty_available"/> <field name="uom_id"/>
+                    </div>
                 </xpath>
             </field>
         </record>
 
         <record id="product_packaging_tree_view" model="ir.ui.view">
-            <field name="name">product.packaging.tree.view.stock</field>
+            <field name="name">product.packaging.list.view.stock</field>
             <field name="model">product.packaging</field>
             <field name="inherit_id" ref="product.product_packaging_tree_view"/>
             <field name="arch" type="xml">
@@ -205,7 +220,7 @@
             <field name="arch" type="xml">
                 <filter name="activities_overdue" position="after">
                     <field name="location_id" options="{'no_create': True}" context="{'location': self}" filter_domain="[]"/>
-                    <field name="warehouse_id" context="{'warehouse': self}" filter_domain="[]"/>
+                    <field name="warehouse_id" context="{'warehouse_id': self}" filter_domain="[]"/>
                 </filter>
             </field>
         </record>
@@ -217,14 +232,13 @@
             <field name="arch" type="xml">
                 <xpath expr="//header/button" position="before">
                     <button string="Update Quantity" type="object"
-                        groups="stock.group_stock_manager"
                         name="action_update_quantity_on_hand"
-                        invisible="type != 'product'"/>
+                        invisible="not is_storable"/>
                     <button string="Replenish" type="action"
                         name="%(action_product_replenish)d"
                         context="{'default_product_id': id}"
                         groups="stock.group_stock_user"
-                        invisible="type not in ['consu', 'product']"/>
+                        invisible="type != 'consu'"/>
                 </xpath>
                 <div name="button_box" position="inside">
                     <button string="Putaway Rules" type="object"
@@ -241,18 +255,18 @@
             <field name="model">product.product</field>
             <field name="inherit_id" ref="product.product_view_kanban_catalog"/>
             <field name="arch" type="xml">
-                <field name="default_code" invisible="1" position="after">
-                    <field name="detailed_type" invisible="1"/>
+                <field name="id" position="after">
+                    <field name="is_storable"/>
                 </field>
                 <div name="o_kanban_price" position="after">
-                    <div t-if="record.detailed_type.raw_value == 'product'"
+                    <div t-if="record.is_storable.raw_value"
                          name="o_kanban_qty_available">
                         <span>On Hand: </span>
                         <field name="qty_available"/>
                         <field name="uom_id" class="ms-1" groups="uom.group_uom"/>
                     </div>
                 </div>
-                <a role="menuitem" type="edit" position="after">
+                <a role="menuitem" type="open" position="after">
                     <a role="menuitem" type="object" name="action_product_forecast_report" class="dropdown-item border-top-0">View Availability</a>
                 </a>
             </field>
@@ -267,14 +281,13 @@
                 <data>
                     <xpath expr="//header/button" position="before">
                         <button string="Update Quantity" type="object"
-                            groups="stock.group_stock_manager"
                             name="action_update_quantity_on_hand"
-                            invisible="type != 'product'"/>
+                            invisible="not is_storable"/>
                         <button string="Replenish" type="action"
                             name="%(action_product_replenish)d"
                             context="{'default_product_id': id}"
                             groups="stock.group_stock_user"
-                            invisible="type not in ['consu', 'product']"/>
+                            invisible="type != 'consu'"/>
                     </xpath>
                     <div name="button_box" position="inside">
                         <t groups="stock.group_stock_user">
@@ -285,6 +298,7 @@
                                 name="action_update_quantity_on_hand"
                                 icon="fa-cubes"
                                 type="object"
+                                context="{'product_variant': True}"
                                 invisible="not show_on_hand_qty_status_button">
                                 <div class="o_field_widget o_stat_info">
                                         <span class="o_stat_value d-flex gap-1">
@@ -309,7 +323,7 @@
                             </button>
                             <button type="object"
                                 name= "action_view_stock_move_lines"
-                                invisible="type not in ['product', 'consu']"
+                                invisible="type != 'consu'"
                                 class="oe_stat_button" icon="fa-exchange"
                                 groups="stock.group_stock_user">
                                 <div class="d-flex flex-column">
@@ -324,7 +338,7 @@
                                 </div>
                             </button>
                             <button name="action_view_orderpoints" type="object"
-                                invisible="type not in ['product', 'consu'] or nbr_reordering_rules != 1"
+                                invisible="type != 'consu' or nbr_reordering_rules != 1"
                                 class="oe_stat_button" icon="fa-refresh">
                                 <div class="d-flex flex-column">
                                     <div class="o_field_widget o_stat_info align-items-baseline flex-row gap-1 me-1">
@@ -339,7 +353,7 @@
                             </button>
                             <button type="object"
                                 name="action_view_orderpoints"
-                                invisible="type != 'product' or nbr_reordering_rules == 1"
+                                invisible="not is_storable or nbr_reordering_rules == 1"
                                 class="oe_stat_button" icon="fa-refresh">
                                 <field name="nbr_reordering_rules" widget="statinfo"/>
                             </button>
@@ -365,7 +379,7 @@
                              </button>
                             <button type="object" string="Storage Capacities"
                                 name="action_view_storage_category_capacity"
-                                groups="stock.group_stock_storage_categories"
+                                groups="stock.group_stock_multi_locations"
                                 invisible="type == 'service'"
                                 class="oe_stat_button"
                                 icon="fa-cubes"/>
@@ -390,16 +404,15 @@
                 <data>
                     <xpath expr="//header/button" position="before">
                         <button string="Update Quantity" type="object"
-                            groups="stock.group_stock_manager"
                             name="action_update_quantity_on_hand"
-                            invisible="type != 'product'"/>
+                            invisible="not is_storable"/>
                         <button string="Replenish" type="action"
                             name="%(action_product_replenish)d"
                             context="{'default_product_tmpl_id': id}"
                             groups="stock.group_stock_user"
-                            invisible="type not in ['consu', 'product']"/>
+                            invisible="type != 'consu'"/>
                     </xpath>
-                    <div name="button_box" position="inside">
+                    <button name="action_open_documents" position="before">
                         <t groups="stock.group_stock_user">
                             <field name="tracking" invisible="1"/>
                             <field name="show_on_hand_qty_status_button" invisible="1"/>
@@ -429,25 +442,13 @@
                                     <span class="o_stat_text">Forecasted</span>
                                 </div>
                             </button>
-                            <button type="object"
-                                name= "action_view_stock_move_lines"
-                                invisible="type not in ['product', 'consu']"
-                                class="oe_stat_button" icon="fa-exchange"
-                                groups="stock.group_stock_user">
-                                <div class="d-flex flex-column">
-                                    <div class="o_field_widget o_stat_info align-items-baseline flex-row gap-1 me-1">
-                                        <span class="o_stat_text">In:</span>
-                                        <span class="o_stat_value"><field name="nbr_moves_in"/></span>
-                                    </div>
-                                    <div class="o_field_widget o_stat_info align-items-baseline flex-row gap-1 me-1">
-                                        <span class="o_stat_text">Out:</span>
-                                        <span class="o_stat_value"><field name="nbr_moves_out"/></span>
-                                    </div>
-                                </div>
-                            </button>
+                        </t>
+                    </button>
+                    <button name="action_open_documents" position="after">
+                        <t groups="stock.group_stock_user">
                             <button type="object"
                                 name="action_view_orderpoints"
-                                invisible="type != 'product' or nbr_reordering_rules != 1"
+                                invisible="not is_storable or nbr_reordering_rules != 1"
                                 class="oe_stat_button" icon="fa-refresh">
                                 <div class="d-flex flex-column">
                                     <div class="o_field_widget o_stat_info align-items-baseline flex-row gap-1 me-1">
@@ -462,10 +463,26 @@
                             </button>
                             <button type="object"
                                 name="action_view_orderpoints"
-                                invisible="type != 'product' or nbr_reordering_rules == 1"
+                                invisible="not is_storable or nbr_reordering_rules == 1"
                                 class="oe_stat_button"
                                 icon="fa-refresh">
                                 <field name="nbr_reordering_rules" widget="statinfo"/>
+                            </button>
+                            <button type="object"
+                                name= "action_view_stock_move_lines"
+                                invisible="type != 'consu'"
+                                class="oe_stat_button" icon="fa-exchange"
+                                groups="stock.group_stock_user">
+                                <div class="d-flex flex-column">
+                                    <div class="o_field_widget o_stat_info align-items-baseline flex-row gap-1 me-1">
+                                        <span class="o_stat_text">In:</span>
+                                        <span class="o_stat_value"><field name="nbr_moves_in"/></span>
+                                    </div>
+                                    <div class="o_field_widget o_stat_info align-items-baseline flex-row gap-1 me-1">
+                                        <span class="o_stat_text">Out:</span>
+                                        <span class="o_stat_value"><field name="nbr_moves_out"/></span>
+                                    </div>
+                                </div>
                             </button>
                             <button type="object"
                                 name="action_open_product_lot"
@@ -489,7 +506,7 @@
                              </button>
                              <button type="object"
                                 name="action_view_storage_category_capacity"
-                                groups="stock.group_stock_storage_categories"
+                                groups="stock.group_stock_multi_locations"
                                 invisible="type == 'service'"
                                 class="oe_stat_button"
                                 icon="fa-cubes">
@@ -498,7 +515,7 @@
                                 </div>
                             </button>
                         </t>
-                    </div>
+                    </button>
 
                     <xpath expr="//label[@for='weight']" position="before">
                         <field name="responsible_id" domain="[('share', '=', False)]" widget="many2one_avatar_user" groups="stock.group_stock_user"/>
@@ -507,13 +524,23 @@
             </field>
         </record>
 
+        <record id="action_inventory_at_date" model="ir.actions.act_window">
+            <field name="name">Inventory at Date</field>
+            <field name="res_model">stock.quantity.history</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
         <!-- Stock Report View -->
         <record model="ir.ui.view" id="product_product_stock_tree">
-            <field name="name">product.product.stock.tree</field>
+            <field name="name">product.product.stock.list</field>
             <field name="model">product.product</field>
             <field name="priority" eval="100"/>
             <field name="arch" type="xml">
-                <tree sample="1" js_class="stock_report_list_view" duplicate="0">
+                <list sample="1" js_class="stock_report_list_view" duplicate="0">
+                    <header>
+                        <button name="%(action_inventory_at_date)d" invisible="((context.get('inventory_mode') and not context.get('inventory_report_mode')) or context.get('no_at_date'))" string="Inventory at Date" type="action" class="btn-primary ms-1" display="always"/>
+                    </header>
                     <field name="id" column_invisible="True"/>
                     <field name="display_name" string="Product"/>
                     <field name="categ_id" optional="hide"/>
@@ -533,10 +560,11 @@
                         icon="fa-cubes" context="{'search_default_product_id': id, 'default_product_id': id}" invisible="qty_available == 0"/>
                     <button name="action_product_forecast_report" string="Forecast" type="object" class="btn-link"
                         icon="fa-area-chart" context="{'default_product_id': id}" invisible="incoming_qty == 0 and outgoing_qty == 0"/>
-                </tree>
+                </list>
             </field>
         </record>
 
+        <!-- Search view for product view with quantity -->
         <record id="product_search_form_view_stock_report" model="ir.ui.view">
             <field name="name">product.product.search.stock.form.stock.report</field>
             <field name="model">product.product</field>
@@ -546,7 +574,7 @@
                 <filter name="services" position="attributes">
                     <attribute name="invisible">1</attribute>
                 </filter>
-                <filter name="consumable" position="attributes">
+                <filter name="goods" position="attributes">
                     <attribute name="invisible">1</attribute>
                 </filter>
                 <filter name="real_stock_negative" position="after">
@@ -560,11 +588,12 @@
         <record model="ir.actions.act_window" id="action_product_stock_view">
             <field name="name">Stock</field>
             <field name="res_model">product.product</field>
-            <field name="view_mode">tree,form</field>
+            <field name="path">stock-report</field>
+            <field name="view_mode">list,form</field>
             <field name="view_id" ref="product_product_stock_tree"/>
             <field name="search_view_id" ref="product_search_form_view_stock_report"/>
-            <field name="context">{'default_detailed_type': 'product'}</field>
-            <field name="domain">[('detailed_type', '=', 'product')]</field>
+            <field name="context">{'default_is_storable': True}</field>
+            <field name="domain">[('is_storable', '=', True)]</field>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">
                     No stock to show
@@ -578,9 +607,9 @@
         <record id="product_template_action_product" model="ir.actions.act_window">
             <field name="name">Products</field>
             <field name="res_model">product.template</field>
-            <field name="view_mode">kanban,tree,form</field>
+            <field name="view_mode">kanban,list,form</field>
             <field name="search_view_id" ref="product_template_search_form_view_stock"/>
-            <field name="context">{"search_default_consumable": 1, 'default_detailed_type': 'product'}</field>
+            <field name="context">{"search_default_goods": 1, 'default_is_storable': True}</field>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">
                     No product found. Let's create one!
@@ -593,7 +622,7 @@
         <record id="stock_product_normal_action" model="ir.actions.act_window">
             <field name="name">Product Variants</field>
             <field name="res_model">product.product</field>
-            <field name="view_mode">tree,form,kanban</field>
+            <field name="view_mode">list,form,kanban</field>
             <field name="search_view_id" ref="stock_product_search_form_view"/>
         </record>
 

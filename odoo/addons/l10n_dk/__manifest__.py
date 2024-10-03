@@ -5,7 +5,7 @@
     'countries': ['dk'],
     'version': '1.2',
     'author': 'Odoo House ApS, VK DATA ApS, FlexERP ApS',
-    'website': 'https://www.odoo.com/documentation/17.0/applications/finance/fiscal_localizations.html',
+    'website': 'https://www.odoo.com/documentation/master/applications/finance/fiscal_localizations.html',
     'category': 'Accounting/Localizations/Account Charts',
     'description': """
 
@@ -93,8 +93,8 @@ Produkt setup:
         'base_vat',
         'account',
     ],
+    'auto_install': ['account'],
     'data': [
-        'data/account_account_tags.xml',
         'data/account_tax_report_data.xml',
         'data/account.account.tag.csv',
     ],

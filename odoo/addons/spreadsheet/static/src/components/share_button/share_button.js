@@ -6,7 +6,7 @@ import { _t } from "@web/core/l10n/translation";
 
 import { Dropdown } from "@web/core/dropdown/dropdown";
 import { DropdownItem } from "@web/core/dropdown/dropdown_item";
-import { CopyButton } from "@web/views/fields/copy_clipboard/copy_button";
+import { CopyButton } from "@web/core/copy_button/copy_button";
 import { waitForDataLoaded, freezeOdooData } from "@spreadsheet/helpers/model";
 import { Model } from "@odoo/o-spreadsheet";
 
@@ -28,7 +28,7 @@ export class SpreadsheetShareButton extends Component {
     }
 
     get togglerClass() {
-        return ["btn btn-light", this.props.togglerClass].join(" ");
+        return ["btn", this.props.togglerClass].join(" ");
     }
 
     async onOpened() {
@@ -43,10 +43,10 @@ export class SpreadsheetShareButton extends Component {
         setTimeout(async () => {
             try {
                 await browser.navigator.clipboard.writeText(url);
-            } catch(error) {
+            } catch (error) {
                 browser.console.warn(error);
             }
-        })
+        });
     }
 
     /**

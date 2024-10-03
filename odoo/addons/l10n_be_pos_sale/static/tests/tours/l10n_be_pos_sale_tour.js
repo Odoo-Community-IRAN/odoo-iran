@@ -1,36 +1,36 @@
 /** @odoo-module */
-
-import * as ErrorPopup from "@point_of_sale/../tests/tours/helpers/ErrorPopupTourMethods";
-import * as PaymentScreen from "@point_of_sale/../tests/tours/helpers/PaymentScreenTourMethods";
-import * as ProductScreenPos from "@point_of_sale/../tests/tours/helpers/ProductScreenTourMethods";
-import * as ProductScreenSale from "@pos_sale/../tests/helpers/ProductScreenTourMethods";
-const ProductScreen = { ...ProductScreenPos, ...ProductScreenSale };
+import * as PaymentScreen from "@point_of_sale/../tests/tours/utils/payment_screen_util";
+import * as ProductScreen from "@point_of_sale/../tests/tours/utils/product_screen_util";
+import * as Dialog from "@point_of_sale/../tests/tours/utils/dialog_util";
+import * as PosSale from "@pos_sale/../tests/tours/utils/pos_sale_utils";
+import * as Chrome from "@point_of_sale/../tests/tours/utils/chrome_util";
+import * as Order from "@point_of_sale/../tests/tours/utils/generic_components/order_widget_util";
 import { registry } from "@web/core/registry";
 
 registry.category("web_tour.tours").add("PosSettleOrderIsInvoice", {
     test: true,
-    url: "/pos/ui",
     steps: () =>
         [
-            ProductScreen.confirmOpeningPopup(),
-            ProductScreen.clickQuotationButton(),
-            ProductScreen.selectFirstOrder(),
+            Chrome.startPoS(),
+            Dialog.confirm("Open Register"),
+            PosSale.settleNthOrder(1),
+            Order.hasLine({}),
             ProductScreen.clickPayButton(),
             PaymentScreen.isInvoiceButtonChecked(),
             PaymentScreen.clickInvoiceButton(),
+            Dialog.is({ title: "This order needs to be invoiced" }),
+            Dialog.confirm(),
             PaymentScreen.isInvoiceButtonChecked(),
-            ErrorPopup.clickConfirm(),
         ].flat(),
 });
 
 registry.category("web_tour.tours").add("PosSettleOrderTryInvoice", {
     test: true,
-    url: "/pos/ui",
     steps: () =>
         [
-            ProductScreen.confirmOpeningPopup(),
-            ProductScreen.clickQuotationButton(),
-            ProductScreen.selectFirstOrder(),
+            Chrome.startPoS(),
+            Dialog.confirm("Open Register"),
+            PosSale.settleNthOrder(1),
             ProductScreen.clickPayButton(),
             PaymentScreen.clickInvoiceButton(),
             PaymentScreen.isInvoiceButtonChecked(),

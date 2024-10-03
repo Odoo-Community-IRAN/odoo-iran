@@ -29,17 +29,13 @@ class PosSession(models.Model):
 
         return sessions
 
-    def _loader_params_product_product(self):
-        res = super()._loader_params_product_product()
-        res['search_params']['fields'].append('self_order_available')
-        return res
+    @api.model
+    def _load_pos_self_data_domain(self, data):
+        return [('config_id', '=', data['pos.config']['data'][0]['id']), ('state', '=', 'opened')]
 
-    def _pos_data_process(self, loaded_data):
-        """
-        This is where we need to process the data if we can't do it in the loader/getter
-        """
-        super()._pos_data_process(loaded_data)
-        loaded_data["company_has_self_ordering"] = (
+    def _load_pos_data(self, data):
+        sessions = super()._load_pos_data(data)
+        sessions['data'][0]['_self_ordering'] = (
             self.env["pos.config"]
             .sudo()
             .search_count(
@@ -52,3 +48,4 @@ class PosSession(models.Model):
             )
             > 0
         )
+        return sessions

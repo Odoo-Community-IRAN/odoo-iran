@@ -7,42 +7,45 @@ const websiteName = "Website Test Settings";
 
 registry.category("web_tour.tours").add("website_settings_m2o_dirty", {
     test: true,
-    url: "/web",
+    url: "/odoo",
     steps: () => [
         stepUtils.showAppsMenuItem(),
         {
             content: "open settings",
             trigger: ".o_app[data-menu-xmlid='base.menu_administration']",
+            run: "click",
         },
         {
             content: "open website settings",
             trigger: ".settings_tab .tab[data-key='website']",
+            run: "click",
         },
         {
             content: "check that the 'Shared Customers Accounts' setting is checked",
             trigger: "input[id^='shared_user_account']:checked",
-            isCheck: true,
         },
         {
             content: "open website switcher",
             trigger: "input[id^='website_id']",
+            run: `edit ${websiteName}`,
         },
         {
             content: `select ${websiteName} in the website switcher`,
             trigger: `li:has(.dropdown-item:contains('${websiteName}'))`,
+            run: "click",
         },
         {
             content: `check that the settings of ${websiteName} are loaded (Shared Customers Accounts)`,
             trigger: "input[id^='shared_user_account']:not(:checked)",
-            isCheck: true,
         },
         {
             content: "click on the fake website setting after checking the edited website",
             trigger: "button[name='action_website_test_setting']",
+            run: "click",
         },
         {
             content: "check that we are on '/'",
-            trigger: "iframe body div#wrap",
+            trigger: ":iframe body div#wrap",
             run: function () {
                 if (window.location.pathname !== "/") {
                     // If this fails, it's probably because the change of website

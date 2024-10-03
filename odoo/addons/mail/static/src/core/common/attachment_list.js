@@ -1,12 +1,26 @@
-/* @odoo-module */
-
 import { Component, useState } from "@odoo/owl";
+import { isMobileOS } from "@web/core/browser/feature_detection";
 
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
+import { Dropdown } from "@web/core/dropdown/dropdown";
+import { useDropdownState } from "@web/core/dropdown/dropdown_hooks";
+import { DropdownItem } from "@web/core/dropdown/dropdown_item";
 import { useFileViewer } from "@web/core/file_viewer/file_viewer_hook";
 import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
 import { url } from "@web/core/utils/urls";
+
+class ImageActions extends Component {
+    static components = { Dropdown, DropdownItem };
+    static props = ["actions", "imagesHeight"];
+    static template = "mail.ImageActions";
+
+    setup() {
+        super.setup();
+        this.actionsMenuState = useDropdownState();
+        this.isMobileOS = isMobileOS;
+    }
+}
 
 /**
  * @typedef {Object} Props
@@ -17,29 +31,19 @@ import { url } from "@web/core/utils/urls";
  * @extends {Component<Props, Env>}
  */
 export class AttachmentList extends Component {
+    static components = { ImageActions };
     static props = ["attachments", "unlinkAttachment", "imagesHeight", "messageSearch?"];
     static template = "mail.AttachmentList";
 
     setup() {
+        super.setup();
         this.ui = useState(useService("ui"));
         // Arbitrary high value, this is effectively a max-width.
         this.imagesWidth = 1920;
         this.dialog = useService("dialog");
         this.fileViewer = useFileViewer();
-    }
-
-    /**
-     * @return {import("models").Attachment[]}
-     */
-    get nonImagesAttachments() {
-        return this.props.attachments.filter((attachment) => !attachment.isImage);
-    }
-
-    /**
-     * @return {import("models").Attachment[]}
-     */
-    get imagesAttachments() {
-        return this.props.attachments.filter((attachment) => attachment.isImage);
+        this.actionsMenuState = useDropdownState();
+        this.isMobileOS = isMobileOS;
     }
 
     /**
@@ -51,9 +55,17 @@ export class AttachmentList extends Component {
         }
         return url(attachment.urlRoute, {
             ...attachment.urlQueryParams,
-            width: this.imagesWidth,
-            height: this.props.imagesHeight,
+            width: this.imagesWidth * 2,
+            height: this.props.imagesHeight * 2,
         });
+    }
+
+    get images() {
+        return this.props.attachments.filter((a) => a.isImage);
+    }
+
+    get cards() {
+        return this.props.attachments.filter((a) => !a.isImage);
     }
 
     /**
@@ -107,6 +119,25 @@ export class AttachmentList extends Component {
 
     get isInChatWindowAndIsAlignedLeft() {
         return this.env.inChatWindow && !this.env.alignedRight;
+    }
+
+    getActions(attachment) {
+        const res = [];
+        if (this.showDelete) {
+            res.push({
+                label: "Remove",
+                icon: "fa fa-trash",
+                onSelect: () => this.onClickUnlink(attachment),
+            });
+        }
+        if (this.canDownload(attachment)) {
+            res.push({
+                label: "Download",
+                icon: "fa fa-download",
+                onSelect: () => this.onClickDownload(attachment),
+            });
+        }
+        return res;
     }
 
     get showDelete() {

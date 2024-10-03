@@ -1,8 +1,7 @@
-/** @odoo-module **/
-
 import { Component } from "@odoo/owl";
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
+import { getFieldDomain } from "@web/model/relational_model/utils";
 import { useSpecialData } from "@web/views/fields/relational_utils";
 import { standardFieldProps } from "../standard_field_props";
 
@@ -12,7 +11,7 @@ export class SelectionField extends Component {
         ...standardFieldProps,
         placeholder: { type: String, optional: true },
         required: { type: Boolean, optional: true },
-        domain: { type: Array, optional: true },
+        domain: { type: [Array, Function], optional: true },
         autosave: { type: Boolean, optional: true },
     };
     static defaultProps = {
@@ -24,7 +23,8 @@ export class SelectionField extends Component {
         if (this.type === "many2one") {
             this.specialData = useSpecialData((orm, props) => {
                 const { relation } = props.record.fields[props.name];
-                return orm.call(relation, "name_search", ["", props.domain]);
+                const domain = getFieldDomain(props.record, props.name, props.domain);
+                return orm.call(relation, "name_search", ["", domain]);
             });
         }
     }
@@ -105,7 +105,7 @@ export const selectionField = {
             autosave: viewType === "kanban",
             placeholder: attrs.placeholder,
             required: dynamicInfo.required,
-            domain: dynamicInfo.domain(),
+            domain: dynamicInfo.domain,
         };
         if (viewType === "kanban") {
             props.readonly = dynamicInfo.readonly;

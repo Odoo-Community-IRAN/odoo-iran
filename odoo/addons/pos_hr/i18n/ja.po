@@ -3,16 +3,17 @@
 # 	* pos_hr
 # 
 # Translators:
-# Wil Odoo, 2023
+# Martin Trigaux, 2024
 # Junko Augias, 2024
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-08-13 10:27+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Junko Augias, 2024\n"
+"POT-Creation-Date: 2024-09-26 08:55+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Japanese (https://app.transifex.com/odoo/teams/41243/ja/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -21,15 +22,46 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0;\n"
 
 #. module: pos_hr
+#: model:ir.model,name:pos_hr.model_report_pos_hr_multi_employee_sales_report
+msgid "A collection of single session reports. One for each employee"
+msgstr ""
+
+#. module: pos_hr
+#: model_terms:ir.ui.view,arch_db:pos_hr.single_employee_sales_report
+msgid "Abigal Peterson"
+msgstr ""
+
+#. module: pos_hr
+#. odoo-javascript
+#: code:addons/pos_hr/static/src/overrides/screens/product_screen/order_summary/order_summary.js:0
+msgid "Access Denied"
+msgstr "アクセスが拒否されました。"
+
+#. module: pos_hr
+#: model:ir.model.fields,field_description:pos_hr.field_pos_daily_sales_reports_wizard__add_report_per_employee
+msgid "Add a report per each employee"
+msgstr ""
+
+#. module: pos_hr
 #: model_terms:ir.ui.view,arch_db:pos_hr.pos_config_form_view_inherit
 #: model_terms:ir.ui.view,arch_db:pos_hr.res_config_settings_view_form
 msgid "Advanced rights"
 msgstr "高度な権利"
 
 #. module: pos_hr
+#: model_terms:ir.ui.view,arch_db:pos_hr.pos_config_form_view_inherit
+msgid "All Employees"
+msgstr "全従業員"
+
+#. module: pos_hr
 #: model_terms:ir.ui.view,arch_db:pos_hr.res_config_settings_view_form
 msgid "All employees"
 msgstr "全従業員"
+
+#. module: pos_hr
+#: model:ir.model,name:pos_hr.model_account_bank_statement_line
+msgid "Bank Statement Line"
+msgstr "銀行取引明細書内容"
 
 #. module: pos_hr
 #: model_terms:ir.ui.view,arch_db:pos_hr.pos_config_form_view_inherit
@@ -38,18 +70,48 @@ msgid "Basic rights"
 msgstr "基本的権利"
 
 #. module: pos_hr
-#: model:ir.model.fields,field_description:pos_hr.field_pos_order__cashier
-#: model_terms:ir.ui.view,arch_db:pos_hr.pos_order_form_inherit
+#: model_terms:ir.ui.view,arch_db:pos_hr.view_pos_daily_sales_reports_wizard
+msgid ""
+"Can't generate a report per employee! as selected session has no orders "
+"associated with any employee."
+msgstr ""
+
+#. module: pos_hr
+#. odoo-javascript
+#: code:addons/pos_hr/static/src/overrides/components/closing_popup/closing_popup.xml:0
+msgid "Cash in/out"
+msgstr ""
+
+#. module: pos_hr
+#: model:ir.model.fields,field_description:pos_hr.field_pos_order__employee_id
+#: model:ir.model.fields,field_description:pos_hr.field_pos_payment__employee_id
+#: model:ir.model.fields,field_description:pos_hr.field_pos_session__employee_id
 #: model_terms:ir.ui.view,arch_db:pos_hr.pos_order_list_select_inherit
 msgid "Cashier"
 msgstr "キャッシャー"
 
 #. module: pos_hr
+#. odoo-python
+#: code:addons/pos_hr/models/pos_order.py:0
+msgid "Cashier %s"
+msgstr ""
+
+#. module: pos_hr
+#: model:ir.model.fields,field_description:pos_hr.field_pos_order__cashier
+msgid "Cashier name"
+msgstr ""
+
+#. module: pos_hr
 #. odoo-javascript
 #: code:addons/pos_hr/static/src/app/select_cashier_mixin.js:0
-#, python-format
 msgid "Change Cashier"
 msgstr "キャッシャーを変更"
+
+#. module: pos_hr
+#. odoo-python
+#: code:addons/pos_hr/models/pos_session.py:0
+msgid "Closed Register"
+msgstr "レジ締め完了"
 
 #. module: pos_hr
 #: model:ir.model,name:pos_hr.model_res_config_settings
@@ -57,19 +119,47 @@ msgid "Config Settings"
 msgstr "コンフィグ設定"
 
 #. module: pos_hr
+#. odoo-javascript
+#: code:addons/pos_hr/static/src/overrides/components/closing_popup/closing_popup.xml:0
+msgid "Counted"
+msgstr "棚卸数量"
+
+#. module: pos_hr
+#. odoo-javascript
+#: code:addons/pos_hr/static/src/overrides/components/closing_popup/closing_popup.xml:0
+msgid "Difference"
+msgstr "差異"
+
+#. module: pos_hr
+#. odoo-javascript
+#: code:addons/pos_hr/static/src/overrides/screens/login_screen/login_screen.js:0
+msgid "Discard"
+msgstr "破棄"
+
+#. module: pos_hr
 #: model:ir.model,name:pos_hr.model_hr_employee
-#: model:ir.model.fields,field_description:pos_hr.field_pos_order__employee_id
+#: model:ir.model.fields,field_description:pos_hr.field_account_bank_statement_line__employee_id
+#: model:ir.model.fields,field_description:pos_hr.field_pos_daily_sales_reports_wizard__employee_ids
 #: model:ir.model.fields,field_description:pos_hr.field_report_pos_order__employee_id
 #: model_terms:ir.ui.view,arch_db:pos_hr.view_report_pos_order_search_inherit
 msgid "Employee"
 msgstr "従業員"
 
 #. module: pos_hr
+#: model_terms:ir.ui.view,arch_db:pos_hr.single_employee_sales_report
+msgid "Employee Sales Report"
+msgstr ""
+
+#. module: pos_hr
+#: model_terms:ir.ui.view,arch_db:pos_hr.single_employee_sales_report
+msgid "Employee:"
+msgstr ""
+
+#. module: pos_hr
 #. odoo-python
 #: code:addons/pos_hr/models/hr_employee.py:0
-#, python-format
-msgid "Employee: %s - PoS Config(s): %s \n"
-msgstr "従業員: %s - POS 設定: %s \n"
+msgid "Employee: %(employee)s - PoS Config(s): %(config_list)s \n"
+msgstr "従業員: %(employee)s - PoSコンフィグ: %(config_list)s \n"
 
 #. module: pos_hr
 #: model:ir.model.fields,field_description:pos_hr.field_pos_config__basic_employee_ids
@@ -82,6 +172,12 @@ msgstr "基本的アクセス権のある従業員"
 #: model:ir.model.fields,field_description:pos_hr.field_res_config_settings__pos_advanced_employee_ids
 msgid "Employees with manager access"
 msgstr "管理者アクセス権のある従業員"
+
+#. module: pos_hr
+#. odoo-javascript
+#: code:addons/pos_hr/static/src/overrides/screens/login_screen/login_screen.xml:0
+msgid "Enter your PIN"
+msgstr ""
 
 #. module: pos_hr
 #: model:ir.model.fields,help:pos_hr.field_pos_config__basic_employee_ids
@@ -97,29 +193,13 @@ msgstr "空の場合、OdooユーザのみがPOSの拡張権限を持ちます�
 
 #. module: pos_hr
 #. odoo-javascript
-#: code:addons/pos_hr/static/src/app/select_cashier_mixin.js:0
-#, python-format
-msgid "Incorrect Password"
-msgstr "パスワードが間違っています"
-
-#. module: pos_hr
-#. odoo-javascript
 #: code:addons/pos_hr/static/src/overrides/components/navbar/navbar.xml:0
-#, python-format
 msgid "Lock"
 msgstr "ロック"
 
 #. module: pos_hr
 #. odoo-javascript
-#: code:addons/pos_hr/static/src/app/login_screen/login_screen.xml:0
-#, python-format
-msgid "Log in to"
-msgstr "以下にログイン:"
-
-#. module: pos_hr
-#. odoo-javascript
 #: code:addons/pos_hr/static/src/app/select_cashier_mixin.js:0
-#, python-format
 msgid "No Cashiers"
 msgstr "レジなし"
 
@@ -130,29 +210,55 @@ msgstr "従業員なし"
 
 #. module: pos_hr
 #. odoo-javascript
-#: code:addons/pos_hr/static/src/app/select_cashier_mixin.js:0
-#, python-format
-msgid "Password?"
-msgstr "パスワード？"
+#: code:addons/pos_hr/static/src/overrides/screens/login_screen/login_screen.xml:0
+msgid "Open Register"
+msgstr "レジをオープン"
 
 #. module: pos_hr
-#: model:ir.model.fields,help:pos_hr.field_pos_order__employee_id
-msgid ""
-"Person who uses the cash register. It can be a reliever, a student or an "
-"interim employee."
-msgstr "レジを利用する方。それは、救援者、学生、または暫定従業員である可能性があります。"
+#. odoo-python
+#: code:addons/pos_hr/models/pos_session.py:0
+msgid "Opened register"
+msgstr ""
+
+#. module: pos_hr
+#. odoo-javascript
+#: code:addons/pos_hr/static/src/overrides/components/closing_popup/closing_popup.xml:0
+msgid "Opening"
+msgstr "オープニング"
 
 #. module: pos_hr
 #. odoo-javascript
 #: code:addons/pos_hr/static/src/app/select_cashier_mixin.js:0
-#, python-format
-msgid "Please try again."
-msgstr "もう一度試して下さい。"
+msgid "PIN not found"
+msgstr "PINが見つかりません"
+
+#. module: pos_hr
+#. odoo-javascript
+#: code:addons/pos_hr/static/src/app/select_cashier_mixin.js:0
+msgid "Password?"
+msgstr "パスワード？"
+
+#. module: pos_hr
+#. odoo-javascript
+#: code:addons/pos_hr/static/src/overrides/components/closing_popup/closing_popup.xml:0
+msgid "Payments"
+msgstr "支払"
+
+#. module: pos_hr
+#. odoo-javascript
+#: code:addons/pos_hr/static/src/overrides/components/closing_popup/closing_popup.js:0
+msgid "Payments in %(paymentMethod)s"
+msgstr ""
 
 #. module: pos_hr
 #: model:ir.model,name:pos_hr.model_pos_config
 msgid "Point of Sale Configuration"
 msgstr "POS設定"
+
+#. module: pos_hr
+#: model:ir.model,name:pos_hr.model_pos_daily_sales_reports_wizard
+msgid "Point of Sale Daily Report"
+msgstr "POS日報"
 
 #. module: pos_hr
 #: model:ir.model,name:pos_hr.model_pos_order
@@ -165,43 +271,85 @@ msgid "Point of Sale Orders Report"
 msgstr "POS注文レポート"
 
 #. module: pos_hr
+#: model:ir.model,name:pos_hr.model_pos_payment
+msgid "Point of Sale Payments"
+msgstr "POS支払い"
+
+#. module: pos_hr
 #: model:ir.model,name:pos_hr.model_pos_session
 msgid "Point of Sale Session"
 msgstr "POSセッション"
 
 #. module: pos_hr
 #. odoo-javascript
-#: code:addons/pos_hr/static/src/app/login_screen/login_screen.xml:0
-#, python-format
-msgid "Scan your badge"
-msgstr "バッジをスキャン"
+#: code:addons/pos_hr/static/src/app/print_report_button/print_report_button.xml:0
+msgid "Print"
+msgstr "印刷"
 
 #. module: pos_hr
-#. odoo-javascript
-#: code:addons/pos_hr/static/src/app/login_screen/login_screen.xml:0
-#, python-format
-msgid "Select Cashier"
-msgstr "キャッシャーを選択"
+#: model:ir.model,name:pos_hr.model_product_product
+msgid "Product Variant"
+msgstr "プロダクトバリアント"
+
+#. module: pos_hr
+#: model:ir.actions.report,name:pos_hr.multi_employee_sales_report_action
+msgid "Sales Details"
+msgstr "販売詳細"
+
+#. module: pos_hr
+#: model_terms:ir.ui.view,arch_db:pos_hr.pos_config_form_view_inherit
+msgid "Select Employee(s)"
+msgstr "従業員を選択"
+
+#. module: pos_hr
+#: model:ir.model,name:pos_hr.model_report_pos_hr_single_employee_sales_report
+msgid "Session sales details for a single employee"
+msgstr ""
+
+#. module: pos_hr
+#: model:ir.model.fields,help:pos_hr.field_pos_session__employee_id
+msgid "The employee who currently uses the cash register"
+msgstr ""
+
+#. module: pos_hr
+#: model:ir.model.fields,help:pos_hr.field_account_bank_statement_line__employee_id
+msgid "The employee who made the cash move."
+msgstr ""
+
+#. module: pos_hr
+#: model:ir.model.fields,help:pos_hr.field_pos_order__employee_id
+#: model:ir.model.fields,help:pos_hr.field_pos_payment__employee_id
+msgid "The employee who uses the cash register."
+msgstr ""
 
 #. module: pos_hr
 #. odoo-javascript
 #: code:addons/pos_hr/static/src/app/select_cashier_mixin.js:0
-#, python-format
-msgid "There are no employees to select as cashier. Please create one."
-msgstr "レジ係として選択されている従業員がいません。作成して下さい。"
+msgid "There is no cashier available."
+msgstr ""
+
+#. module: pos_hr
+#. odoo-javascript
+#: code:addons/pos_hr/static/src/overrides/screens/login_screen/login_screen.xml:0
+msgid "Unlock Register"
+msgstr ""
+
+#. module: pos_hr
+#. odoo-javascript
+#: code:addons/pos_hr/static/src/app/select_cashier_mixin.js:0
+msgid "Wrong PIN"
+msgstr "不正な暗証番号"
+
+#. module: pos_hr
+#. odoo-javascript
+#: code:addons/pos_hr/static/src/overrides/screens/product_screen/order_summary/order_summary.js:0
+msgid "You are not allowed to change the price of a product."
+msgstr ""
 
 #. module: pos_hr
 #. odoo-python
 #: code:addons/pos_hr/models/hr_employee.py:0
-#, python-format
 msgid ""
 "You cannot delete an employee that may be used in an active PoS session, "
 "close the session(s) first: \n"
 msgstr "有効なPOSセッションで使用されている従業員を削除することはできません。最初にセッションをクローズして下さい:\n"
-
-#. module: pos_hr
-#. odoo-javascript
-#: code:addons/pos_hr/static/src/app/login_screen/login_screen.xml:0
-#, python-format
-msgid "or"
-msgstr "又は"

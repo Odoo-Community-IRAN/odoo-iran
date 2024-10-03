@@ -1,7 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 {
     'name': 'Finnish Localization',
-    'website': 'https://www.odoo.com/documentation/17.0/applications/finance/fiscal_localizations.html',
+    'website': 'https://www.odoo.com/documentation/master/applications/finance/fiscal_localizations.html',
     'icon': '/account/static/description/l10n.png',
     'countries': ['fi'],
     'version': '13.0.2',
@@ -24,6 +24,7 @@ Set the payment reference type from the Sales Journal.
         'base_vat',
         'account',
     ],
+    'auto_install': ['account'],
     'data': [
         'data/account_account_tag_data.xml',
         'data/account_tax_report_line.xml',

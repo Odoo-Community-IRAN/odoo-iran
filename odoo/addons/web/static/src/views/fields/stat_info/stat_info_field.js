@@ -1,8 +1,6 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
-import { archParseBoolean } from "@web/views/utils";
+import { exprToBoolean } from "@web/core/utils/strings";
 import { standardFieldProps } from "../standard_field_props";
 
 import { Component } from "@odoo/owl";
@@ -18,13 +16,13 @@ export class StatInfoField extends Component {
         string: { type: String, optional: true },
     };
 
-    get digits() {
-        const fieldDigits = this.props.record.fields[this.props.name].digits;
-        return !this.props.digits && Array.isArray(fieldDigits) ? fieldDigits : this.props.digits;
-    }
     get formattedValue() {
-        const formatter = formatters.get(this.props.record.fields[this.props.name].type);
-        return formatter(this.props.record.data[this.props.name] || 0, { digits: this.digits });
+        const field = this.props.record.fields[this.props.name];
+        const formatter = formatters.get(field.type);
+        return formatter(this.props.record.data[this.props.name] || 0, {
+            digits: this.props.digits,
+            field,
+        });
     }
     get label() {
         return this.props.labelField
@@ -59,7 +57,7 @@ export const statInfoField = {
         return {
             digits,
             labelField: options.label_field,
-            noLabel: archParseBoolean(attrs.nolabel),
+            noLabel: exprToBoolean(attrs.nolabel),
             string,
         };
     },

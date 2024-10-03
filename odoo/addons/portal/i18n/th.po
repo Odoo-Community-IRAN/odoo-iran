@@ -3,16 +3,16 @@
 # 	* portal
 # 
 # Translators:
-# Wil Odoo, 2023
 # Rasareeyar Lappiam, 2024
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-08-13 10:29+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Rasareeyar Lappiam, 2024\n"
+"POT-Creation-Date: 2024-09-26 08:57+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Thai (https://app.transifex.com/odoo/teams/41243/th/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -28,7 +28,6 @@ msgstr "\" เพื่อตรวจสอบการดำเนินกา
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/js/portal_sidebar.js:0
-#, python-format
 msgid "%s days overdue"
 msgstr "เกินกำหนด %s วัน"
 
@@ -184,7 +183,7 @@ msgid ""
 "                        An account has been created for you with the following login: <t t-out=\"object.user_id.login\">demo</t><br><br>\n"
 "                        Click on the button below to pick a password and activate your account.\n"
 "                        <div style=\"margin: 16px 0px 16px 0px; text-align: center;\">\n"
-"                            <a t-att-href=\"object.user_id.signup_url\" style=\"display: inline-block; padding: 10px; text-decoration: none; font-size: 12px; background-color: #875A7B; color: #fff; border-radius: 5px;\">\n"
+"                            <a t-att-href=\"object.user_id.partner_id._get_signup_url()\" style=\"display: inline-block; padding: 10px; text-decoration: none; font-size: 12px; background-color: #875A7B; color: #fff; border-radius: 5px;\">\n"
 "                                <strong>Activate Account</strong>\n"
 "                            </a>\n"
 "                        </div>\n"
@@ -233,7 +232,7 @@ msgstr ""
 "<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" style=\"padding-top: 16px; background-color: #F1F1F1; font-family:Verdana, Arial,sans-serif; color: #454748; width: 100%; border-collapse:separate;\"><tr><td align=\"center\">\n"
 "<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"590\" style=\"padding: 16px; background-color: white; color: #454748; border-collapse:separate;\">\n"
 "<tbody>\n"
-"    <!-- ส่วนหัว -->\n"
+"    <!-- ส่วนท้าย -->\n"
 "    <tr>\n"
 "        <td align=\"center\" style=\"min-width: 590px;\">\n"
 "            <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"590\" style=\"min-width: 590px; background-color: white; padding: 0px 8px 0px 8px; border-collapse:separate;\">\n"
@@ -255,12 +254,12 @@ msgstr ""
 "            <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"590\" style=\"min-width: 590px; background-color: white; padding: 0px 8px 0px 8px; border-collapse:separate;\">\n"
 "                <tr><td valign=\"top\" style=\"font-size: 13px;\">\n"
 "                    <div>\n"
-"                        เรียน <t t-out=\"object.user_id.name or ''\">Marc Demo</t><br> <br>\n"
-"                        ยินดีต้อนรับสู่พอทัลของ <t t-out=\"object.user_id.company_id.name\">YourCompany</t>!<br><br>\n"
-"                        บัญชีได้ถูกสร้างขึ้นสำหรับคุณด้วยการเข้าสู่ระบบต่อไปนี้: <t t-out=\"object.user_id.login\">demo</t><br><br>\n"
+"                        เรียน <t t-out=\"object.user_id.name or ''\">Marc Demo</t>,<br> <br>\n"
+"                        ยินดีต้อนรับเข้าสู่พอร์ทัล <t t-out=\"object.user_id.company_id.name\">YourCompany</t><br><br>\n"
+"                        บัญชีได้ถูกสร้างขึ้นด้วยการเข้าสู่ระบบดังต่อไปนี้: <t t-out=\"object.user_id.login\">การสาธิต</t><br><br>\n"
 "                        คลิกที่ปุ่มด้านล่างเพื่อเลือกรหัสผ่านและเปิดใช้งานบัญชีของคุณ\n"
 "                        <div style=\"margin: 16px 0px 16px 0px; text-align: center;\">\n"
-"                            <a t-att-href=\"object.user_id.signup_url\" style=\"display: inline-block; padding: 10px; text-decoration: none; font-size: 12px; background-color: #875A7B; color: #fff; border-radius: 5px;\">\n"
+"                            <a t-att-href=\"object.user_id.partner_id._get_signup_url()\" style=\"display: inline-block; padding: 10px; text-decoration: none; font-size: 12px; background-color: #875A7B; color: #fff; border-radius: 5px;\">\n"
 "                                <strong>เปิดใช้งานบัญชี</strong>\n"
 "                            </a>\n"
 "                        </div>\n"
@@ -314,14 +313,12 @@ msgstr "คำอธิบายคีย์ API"
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/js/portal_security.js:0
-#, python-format
 msgid "API Key Ready"
 msgstr "คีย์ API พร้อมแล้ว"
 
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/signature_form/signature_form.js:0
-#, python-format
 msgid "Accept & Sign"
 msgstr "ยอมรับและลงนาม"
 
@@ -334,7 +331,6 @@ msgstr "คําเตือนการเข้าถึง"
 #. module: portal
 #. odoo-python
 #: code:addons/portal/controllers/portal.py:0
-#, python-format
 msgid "Account deleted!"
 msgstr "ลบบัญชีแล้ว!"
 
@@ -346,9 +342,8 @@ msgstr "เพิ่มโน้ต"
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
 msgid "Add attachment"
-msgstr "เพิ่มไฟล์แนบ"
+msgstr "Add attachment"
 
 #. module: portal
 #: model_terms:ir.ui.view,arch_db:portal.portal_share_wizard
@@ -378,7 +373,6 @@ msgstr "คุณแน่ใจหรือไม่ว่าต้องกา
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
 msgid "Avatar"
 msgstr "อวตาร"
 
@@ -397,7 +391,6 @@ msgstr "เปลี่ยนรหัสผ่าน"
 #. odoo-python
 #: code:addons/portal/controllers/portal.py:0
 #: model_terms:ir.ui.view,arch_db:portal.portal_my_details_fields
-#, python-format
 msgid ""
 "Changing VAT number is not allowed once document(s) have been issued for "
 "your account. Please contact us directly for this operation."
@@ -426,8 +419,6 @@ msgstr ""
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/js/portal_security.js:0
-#: code:addons/portal/static/src/js/portal_security.js:0
-#, python-format
 msgid "Check failed"
 msgstr "การตรวจสอบล้มเหลว"
 
@@ -439,7 +430,6 @@ msgstr "เมือง"
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/signature_form/signature_form.xml:0
-#, python-format
 msgid "Click here to see your document."
 msgstr "คลิกที่นี่เพื่อดูเอกสารของคุณ"
 
@@ -449,7 +439,6 @@ msgstr "คลิกที่นี่เพื่อดูเอกสารข
 #: model_terms:ir.ui.view,arch_db:portal.portal_back_in_edit_mode
 #: model_terms:ir.ui.view,arch_db:portal.side_content
 #: model_terms:ir.ui.view,arch_db:portal.wizard_view
-#, python-format
 msgid "Close"
 msgstr "ปิด"
 
@@ -471,14 +460,12 @@ msgstr "กำหนดค่าพารามิเตอร์การเช
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/js/portal_security.js:0
-#, python-format
 msgid "Confirm"
 msgstr "ยืนยัน"
 
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/js/portal_security.js:0
-#, python-format
 msgid "Confirm Password"
 msgstr "ยืนยันรหัสผ่าน"
 
@@ -492,6 +479,7 @@ msgstr "การเชื่อมต่อ &amp; ความปลอดภ�
 #: model:ir.model,name:portal.model_res_partner
 #: model:ir.model.fields,field_description:portal.field_portal_wizard_user__partner_id
 #: model_terms:ir.ui.view,arch_db:portal.portal_layout
+#: model_terms:ir.ui.view,arch_db:portal.portal_my_contact
 #: model_terms:ir.ui.view,arch_db:portal.side_content
 msgid "Contact"
 msgstr "ติดต่อ"
@@ -509,7 +497,6 @@ msgstr "การติดต่อ"
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/js/portal_composer.js:0
-#, python-format
 msgid "Could not save file <strong>%s</strong>"
 msgstr "ไม่สามารถบันทึกไฟล์ <strong>%s</strong> ได้"
 
@@ -531,27 +518,6 @@ msgstr "สร้างโดย"
 #: model:ir.model.fields,field_description:portal.field_portal_wizard_user__create_date
 msgid "Created on"
 msgstr "สร้างเมื่อ"
-
-#. module: portal
-#. odoo-javascript
-#: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
-msgid ""
-"Currently available to everyone viewing this document, click to restrict to "
-"internal employees."
-msgstr ""
-"ขณะนี้เปิดให้ทุกคนที่ดูเอกสารนี้ คลิกเพื่อจำกัดเฉพาะพนักงานภายในเท่านั้น"
-
-#. module: portal
-#. odoo-javascript
-#: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
-msgid ""
-"Currently restricted to internal employees, click to make it available to "
-"everyone viewing this document."
-msgstr ""
-"ขณะนี้จำกัดเฉพาะพนักงานภายในเท่านั้น "
-"คลิกเพื่อให้ทุกคนที่ดูเอกสารนี้สามารถใช้ได้"
 
 #. module: portal
 #: model:ir.model.fields,field_description:portal.field_res_config_settings__portal_allow_api_keys
@@ -576,7 +542,6 @@ msgstr "เรียน"
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
 msgid "Delete"
 msgstr "ลบ"
 
@@ -630,14 +595,12 @@ msgstr "แสดงชื่อ"
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/js/portal_sidebar.js:0
-#, python-format
 msgid "Due in %s days"
 msgstr "ครบกำหนดใน %s วัน"
 
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/js/portal_sidebar.js:0
-#, python-format
 msgid "Due today"
 msgstr "ครบกำหนดวันนี้"
 
@@ -660,14 +623,12 @@ msgstr "เธรดอีเมล"
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_security.xml:0
-#, python-format
 msgid "Enter a description of and purpose for the key."
 msgstr "ป้อนคำอธิบายและวัตถุประสงค์ของคีย์"
 
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_security.xml:0
-#, python-format
 msgid "Forgot password?"
 msgstr "ลืมรหัสผ่าน?"
 
@@ -700,7 +661,6 @@ msgstr "การกำหนด HTTP"
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_security.xml:0
-#, python-format
 msgid ""
 "Here is your new API key, use it instead of a password for RPC access.\n"
 "                Your login is still necessary for interactive usage."
@@ -711,7 +671,7 @@ msgstr ""
 #. module: portal
 #: model_terms:ir.ui.view,arch_db:portal.portal_breadcrumbs
 msgid "Home"
-msgstr "โฮม"
+msgstr "หน้าแรก"
 
 #. module: portal
 #: model:ir.model.fields,field_description:portal.field_portal_share__id
@@ -723,28 +683,13 @@ msgstr "ไอดี"
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_security.xml:0
-#, python-format
 msgid "Important:"
 msgstr "สิ่งสำคัญ:"
-
-#. module: portal
-#. odoo-javascript
-#: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
-msgid "Internal Note"
-msgstr "บันทึกย่อภายใน"
 
 #. module: portal
 #: model_terms:ir.ui.view,arch_db:portal.wizard_view
 msgid "Internal User"
 msgstr "ผู้ใช้งาน"
-
-#. module: portal
-#. odoo-javascript
-#: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
-msgid "Internal notes are only displayed to internal users."
-msgstr "โน๊ตภายในจะแสดงต่อผู้ใช้ภายในเท่านั้น"
 
 #. module: portal
 #: model:ir.model.fields.selection,name:portal.selection__portal_wizard_user__email_state__ko
@@ -759,14 +704,12 @@ msgstr "ที่อยู่อีเมลที่ไม่ถูกต้อ
 #. module: portal
 #. odoo-python
 #: code:addons/portal/controllers/portal.py:0
-#, python-format
 msgid "Invalid Email! Please enter a valid email address."
 msgstr "อีเมลไม่ถูกต้อง! กรุณาใส่อีเมล์ที่ถูกต้อง."
 
 #. module: portal
 #. odoo-python
 #: code:addons/portal/controllers/portal.py:0
-#, python-format
 msgid "Invalid report type: %s"
 msgstr "ประเภทรายงานไม่ถูกต้อง: %s"
 
@@ -783,8 +726,6 @@ msgstr "อีเมลคำเชิญไปยังผู้ติดต่
 #. module: portal
 #. odoo-python
 #: code:addons/portal/wizard/portal_share.py:0
-#: code:addons/portal/wizard/portal_share.py:0
-#, python-format
 msgid "Invitation to access %s"
 msgstr "เชิญให้เข้าถึง %s"
 
@@ -801,7 +742,6 @@ msgstr "เป็นพอร์ทัล"
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_security.xml:0
-#, python-format
 msgid ""
 "It is very important that this description be clear\n"
 "                and complete,"
@@ -812,7 +752,6 @@ msgstr ""
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_security.xml:0
-#, python-format
 msgid "Key Description"
 msgstr ""
 
@@ -838,7 +777,6 @@ msgstr "การรับรองความถูกต้องล่าส
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
 msgid "Leave a comment"
 msgstr "แสดงความคิดเห็น"
 
@@ -851,14 +789,12 @@ msgstr "ลิงก์"
 #. odoo-javascript
 #: code:addons/portal/static/src/js/portal_security.js:0
 #: model_terms:ir.ui.view,arch_db:portal.portal_my_security
-#, python-format
 msgid "Log out from all devices"
 msgstr "ออกจากระบบจากอุปกรณ์ทั้งหมด"
 
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/js/portal_security.js:0
-#, python-format
 msgid "Log out from all devices?"
 msgstr "ต้องการออกจากระบบจากอุปกรณ์ทั้งหมดใช่ไหม"
 
@@ -870,7 +806,6 @@ msgstr "ข้อความ"
 #. module: portal
 #. odoo-python
 #: code:addons/portal/models/mail_thread.py:0
-#, python-format
 msgid ""
 "Model %(model_name)s does not support token signature, as it does not have "
 "%(field_name)s field."
@@ -881,7 +816,6 @@ msgstr ""
 #. module: portal
 #. odoo-python
 #: code:addons/portal/controllers/portal.py:0
-#, python-format
 msgid "Multi company reports are not supported."
 msgstr "ไม่รองรับรายงานหลายบริษัท"
 
@@ -898,7 +832,6 @@ msgstr "ชื่อ"
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_security.xml:0
-#, python-format
 msgid "Name your key"
 msgstr "ตั้งชื่อกุญแจของคุณ"
 
@@ -906,7 +839,6 @@ msgstr "ตั้งชื่อกุญแจของคุณ"
 #. odoo-javascript
 #: code:addons/portal/static/src/js/portal_security.js:0
 #: model_terms:ir.ui.view,arch_db:portal.portal_my_security
-#, python-format
 msgid "New API Key"
 msgstr "คีย์ API ใหม่"
 
@@ -918,8 +850,6 @@ msgstr "รหัสผ่านใหม่:"
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
 msgid "Next"
 msgstr "ถัดไป"
 
@@ -936,14 +866,12 @@ msgstr "โลโก้ Odoo "
 #. module: portal
 #. odoo-python
 #: code:addons/portal/models/res_users_apikeys_description.py:0
-#, python-format
 msgid "Only internal and portal users can create API keys"
 msgstr "เฉพาะผู้ใช้ภายในและพอร์ทัลเท่านั้นที่สามารถสร้างคีย์ API ได้"
 
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
 msgid "Oops! Something went wrong. Try to reload the page and log in."
 msgstr "อ๊ะ! มีบางอย่างผิดพลาด ลองโหลดหน้านี้อีกครั้งและเข้าสู่ระบบ"
 
@@ -975,7 +903,6 @@ msgstr "โทรศัพท์"
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_security.xml:0
-#, python-format
 msgid "Please enter your password to confirm you own this account"
 msgstr "โปรดป้อนรหัสผ่านของคุณเพื่อยืนยันว่าคุณเป็นเจ้าของบัญชีนี้"
 
@@ -983,7 +910,6 @@ msgstr "โปรดป้อนรหัสผ่านของคุณเพ
 #. odoo-python
 #: code:addons/portal/wizard/portal_wizard.py:0
 #: model_terms:ir.ui.view,arch_db:portal.wizard_view
-#, python-format
 msgid "Portal Access Management"
 msgstr "การจัดการการเข้าถึงพอร์ทัล"
 
@@ -1020,25 +946,8 @@ msgstr "สนับสนุนโดย"
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
 msgid "Previous"
 msgstr "ก่อนหน้า"
-
-#. module: portal
-#. odoo-javascript
-#: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
-msgid "Public"
-msgstr "สาธารณะ"
-
-#. module: portal
-#. odoo-javascript
-#: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
-msgid "Published on"
-msgstr "เผยแพร่เมื่อ"
 
 #. module: portal
 #: model_terms:ir.ui.view,arch_db:portal.portal_my_security
@@ -1113,7 +1022,6 @@ msgstr "ความปลอดภัย"
 #. odoo-javascript
 #: code:addons/portal/static/src/js/portal_security.js:0
 #: code:addons/portal/static/src/xml/portal_security.xml:0
-#, python-format
 msgid "Security Control"
 msgstr "การควบคุมความปลอดภัย"
 
@@ -1135,11 +1043,15 @@ msgstr ""
 
 #. module: portal
 #. odoo-javascript
-#: code:addons/portal/static/src/xml/portal_chatter.xml:0
+#: code:addons/portal/static/src/js/portal_composer.js:0
 #: model_terms:ir.ui.view,arch_db:portal.portal_share_wizard
-#, python-format
 msgid "Send"
 msgstr "ส่ง"
+
+#. module: portal
+#: model_terms:ir.ui.view,arch_db:portal.portal_my_contact
+msgid "Send message"
+msgstr "ส่งข้อความ"
 
 #. module: portal
 #: model:ir.actions.act_window,name:portal.portal_share_action
@@ -1158,9 +1070,13 @@ msgid "Sign in"
 msgstr "ลงชื่อเข้าใช้"
 
 #. module: portal
+#: model_terms:ir.ui.view,arch_db:portal.frontend_layout
+msgid "Skip to Content"
+msgstr ""
+
+#. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/js/portal_composer.js:0
-#, python-format
 msgid ""
 "Some fields are required. Please make sure to write a message or attach a "
 "document"
@@ -1170,7 +1086,6 @@ msgstr ""
 #. module: portal
 #. odoo-python
 #: code:addons/portal/controllers/portal.py:0
-#, python-format
 msgid "Some required fields are empty."
 msgstr "ช่องที่ต้องกรอกบางช่องว่างเปล่า"
 
@@ -1190,23 +1105,25 @@ msgid "Street"
 msgstr "ถนน"
 
 #. module: portal
+#: model_terms:ir.ui.view,arch_db:portal.portal_my_details_fields
+msgid "Street 2"
+msgstr "ถนน 2"
+
+#. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/signature_form/signature_form.xml:0
-#, python-format
 msgid "Thank You!"
 msgstr "ขอบคุณ!"
 
 #. module: portal
 #. odoo-python
 #: code:addons/portal/controllers/portal.py:0
-#, python-format
 msgid "The attachment %s cannot be removed because it is linked to a message."
 msgstr "สิ่งที่แนบมา %s ไม่สามารถลบออกได้ เนื่องจากถูกเชื่อมโยงกับข้อความ"
 
 #. module: portal
 #. odoo-python
 #: code:addons/portal/controllers/portal.py:0
-#, python-format
 msgid ""
 "The attachment %s cannot be removed because it is not in a pending state."
 msgstr "สิ่งที่แนบมา %s ไม่สามารถลบออกได้ เนื่องจากไม่อยู่ในสถานะรอดำเนินการ"
@@ -1214,7 +1131,6 @@ msgstr "สิ่งที่แนบมา %s ไม่สามารถล�
 #. module: portal
 #. odoo-python
 #: code:addons/portal/controllers/portal.py:0
-#, python-format
 msgid ""
 "The attachment does not exist or you do not have the rights to access it."
 msgstr "ไม่มีเอกสารแนบหรือคุณไม่มีสิทธิ์ในการเข้าถึง"
@@ -1222,43 +1138,30 @@ msgstr "ไม่มีเอกสารแนบหรือคุณไม่
 #. module: portal
 #. odoo-python
 #: code:addons/portal/wizard/portal_wizard.py:0
-#, python-format
 msgid "The contact \"%s\" does not have a valid email."
 msgstr "ผู้ติดต่อ \"%s\" ไม่มีอีเมลที่ถูกต้อง"
 
 #. module: portal
 #. odoo-python
 #: code:addons/portal/wizard/portal_wizard.py:0
-#, python-format
 msgid "The contact \"%s\" has the same email as an existing user"
 msgstr "ผู้ติดต่อ \"%s\" มีอีเมลเดียวกันกับผู้ใช้ที่มีอยู่"
 
 #. module: portal
-#. odoo-python
-#: code:addons/portal/controllers/portal.py:0
-#, python-format
-msgid ""
-"The document does not exist or you do not have the rights to access it."
-msgstr "ไม่มีเอกสารนี้หรือคุณไม่มีสิทธิ์ในการเข้าถึงเอกสารนั้น"
-
-#. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_security.xml:0
-#, python-format
 msgid "The key cannot be retrieved later and provides"
 msgstr "ไม่สามารถเรียกคีย์ได้ในภายหลังและให้"
 
 #. module: portal
 #. odoo-python
 #: code:addons/portal/controllers/portal.py:0
-#, python-format
 msgid "The new password and its confirmation must be identical."
 msgstr "รหัสผ่านใหม่และรหัสผ่านที่ยืนยันที่จะต้องเหมือนกัน"
 
 #. module: portal
 #. odoo-python
 #: code:addons/portal/controllers/portal.py:0
-#, python-format
 msgid ""
 "The old password you provided is incorrect, your password was not changed."
 msgstr "รหัสผ่านเดิมผิด รหัสผ่านของคุณยังไม่ถูกเปลี่ยนแปลง"
@@ -1266,37 +1169,26 @@ msgstr "รหัสผ่านเดิมผิด รหัสผ่าน�
 #. module: portal
 #. odoo-python
 #: code:addons/portal/wizard/portal_wizard.py:0
-#, python-format
 msgid "The partner \"%s\" already has the portal access."
 msgstr "พาร์ทเนอร์ \"%s\" ได้มีการเข้าถึงพอร์ทัลแล้ว"
 
 #. module: portal
 #. odoo-python
 #: code:addons/portal/wizard/portal_wizard.py:0
-#, python-format
 msgid "The partner \"%s\" has no portal access or is internal."
 msgstr "พาร์ทเนอร์ \"%s\" ไม่มีการเข้าถึงพอร์ทัลหรืออยู่ภายใน"
 
 #. module: portal
 #. odoo-python
 #: code:addons/portal/wizard/portal_wizard.py:0
-#, python-format
 msgid ""
 "The template \"Portal: new user\" not found for sending email to the portal "
 "user."
 msgstr "ไม่พบเทมเพลต \"พอร์ทัล: ผู้ใช้ใหม่\" สำหรับการส่งอีเมลไปยังผู้ใช้พอร์ทัล"
 
 #. module: portal
-#. odoo-javascript
-#: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
-msgid "There are no comments for now."
-msgstr "ไม่มีความคิดเห็นในขณะนี้"
-
-#. module: portal
 #. odoo-python
 #: code:addons/portal/controllers/portal.py:0
-#, python-format
 msgid "This document does not exist."
 msgstr "ไม่มีเอกสารนี้"
 
@@ -1331,7 +1223,6 @@ msgstr "สลับตัวกรอง"
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_security.xml:0
-#, python-format
 msgid "Type in your password to confirm :"
 msgstr "พิมพ์รหัสผ่านของคุณเพื่อยืนยัน:"
 
@@ -1379,12 +1270,10 @@ msgstr "ดู"
 #: model:ir.model.fields,field_description:portal.field_fleet_vehicle__website_message_ids
 #: model:ir.model.fields,field_description:portal.field_fleet_vehicle_log_contract__website_message_ids
 #: model:ir.model.fields,field_description:portal.field_fleet_vehicle_log_services__website_message_ids
+#: model:ir.model.fields,field_description:portal.field_fleet_vehicle_model__website_message_ids
 #: model:ir.model.fields,field_description:portal.field_gamification_badge__website_message_ids
 #: model:ir.model.fields,field_description:portal.field_gamification_challenge__website_message_ids
-#: model:ir.model.fields,field_description:portal.field_hr_department__website_message_ids
-#: model:ir.model.fields,field_description:portal.field_hr_employee__website_message_ids
-#: model:ir.model.fields,field_description:portal.field_hr_job__website_message_ids
-#: model:ir.model.fields,field_description:portal.field_loyalty_card__website_message_ids
+#: model:ir.model.fields,field_description:portal.field_iap_account__website_message_ids
 #: model:ir.model.fields,field_description:portal.field_lunch_supplier__website_message_ids
 #: model:ir.model.fields,field_description:portal.field_mail_blacklist__website_message_ids
 #: model:ir.model.fields,field_description:portal.field_mail_thread__website_message_ids
@@ -1396,6 +1285,7 @@ msgstr "ดู"
 #: model:ir.model.fields,field_description:portal.field_maintenance_equipment_category__website_message_ids
 #: model:ir.model.fields,field_description:portal.field_maintenance_request__website_message_ids
 #: model:ir.model.fields,field_description:portal.field_phone_blacklist__website_message_ids
+#: model:ir.model.fields,field_description:portal.field_product_category__website_message_ids
 #: model:ir.model.fields,field_description:portal.field_product_pricelist__website_message_ids
 #: model:ir.model.fields,field_description:portal.field_product_product__website_message_ids
 #: model:ir.model.fields,field_description:portal.field_product_template__website_message_ids
@@ -1414,12 +1304,10 @@ msgstr "ข้อความเว็บไซต์"
 #: model:ir.model.fields,help:portal.field_fleet_vehicle__website_message_ids
 #: model:ir.model.fields,help:portal.field_fleet_vehicle_log_contract__website_message_ids
 #: model:ir.model.fields,help:portal.field_fleet_vehicle_log_services__website_message_ids
+#: model:ir.model.fields,help:portal.field_fleet_vehicle_model__website_message_ids
 #: model:ir.model.fields,help:portal.field_gamification_badge__website_message_ids
 #: model:ir.model.fields,help:portal.field_gamification_challenge__website_message_ids
-#: model:ir.model.fields,help:portal.field_hr_department__website_message_ids
-#: model:ir.model.fields,help:portal.field_hr_employee__website_message_ids
-#: model:ir.model.fields,help:portal.field_hr_job__website_message_ids
-#: model:ir.model.fields,help:portal.field_loyalty_card__website_message_ids
+#: model:ir.model.fields,help:portal.field_iap_account__website_message_ids
 #: model:ir.model.fields,help:portal.field_lunch_supplier__website_message_ids
 #: model:ir.model.fields,help:portal.field_mail_blacklist__website_message_ids
 #: model:ir.model.fields,help:portal.field_mail_thread__website_message_ids
@@ -1431,6 +1319,7 @@ msgstr "ข้อความเว็บไซต์"
 #: model:ir.model.fields,help:portal.field_maintenance_equipment_category__website_message_ids
 #: model:ir.model.fields,help:portal.field_maintenance_request__website_message_ids
 #: model:ir.model.fields,help:portal.field_phone_blacklist__website_message_ids
+#: model:ir.model.fields,help:portal.field_product_category__website_message_ids
 #: model:ir.model.fields,help:portal.field_product_pricelist__website_message_ids
 #: model:ir.model.fields,help:portal.field_product_product__website_message_ids
 #: model:ir.model.fields,help:portal.field_product_template__website_message_ids
@@ -1443,7 +1332,6 @@ msgstr "ประวัติการสื่อสารของเว็บ
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_security.xml:0
-#, python-format
 msgid "What's this key for?"
 msgstr "กุญแจนี้มีไว้เพื่ออะไร?"
 
@@ -1455,14 +1343,18 @@ msgstr "ตัวช่วย"
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
 msgid "Write a message..."
 msgstr "เริ่มเขียนข้อความ..."
 
 #. module: portal
 #. odoo-javascript
+#: code:addons/portal/static/src/chatter/core/composer_patch.js:0
+msgid "Write a message…"
+msgstr ""
+
+#. module: portal
+#. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_security.xml:0
-#, python-format
 msgid "Write down your key"
 msgstr "จดรหัสของคุณ"
 
@@ -1474,7 +1366,6 @@ msgstr "รหัสผ่านไม่ถูกต้อง"
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_security.xml:0
-#, python-format
 msgid ""
 "You are about to log out from all devices that currently have access to this"
 " user's account."
@@ -1484,14 +1375,12 @@ msgstr ""
 #. module: portal
 #. odoo-python
 #: code:addons/portal/controllers/portal.py:0
-#, python-format
 msgid "You cannot leave any password empty."
 msgstr "คุณไม่สามารถปล่อยรหัสผ่านว่างไว้ได้"
 
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
 msgid "You must be"
 msgstr "คุณจะต้องเป็น"
 
@@ -1503,7 +1392,6 @@ msgstr "คุณควรกรอก \""
 #. module: portal
 #. odoo-python
 #: code:addons/portal/wizard/portal_wizard.py:0
-#, python-format
 msgid "You should first grant the portal access to the partner \"%s\"."
 msgstr "คุณควรให้สิทธิ์การเข้าถึงพอร์ทัลกับพาร์ทเนอร์ \"%s\" ก่อน"
 
@@ -1524,29 +1412,7 @@ msgstr "รหัสไปรษณีย์"
 
 #. module: portal
 #. odoo-javascript
-#: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
-msgid "avatar"
-msgstr "สัญลักษณ์"
-
-#. module: portal
-#. odoo-javascript
-#: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
-msgid "comment"
-msgstr "ความเห็น"
-
-#. module: portal
-#. odoo-javascript
-#: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
-msgid "comments"
-msgstr "ความคิดเห็น"
-
-#. module: portal
-#. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_security.xml:0
-#, python-format
 msgid "full access"
 msgstr "เข้าถึงได้เต็มรูปแบบ"
 
@@ -1558,7 +1424,6 @@ msgstr "ได้เชิญคุณให้เข้าถึงสิ่ง
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_security.xml:0
-#, python-format
 msgid ""
 "it will be the only way to\n"
 "                identify the key once created"
@@ -1569,7 +1434,6 @@ msgstr ""
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
 msgid "logged in"
 msgstr "เข้าสู่ระบบ"
 
@@ -1586,20 +1450,17 @@ msgstr "รหัสผ่าน"
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_security.xml:0
-#, python-format
 msgid "revoke"
 msgstr ""
 
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_chatter.xml:0
-#, python-format
 msgid "to post a comment."
 msgstr "แสดงความคิดเห็น"
 
 #. module: portal
 #. odoo-javascript
 #: code:addons/portal/static/src/xml/portal_security.xml:0
-#, python-format
 msgid "to your user account, it is very important to store it securely."
 msgstr "ไปยังบัญชีผู้ใช้ของคุณ สิ่งสำคัญมากคือต้องเก็บไว้อย่างปลอดภัย"

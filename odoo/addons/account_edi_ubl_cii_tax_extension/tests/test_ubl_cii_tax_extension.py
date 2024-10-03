@@ -10,8 +10,8 @@ from odoo.tests import tagged
 class TestAccountEdiUblCiiTaxExtension(AccountTestInvoicingCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref=None):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
 
         cls.reverse_charge_tax = cls.company_data['default_tax_sale'].copy({'name': 'Reverse charge tax', 'ubl_cii_tax_category_code': 'AE', 'ubl_cii_tax_exemption_reason_code': 'VATEX_EU_AE'})
         cls.zero_rated_tax = cls.company_data['default_tax_sale'].copy({'name': 'Zero rated tax', 'ubl_cii_tax_category_code': 'Z'})

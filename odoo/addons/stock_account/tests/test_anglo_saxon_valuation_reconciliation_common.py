@@ -15,8 +15,8 @@ class ValuationReconciliationTestCommon(AccountTestInvoicingCommon):
     """
 
     @classmethod
-    def setUpClass(cls, chart_template_ref=None):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
 
         cls.env.user.groups_id += cls.env.ref('stock_account.group_stock_accounting_automatic')
 
@@ -34,7 +34,7 @@ class ValuationReconciliationTestCommon(AccountTestInvoicingCommon):
         cls.test_product_order = cls.env['product.product'].create({
             'name': "Test product template invoiced on order",
             'standard_price': 42.0,
-            'type': 'product',
+            'is_storable': True,
             'categ_id': cls.stock_account_product_categ.id,
             'uom_id': uom_unit.id,
             'uom_po_id': uom_unit.id,
@@ -42,7 +42,7 @@ class ValuationReconciliationTestCommon(AccountTestInvoicingCommon):
         cls.test_product_delivery = cls.env['product.product'].create({
             'name': 'Test product template invoiced on delivery',
             'standard_price': 42.0,
-            'type': 'product',
+            'is_storable': True,
             'categ_id': cls.stock_account_product_categ.id,
             'uom_id': uom_unit.id,
             'uom_po_id': uom_unit.id,
@@ -56,34 +56,31 @@ class ValuationReconciliationTestCommon(AccountTestInvoicingCommon):
             })
 
     @classmethod
-    def setup_company_data(cls, company_name, chart_template=None, **kwargs):
-        company_data = super().setup_company_data(company_name, chart_template=chart_template, **kwargs)
+    def collect_company_accounting_data(cls, company):
+        company_data = super().collect_company_accounting_data(company)
 
         # Create stock config.
         company_data.update({
-            'default_account_stock_in': cls.env['account.account'].create({
+            'default_account_stock_in': cls.env['account.account'].with_company(company).create({
                 'name': 'default_account_stock_in',
                 'code': 'STOCKIN',
                 'reconcile': True,
                 'account_type': 'asset_current',
-                'company_id': company_data['company'].id,
             }),
-            'default_account_stock_out': cls.env['account.account'].create({
+            'default_account_stock_out': cls.env['account.account'].with_company(company).create({
                 'name': 'default_account_stock_out',
                 'code': 'STOCKOUT',
                 'reconcile': True,
                 'account_type': 'asset_current',
-                'company_id': company_data['company'].id,
             }),
-            'default_account_stock_valuation': cls.env['account.account'].create({
+            'default_account_stock_valuation': cls.env['account.account'].with_company(company).create({
                 'name': 'default_account_stock_valuation',
                 'code': 'STOCKVAL',
                 'reconcile': True,
                 'account_type': 'asset_current',
-                'company_id': company_data['company'].id,
             }),
             'default_warehouse': cls.env['stock.warehouse'].search(
-                [('company_id', '=', company_data['company'].id)],
+                [('company_id', '=', company.id)],
                 limit=1,
             ),
         })

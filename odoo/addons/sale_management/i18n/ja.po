@@ -3,17 +3,15 @@
 # 	* sale_management
 # 
 # Translators:
-# Wil Odoo, 2023
-# Junko Augias, 2024
-# Ryoko Tsuda <ryoko@quartile.co>, 2024
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-01-05 12:30+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Ryoko Tsuda <ryoko@quartile.co>, 2024\n"
+"POT-Creation-Date: 2024-09-25 08:39+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Japanese (https://app.transifex.com/odoo/teams/41243/ja/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -27,13 +25,9 @@ msgid "1.5"
 msgstr "1.5"
 
 #. module: sale_management
-#: model_terms:ir.ui.view,arch_db:sale_management.res_config_settings_view_form
-msgid ""
-"<span class=\"fa fa-lg fa-building-o p-2\" title=\"Values set here are "
-"company-specific.\" groups=\"base.group_multi_company\"/>"
-msgstr ""
-"<span class=\"fa fa-lg fa-building-o p-2\" title=\"Values set here are "
-"company-specific.\" groups=\"base.group_multi_company\"/>"
+#: model_terms:ir.ui.view,arch_db:sale_management.sale_order_portal_content_inherit_sale_management
+msgid "<span class=\"btn btn-secondary\">Add to order</span>"
+msgstr "<span class=\"btn btn-secondary\">オーダに追加</span>"
 
 #. module: sale_management
 #: model_terms:ir.ui.view,arch_db:sale_management.sale_order_template_view_form
@@ -168,13 +162,6 @@ msgid "Default Template"
 msgstr "デフォルトテンプレート"
 
 #. module: sale_management
-#: model_terms:ir.ui.view,arch_db:sale_management.res_config_settings_view_form
-msgid ""
-"Default values will be overwritten by values provided by the quotation "
-"template."
-msgstr "デフォルト値は、引用テンプレートが提供する値で上書きされます。"
-
-#. module: sale_management
 #: model:ir.model.fields,field_description:sale_management.field_sale_order_option__name
 #: model:ir.model.fields,field_description:sale_management.field_sale_order_template_line__name
 #: model:ir.model.fields,field_description:sale_management.field_sale_order_template_option__name
@@ -216,7 +203,6 @@ msgstr "表示タイプ"
 #. module: sale_management
 #. odoo-python
 #: code:addons/sale_management/models/digest.py:0
-#, python-format
 msgid "Do not have access, skip this data for user's digest email"
 msgstr "アクセス権がありません。ユーザのダイジェストメールにこのデータをスキップしてください"
 
@@ -279,11 +265,6 @@ msgid "Kpi All Sale Total Value"
 msgstr "Kpi 全販売総額"
 
 #. module: sale_management
-#: model:sale.order.template.line,name:sale_management.sale_order_template_line_1
-msgid "Large Meeting Table"
-msgstr "ミーティングテーブル大"
-
-#. module: sale_management
 #: model:ir.model.fields,field_description:sale_management.field_sale_order_option__write_uid
 #: model:ir.model.fields,field_description:sale_management.field_sale_order_template__write_uid
 #: model:ir.model.fields,field_description:sale_management.field_sale_order_template_line__write_uid
@@ -327,11 +308,6 @@ msgid "Number of days for the validity date computation of the quotation"
 msgstr "見積有効期限計算用日数"
 
 #. module: sale_management
-#: model:sale.order.template.option,name:sale_management.sale_order_template_option_1
-msgid "Office Chair"
-msgstr "オフィスチェア"
-
-#. module: sale_management
 #: model:ir.model.fields,field_description:sale_management.field_sale_order_template__require_payment
 msgid "Online Payment"
 msgstr "オンライン支払"
@@ -367,7 +343,6 @@ msgstr "前払パーセンテージ"
 #. module: sale_management
 #. odoo-python
 #: code:addons/sale_management/models/sale_order_template.py:0
-#, python-format
 msgid "Prepayment percentage must be a valid percentage."
 msgstr "前払パーセンテージは有効なパーセンテージにして下さい。"
 
@@ -443,7 +418,7 @@ msgstr "見積テンプレート"
 #. module: sale_management
 #: model_terms:ir.ui.view,arch_db:sale_management.sale_order_template_view_form
 msgid "Quotation Validity"
-msgstr "見積書の有効性"
+msgstr "見積有効期間"
 
 #. module: sale_management
 #: model_terms:ir.ui.view,arch_db:sale_management.sale_order_portal_content_inherit_sale_management
@@ -460,7 +435,7 @@ msgstr "一つを削除"
 msgid ""
 "Request a online signature to the customer in order to confirm orders "
 "automatically."
-msgstr "注文を自動的に確認するために、顧客にオンライン署名を依頼します。"
+msgstr "オーダを自動的に確認するために、顧客にオンライン署名を依頼します。"
 
 #. module: sale_management
 #: model:ir.model.fields,help:sale_management.field_sale_order_template__require_payment
@@ -521,6 +496,7 @@ msgstr ""
 
 #. module: sale_management
 #: model:ir.model.fields,field_description:sale_management.field_sale_order_option__sequence
+#: model:ir.model.fields,field_description:sale_management.field_sale_order_template__sequence
 #: model:ir.model.fields,field_description:sale_management.field_sale_order_template_line__sequence
 msgid "Sequence"
 msgstr "シーケンス"
@@ -620,14 +596,12 @@ msgstr ""
 #. module: sale_management
 #. odoo-python
 #: code:addons/sale_management/models/sale_order_option.py:0
-#, python-format
 msgid "You cannot add options to a confirmed order."
 msgstr "確認済みの注文にオプションを追加することはできません。"
 
 #. module: sale_management
 #. odoo-python
 #: code:addons/sale_management/models/sale_order_template_line.py:0
-#, python-format
 msgid ""
 "You cannot change the type of a sale quote line. Instead you should delete "
 "the current line and create a new line of the proper type."
@@ -636,7 +610,6 @@ msgstr "販売見積書明細のタイプを変更することはできません
 #. module: sale_management
 #. odoo-python
 #: code:addons/sale_management/models/sale_order.py:0
-#, python-format
 msgid ""
 "Your quotation contains products from company %(product_company)s whereas your quotation belongs to company %(quote_company)s. \n"
 " Please change the company of your quotation or remove the products from other companies (%(bad_products)s)."
@@ -647,14 +620,12 @@ msgstr ""
 #. module: sale_management
 #. odoo-python
 #: code:addons/sale_management/models/sale_order_template.py:0
-#, python-format
 msgid "Your template cannot contain products from multiple companies."
 msgstr "テンプレートに複数の企業のプロダクトを含めることはできません。"
 
 #. module: sale_management
 #. odoo-python
 #: code:addons/sale_management/models/sale_order_template.py:0
-#, python-format
 msgid ""
 "Your template contains products from company %(product_company)s whereas your template belongs to company %(template_company)s. \n"
 " Please change the company of your template or remove the products from other companies."

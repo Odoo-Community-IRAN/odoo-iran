@@ -6,15 +6,15 @@ const setPager = value => [
     {
         content: "Click Pager",
         trigger: ".o_pager_value:first()",
+        run: "click",
     },
     {
         content: "Change pager to display lines " + value,
         trigger: "input.o_pager_value",
-        run: "text " + value,
+        run: `edit ${value} && click body`,
     },
     {
         trigger: `.o_pager_value:contains('${value}')`,
-        isCheck: true,
     },
 ]
 
@@ -42,22 +42,26 @@ registry.category("web_tour.tours").add("mail_activity_view", {
         {
             content: "Open the debug menu",
             trigger: ".o_debug_manager button",
+            run: "click",
         },
         {
             content: "Click the Set Defaults menu",
-            trigger: ".o_debug_manager .dropdown-item:contains(Open View)",
+            trigger: ".o-dropdown-item:contains(Open View)",
+            run: "click",
         },
         {
             trigger: ".o_searchview_input",
-            run: "text Test Activity View"
+            run: "edit Test Activity View"
         },
         {
             trigger: ".o_menu_item.focus",
             content: "Validate search",
+            run: "click",
         },
         {
             content: "Select Test Activity View",
             trigger: `.o_data_row td:contains("Test Activity View")`,
+            run: "click",
         },
         checkRows(["Task 1", "Task 2", "Task 3"]),
         ...setPager("1-2"),

@@ -2,8 +2,10 @@
 
 import publicWidget from "@web/legacy/js/public/public_widget";
 import { _t } from "@web/core/l10n/translation";
+import { rpc } from "@web/core/network/rpc";
 import { cookie } from "@web/core/browser/cookie";
 import { utils as uiUtils } from "@web/core/ui/ui_service";
+import { scrollTo } from "@web_editor/js/common/scrolling";
 
 import SurveyPreloadImageMixin from "@survey/js/survey_preload_image_mixin";
 import { SurveyImageZoomer } from "@survey/js/survey_image_zoomer";
@@ -38,11 +40,6 @@ publicWidget.registry.SurveyFormWidget = publicWidget.Widget.extend(SurveyPreloa
     //--------------------------------------------------------------------------
     // Widget
     //--------------------------------------------------------------------------
-
-    init() {
-        this._super(...arguments);
-        this.rpc = this.bindService("rpc");
-    },
 
     /**
     * @override
@@ -198,7 +195,11 @@ publicWidget.registry.SurveyFormWidget = publicWidget.Widget.extend(SurveyPreloa
      * @param {Event} ev
      */
     _onChoiceImgClick: function (ev) {
-        ev.preventDefault();
+        if (!uiUtils.isSmall()) {
+            // On large screen, it prevents the answer to be selected as the user only want to enlarge the image.
+            // We don't do it on small device as it can be hard to click outside the picture to select the answer.
+            ev.preventDefault();
+        }
         this.imgZoomer = new SurveyImageZoomer({
             sourceImage: $(ev.currentTarget).attr('src')
         });
@@ -288,14 +289,11 @@ publicWidget.registry.SurveyFormWidget = publicWidget.Widget.extend(SurveyPreloa
     },
 
     /**
-     * We listen to 'next_question' and 'end_session' events to load the next
-     * page of the survey automatically, based on the host pacing.
-     *
-     * If the trigger is 'next_question', we handle some extra computation to find
-     * a suitable "fadeInOutDelay" based on the delay between the time of the question
-     * change by the host and the time of reception of the event.
-     * This will allow us to account for a little bit of server lag (up to 1 second)
-     * while giving everyone a fair experience on the quiz.
+     * Handle some extra computation to find a suitable "fadeInOutDelay" based
+     * on the delay between the time of the question change by the host and the
+     * time of reception of the event. This will allow us to account for a
+     * little bit of server lag (up to 1 second) while giving everyone a fair
+     * experience on the quiz.
      *
      * e.g 1:
      * - The host switches the question
@@ -308,53 +306,54 @@ publicWidget.registry.SurveyFormWidget = publicWidget.Widget.extend(SurveyPreloa
      * - -> The fadeInOutDelay will be 200ms (600ms delay + 200ms * 2 fade in fade out)
      *
      * @private
-     * @param {CustomEvent} ev
-     * @param {Array[]} [ev.detail] notifications structured as specified by the bus feature
+     * @param {object} notification notification of type `next_question` as
+     * specified by the bus.
      */
-    _onNotification: function ({ detail: notifications }) {
-        var nextPageEvent = false;
-        if (notifications && notifications.length !== 0) {
-            notifications.forEach(function (notification) {
-                if (notification.type === 'next_question' ||
-                    notification.type === 'end_session') {
-                    nextPageEvent = notification;
-                }
-            });
+    _onNextQuestionNotification(notification) {
+        let serverDelayMS = (DateTime.now().toSeconds() - notification.question_start) * 1000;
+        if (serverDelayMS < 0) {
+            serverDelayMS = 0;
+        } else if (serverDelayMS > 1000) {
+            serverDelayMS = 1000;
         }
+        this.fadeInOutDelay = (1000 - serverDelayMS) / 2;
+        this._goToNextPage();
+    },
 
-        if (this.options.isStartScreen && nextPageEvent.type === 'end_session') {
+    /**
+     * Handle the `end_session` bus event. This will fade out the current page
+     * and fade in the end screen.
+     *
+     * @private
+     */
+    _onEndSessionNotification() {
+        if (this.options.isStartScreen) {
             // can happen when triggering the same survey session multiple times
             // we received an "old" end_session event that needs to be ignored
             return;
         }
+        this.fadeInOutDelay = 400;
+        this._goToNextPage({ isFinish: true });
+    },
 
-        if (nextPageEvent) {
-            if (nextPageEvent.type === 'next_question') {
-                var serverDelayMS =
-                   (DateTime.now().toSeconds() - nextPageEvent.payload.question_start) * 1000;
-                if (serverDelayMS < 0) {
-                    serverDelayMS = 0;
-                } else if (serverDelayMS > 1000) {
-                    serverDelayMS = 1000;
-                }
-                this.fadeInOutDelay = (1000 - serverDelayMS) / 2;
-            } else {
-                this.fadeInOutDelay = 400;
+    /**
+     * Go to the next page of the survey.
+     *
+     * @private
+     * @param {Object} param0
+     * @param {Object} param0.isFinish Wether the survey is done or not
+     */
+    _goToNextPage: function ({ isFinish = false } = {}) {
+        this.$(".o_survey_main_title:visible").fadeOut(400);
+        this.preventEnterSubmit = false;
+        this.readonly = false;
+        this._nextScreen(
+            rpc(`/survey/next_question/${this.options.surveyToken}/${this.options.answerToken}`),
+            {
+                initTimer: true,
+                isFinish,
             }
-
-            this.$('.o_survey_main_title:visible').fadeOut(400);
-
-            this.preventEnterSubmit = false;
-            this.readonly = false;
-            this._nextScreen(
-                this.rpc(
-                    `/survey/next_question/${this.options.surveyToken}/${this.options.answerToken}`
-                ), {
-                    initTimer: true,
-                    isFinish: nextPageEvent.type === 'end_session'
-                }
-            );
-        }
+        );
     },
 
     // SUBMIT
@@ -415,7 +414,7 @@ publicWidget.registry.SurveyFormWidget = publicWidget.Widget.extend(SurveyPreloa
             this.readonly = true;
         }
 
-        const submitPromise = this.rpc(
+        const submitPromise = rpc(
             `${route}/${this.options.surveyToken}/${this.options.answerToken}`,
             params
         );
@@ -550,7 +549,7 @@ publicWidget.registry.SurveyFormWidget = publicWidget.Widget.extend(SurveyPreloa
         } else {
             var $errorTarget = this.$('.o_survey_error');
             $errorTarget.removeClass("d-none");
-            this._scrollToError($errorTarget);
+            scrollTo($errorTarget[0]);
         }
     },
 
@@ -652,6 +651,11 @@ publicWidget.registry.SurveyFormWidget = publicWidget.Widget.extend(SurveyPreloa
                         }
                     }
                     break;
+                case 'scale':
+                    if (questionRequired && !data[questionId]) {
+                        errors[questionId] = constrErrorMsg;
+                    }
+                    break;
                 case 'simple_choice_radio':
                 case 'multiple_choice':
                     if (questionRequired) {
@@ -722,6 +726,8 @@ publicWidget.registry.SurveyFormWidget = publicWidget.Widget.extend(SurveyPreloa
             switch ($(this).data('questionType')) {
                 case 'text_box':
                 case 'char_box':
+                    params[this.name] = this.value;
+                    break;
                 case 'numerical_box':
                     params[this.name] = this.value;
                     break;
@@ -735,6 +741,7 @@ publicWidget.registry.SurveyFormWidget = publicWidget.Widget.extend(SurveyPreloa
                     params[this.name] = date ? serialize(date) : "";
                     break;
                 }
+                case 'scale':
                 case 'simple_choice_radio':
                 case 'multiple_choice':
                     params = self._prepareSubmitChoices(params, $(this), $(this).data('name'));
@@ -908,7 +915,8 @@ publicWidget.registry.SurveyFormWidget = publicWidget.Widget.extend(SurveyPreloa
                 }, 2000);
             }
 
-            this.call('bus_service', 'addEventListener', 'notification', this._onNotification.bind(this));
+            this.call('bus_service', 'subscribe', 'next_question', this._onNextQuestionNotification.bind(this));
+            this.call('bus_service', 'subscribe', 'end_session', this._onEndSessionNotification.bind(this));
         }
     },
 
@@ -1098,6 +1106,8 @@ publicWidget.registry.SurveyFormWidget = publicWidget.Widget.extend(SurveyPreloa
 
     /**
      * Apply visibility rules of conditional questions.
+     * When layout is "one_page", hide the empty sections (the ones without description and
+     * which don't have any question to be displayed because of conditional questions).
      *
      * @param {Number[] | String[] | Set | undefined} questionIds Conditional questions ids
      */
@@ -1105,6 +1115,7 @@ publicWidget.registry.SurveyFormWidget = publicWidget.Widget.extend(SurveyPreloa
         if (!questionIds || (!questionIds.length && !questionIds.size)) {
             return;
         }
+        // Questions visibility
         for (const questionId of questionIds) {
             const dependingQuestion = document.querySelector(`.js_question-wrapper[id="${questionId}"]`);
             if (!dependingQuestion) {  // Could be on different page
@@ -1124,6 +1135,16 @@ publicWidget.registry.SurveyFormWidget = publicWidget.Widget.extend(SurveyPreloa
                     }
                 });
                 $(dependingQuestion).find('textarea').val('');
+            }
+        }
+        // Sections visibility
+        if (this.options.questionsLayout === 'one_page') {
+            const sections = document.querySelectorAll('.js_section_wrapper');
+            for (const section of sections) {
+                if (!section.querySelector('.o_survey_description')) {
+                    const hasVisibleQuestions = Boolean(section.querySelector('.js_question-wrapper:not(.d-none)'));
+                    section.classList.toggle('d-none', !hasVisibleQuestions);
+                }
             }
         }
     },
@@ -1183,6 +1204,7 @@ publicWidget.registry.SurveyFormWidget = publicWidget.Widget.extend(SurveyPreloa
         const answerWrapper = questionWrapper.querySelector('.o_survey_answer_wrapper');
         const questionType = questionWrapper.querySelector('[data-question-type]').dataset.questionType;
 
+        // Only questions supporting correct answer are present here (ex.: scale question doesn't support it)
         if (['numerical_box', 'date', 'datetime'].includes(questionType)) {
             const input = answerWrapper.querySelector('input');
             let isCorrect;
@@ -1225,7 +1247,7 @@ publicWidget.registry.SurveyFormWidget = publicWidget.Widget.extend(SurveyPreloa
         errorKeys.forEach(key => {
             self.$("#" + key + '>.o_survey_question_error').append($('<span>', {text: errors[key]})).addClass("slide_in");
             if (errorKeys[0] === key) {
-                self._scrollToError(self.$('.js_question-wrapper#' + key));
+                scrollTo(self.$('.js_question-wrapper#' + key)[0]);
             }
         });
     },
@@ -1237,19 +1259,6 @@ publicWidget.registry.SurveyFormWidget = publicWidget.Widget.extend(SurveyPreloa
     _scrollToFirstError: function() {
         const errorElem = this.el.querySelector('.o_survey_question_error :not(:empty)');
         errorElem?.scrollIntoView();
-    },
-
-    _scrollToError: function ($target) {
-        var scrollLocation = $target.offset().top;
-        var navbarHeight = $('.o_main_navbar').height();
-        if (navbarHeight) {
-            // In overflow auto, scrollLocation of target can be negative if target is out of screen (up side)
-            scrollLocation = scrollLocation >= 0 ? scrollLocation - navbarHeight : scrollLocation + navbarHeight;
-        }
-        var scrollinside = $("#wrapwrap").scrollTop();
-        $('#wrapwrap').animate({
-            scrollTop: scrollinside + scrollLocation
-        }, 500);
     },
 
     /**

@@ -3,16 +3,16 @@
 # 	* website_livechat
 # 
 # Translators:
-# Wil Odoo, 2023
-# Daye Jeong, 2023
+# Daye Jeong, 2024
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-08-13 10:28+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Daye Jeong, 2023\n"
+"POT-Creation-Date: 2024-09-26 08:56+0000\n"
+"PO-Revision-Date: 2024-09-25 09:42+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Korean (https://app.transifex.com/odoo/teams/41243/ko/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -28,13 +28,12 @@ msgstr "# 세션"
 #. module: website_livechat
 #. odoo-python
 #: code:addons/website_livechat/models/discuss_channel.py:0
-#, python-format
 msgid ""
-"%s started a conversation with %s.\n"
-"                        The chat request has been canceled."
+"%(visitor)s started a conversation with %(operator)s.\n"
+"The chat request has been cancelled"
 msgstr ""
-"%s님이 %s님과의 채팅을 시작했습니다.\n"
-"                        채팅 요청이 취소되었습니다."
+"%(visitor)s가 %(operator)s와 대화를 시작했습니다.\n"
+"채팅 요청이 취소되었습니다."
 
 #. module: website_livechat
 #: model_terms:ir.ui.view,arch_db:website_livechat.channel_page
@@ -54,7 +53,6 @@ msgstr "사용 가능"
 #. module: website_livechat
 #. odoo-javascript
 #: code:addons/website_livechat/static/src/web/thread_patch.xml:0
-#, python-format
 msgid "Avatar"
 msgstr "아바타"
 
@@ -133,7 +131,6 @@ msgstr "행복한 표정"
 #. module: website_livechat
 #. odoo-javascript
 #: code:addons/website_livechat/static/src/web/thread_patch.xml:0
-#, python-format
 msgid "History"
 msgstr "기록"
 
@@ -150,14 +147,12 @@ msgstr "게시 여부"
 #. module: website_livechat
 #. odoo-javascript
 #: code:addons/website_livechat/static/src/web/thread_patch.xml:0
-#, python-format
 msgid "Lang"
 msgstr "언어"
 
 #. module: website_livechat
 #. odoo-python
 #: code:addons/website_livechat/models/website.py:0
-#, python-format
 msgid "Live Support"
 msgstr "실시간 지원"
 
@@ -184,7 +179,6 @@ msgstr "신규 채널"
 #. module: website_livechat
 #. odoo-python
 #: code:addons/website_livechat/models/website_visitor.py:0
-#, python-format
 msgid "No Livechat Channel allows you to send a chat request for website %s."
 msgstr "실시간 채팅 채널이 없어 %s 웹사이트에 대한 채팅 요청을 보낼 수 있습니다."
 
@@ -211,7 +205,6 @@ msgstr "운영자 이름"
 #. module: website_livechat
 #. odoo-python
 #: code:addons/website_livechat/models/website_visitor.py:0
-#, python-format
 msgid ""
 "Recipients are not available. Please refresh the page to get latest visitors"
 " status."
@@ -270,7 +263,6 @@ msgstr "웹사이트를 통해 문서에 접근 하는 전체 URL입니다."
 #. module: website_livechat
 #. odoo-python
 #: code:addons/website_livechat/models/discuss_channel.py:0
-#, python-format
 msgid "The visitor"
 msgstr "방문자"
 
@@ -296,27 +288,34 @@ msgstr "방문자"
 
 #. module: website_livechat
 #. odoo-python
+#: code:addons/website_livechat/models/discuss_channel.py:0
+msgid "Visitor #%(id)d left the conversation."
+msgstr "방문자 #%(id)d가 대화를 나갔습니다."
+
+#. module: website_livechat
+#. odoo-python
+#: code:addons/website_livechat/models/discuss_channel.py:0
+msgid "Visitor #%(id)d."
+msgstr ""
+
+#. module: website_livechat
+#. odoo-python
 #: code:addons/website_livechat/controllers/main.py:0
 #: code:addons/website_livechat/models/website_visitor.py:0
-#, python-format
 msgid "Visitor #%d"
 msgstr "방문자 #%d"
 
 #. module: website_livechat
-#. odoo-javascript
 #. odoo-python
 #: code:addons/website_livechat/controllers/main.py:0
-#: code:addons/website_livechat/static/src/web/persona_model_patch.js:0
-#, python-format
 msgid "Visitor #%s"
 msgstr "방문자 #%s"
 
 #. module: website_livechat
 #. odoo-python
 #: code:addons/website_livechat/models/discuss_channel.py:0
-#, python-format
-msgid "Visitor %s left the conversation."
-msgstr "방문자 %s님이 대화를 종료했습니다."
+msgid "Visitor left the conversation."
+msgstr "방문자가 대화를 종료했습니다."
 
 #. module: website_livechat
 #: model:ir.actions.act_window,name:website_livechat.website_visitor_livechat_session_action
@@ -337,7 +336,6 @@ msgstr "방문자"
 #. odoo-javascript
 #: code:addons/website_livechat/static/src/web/thread_patch.xml:0
 #: model:ir.model,name:website_livechat.model_website
-#, python-format
 msgid "Website"
 msgstr "웹사이트"
 
@@ -360,7 +358,6 @@ msgstr "웹 사이트 URL"
 #. odoo-python
 #: code:addons/website_livechat/tests/test_livechat_basic_flow.py:0
 #: model:ir.model,name:website_livechat.model_website_visitor
-#, python-format
 msgid "Website Visitor"
 msgstr "웹사이트 방문자"
 
@@ -372,7 +369,6 @@ msgstr "웹 사이트 설명"
 #. module: website_livechat
 #. odoo-python
 #: code:addons/website_livechat/models/discuss_channel.py:0
-#, python-format
 msgid "an operator"
 msgstr "운영자"
 

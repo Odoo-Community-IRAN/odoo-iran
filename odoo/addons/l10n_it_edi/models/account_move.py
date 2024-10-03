@@ -4,15 +4,13 @@ from base64 import b64encode
 from datetime import datetime
 import logging
 from lxml import etree
-from markupsafe import escape
 import uuid
-from operator import itemgetter
 
-from odoo import _, api, Command, fields, models
+from odoo import _, api, Command, fields, models, modules
 from odoo.addons.base.models.ir_qweb_fields import Markup, nl2br, nl2br_enclose
 from odoo.addons.account_edi_proxy_client.models.account_edi_proxy_user import AccountEdiProxyError
 from odoo.exceptions import UserError
-from odoo.tools import float_compare, float_repr, cleanup_xml_node
+from odoo.tools import float_repr, cleanup_xml_node, float_is_zero
 
 _logger = logging.getLogger(__name__)
 
@@ -43,7 +41,7 @@ def get_datetime(tree, xpath):
     """ Datetimes in FatturaPA are ISO 8601 date format, pattern '[-]CCYY-MM-DDThh:mm:ss[Z|(+|-)hh:mm]'
         Python 3.7 -> 3.11 doesn't support 'Z'.
     """
-    if (datetime_str := get_text(tree, xpath)):
+    if datetime_str := get_text(tree, xpath):
         try:
             return datetime.fromisoformat(datetime_str.replace('Z', '+00:00'))
         except (ValueError, TypeError):
@@ -174,7 +172,7 @@ class AccountMove(models.Model):
 
     def _post(self, soft=True):
         # EXTENDS 'account'
-        self.write({'l10n_it_edi_header': False})
+        self.with_context(skip_is_manually_modified=True).write({'l10n_it_edi_header': False})
         return super()._post(soft)
 
     def _extend_with_attachments(self, attachments, new=False):
@@ -201,8 +199,32 @@ class AccountMove(models.Model):
         """
         self.ensure_one()
 
-        if self._l10n_it_edi_export_data_check():
-            raise UserError(_("The invoices you're trying to send have incomplete or incorrect data, please verify before sending."))
+        if errors := self._l10n_it_edi_export_data_check():
+            messages = []
+            for error_key, error_data in errors.items():
+                message = error_data['message']
+                split = error_key.split("_")
+                if len(split) > 3 and (model_id := {
+                    'partner': 'res.partner',
+                    'move': 'account.move',
+                    'company': 'res.company'
+                }.get(split[3], None)):
+                    if action := error_data.get('action'):
+                        if 'res_id' in action:
+                            record_ids = [action['res_id']]
+                        else:
+                            record_ids = action['domain'][0][2]
+                        records = self.env[model_id].browse(record_ids)
+                        message = f"{message} - {', '.join(records.mapped('display_name'))}"
+                messages.append(nl2br(message))
+
+            # Update the vendor bill's header with the warning messages,
+            # and force reload the view to make sure the header is loaded
+            self.l10n_it_edi_header = Markup('<br/>').join(messages)
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'reload',
+            }
 
         attachment_vals = self._l10n_it_edi_get_attachment_values(pdf_values=None)
         self.env['ir.attachment'].create(attachment_vals)
@@ -238,122 +260,162 @@ class AccountMove(models.Model):
             and self.l10n_it_edi_state in (False, 'rejected')
         )
 
-    def _l10n_it_edi_get_line_values(self, reverse_charge_refund=False, is_downpayment=False, convert_to_euros=True):
-        """ Returns a list of dictionaries passed to the template for the invoice lines (DettaglioLinee)
-        """
-        invoice_lines = []
-        lines = self.invoice_line_ids.filtered(lambda l: l.display_type not in ('line_note', 'line_section'))
-        base_lines = [invl._convert_to_tax_base_line_dict() for invl in lines]
-        inverse_factor = (-1 if reverse_charge_refund else 1)
-        for num, line in enumerate(base_lines):
-            sign = -1 if line['record'].move_id.is_inbound() else 1
-            line['sequence'] = num
-            line['price_subtotal'] = line['record'].balance * sign if convert_to_euros else line['price_subtotal']
-            line['price_subtotal'] = line['price_subtotal'] * inverse_factor
-            if line['discount'] != 100.0 and line['quantity']:
-                gross_price = line['price_subtotal'] / (1 - line['discount'] / 100.0)
-                line['discount_amount_before_dispatching'] = (gross_price - line['price_subtotal']) * inverse_factor
-                line['gross_price_subtotal'] = line['currency'].round(gross_price * inverse_factor)
-                line['price_unit'] = gross_price / abs(line['quantity'])
-            else:
-                line['gross_price_subtotal'] = line['currency'].round(line['price_unit'] * line['quantity'])
-                line['discount_amount_before_dispatching'] = line['gross_price_subtotal']
+    def _l10n_it_edi_add_base_lines_xml_values(self, base_lines_aggregated_values, is_downpayment):
+        self.ensure_one()
+        quantita_pd = min(self.env['account.move.line']._fields['quantity'].get_digits(self.env)[1], 8)
+        for index, (base_line, aggregated_values) in enumerate(base_lines_aggregated_values, start=1):
+            line = base_line['record']
+            tax_details = base_line['tax_details']
+            discount = base_line['discount']
+            quantity = base_line['quantity']
+            price_subtotal = base_line['price_subtotal'] = tax_details['raw_total_excluded_currency']
+            it_values = base_line['it_values'] = {}
 
-        template = self.env['ir.qweb']._load('l10n_it_edi.account_invoice_line_it_FatturaPA')[0]
-        flat_discount_element = template.find('.//ScontoMaggiorazione/Percentuale')
-        if flat_discount_element is not None:
-            dispatch_result = self.env['account.tax']._dispatch_negative_lines(base_lines)
-            base_lines = sorted(
-                dispatch_result['result_lines'] + dispatch_result['orphan_negative_lines'] + dispatch_result['nulled_candidate_lines'],
-                key=itemgetter('sequence')
-            )
-        else:
-            # The template needs to be updated to be able to handle negative lines
-            if any(line['price_subtotal'] < 0 for line in base_lines):
-                raise UserError(_("To handle negative lines, we need you to update your module 'Italy - E-invoicing'"))
-
-        for num, line_dict in enumerate(base_lines):
-            line = line_dict['record']
-            description = line.name
-
+            # Description.
             # Down payment lines:
             # If there was a down paid amount that has been deducted from this move,
             # we need to put a reference to the down payment invoice in the DatiFattureCollegate tag
-            downpayment_moves = self.env['account.move']
-            if not is_downpayment and line.price_subtotal < 0:
-                downpayment_moves = line._get_downpayment_lines().mapped("move_id")
+            description = line.name
+            if not is_downpayment and price_subtotal < 0:
+                downpayment_moves = line._get_downpayment_lines().move_id
                 if downpayment_moves:
-                    downpayment_moves_description = ', '.join(m.name for m in downpayment_moves)
+                    downpayment_moves_description = ', '.join(downpayment_moves.mapped('name'))
                     sep = ', ' if description else ''
                     description = f"{description}{sep}{downpayment_moves_description}"
+            description = description or "NO NAME"
 
-            invoice_lines.append({
-                'line': line,
-                'line_number': num + 1,
-                'description': description or 'NO NAME',
-                'subtotal_price_eur': (line_dict['gross_price_subtotal'] - line_dict['discount_amount']) * inverse_factor,
-                'subtotal_price': (line_dict['gross_price_subtotal'] - line_dict['discount_amount']) * inverse_factor * line_dict['rate'],
-                'unit_price': line_dict['price_unit'],
-                'discount_amount': ((line_dict['discount_amount'] - line_dict['discount_amount_before_dispatching']) / line.quantity) if line.quantity else 0,
-                'vat_tax': line.tax_ids.flatten_taxes_hierarchy().filtered(lambda t: t._l10n_it_filter_kind('vat') and t.amount >= 0),
-                'downpayment_moves': downpayment_moves,
-                'discount_type': (
-                    'SC' if line.discount > 0
-                    else 'MG' if line.discount < 0
-                    else False
-                )
+            # Price unit.
+            if quantity:
+                it_values['prezzo_unitario'] = base_line['gross_price_subtotal'] / quantity
+            else:
+                it_values['prezzo_unitario'] = 0.0
+
+            # Discount.
+            discount_list = it_values['sconto_maggiorazione_list'] = []
+            delta_discount = base_line['discount_amount'] - base_line['discount_amount_before_dispatching']
+            if discount:
+                discount_list.append({
+                    'tipo': 'SC' if discount > 0 else 'MG',
+                    'percentuale': abs(discount),
+                    'importo': None,
+                })
+            if not base_line['currency_id'].is_zero(delta_discount):
+                discount_list.append({
+                    'tipo': 'SC',
+                    'percentuale': None,
+                    'importo': abs(delta_discount / (quantity or 1.0)),
+                })
+
+            # Tax rates.
+            rates = it_values['aliquota_iva_list'] = []
+            for values in aggregated_values.values():
+                grouping_key = values['grouping_key']
+                if not grouping_key or grouping_key['skip']:
+                    continue
+
+                rates.append(grouping_key['tax_amount_field'] if grouping_key['tax_amount_type_field'] == 'percent' else 0.0)
+
+            # Tax exempt reason.
+            vat_tax = base_line['tax_ids'].flatten_taxes_hierarchy().filtered(lambda t: t._l10n_it_filter_kind('vat') and t.amount >= 0)[:1]
+            it_values['natura'] = vat_tax.l10n_it_exempt_reason or None
+
+            # Other data.
+            other_data_list = it_values['altri_dati_gestionali_list'] = []
+            if base_line['currency_id'] != self.company_currency_id:
+                other_data_list.extend([
+                    {
+                        'tipo_dato': 'DIVISA',
+                        'riferimento_testo': base_line['currency_id'].name,
+                        'riferimento_numero': tax_details['raw_total_excluded_currency'],
+                        'riferimento_data': None,
+                    },
+                    {
+                        'tipo_dato': 'CAMBIO',
+                        'riferimento_testo': None,
+                        'riferimento_numero': base_line['rate'],
+                        'riferimento_data': self.invoice_date,
+                    },
+                ])
+
+            it_values.update({
+                'numero_linea': index,
+                'descrizione': description,
+                'prezzo_totale': tax_details['raw_total_excluded'],
+                'quantita': quantity,
+                'quantita_pd': quantita_pd,
+                'ritenuta': None,
             })
-        return invoice_lines
 
-    def _l10n_it_edi_get_tax_values(self, tax_details):
-        """ Returns a list of dictionaries passed to the template for the invoice lines (DatiRiepilogo)
-        """
+    def _l10n_it_edi_get_tax_lines_xml_values(self, base_lines_aggregated_values, values_per_grouping_key):
+        self.ensure_one()
         tax_lines = []
-        for _tax_name, tax_dict in tax_details['tax_details'].items():
-            # The assumption is that the company currency is EUR.
-            base_amount = tax_dict['base_amount']
-            tax_amount = tax_dict['tax_amount']
-            tax = tax_dict['tax']
-            tax_rate = tax.amount
-            tax_exigibility_code = (
-                'S' if tax._l10n_it_is_split_payment()
-                else 'D' if tax.tax_exigibility == 'on_payment'
-                else 'I' if tax.tax_exigibility == 'on_invoice'
-                else False
-            )
-            expected_base_amount = tax_amount * 100 / tax_rate if tax_rate else False
-            tax = tax_dict['tax']
-            # Constraints within the edi make local rounding on price included taxes a problem.
-            # To solve this there is a <Arrotondamento> or 'rounding' field, such that:
-            #   taxable base = sum(taxable base for each unit) + Arrotondamento
-            if tax.price_include and tax.amount_type == 'percent':
-                if expected_base_amount and float_compare(base_amount, expected_base_amount, 2):
-                    tax_dict['rounding'] = base_amount - (tax_amount * 100 / tax_rate)
-                    tax_dict['base_amount'] = base_amount - tax_dict['rounding']
+        for values in values_per_grouping_key.values():
+            grouping_key = values['grouping_key']
+            if not grouping_key or grouping_key['skip']:
+                continue
 
-            tax_line_dict = {
-                'tax': tax,
-                'rounding': tax_dict.get('rounding', False),
-                'base_amount': tax_dict['base_amount'],
-                'tax_amount': tax_dict['tax_amount'],
-                'exigibility_code': tax_exigibility_code,
-            }
-            tax_lines.append(tax_line_dict)
+            rounding = values['base_amount']
+            for _base_line, aggregated_values in base_lines_aggregated_values:
+                if grouping_key in aggregated_values:
+                    rounding -= aggregated_values[grouping_key]['raw_base_amount']
+            if float_is_zero(rounding, precision_digits=8):
+                rounding = None
+
+            tax_lines.append({
+                'aliquota_iva': grouping_key['tax_amount_field'],
+                'natura': grouping_key['l10n_it_exempt_reason'],
+                'arrotondamento': rounding,
+                'imponibile_importo': values['base_amount'],
+                'imposta': values['tax_amount'],
+                'esigibilita_iva': grouping_key['tax_exigibility_code'],
+                'riferimento_normativo': grouping_key['l10n_it_law_reference'],
+            })
         return tax_lines
 
-    def _l10n_it_edi_filter_tax_details(self, line, tax_values):
-        """Filters tax details to only include the positive amounted lines regarding VAT taxes."""
-        repartition_line = tax_values['tax_repartition_line']
-        return (repartition_line.factor_percent >= 0 and repartition_line.tax_id.amount >= 0)
+    @api.model
+    def _l10n_it_edi_is_neg_split_payment(self, tax_data):
+        tax = tax_data['tax']
+        return (
+            tax.amount < 0.0
+            and tax_data['group']
+            and any(child_tax._l10n_it_is_split_payment() for child_tax in tax_data['group'].children_tax_ids)
+        )
 
-    def _get_l10n_it_amount_split_payment(self):
-        self.ensure_one()
-        amount = 0.0
-        if self.is_invoice(True):
-            for line in [line for line in self.line_ids if line.tax_line_id]:
-                if line.tax_line_id._l10n_it_is_split_payment() and line.credit > 0.0:
-                    amount += line.credit
-        return amount
+    @api.model
+    def _l10n_it_edi_grouping_function_base_lines(self, base_line, tax_data):
+        tax = tax_data['tax']
+        return {
+            'tax_amount_field': -23.0 if tax.amount == -11.5 else tax.amount,
+            'tax_amount_type_field': tax.amount_type,
+            'skip': tax_data['is_reverse_charge'] or self._l10n_it_edi_is_neg_split_payment(tax_data),
+        }
+
+    @api.model
+    def _l10n_it_edi_grouping_function_tax_lines(self, base_line, tax_data):
+        tax = tax_data['tax']
+
+        if tax._l10n_it_is_split_payment():
+            tax_exigibility_code = 'S'
+        elif tax.tax_exigibility == 'on_payment':
+            tax_exigibility_code = 'D'
+        elif tax.tax_exigibility == 'on_invoice':
+            tax_exigibility_code = 'I'
+        else:
+            tax_exigibility_code = None
+
+        return {
+            'tax_amount_field': -23.0 if tax.amount == -11.5 else tax.amount,
+            'l10n_it_exempt_reason': tax.l10n_it_exempt_reason,
+            'l10n_it_law_reference': tax.l10n_it_law_reference,
+            'tax_exigibility_code': tax_exigibility_code,
+            'tax_amount_type_field': tax.amount_type,
+            'skip': tax_data['is_reverse_charge'] or self._l10n_it_edi_is_neg_split_payment(tax_data),
+        }
+
+    @api.model
+    def _l10n_it_edi_grouping_function_total(self, base_line, tax_data):
+        skip = tax_data['is_reverse_charge'] or self._l10n_it_edi_is_neg_split_payment(tax_data)
+        return not skip
 
     def _l10n_it_edi_get_values(self, pdf_values=None):
         self.ensure_one()
@@ -368,7 +430,68 @@ class AccountMove(models.Model):
         reverse_charge_refund = self.move_type == 'in_refund' and reverse_charge
         convert_to_euros = self.currency_id.name != 'EUR'
 
-        tax_details = self._prepare_invoice_aggregated_taxes(filter_tax_values_to_apply=self._l10n_it_edi_filter_tax_details)
+        # Base lines.
+        base_amls = self.line_ids.filtered(lambda x: x.display_type == 'product')
+        base_lines = [self._prepare_product_base_line_for_taxes_computation(x) for x in base_amls]
+        tax_amls = self.line_ids.filtered(lambda x: x.display_type == 'tax')
+        tax_lines = [self._prepare_tax_line_for_taxes_computation(x) for x in tax_amls]
+
+        if reverse_charge_refund:
+            for base_line in base_lines:
+                base_line['price_unit'] *= -1
+
+        AccountTax = self.env['account.tax']
+        AccountTax._add_tax_details_in_base_lines(base_lines, self.company_id)
+
+        # Prepare for '_dispatch_negative_lines'
+        for base_line in base_lines:
+            tax_details = base_line['tax_details']
+            discount = base_line['discount']
+            price_unit = base_line['price_unit']
+            quantity = base_line['quantity']
+            price_subtotal = base_line['price_subtotal'] = tax_details['total_excluded_currency']
+
+            if discount == 100.0:
+                gross_price_subtotal_before_discount = price_unit * quantity
+            else:
+                gross_price_subtotal_before_discount = price_subtotal / (1 - discount / 100.0)
+
+            base_line['gross_price_subtotal'] = gross_price_subtotal_before_discount
+            base_line['discount_amount_before_dispatching'] = gross_price_subtotal_before_discount - price_subtotal
+
+            # The tax "23% Ritenuta Agenti e Rappresentanti" is not supported because it's supposed to be a tax of 23% based on
+            # 50% of the base amount. It's currently implemented as a -11.5% tax. So on 1000, it gives an amount of -115.
+            # We need to fix the base amount from 1000 to 500.0.
+            for tax_data in tax_details['taxes_data']:
+                tax = tax_data['tax']
+                tax_data['_tax_amount'] = tax.amount
+                if tax.amount == -11.5:
+                    tax_data['_tax_amount'] = -23.0
+                    tax_data['base_amount'] *= 0.5
+                    tax_data['base_amount_currency'] *= 0.5
+
+        AccountTax._round_base_lines_tax_details(base_lines, self.company_id, tax_lines=tax_lines)
+        dispatched_results = self.env['account.tax']._dispatch_negative_lines(base_lines)
+        base_lines = dispatched_results['result_lines'] + dispatched_results['orphan_negative_lines']
+        base_lines_aggregated_values = AccountTax._aggregate_base_lines_tax_details(base_lines, self._l10n_it_edi_grouping_function_base_lines)
+        self._l10n_it_edi_add_base_lines_xml_values(base_lines_aggregated_values, is_downpayment)
+        base_lines = sorted(base_lines, key=lambda base_line: base_line['it_values']['numero_linea'])
+
+        # Tax lines.
+        base_lines_aggregated_values = AccountTax._aggregate_base_lines_tax_details(base_lines, self._l10n_it_edi_grouping_function_tax_lines)
+        values_per_grouping_key = AccountTax._aggregate_base_lines_aggregated_values(base_lines_aggregated_values)
+        tax_lines = self._l10n_it_edi_get_tax_lines_xml_values(base_lines_aggregated_values, values_per_grouping_key)
+
+        # Total of the document.
+        base_lines_aggregated_values = AccountTax._aggregate_base_lines_tax_details(base_lines, self._l10n_it_edi_grouping_function_total)
+        values_per_grouping_key = AccountTax._aggregate_base_lines_aggregated_values(base_lines_aggregated_values)
+        importo_totale_documento = 0.0
+        for values in values_per_grouping_key.values():
+            grouping_key = values['grouping_key']
+            if grouping_key is False:
+                continue
+            importo_totale_documento += values['base_amount_currency']
+            importo_totale_documento += values['tax_amount_currency']
 
         company = self.company_id
         partner = self.commercial_partner_id
@@ -387,32 +510,19 @@ class AccountMove(models.Model):
         else:
             formato_trasmissione = "FPR12"
 
-        # Self-invoices are technically -100%/+100% repartitioned
-        # but functionally need to be exported as 100%
-        document_total = self.amount_total
-        if is_self_invoice:
-            document_total += sum([abs(v['tax_amount_currency']) for k, v in tax_details['tax_details'].items()])
-            if reverse_charge_refund:
-                document_total = -abs(document_total)
-
-        split_payment_amount = self._get_l10n_it_amount_split_payment()
-        if split_payment_amount:
-            document_total += split_payment_amount
-
         # Reference line for finding the conversion rate used in the document
         conversion_rate = float_repr(
             abs(self.amount_total / self.amount_total_signed), precision_digits=5,
         ) if convert_to_euros and self.invoice_line_ids else None
 
-        invoice_lines = self._l10n_it_edi_get_line_values(reverse_charge_refund, is_downpayment, convert_to_euros)
-        tax_lines = self._l10n_it_edi_get_tax_values(tax_details)
-
         # Reduce downpayment views to a single recordset
-        downpayment_moves = [l.get('downpayment_moves', self.env['account.move']) for l in invoice_lines]
-        downpayment_moves = self.browse(move.id for moves in downpayment_moves for move in moves)
+        downpayment_moves = self.invoice_line_ids._get_downpayment_lines().move_id
 
         return {
             'record': self,
+            'base_lines': base_lines,
+            'tax_lines': tax_lines,
+            'importo_totale_documento': importo_totale_documento,
             'company': company,
             'partner': partner,
             'sender': sender,
@@ -429,18 +539,14 @@ class AccountMove(models.Model):
             'cig': self.l10n_it_cig,
             'cup': self.l10n_it_cup,
             'currency': self.currency_id or self.company_currency_id if not convert_to_euros else self.env.ref('base.EUR'),
-            'document_total': document_total,
             'regime_fiscale': company.l10n_it_tax_system if not is_self_invoice else 'RF18',
             'is_self_invoice': is_self_invoice,
             'partner_bank': self.partner_bank_id,
             'formato_trasmissione': formato_trasmissione,
             'document_type': document_type,
             'payment_method': 'MP05',
-            'tax_details': tax_details,
             'downpayment_moves': downpayment_moves,
             'rc_refund': reverse_charge_refund,
-            'invoice_lines': invoice_lines,
-            'tax_lines': tax_lines,
             'conversion_rate': conversion_rate,
             'balance_multiplicator': -1 if self.is_inbound() else 1,
             'abs': abs,
@@ -499,7 +605,7 @@ class AccountMove(models.Model):
         return bool(
             template_reference
             and not self.l10n_it_edi_is_self_invoice
-            and list(buyer._l10n_it_edi_export_check(checks).keys()) == ['partner_address_missing']
+            and list(buyer._l10n_it_edi_export_check(checks).keys()) == ['l10n_it_edi_partner_address_missing']
             and (not buyer.country_id or buyer.country_id.code == 'IT')
             and (buyer.l10n_it_codice_fiscale or (buyer.vat and (buyer.vat[:2].upper() == 'IT' or buyer.vat[:2].isdecimal())))
             and self.amount_total <= 400
@@ -745,14 +851,17 @@ class AccountMove(models.Model):
                 invoice_data['key'],
                 proxy_user,
             ):
-                self.env.cr.commit()
+
+                if not modules.module.current_test:
+                    self.env.cr.commit()
                 moves |= move
             proxy_acks.append(id_transaction)
 
         # Extend created moves with the related attachments and commit
         for move in moves:
             move._extend_with_attachments(move.l10n_it_edi_attachment_id, new=True)
-            self.env.cr.commit()
+            if not modules.module.current_test:
+                self.env.cr.commit()
 
         return {"retrigger": retrigger, "proxy_acks": proxy_acks}
 
@@ -812,6 +921,12 @@ class AccountMove(models.Model):
     def _l10n_it_edi_search_tax_for_import(self, company, percentage, extra_domain=None, l10n_it_exempt_reason=None):
         """ Returns the VAT, Withholding or Pension Fund tax that suits the conditions given
             and matches the percentage found in the XML for the company. """
+
+        # The tax "23% Ritenuta Agenti e Rappresentanti" is not supported because it's supposed to be a tax of 23% based on
+        # 50% of the base amount. It's currently implemented as a -11.5% tax. So on 1000, it gives an amount of -115.
+        # We need to fix the base amount from 1000 to 500.0.
+        if percentage == -23.0:
+            percentage = -11.5
 
         domain = [
             *self.env['account.tax']._check_company_domain(company),
@@ -1026,7 +1141,7 @@ class AccountMove(models.Model):
 
             # Global discount summarized in 1 amount
             if discount_elements := tree.xpath('.//DatiGeneraliDocumento/ScontoMaggiorazione'):
-                taxable_amount = float(self.tax_totals['amount_untaxed'])
+                taxable_amount = float(self.tax_totals['base_amount_currency'])
                 discounted_amount = taxable_amount
                 for discount_element in discount_elements:
                     discount_sign = 1
@@ -1225,16 +1340,17 @@ class AccountMove(models.Model):
 
         errors = {}
         if moves := self.filtered(lambda move: move.l10n_it_edi_is_self_invoice and move._l10n_it_edi_services_or_goods() == 'both'):
-            errors['move_reverse_charge_with_mixed_services_and_goods'] = build_error(
+            errors['l10n_it_edi_move_rc_mixed_product_types'] = build_error(
                 message=_("Cannot apply Reverse Charge to bills which contains both services and goods."),
                 records=moves)
+
         if pa_moves := self.filtered(lambda move: move.commercial_partner_id._l10n_it_edi_is_public_administration()):
             if moves := pa_moves.filtered(lambda move: not move.l10n_it_origin_document_type):
                 message = _("Partner(s) belongs to the Public Administration, please fill out Origin Document Type field in the Electronic Invoicing tab.")
                 errors['move_missing_origin_document'] = build_error(message=message, records=moves)
             if moves := pa_moves.filtered(lambda move: move.l10n_it_origin_document_date and move.l10n_it_origin_document_date > fields.Date.today()):
                 message = _("The Origin Document Date cannot be in the future.")
-                errors['move_future_origin_document_date'] = build_error(message=message, records=moves)
+                errors['l10n_it_edi_move_future_origin_document_date'] = build_error(message=message, records=moves)
         if pa_moves := self.filtered(lambda move: len(move.commercial_partner_id.l10n_it_pa_index or '') == 7):
             if moves := pa_moves.filtered(lambda move: not move.l10n_it_origin_document_type and move.l10n_it_cig and move.l10n_it_cup):
                 message = _("CIG/CUP fields of partner(s) are present, please fill out Origin Document Type field in the Electronic Invoicing tab.")
@@ -1247,7 +1363,7 @@ class AccountMove(models.Model):
             and len(line.tax_ids.flatten_taxes_hierarchy()._l10n_it_filter_kind('vat')) != 1
         ):
             return {
-                'move_only_one_vat_tax_per_line': {
+                'l10n_it_edi_move_only_one_vat_tax_per_line': {
                     'message': _("Invoices must have exactly one VAT tax set per line."),
                     **({
                         'action_text': _("View invoice(s)"),
@@ -1275,6 +1391,12 @@ class AccountMove(models.Model):
         def format_monetary(number, currency):
             # Format the monetary values to avoid trailing decimals (e.g. 90.85000000000001).
             return float_repr(number, min(2, currency.decimal_places))
+
+        def format_float(amount, precision):
+            if amount is None or amount is False:
+                return None
+            # Avoid things like -0.0, see: https://stackoverflow.com/a/11010869
+            return '%.*f' % (precision, amount if not float_is_zero(amount, precision_digits=precision) else 0.0)
 
         def format_numbers(number):
             #format number to str with between 2 and 8 decimals (event if it's .00)
@@ -1308,6 +1430,7 @@ class AccountMove(models.Model):
 
         return {
             'format_date': format_date,
+            'format_float': format_float,
             'format_monetary': format_monetary,
             'format_numbers': format_numbers,
             'format_numbers_two': format_numbers_two,
@@ -1387,11 +1510,11 @@ class AccountMove(models.Model):
             if move.commercial_partner_id._l10n_it_edi_is_public_administration():
                 move.l10n_it_edi_state = 'requires_user_signature'
                 move.l10n_it_edi_transaction = False
-                move.sudo().message_post(body=nl2br(escape(_(
+                move.sudo().message_post(body=nl2br(_(
                     "Sending invoices to Public Administration partners is not supported.\n"
                     "The IT EDI XML file is generated, please sign the document and upload it "
                     "through the 'Fatture e Corrispettivi' portal of the Tax Agency."
-                ))))
+                )))
             else:
                 move.l10n_it_edi_state = 'being_sent'
                 files_to_upload.append({'filename': filename, 'xml': content})
@@ -1405,8 +1528,8 @@ class AccountMove(models.Model):
             for filename in filename_move:
                 unsent_move = filename_move[filename]
                 unsent_move.l10n_it_edi_state = False
-                text_message = _("Error uploading the e-invoice file %s.\n%s", filename, e.message)
-                html_message = nl2br(escape(text_message))
+                text_message = _("Error uploading the e-invoice file %(file)s.\n%(error)s", file=filename, error=e.message)
+                html_message = nl2br(text_message)
                 unsent_move.l10n_it_edi_header = text_message
                 unsent_move.sudo().message_post(body=html_message)
                 messages_to_log.append(text_message)
@@ -1418,7 +1541,7 @@ class AccountMove(models.Model):
             if 'error' in vals:
                 sent_move.l10n_it_edi_state = False
                 sent_move.l10n_it_edi_transaction = False
-                message = nl2br(escape(_("Error uploading the e-invoice file %s.\n%s", filename, vals['error'])))
+                message = nl2br(_("Error uploading the e-invoice file %(file)s.\n%(error)s", file=filename, error=vals['error']))
             else:
                 is_demo = vals['id_transaction'] == 'demo'
                 sent_move.l10n_it_edi_state = 'processing'
@@ -1486,7 +1609,7 @@ class AccountMove(models.Model):
                 f'{server_url}/api/l10n_it_edi/1/in/TrasmissioneFatture',
                 params={'ids_transaction': self.mapped("l10n_it_edi_transaction")})
         except AccountEdiProxyError as pe:
-            raise UserError(_("An error occurred while downloading updates from the Proxy Server: (%s) %s", pe.code, pe.message)) from pe
+            raise UserError(_("An error occurred while downloading updates from the Proxy Server: (%(code)s) %(message)s", code=pe.code, message=pe.message)) from pe
 
         for _id_transaction, notification in notifications.items():
             encrypted_update_content = notification.get('file')
@@ -1517,7 +1640,7 @@ class AccountMove(models.Model):
                     f'{server_url}/api/l10n_it_edi/1/ack',
                     params={'transaction_ids': transaction_ids, 'states': states})
             except AccountEdiProxyError as pe:
-                raise UserError(_("An error occurred while downloading updates from the Proxy Server: (%s) %s", pe.code, pe.message)) from pe
+                raise UserError(_("An error occurred while downloading updates from the Proxy Server: (%(code)s) %(message)s", code=pe.code, message=pe.message)) from pe
 
     def _l10n_it_edi_parse_notification(self, notification):
         sdi_state = notification.get('state', '')
@@ -1620,43 +1743,43 @@ class AccountMove(models.Model):
                 error_description_copy = error_description
                 if error_code == DUPLICATE_MOVE:
                     error_description_copy = _(
-                        "The e-invoice file %s is duplicated.\n"
-                        "Original message from the SdI: %s",
-                        filename, error_description_copy)
+                        "The e-invoice file %(file)s is duplicated.\n"
+                        "Original message from the SdI: %(message)s",
+                        file=filename, message=error_description_copy)
                 elif error_code == DUPLICATE_FILENAME:
                     error_description_copy = _(
-                        "The e-invoice filename %s is duplicated. Please check the FatturaPA Filename sequence.\n"
-                        "Original message from the SdI: %s",
-                        filename, error_description_copy)
+                        "The e-invoice filename %(file)s is duplicated. Please check the FatturaPA Filename sequence.\n"
+                        "Original message from the SdI: %(message)s",
+                        file=filename, message=error_description_copy)
                 error_descriptions.append(error_description_copy)
 
             return self._l10n_it_edi_format_errors(_('The e-invoice has been refused by the SdI.'), error_descriptions)
 
         elif partner._l10n_it_edi_is_public_administration():
             pa_specific_map = {
-                'forwarded': nl2br(escape(_(
-                    "The e-invoice file %s was succesfully sent to the SdI.\n"
-                    "%s has 15 days to accept or reject it.",
-                    filename, partner_name))),
-                'forward_attempt': nl2br(escape(_(
-                    "The e-invoice file %s can't be forward to %s (Public Administration) by the SdI at the moment.\n"
+                'forwarded': nl2br(_(
+                    "The e-invoice file %(file)s was succesfully sent to the SdI.\n"
+                    "%(partner)s has 15 days to accept or reject it.",
+                    file=filename, partner=partner_name)),
+                'forward_attempt': nl2br(_(
+                    "The e-invoice file %(file)s can't be forward to %(partner)s (Public Administration) by the SdI at the moment.\n"
                     "It will try again for 10 days, after which it will be considered accepted, but "
                     "you will still have to send it by post or e-mail.",
-                    filename, partner_name))),
-                'accepted_by_pa_partner_after_expiry': nl2br(escape(_(
-                    "The e-invoice file %s is succesfully sent to the SdI. The invoice is now considered fiscally relevant.\n"
-                    "The %s (Public Administration) had 15 days to either accept or refused this document,"
+                    file=filename, partner=partner_name)),
+                'accepted_by_pa_partner_after_expiry': nl2br(_(
+                    "The e-invoice file %(file)s is succesfully sent to the SdI. The invoice is now considered fiscally relevant.\n"
+                    "The %(partner)s (Public Administration) had 15 days to either accept or refused this document,"
                     "but since they did not reply, it's now considered accepted.",
-                    filename, partner_name))),
-                'rejected_by_pa_partner': nl2br(escape(_(
-                    "The e-invoice file %s has been refused by %s (Public Administration).\n"
+                    file=filename, partner=partner_name)),
+                'rejected_by_pa_partner': nl2br(_(
+                    "The e-invoice file %(file)s has been refused by %(partner)s (Public Administration).\n"
                     "You have 5 days from now to issue a full refund for this invoice, "
                     "then contact the PA partner to create a new one according to their "
                     "requests and submit it.",
-                    filename, partner_name))),
+                    file=filename, partner=partner_name)),
                 'accepted_by_pa_partner': _(
-                    "The e-invoice file %s has been accepted by %s (Public Administration), a payment will be issued soon",
-                    filename, partner_name),
+                    "The e-invoice file %(file)s has been accepted by %(partner)s (Public Administration), a payment will be issued soon",
+                    file=filename, partner=partner_name),
             }
             if pa_specific_message := pa_specific_map.get(new_state):
                 return pa_specific_message
@@ -1664,22 +1787,22 @@ class AccountMove(models.Model):
         new_state_messages_map = {
             False: _(
                 "The e-invoice file %s has not been found on the EDI Proxy server.", filename),
-            'processing': nl2br(escape(_(
+            'processing': nl2br(_(
                 "The e-invoice file %s was sent to the SdI for validation.\n"
                 "It is not yet considered accepted, please wait further notifications.",
-                filename))),
+                filename)),
             'forwarded': _(
-                "The e-invoice file %s was accepted and succesfully forwarded it to %s by the SdI.",
-                filename, partner_name),
-            'forward_attempt': nl2br(escape(_(
-                "The e-invoice file %s has been accepted by the SdI.\n"
-                "The SdI is trying to forward it to %s.\n"
+                "The e-invoice file %(file)s was accepted and succesfully forwarded it to %(partner)s by the SdI.",
+                file=filename, partner=partner_name),
+            'forward_attempt': nl2br(_(
+                "The e-invoice file %(file)s has been accepted by the SdI.\n"
+                "The SdI is trying to forward it to %(partner)s.\n"
                 "It will try for up to 2 days, after which you'll eventually "
                 "need to send it the invoice to the partner by post or e-mail.",
-                filename, partner_name))),
-            'forward_failed': nl2br(escape(_(
-                "The e-invoice file %s couldn't be forwarded to %s.\n"
+                file=filename, partner=partner_name)),
+            'forward_failed': nl2br(_(
+                "The e-invoice file %(file)s couldn't be forwarded to %(partner)s.\n"
                 "Please remember to send it via post or e-mail.",
-                filename, partner_name)))
+                file=filename, partner=partner_name))
         }
         return new_state_messages_map.get(new_state)

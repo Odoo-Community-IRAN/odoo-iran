@@ -1,5 +1,5 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
-
+import csv
 import datetime
 import functools
 import io
@@ -11,14 +11,11 @@ from collections import OrderedDict
 
 from werkzeug.exceptions import InternalServerError
 
-import odoo
-import odoo.modules.registry
 from odoo import http
 from odoo.exceptions import UserError
 from odoo.http import content_disposition, request
-from odoo.tools import lazy_property, osutil, pycompat
+from odoo.tools import lazy_property, osutil
 from odoo.tools.misc import xlsxwriter
-from odoo.tools.translate import _
 
 
 _logger = logging.getLogger(__name__)
@@ -77,18 +74,18 @@ class GroupsTreeNode:
         if root:
             self.insert_leaf(root)
 
-    def _get_aggregate(self, field_name, data, group_operator):
+    def _get_aggregate(self, field_name, data, aggregator):
         # When exporting one2many fields, multiple data lines might be exported for one record.
         # Blank cells of additionnal lines are filled with an empty string. This could lead to '' being
         # aggregated with an integer or float.
         data = (value for value in data if value != '')
 
-        if group_operator == 'avg':
+        if aggregator == 'avg':
             return self._get_avg_aggregate(field_name, data)
 
-        aggregate_func = OPERATOR_MAPPING.get(group_operator)
+        aggregate_func = OPERATOR_MAPPING.get(aggregator)
         if not aggregate_func:
-            _logger.warning("Unsupported export of group_operator '%s' for field %s on model %s", group_operator, field_name, self._model._name)
+            _logger.warning("Unsupported export of aggregator '%s' for field %s on model %s", aggregator, field_name, self._model._name)
             return
 
         if self.data:
@@ -108,12 +105,12 @@ class GroupsTreeNode:
         for field_name in self._export_field_names:
             if field_name == '.id':
                 field_name = 'id'
-            if '/' in field_name:
+            if '/' in field_name or field_name not in self._model:
                 # Currently no support of aggregated value for nested record fields
                 # e.g. line_ids/analytic_line_ids/amount
                 continue
             field = self._model._fields[field_name]
-            if field.group_operator:
+            if field.aggregator:
                 aggregated_field_names.append(field_name)
         return aggregated_field_names
 
@@ -130,7 +127,7 @@ class GroupsTreeNode:
 
             if field_name in self._get_aggregated_field_names():
                 field = self._model._fields[field_name]
-                aggregated_values[field_name] = self._get_aggregate(field_name, field_data, field.group_operator)
+                aggregated_values[field_name] = self._get_aggregate(field_name, field_data, field.aggregator)
 
         return aggregated_values
 
@@ -172,24 +169,32 @@ class GroupsTreeNode:
 
 class ExportXlsxWriter:
 
-    def __init__(self, field_names, row_count=0):
-        self.field_names = field_names
+    def __init__(self, fields, columns_headers, row_count):
+        self.fields = fields
+        self.columns_headers = columns_headers
         self.output = io.BytesIO()
         self.workbook = xlsxwriter.Workbook(self.output, {'in_memory': True})
-        self.base_style = self.workbook.add_format({'text_wrap': True})
         self.header_style = self.workbook.add_format({'bold': True})
-        self.header_bold_style = self.workbook.add_format({'text_wrap': True, 'bold': True, 'bg_color': '#e9ecef'})
         self.date_style = self.workbook.add_format({'text_wrap': True, 'num_format': 'yyyy-mm-dd'})
         self.datetime_style = self.workbook.add_format({'text_wrap': True, 'num_format': 'yyyy-mm-dd hh:mm:ss'})
+        self.base_style = self.workbook.add_format({'text_wrap': True})
+        # FIXME: Should depends of the field digits
+        self.float_style = self.workbook.add_format({'text_wrap': True, 'num_format': '#,##0.00'})
+
+        # FIXME: Should depends of the currency field for each row (also maybe add the currency symbol)
+        decimal_places = request.env['res.currency']._read_group([], aggregates=['decimal_places:max'])[0][0]
+        self.monetary_style = self.workbook.add_format({'text_wrap': True, 'num_format': f'#,##0.{(decimal_places or 2) * "0"}'})
+
+        header_bold_props = {'text_wrap': True, 'bold': True, 'bg_color': '#e9ecef'}
+        self.header_bold_style = self.workbook.add_format(header_bold_props)
+        self.header_bold_style_float = self.workbook.add_format(dict(**header_bold_props, num_format='#,##0.00'))
+        self.header_bold_style_monetary = self.workbook.add_format(dict(**header_bold_props, num_format=f'#,##0.{(decimal_places or 2) * "0"}'))
+
         self.worksheet = self.workbook.add_worksheet()
         self.value = False
-        self.float_format = '#,##0.00'
-        decimal_places = [res['decimal_places'] for res in
-                          request.env['res.currency'].search_read([], ['decimal_places'])]
-        self.monetary_format = f'#,##0.{max(decimal_places or [2]) * "0"}'
 
         if row_count > self.worksheet.xls_rowmax:
-            raise UserError(_('There are too many rows (%s rows, limit: %s) to export as Excel 2007-2013 (.xlsx) format. Consider splitting the export.') % (row_count, self.worksheet.xls_rowmax))
+            raise UserError(request.env._('There are too many rows (%(count)s rows, limit: %(limit)s) to export as Excel 2007-2013 (.xlsx) format. Consider splitting the export.', count=row_count, limit=self.worksheet.xls_rowmax))
 
     def __enter__(self):
         self.write_header()
@@ -200,9 +205,9 @@ class ExportXlsxWriter:
 
     def write_header(self):
         # Write main header
-        for i, fieldname in enumerate(self.field_names):
-            self.write(0, i, fieldname, self.header_style)
-        self.worksheet.set_column(0, max(0, len(self.field_names) - 1), 30) # around 220 pixels
+        for i, column_header in enumerate(self.columns_headers):
+            self.write(0, i, column_header, self.header_style)
+        self.worksheet.set_column(0, max(0, len(self.columns_headers) - 1), 30)  # around 220 pixels
 
     def close(self):
         self.workbook.close()
@@ -221,15 +226,15 @@ class ExportXlsxWriter:
                 # here. xlsxwriter does not support bytes values in Python 3 ->
                 # assume this is base64 and decode to a string, if this
                 # fails note that you can't export
-                cell_value = pycompat.to_text(cell_value)
+                cell_value = cell_value.decode()
             except UnicodeDecodeError:
-                raise UserError(_("Binary fields can not be exported to Excel unless their content is base64-encoded. That does not seem to be the case for %s.", self.field_names)[column])
+                raise UserError(request.env._("Binary fields can not be exported to Excel unless their content is base64-encoded. That does not seem to be the case for %s.", self.field_names)[column]) from None
         elif isinstance(cell_value, (list, tuple, dict)):
-            cell_value = pycompat.to_text(cell_value)
+            cell_value = str(cell_value)
 
         if isinstance(cell_value, str):
             if len(cell_value) > self.worksheet.xls_strmax:
-                cell_value = _("The content of this cell is too long for an XLSX file (more than %s characters). Please use the CSV format for this export.", self.worksheet.xls_strmax)
+                cell_value = request.env._("The content of this cell is too long for an XLSX file (more than %s characters). Please use the CSV format for this export.", self.worksheet.xls_strmax)
             else:
                 cell_value = cell_value.replace("\r", " ")
         elif isinstance(cell_value, datetime.datetime):
@@ -237,20 +242,17 @@ class ExportXlsxWriter:
         elif isinstance(cell_value, datetime.date):
             cell_style = self.date_style
         elif isinstance(cell_value, float):
-            cell_style.set_num_format(self.float_format)
+            field = self.fields[column]
+            cell_style = self.monetary_style if field['type'] == 'monetary' else self.float_style
         self.write(row, column, cell_value, cell_style)
 
 
 class GroupExportXlsxWriter(ExportXlsxWriter):
 
-    def __init__(self, fields, row_count=0):
-        super().__init__([f['label'].strip() for f in fields], row_count)
-        self.fields = fields
-
     def write_group(self, row, column, group_name, group, group_depth=0):
         group_name = group_name[1] if isinstance(group_name, tuple) and len(group_name) > 1 else group_name
         if group._groupby_type[group_depth] != 'boolean':
-            group_name = group_name or _("Undefined")
+            group_name = group_name or request.env._("Undefined")
         row, column = self._write_group_header(row, column, group_name, group, group_depth)
 
         # Recursively write sub-groups
@@ -275,19 +277,20 @@ class GroupExportXlsxWriter(ExportXlsxWriter):
         for field in self.fields[1:]: # No aggregates allowed in the first column because of the group title
             column += 1
             aggregated_value = aggregates.get(field['name'])
-            if field.get('type') == 'monetary':
-                self.header_bold_style.set_num_format(self.monetary_format)
-            elif field.get('type') == 'float':
-                self.header_bold_style.set_num_format(self.float_format)
+            header_style = self.header_bold_style
+            if field['type'] == 'monetary':
+                header_style = self.header_bold_style_monetary
+            elif field['type'] == 'float':
+                header_style = self.header_bold_style_float
             else:
                 aggregated_value = str(aggregated_value if aggregated_value is not None else '')
-            self.write(row, column, aggregated_value, self.header_bold_style)
+            self.write(row, column, aggregated_value, header_style)
         return row + 1, 0
 
 
 class Export(http.Controller):
 
-    @http.route('/web/export/formats', type='json', auth="user")
+    @http.route('/web/export/formats', type='json', auth='user', readonly=True)
     def formats(self):
         """ Returns all valid export formats
 
@@ -299,84 +302,147 @@ class Export(http.Controller):
             {'tag': 'csv', 'label': 'CSV'},
         ]
 
-    def fields_get(self, model):
+    def _get_property_fields(self, fields, model, domain=()):
+        """ Return property fields existing for the `domain` """
+        property_fields = {}
         Model = request.env[model]
-        fields = Model.fields_get()
-        return fields
+        for fname, field in fields.items():
+            if field.get('type') != 'properties':
+                continue
 
-    @http.route('/web/export/get_fields', type='json', auth="user")
-    def get_fields(self, model, prefix='', parent_name='',
+            definition_record = field['definition_record']
+            definition_record_field = field['definition_record_field']
+
+            target_model = Model.env[Model._fields[definition_record].comodel_name]
+            domain_definition = [(definition_record_field, '!=', False)]
+            # Depends of the records selected to avoid showing useless Properties
+            if domain:
+                self_subquery = Model.with_context(active_test=False)._search(domain)
+                domain_definition.append(('id', 'in', self_subquery.subselect(definition_record)))
+
+            definition_records = target_model.search_fetch(
+                domain_definition, [definition_record_field, 'display_name'],
+                order='id',  # Avoid complex order
+            )
+
+            for record in definition_records:
+                for definition in record[definition_record_field]:
+                    # definition = {
+                    #     'name': 'aa34746a6851ee4e',
+                    #     'string': 'Partner',
+                    #     'type': 'many2one',
+                    #     'comodel': 'test_new_api.partner',
+                    #     'default': [1337, 'Bob'],
+                    # }
+                    if (
+                        definition['type'] == 'separator' or
+                        (
+                            definition['type'] in ('many2one', 'many2many')
+                            and definition['comodel'] not in Model.env
+                        )
+                    ):
+                        continue
+                    id_field = f"{fname}.{definition['name']}"
+                    property_fields[id_field] = {
+                        'type': definition['type'],
+                        'string': Model.env._(
+                            "%(property_string)s (%(parent_name)s)",
+                            property_string=definition['string'], parent_name=record.display_name,
+                        ),
+                        'default_export_compatible': field['default_export_compatible'],
+                    }
+                    if definition['type'] in ('many2one', 'many2many'):
+                        property_fields[id_field]['relation'] = definition['comodel']
+
+        return property_fields
+
+    @http.route('/web/export/get_fields', type='json', auth='user', readonly=True)
+    def get_fields(self, model, domain, prefix='', parent_name='',
                    import_compat=True, parent_field_type=None,
                    parent_field=None, exclude=None):
 
-        fields = self.fields_get(model)
+        Model = request.env[model]
+        fields = Model.fields_get(
+            attributes=[
+                'type', 'string', 'required', 'relation_field', 'default_export_compatible',
+                'relation', 'definition_record', 'definition_record_field',
+            ],
+        )
+
         if import_compat:
             if parent_field_type in ['many2one', 'many2many']:
-                rec_name = request.env[model]._rec_name_fallback()
+                rec_name = Model._rec_name_fallback()
                 fields = {'id': fields['id'], rec_name: fields[rec_name]}
         else:
             fields['.id'] = {**fields['id']}
 
-        fields['id']['string'] = _('External ID')
+        fields['id']['string'] = request.env._('External ID')
 
         if parent_field:
-            parent_field['string'] = _('External ID')
+            parent_field['string'] = request.env._('External ID')
             fields['id'] = parent_field
 
-        fields_sequence = sorted(fields.items(),
-            key=lambda field: odoo.tools.ustr(field[1].get('string', '').lower()))
-
-        records = []
-        for field_name, field in fields_sequence:
-            if import_compat and not field_name == 'id':
+        exportable_fields = {}
+        for field_name, field in fields.items():
+            if import_compat and field_name != 'id':
                 if exclude and field_name in exclude:
-                    continue
-                if field.get('type') in ('properties', 'properties_definition'):
                     continue
                 if field.get('readonly'):
                     continue
             if not field.get('exportable', True):
                 continue
+            exportable_fields[field_name] = field
 
+        exportable_fields.update(self._get_property_fields(fields, model, domain=domain))
+
+        fields_sequence = sorted(exportable_fields.items(), key=lambda field: field[1]['string'].lower())
+
+        result = []
+        for field_name, field in fields_sequence:
             ident = prefix + ('/' if prefix else '') + field_name
             val = ident
             if field_name == 'name' and import_compat and parent_field_type in ['many2one', 'many2many']:
                 # Add name field when expand m2o and m2m fields in import-compatible mode
                 val = prefix
             name = parent_name + (parent_name and '/' or '') + field['string']
-            record = {'id': ident, 'string': name,
-                      'value': val, 'children': False,
-                      'field_type': field.get('type'),
-                      'required': field.get('required'),
-                      'relation_field': field.get('relation_field'),
-                      'default_export': import_compat and field.get('default_export_compatible')}
-            records.append(record)
-
+            field_dict = {
+                'id': ident,
+                'string': name,
+                'value': val,
+                'children': False,
+                'field_type': field.get('type'),
+                'required': field.get('required'),
+                'relation_field': field.get('relation_field'),
+                'default_export': import_compat and field.get('default_export_compatible')
+            }
             if len(ident.split('/')) < 3 and 'relation' in field:
-                ref = field.pop('relation')
-                record['value'] += '/id'
-                record['params'] = {'model': ref, 'prefix': ident, 'name': name, 'parent_field': field}
-                record['children'] = True
+                field_dict['value'] += '/id'
+                field_dict['params'] = {
+                    'model': field['relation'],
+                    'prefix': ident,
+                    'name': name,
+                    'parent_field': field,
+                }
+                field_dict['children'] = True
 
-        return records
+            result.append(field_dict)
 
-    @http.route('/web/export/namelist', type='json', auth="user")
+        return result
+
+    @http.route('/web/export/namelist', type='json', auth='user', readonly=True)
     def namelist(self, model, export_id):
-        # TODO: namelist really has no reason to be in Python (although itertools.groupby helps)
-        export = request.env['ir.exports'].browse([export_id]).read()[0]
-        export_fields_list = request.env['ir.exports.line'].browse(export['export_fields']).read()
-
-        fields_data = self.fields_info(
-            model, [f['name'] for f in export_fields_list])
-
-        return [
-            {'name': field['name'], 'label': fields_data[field['name']]}
-            for field in export_fields_list
-        ]
+        export = request.env['ir.exports'].browse([export_id])
+        return self.fields_info(model, export.export_fields.mapped('name'))
 
     def fields_info(self, model, export_fields):
-        info = {}
-        fields = self.fields_get(model)
+        field_info = []
+        fields = request.env[model].fields_get(
+            attributes=[
+                'type', 'string', 'required', 'relation_field', 'default_export_compatible',
+                'relation', 'definition_record', 'definition_record_field',
+            ],
+        )
+        fields.update(self._get_property_fields(fields, model))
         if ".id" in export_fields:
             fields['.id'] = fields.get('id', {'string': 'ID'})
 
@@ -414,20 +480,31 @@ class Export(http.Controller):
             subfields = list(subfields)
             if length == 2:
                 # subfields is a seq of $base/*rest, and not loaded yet
-                info.update(self.graft_subfields(
-                    fields[base]['relation'], base, fields[base]['string'],
-                    subfields
-                ))
+                field_info.extend(
+                    self.graft_subfields(
+                        fields[base]['relation'], base, fields[base]['string'], subfields
+                    ),
+                )
             elif base in fields:
-                info[base] = fields[base]['string']
+                field_dict = fields[base]
+                field_info.append({
+                    'id': base,
+                    'string': field_dict['string'],
+                    'field_type': field_dict['type'],
+                })
 
-        return info
+        return field_info
 
     def graft_subfields(self, model, prefix, prefix_string, fields):
         export_fields = [field.split('/', 1)[1] for field in fields]
         return (
-            (prefix + '/' + k, prefix_string + '/' + v)
-            for k, v in self.fields_info(model, export_fields).items())
+            dict(
+                field_info,
+                id=f"{prefix}/{field_info['id']}",
+                string=f"{prefix_string}/{field_info['string']}",
+            )
+            for field_info in self.fields_info(model, export_fields)
+        )
 
 
 class ExportFormat(object):
@@ -451,7 +528,7 @@ class ExportFormat(object):
         model_description = request.env['ir.model']._get(base).name
         return f"{model_description} ({base})"
 
-    def from_data(self, fields, rows):
+    def from_data(self, fields, columns_headers, rows):
         """ Conversion method from Odoo's export data to whatever the
         current export class outputs
 
@@ -462,7 +539,7 @@ class ExportFormat(object):
         """
         raise NotImplementedError()
 
-    def from_group_data(self, fields, groups):
+    def from_group_data(self, fields, columns_headers, groups):
         raise NotImplementedError()
 
     def base(self, data):
@@ -492,12 +569,12 @@ class ExportFormat(object):
             for leaf in groups_data:
                 tree.insert_leaf(leaf)
 
-            response_data = self.from_group_data(fields, tree)
+            response_data = self.from_group_data(fields, columns_headers, tree)
         else:
             records = Model.browse(ids) if ids else Model.search(domain, offset=0, limit=False, order=False)
 
             export_data = records.export_data(field_names).get('datas', [])
-            response_data = self.from_data(columns_headers, export_data)
+            response_data = self.from_data(fields, columns_headers, export_data)
 
         # TODO: call `clean_filename` directly in `content_disposition`?
         return request.make_response(response_data,
@@ -509,7 +586,7 @@ class ExportFormat(object):
 
 class CSVExport(ExportFormat, http.Controller):
 
-    @http.route('/web/export/csv', type='http', auth="user")
+    @http.route('/web/export/csv', type='http', auth='user')
     def web_export_csv(self, data):
         try:
             return self.base(data)
@@ -530,30 +607,34 @@ class CSVExport(ExportFormat, http.Controller):
     def extension(self):
         return '.csv'
 
-    def from_group_data(self, fields, groups):
-        raise UserError(_("Exporting grouped data to csv is not supported."))
+    def from_group_data(self, fields, columns_headers, groups):
+        raise UserError(request.env._("Exporting grouped data to csv is not supported."))
 
-    def from_data(self, fields, rows):
-        fp = io.BytesIO()
-        writer = pycompat.csv_writer(fp, quoting=1)
+    def from_data(self, fields, columns_headers, rows):
+        fp = io.StringIO()
+        writer = csv.writer(fp, quoting=1)
 
-        writer.writerow(fields)
+        writer.writerow(columns_headers)
 
         for data in rows:
             row = []
             for d in data:
+                if d is None or d is False:
+                    d = ''
+                elif isinstance(d, bytes):
+                    d = d.decode()
                 # Spreadsheet apps tend to detect formulas on leading =, + and -
                 if isinstance(d, str) and d.startswith(('=', '-', '+')):
                     d = "'" + d
 
-                row.append(pycompat.to_text(d))
+                row.append(d)
             writer.writerow(row)
 
         return fp.getvalue()
 
 class ExcelExport(ExportFormat, http.Controller):
 
-    @http.route('/web/export/xlsx', type='http', auth="user")
+    @http.route('/web/export/xlsx', type='http', auth='user')
     def web_export_xlsx(self, data):
         try:
             return self.base(data)
@@ -574,16 +655,16 @@ class ExcelExport(ExportFormat, http.Controller):
     def extension(self):
         return '.xlsx'
 
-    def from_group_data(self, fields, groups):
-        with GroupExportXlsxWriter(fields, groups.count) as xlsx_writer:
+    def from_group_data(self, fields, columns_headers, groups):
+        with GroupExportXlsxWriter(fields, columns_headers, groups.count) as xlsx_writer:
             x, y = 1, 0
             for group_name, group in groups.children.items():
                 x, y = xlsx_writer.write_group(x, y, group_name, group)
 
         return xlsx_writer.value
 
-    def from_data(self, fields, rows):
-        with ExportXlsxWriter(fields, len(rows)) as xlsx_writer:
+    def from_data(self, fields, columns_headers, rows):
+        with ExportXlsxWriter(fields, columns_headers, len(rows)) as xlsx_writer:
             for row_index, row in enumerate(rows):
                 for cell_index, cell_value in enumerate(row):
                     xlsx_writer.write_cell(row_index + 1, cell_index, cell_value)

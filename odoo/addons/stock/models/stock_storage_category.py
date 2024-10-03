@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 
 class StorageCategory(models.Model):
@@ -39,10 +39,9 @@ class StorageCategory(models.Model):
         for storage_category in self:
             storage_category.capacity_ids = storage_category.product_capacity_ids | storage_category.package_capacity_ids
 
-    def copy(self, default=None):
-        default = dict(default or {})
-        default['name'] = _("%s (copy)", self.name)
-        return super().copy(default)
+    def copy_data(self, default=None):
+        vals_list = super().copy_data(default=default)
+        return [dict(vals, name=self.env._("%s (copy)", category.name)) for category, vals in zip(self, vals_list)]
 
 
 class StorageCategoryProductCapacity(models.Model):
@@ -55,7 +54,7 @@ class StorageCategoryProductCapacity(models.Model):
     product_id = fields.Many2one('product.product', 'Product', ondelete='cascade', check_company=True,
         domain=("[('product_tmpl_id', '=', context.get('active_id', False))] if context.get('active_model') == 'product.template' else"
             " [('id', '=', context.get('default_product_id', False))] if context.get('default_product_id') else"
-            " [('type', '=', 'product')]"))
+            " [('is_storable', '=', True)]"))
     package_type_id = fields.Many2one('stock.package.type', 'Package Type', ondelete='cascade', check_company=True)
     quantity = fields.Float('Quantity', required=True)
     product_uom_id = fields.Many2one(related='product_id.uom_id')

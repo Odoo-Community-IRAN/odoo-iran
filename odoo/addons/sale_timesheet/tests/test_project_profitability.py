@@ -9,8 +9,8 @@ from .common import TestCommonSaleTimesheet
 @tagged('-at_install', 'post_install')
 class TestSaleTimesheetProjectProfitability(TestCommonSaleTimesheet):
     @classmethod
-    def setUpClass(cls, chart_template_ref=None):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
         cls.task = cls.env['project.task'].create({
             'name': 'Test',
             'project_id': cls.project_task_rate.id,
@@ -40,16 +40,16 @@ class TestSaleTimesheetProjectProfitability(TestCommonSaleTimesheet):
         """
         foreign_company = self.company_data_2['company']
         foreign_company.currency_id = self.foreign_currency
-        self.project_task_rate.analytic_account_id.company_id = False
+        self.project_task_rate.account_id.company_id = False
         self.project_task_rate.company_id = False
 
         # Create and confirm a SO with the main company
-        sale_order = self.env['sale.order'].with_context(mail_notrack=True, mail_create_nolog=True).create({
+        sale_order = self.env['sale.order'].create({
             'partner_id': self.partner_b.id,
             'partner_invoice_id': self.partner_b.id,
             'partner_shipping_id': self.partner_b.id,
         })
-        SaleOrderLine = self.env['sale.order.line'].with_context(tracking_disable=True, default_order_id=sale_order.id)
+        SaleOrderLine = self.env['sale.order.line'].with_context(default_order_id=sale_order.id)
         delivery_service_order_line = SaleOrderLine.create({
             'product_id': self.product_delivery_manual1.id,
             'product_uom_qty': 5,
@@ -63,14 +63,14 @@ class TestSaleTimesheetProjectProfitability(TestCommonSaleTimesheet):
         )
 
         # Create and confirm a SO with the foreign company
-        sale_order_foreign = self.env['sale.order'].with_context(mail_notrack=True, mail_create_nolog=True).create({
+        sale_order_foreign = self.env['sale.order'].create({
             'partner_id': self.partner_b.id,
             'partner_invoice_id': self.partner_b.id,
             'partner_shipping_id': self.partner_b.id,
             'company_id': foreign_company.id,
         })
         sale_order_foreign.currency_id = foreign_company.currency_id
-        SaleOrderLineForeign = self.env['sale.order.line'].with_context(tracking_disable=True, default_order_id=sale_order_foreign.id)
+        SaleOrderLineForeign = self.env['sale.order.line'].with_context(default_order_id=sale_order_foreign.id)
         SaleOrderLineForeign.create({
             'product_id': self.product_delivery_manual1.id,
             'product_uom_qty': 5,
@@ -125,11 +125,11 @@ class TestSaleTimesheetProjectProfitability(TestCommonSaleTimesheet):
         # Adding an extra cost/revenue to ensure those are computed correctly.
         self.env['account.analytic.line'].create([{
             'name': 'other revenues line',
-            'account_id': self.project_task_rate.analytic_account_id.id,
+            'account_id': self.project_task_rate.account_id.id,
             'amount': 100,
         }, {
             'name': 'other costs line',
-            'account_id': self.project_task_rate.analytic_account_id.id,
+            'account_id': self.project_task_rate.account_id.id,
             'amount': -100,
         }])
         self.assertDictEqual(
@@ -347,7 +347,7 @@ class TestSaleTimesheetProjectProfitability(TestCommonSaleTimesheet):
             'product_id': self.product_delivery_timesheet1.id,
             'product_uom_qty': 5,
         })
-        task_2 = self.env['project.task'].with_context({'mail_create_nolog': True}).create({
+        task_2 = self.env['project.task'].create({
             'name': 'Task 2',
             'project_id': self.project_task_rate.id,
             'sale_line_id': delivery_timesheet_order_line.id,
@@ -407,7 +407,7 @@ class TestSaleTimesheetProjectProfitability(TestCommonSaleTimesheet):
             'product_id': self.product_milestone.id,
             'product_uom_qty': 1,
         })
-        task2_foreign = self.env['project.task'].with_context({'mail_create_nolog': True}).create({
+        task2_foreign = self.env['project.task'].create({
             'name': 'Test',
             'project_id': self.project_task_rate.id,
             'sale_line_id': milestone_foreign_order_line.id,
@@ -457,7 +457,7 @@ class TestSaleTimesheetProjectProfitability(TestCommonSaleTimesheet):
             'product_id': self.product_milestone.id,
             'product_uom_qty': 1,
         })
-        task3_milestone = self.env['project.task'].with_context({'mail_create_nolog': True}).create({
+        task3_milestone = self.env['project.task'].create({
             'name': 'Task 3',
             'project_id': self.project_task_rate.id,
             'sale_line_id': milestone_order_line.id,
@@ -489,3 +489,63 @@ class TestSaleTimesheetProjectProfitability(TestCommonSaleTimesheet):
         profitability_items = self.project_task_rate._get_profitability_items(False)
         self.assertFalse([data for data in profitability_items['revenues']['data'] if data['id'] == 'billable_milestones'])
         self.assertFalse([data for data in profitability_items['costs']['data'] if data['id'] == 'billable_milestones'])
+
+    def test_profitability_revenue(self):
+        product_profitability_items = self.env['product.product'].create({
+            'name': "Service Ordered, create task in new project",
+            'standard_price': 10,
+            'list_price': 20,
+            'type': 'service',
+            'invoice_policy': 'order',
+            'uom_id': self.uom_hour.id,
+            'uom_po_id': self.uom_hour.id,
+            'default_code': 'SERV-ORDERED3',
+            'service_tracking': 'task_global_project',
+            'project_id': self.project_task_rate.id,
+            'service_type': 'manual',
+        })
+        saleorder_revenue = self.env['sale.order']
+        saleOrderLine_revenue = self.env['sale.order.line']
+        sale_order_revenue = saleorder_revenue.create({
+            'partner_id': self.partner_b.id,
+            'partner_invoice_id': self.partner_b.id,
+            'partner_shipping_id': self.partner_b.id,
+        })
+
+        sale_order_line_revenue = saleOrderLine_revenue.create({
+            'product_id':product_profitability_items.id,
+            'product_uom_qty':10,
+            'order_id':sale_order_revenue.id,
+        })
+
+        sequence_per_invoice_type = self.project_task_rate._get_profitability_sequence_per_invoice_type()
+        profitability_item_data = {
+            'revenues': {
+                'data': [{
+                    'id': 'billable_fixed',
+                    'sequence': sequence_per_invoice_type['billable_fixed'],
+                    'invoiced': 0.0,
+                    'to_invoice': 200.0
+                }],
+                'total': {
+                    'invoiced': 0.0,
+                    'to_invoice': 200.0
+                }
+            },
+            'costs': {
+                'data': [],
+                'total': {'billed': 0.0, 'to_bill': 0.0}
+            }
+        }
+
+        sale_order_revenue.action_confirm()
+        project_profitability_items = sale_order_line_revenue.project_id
+        self.assertDictEqual(
+            self.project_task_rate._get_profitability_items(False),
+            profitability_item_data
+        )
+        project_profitability_items.active = False
+        self.assertDictEqual(
+            self.project_task_rate._get_profitability_items(False),
+            profitability_item_data
+        )

@@ -13,14 +13,16 @@
     ],
     'depends': [
         'base_setup',
+        'digest',
         'phone_validation',
-        'mail',
-        'resource',
+        'resource_mail',
         'web',
     ],
     'data': [
         'security/hr_security.xml',
         'security/ir.model.access.csv',
+        'data/digest_data.xml',
+        'data/report_paperformat.xml',
         'wizard/hr_departure_wizard_views.xml',
         'wizard/mail_activity_schedule_views.xml',
         'views/mail_activity_plan_views.xml',
@@ -50,10 +52,24 @@
     'assets': {
         'web.assets_backend': [
             'hr/static/src/**/*',
+            ('remove', 'hr/static/src/views/hr_graph_view.js'),
+            ('remove', 'hr/static/src/views/hr_graph_controller.xml'),
+            ('remove', 'hr/static/src/views/hr_pivot_view.js'),
+            ('remove', 'hr/static/src/views/hr_pivot_controller.xml'),
+        ],
+        'web.assets_backend_lazy': [
+            'hr/static/src/views/hr_graph_view.js',
+            'hr/static/src/views/hr_graph_controller.xml',
+            'hr/static/src/views/hr_pivot_view.js',
+            'hr/static/src/views/hr_pivot_controller.xml',
         ],
         'web.qunit_suite_tests': [
+            'hr/static/tests/legacy/**/*',
+        ],
+        'web.assets_unit_tests': [
             'hr/static/tests/**/*',
             ('remove', 'hr/static/tests/tours/**/*'),
+            ('remove', 'hr/static/tests/legacy/**/*'),
         ],
         'web.assets_tests': [
             'hr/static/tests/tours/**/*',

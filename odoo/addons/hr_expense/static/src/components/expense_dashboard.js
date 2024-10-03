@@ -5,10 +5,13 @@ import { formatMonetary } from "@web/views/fields/formatters";
 import { Component, onWillStart, useState } from "@odoo/owl";
 
 export class ExpenseDashboard extends Component {
+    static template = "hr_expense.ExpenseDashboard";
+    static props = {};
 
     setup() {
         super.setup();
         this.orm = useService('orm');
+        this.actionService = useService("action");
 
         this.state = useState({
             expenses: {}
@@ -23,5 +26,13 @@ export class ExpenseDashboard extends Component {
     renderMonetaryField(value, currency_id) {
         return formatMonetary(value, { currencyId: currency_id});;
     }
+
+    async applyFilter(filterName) {
+        const { actionId } = this.env.config;
+        const action = actionId ? await this.actionService.loadAction(actionId) : {};
+
+        action['context'] = { [`search_default_${filterName}`]: 1 };
+        action['tag'] = 'menu'; //disables breadcrumb change on filter change
+        return this.actionService.doAction(action);
+    }
 }
-ExpenseDashboard.template = 'hr_expense.ExpenseDashboard';

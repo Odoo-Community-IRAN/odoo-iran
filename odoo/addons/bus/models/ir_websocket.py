@@ -13,20 +13,12 @@ class IrWebsocket(models.AbstractModel):
     _name = 'ir.websocket'
     _description = 'websocket message handling'
 
-    def _get_im_status(self, im_status_ids_by_model):
-        im_status = {}
-        if 'res.partner' in im_status_ids_by_model:
-            im_status['Persona'] = [{**p, 'type': "partner"} for p in self.env['res.partner'].with_context(active_test=False).search_read(
-                [('id', 'in', im_status_ids_by_model['res.partner'])],
-                ['im_status']
-            )]
-        return im_status
-
     def _get_missed_presences_identity_domains(self, presence_channels):
         """
         Return a list of domains that will be combined with `expression.OR` to
         find presences related to `presence_channels`. This is used to find
         missed presences when subscribing to presence channels.
+
         :param typing.List[typing.Tuple[recordset, str]] presence_channels: The
             presence channels the user subscribed to.
         """
@@ -46,6 +38,7 @@ class IrWebsocket(models.AbstractModel):
     def _build_presence_channel_list(self, presences):
         """
         Return the list of presences to subscribe to.
+
         :param typing.List[typing.Tuple[str, int]] presences: The presence
             list sent by the client where the first element is the model
             name and the second is the record id.
@@ -70,6 +63,7 @@ class IrWebsocket(models.AbstractModel):
         """
         req = request or wsrequest
         channels.append('broadcast')
+        channels.extend(self.env.user.groups_id)
         if req.session.uid:
             channels.append(self.env.user.partner_id)
         return channels
@@ -80,14 +74,17 @@ class IrWebsocket(models.AbstractModel):
         missed presences and the last known notification id. This will be used
         both by the websocket controller and the websocket request class when
         the `subscribe` event is received.
+
         :param typing.List[str] channels: List of channels to subscribe to sent
             by the client.
         :param int last: Last known notification sent by the client.
+
         :return:
             A dict containing the following keys:
             - channels (set of str): The list of channels to subscribe to.
             - last (int): The last known notification id.
             - missed_presences (odoo.models.Recordset): The missed presences.
+
         :raise ValueError: If the list of channels is not a list of strings.
         """
         if not all(isinstance(c, str) for c in channels):
@@ -138,7 +135,7 @@ class IrWebsocket(models.AbstractModel):
     @classmethod
     def _authenticate(cls):
         if wsrequest.session.uid is not None:
-            if not security.check_session(wsrequest.session, wsrequest.env):
+            if not security.check_session(wsrequest.session, wsrequest.env, wsrequest):
                 wsrequest.session.logout(keep_db=True)
                 raise SessionExpiredException()
         else:

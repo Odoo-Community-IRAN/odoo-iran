@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import logging
@@ -25,7 +24,15 @@ class View(models.Model):
     controller_page_ids = fields.One2many('website.controller.page', 'view_id')
     first_page_id = fields.Many2one('website.page', string='Website Page', help='First page linked to this view', compute='_compute_first_page_id')
     track = fields.Boolean(string='Track', default=False, help="Allow to specify for one page of the website to be trackable or not")
-    visibility = fields.Selection([('', 'All'), ('connected', 'Signed In'), ('restricted_group', 'Restricted Group'), ('password', 'With Password')], default='')
+    visibility = fields.Selection(
+        [
+            ('', 'Public'),
+            ('connected', 'Signed In'),
+            ('restricted_group', 'Restricted Group'),
+            ('password', 'With Password')
+        ],
+        default='',
+    )
     visibility_password = fields.Char(groups='base.group_system', copy=False)
     visibility_password_display = fields.Char(compute='_get_pwd', inverse='_set_pwd', groups='website.group_website_designer')
 
@@ -38,7 +45,7 @@ class View(models.Model):
         crypt_context = self.env.user._crypt_context()
         for r in self:
             if r.type == 'qweb':
-                r.sudo().visibility_password = r.visibility_password_display and crypt_context.encrypt(r.visibility_password_display) or ''
+                r.sudo().visibility_password = (r.visibility_password_display and crypt_context.hash(r.visibility_password_display)) or ''
                 r.visibility = r.visibility  # double check access
 
     def _compute_first_page_id(self):
@@ -511,8 +518,8 @@ class View(models.Model):
             res['website_id'] = website_id
         return res
 
-    def _update_field_translations(self, fname, translations, digest=None):
-        return super(View, self.with_context(no_cow=True))._update_field_translations(fname, translations, digest)
+    def _update_field_translations(self, fname, translations, digest=None, source_lang=None):
+        return super(View, self.with_context(no_cow=True))._update_field_translations(fname, translations, digest=digest, source_lang=source_lang)
 
     def _get_base_lang(self):
         """ Returns the default language of the website as the base language if the record is bound to it """

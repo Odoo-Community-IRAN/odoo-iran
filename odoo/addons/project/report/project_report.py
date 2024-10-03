@@ -21,15 +21,15 @@ class ReportProjectTaskUser(models.Model):
     date_last_stage_update = fields.Datetime(string='Last Stage Update', readonly=True)
     project_id = fields.Many2one('project.project', string='Project', readonly=True)
     working_days_close = fields.Float(string='Working Days to Close',
-        digits=(16, 2), readonly=True, group_operator="avg")
+        digits=(16, 2), readonly=True, aggregator="avg")
     working_days_open = fields.Float(string='Working Days to Assign',
-        digits=(16, 2), readonly=True, group_operator="avg")
-    delay_endings_days = fields.Float(string='Days to Deadline', digits=(16, 2), group_operator="avg", readonly=True)
+        digits=(16, 2), readonly=True, aggregator="avg")
+    delay_endings_days = fields.Float(string='Days to Deadline', digits=(16, 2), aggregator="avg", readonly=True)
     nbr = fields.Integer('# of Tasks', readonly=True)  # TDE FIXME master: rename into nbr_tasks
-    working_hours_open = fields.Float(string='Working Hours to Assign', digits=(16, 2), readonly=True, group_operator="avg")
-    working_hours_close = fields.Float(string='Working Hours to Close', digits=(16, 2), readonly=True, group_operator="avg")
-    rating_last_value = fields.Float('Rating (/5)', group_operator="avg", readonly=True, groups="project.group_project_rating")
-    rating_avg = fields.Float('Average Rating', readonly=True, group_operator='avg', groups="project.group_project_rating")
+    working_hours_open = fields.Float(string='Working Hours to Assign', digits=(16, 2), readonly=True, aggregator="avg")
+    working_hours_close = fields.Float(string='Working Hours to Close', digits=(16, 2), readonly=True, aggregator="avg")
+    rating_last_value = fields.Float('Last Rating (1-5)', aggregator="avg", readonly=True, groups="project.group_project_rating")
+    rating_avg = fields.Float('Average Rating (1-5)', readonly=True, aggregator='avg', groups="project.group_project_rating")
     priority = fields.Selection([
         ('0', 'Low'),
         ('1', 'High')
@@ -40,9 +40,10 @@ class ReportProjectTaskUser(models.Model):
         ('1_done', 'Done'),
         ('04_waiting_normal', 'Waiting'),
         ('03_approved', 'Approved'),
-        ('1_canceled', 'Canceled'),
+        ('1_canceled', 'Cancelled'),
         ('02_changes_requested', 'Changes Requested'),
     ], string='State', readonly=True)
+    is_closed = fields.Boolean(string='Closed state', readonly=True)
     company_id = fields.Many2one('res.company', string='Company', readonly=True)
     partner_id = fields.Many2one('res.partner', string='Customer', readonly=True)
     stage_id = fields.Many2one('project.task.type', string='Stage', readonly=True)
@@ -82,14 +83,15 @@ class ReportProjectTaskUser(models.Model):
                 t.stage_id,
                 t.state,
                 t.milestone_id,
+                CASE WHEN t.state IN ('1_done', '1_canceled') THEN True ELSE False END AS is_closed,
                 CASE WHEN pm.id IS NOT NULL THEN true ELSE false END as has_late_and_unreached_milestone,
                 t.description,
                 NULLIF(t.rating_last_value, 0) as rating_last_value,
                 AVG(rt.rating) as rating_avg,
-                t.working_days_close,
-                t.working_days_open,
-                t.working_hours_open,
-                t.working_hours_close,
+                NULLIF(t.working_days_close, 0) as Working_days_close,
+                NULLIF(t.working_days_open, 0) as working_days_open,
+                NULLIF(t.working_hours_open, 0) as working_hours_open,
+                NULLIF(t.working_hours_close, 0) as working_hours_close,
                 (extract('epoch' from (t.date_deadline-(now() at time zone 'UTC'))))/(3600*24) as delay_endings_days,
                 COUNT(td.task_id) as dependent_ids_count
         """

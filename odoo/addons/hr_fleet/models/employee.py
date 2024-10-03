@@ -13,7 +13,7 @@ class Employee(models.Model):
         'fleet.vehicle', 'driver_employee_id', string='Vehicles (private)',
         groups="fleet.fleet_group_manager,hr.group_hr_user",
     )
-    license_plate = fields.Char(compute="_compute_license_plate", search="_search_license_plate")
+    license_plate = fields.Char(compute="_compute_license_plate", search="_search_license_plate", groups="hr.group_hr_user")
     mobility_card = fields.Char(groups="fleet.fleet_group_user")
 
     def action_open_employee_cars(self):
@@ -22,7 +22,7 @@ class Employee(models.Model):
         return {
             "type": "ir.actions.act_window",
             "res_model": "fleet.vehicle.assignation.log",
-            "views": [[self.env.ref("hr_fleet.fleet_vehicle_assignation_log_employee_view_list").id, "tree"], [False, "form"]],
+            "views": [[self.env.ref("hr_fleet.fleet_vehicle_assignation_log_employee_view_list").id, "list"], [False, "form"]],
             "domain": [("driver_employee_id", "in", self.ids)],
             "context": dict(self._context, default_driver_id=self.user_id.partner_id.id, default_driver_employee_id=self.id),
             "name": "History Employee Cars",
@@ -32,9 +32,9 @@ class Employee(models.Model):
     def _compute_license_plate(self):
         for employee in self:
             if employee.private_car_plate and employee.car_ids.license_plate:
-                employee.license_plate = ' '.join([employee.car_ids.license_plate, employee.private_car_plate])
+                employee.license_plate = ' '.join(employee.car_ids.filtered('license_plate').mapped('license_plate') + [employee.private_car_plate])
             else:
-                employee.license_plate = employee.car_ids.license_plate or employee.private_car_plate
+                employee.license_plate = ' '.join(employee.car_ids.filtered('license_plate').mapped('license_plate')) or employee.private_car_plate
 
     def _search_license_plate(self, operator, value):
         employees = self.env['hr.employee'].search(['|', ('car_ids.license_plate', operator, value), ('private_car_plate', operator, value)])

@@ -4,7 +4,6 @@
     'name': 'Hungary - E-invoicing',
     'version': '1.0.0',
     'category': 'Accounting/Localizations/EDI',
-    'countries': ['hu'],
     'author': 'DO Tech (OdooTech Zrt.), BDSC Business Consulting Kft. & Odoo S.A.',
     'description': """
 * Electronically report invoices to the NAV (Hungarian Tax Agency) when issuing physical (paper) invoices.
@@ -28,7 +27,6 @@
         'views/res_partner_views.xml',
         'views/res_company_views.xml',
         'views/res_config_settings_views.xml',
-        'wizard/account_move_send_views.xml',
         'wizard/l10n_hu_edi_cancellation.xml',
         'wizard/l10n_hu_edi_tax_audit_export.xml',
     ],

@@ -11,26 +11,25 @@ registry.category("web_tour.tours").add(
             {
                 content: "Check pricelist",
                 trigger: ".o_pricelist_dropdown .dropdown-toggle:not(:contains('User Pricelist'))",
-                run: function() {} // Check
             },
             {
                 content: "Go to login page",
-                trigger: ".btn:contains('Sign in')"
+                trigger: "a:contains('Sign in')",
+                run: "click",
             },
             {
                 content: "Submit login",
                 trigger: '.oe_login_form',
                 run: function () {
-                    $('.oe_login_form input[name="login"]').val("toto");
-                    $('.oe_login_form input[name="password"]').val("long_enough_password");
-                    $('.oe_login_form input[name="redirect"]').val("/shop");
-                    $('.oe_login_form').submit();
+                    document.querySelector('.oe_login_form input[name="login"]').value = "toto";
+                    document.querySelector('.oe_login_form input[name="password"]').value = "long_enough_password";
+                    document.querySelector('.oe_login_form input[name="redirect"]').value = "/shop";
+                    document.querySelector('.oe_login_form').submit();
                 }
             },
             {
                 content: "Check pricelist",
                 trigger: ".o_pricelist_dropdown .dropdown-toggle:contains('User Pricelist')",
-                run: function() {} // Check
             },
         ]
     }

@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from . import mrp_document
+from . import ir_attachment
+from . import product_document
 from . import res_config_settings
 from . import mrp_bom
 from . import mrp_routing
@@ -20,3 +21,4 @@ from . import stock_rule
 from . import stock_scrap
 from . import stock_warehouse
 from . import stock_quant
+from . import stock_replenish_mixin

@@ -1,52 +1,78 @@
 /** @odoo-module */
 
-import wTourUtils from '@website/js/tours/tour_utils';
+import * as wTourUtils from '@website/js/tours/tour_utils';
 
 const snippets = [
     {
         id: 's_cover',
         name: 'Cover',
+        groupName: "Intro",
     },
     {
-        id: 's_title',
-        name: 'Title',
+        id: 's_numbers_grid',
+        name: 'Numbers Grid',
+        groupName: "Content",
+    },
+    {
+        id: 's_company_team_shapes',
+        name: 'Team Shapes',
+        groupName: "People",
     },
     {
         id: 's_text_block',
         name: 'Text',
+        groupName: "Text",
     },
     {
-        id: 's_three_columns',
-        name: 'Columns',
+        id: 's_freegrid',
+        name: 'Free grid',
+        groupName: "Columns",
     },
     {
-        id: 's_image_wall',
-        name: 'Images Wall',
+        id: 's_cta_box',
+        name: 'Box Call to Action',
+        groupName: "Content",
+    },
+    {
+        id: 's_shape_image',
+        name: 'Shape image',
+        groupName: "Content",
     },
     {
         id: 's_title',
         name: 'Title',
+        groupName: "Text",
     },
     {
-        id: 's_media_list',
-        name: 'Media List',
+        id: 's_images_wall',
+        name: 'Images Wall',
+        groupName: "Images",
     },
     {
-        id: 's_text_image',
-        name: 'Text - Image',
+        id: 's_faq_collapse',
+        name: 'FAQ',
+        groupName: "Text",
+    },
+    {
+        id: 's_references',
+        name: 'References',
+        groupName: "People",
     },
 ];
 
 wTourUtils.registerThemeHomepageTour("monglia_tour", () => [
-    wTourUtils.assertCssVariable('--color-palettes-name', '"monglia-1"'),
-    wTourUtils.dragNDrop(snippets[0]),
-    wTourUtils.clickOnText(snippets[0], 'h1', 'top'),
+    wTourUtils.assertCssVariable('--color-palettes-name', '"default-light-3"'),
+    ...wTourUtils.insertSnippet(snippets[0]),
+    ...wTourUtils.clickOnText(snippets[0], 'h1', 'top'),
     wTourUtils.goBackToBlocks(),
-    wTourUtils.dragNDrop(snippets[1]),
-    wTourUtils.dragNDrop(snippets[2]),
-    wTourUtils.dragNDrop(snippets[3]),
-    wTourUtils.dragNDrop(snippets[4]),
-    wTourUtils.dragNDrop(snippets[5]),
-    wTourUtils.dragNDrop(snippets[6]),
-    wTourUtils.dragNDrop(snippets[7]),
+    ...wTourUtils.insertSnippet(snippets[1]),
+    ...wTourUtils.insertSnippet(snippets[2]),
+    ...wTourUtils.insertSnippet(snippets[3]),
+    ...wTourUtils.insertSnippet(snippets[4]),
+    ...wTourUtils.insertSnippet(snippets[5]),
+    ...wTourUtils.insertSnippet(snippets[6]),
+    ...wTourUtils.insertSnippet(snippets[7]),
+    ...wTourUtils.insertSnippet(snippets[8]),
+    ...wTourUtils.insertSnippet(snippets[9]),
+    ...wTourUtils.insertSnippet(snippets[10]),
 ]);

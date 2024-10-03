@@ -6,7 +6,6 @@ from pytz import utc
 from random import randint
 
 from odoo import api, fields, models, tools
-from odoo.addons.http_routing.models.ir_http import slug
 from odoo.osv import expression
 from odoo.tools.mail import is_html_empty
 from odoo.tools.translate import _, html_translate
@@ -39,7 +38,7 @@ class Track(models.Model):
     stage_id = fields.Many2one(
         'event.track.stage', string='Stage', ondelete='restrict',
         index=True, copy=False, default=_get_default_stage_id,
-        group_expand='_read_group_stage_ids',
+        group_expand='_read_group_expand_full',  # Always display all stages
         required=True, tracking=True)
     legend_blocked = fields.Char(related='stage_id.legend_blocked',
         string='Kanban Blocked Explanation', readonly=True)
@@ -156,7 +155,7 @@ class Track(models.Model):
         super(Track, self)._compute_website_url()
         for track in self:
             if track.id:
-                track.website_url = '/event/%s/track/%s' % (slug(track.event_id), slug(track))
+                track.website_url = '/event/%s/track/%s' % (self.env['ir.http']._slug(track.event_id), self.env['ir.http']._slug(track))
 
     # STAGES
 
@@ -286,7 +285,7 @@ class Track(models.Model):
                  'event_track_visitor_ids.is_blacklisted')
     @api.depends_context('uid')
     def _compute_is_reminder_on(self):
-        current_visitor = self.env['website.visitor']._get_visitor_from_request(force_create=False)
+        current_visitor = self.env['website.visitor']._get_visitor_from_request()
         if self.env.user._is_public() and not current_visitor:
             for track in self:
                 track.is_reminder_on = track.wishlisted_by_default
@@ -426,11 +425,6 @@ class Track(models.Model):
         res = super(Track, self).write(vals)
         return res
 
-    @api.model
-    def _read_group_stage_ids(self, stages, domain, order):
-        """ Always display all stages """
-        return stages.search([], order=order)
-
     def _synchronize_with_stage(self, stage):
         if stage.is_fully_accessible:
             self.is_published = True
@@ -451,17 +445,16 @@ class Track(models.Model):
         }
 
     def _message_get_suggested_recipients(self):
-        recipients = super(Track, self)._message_get_suggested_recipients()
-        for track in self:
-            if track.partner_id:
-                if track.partner_id not in recipients:
-                    track._message_add_suggested_recipient(recipients, partner=track.partner_id, reason=_('Contact'))
-            else:
-                #  Priority: contact information then speaker information
-                if track.contact_email and track.contact_email != track.partner_id.email:
-                    track._message_add_suggested_recipient(recipients, email=track.contact_email, reason=_('Contact Email'))
-                if not track.contact_email and track.partner_email and track.partner_email != track.partner_id.email:
-                    track._message_add_suggested_recipient(recipients, email=track.partner_email, reason=_('Speaker Email'))
+        recipients = super()._message_get_suggested_recipients()
+        if self.partner_id:
+            if self.partner_id not in recipients:
+                self._message_add_suggested_recipient(recipients, partner=self.partner_id, reason=_('Contact'))
+        else:
+            #  Priority: contact information then speaker information
+            if self.contact_email and self.contact_email != self.partner_id.email:
+                self._message_add_suggested_recipient(recipients, email=self.contact_email, reason=_('Contact Email'))
+            if not self.contact_email and self.partner_email and self.partner_email != self.partner_id.email:
+                self._message_add_suggested_recipient(recipients, email=self.partner_email, reason=_('Speaker Email'))
         return recipients
 
     def _message_post_after_hook(self, message, msg_vals):

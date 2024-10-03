@@ -1,7 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 {
     'name': 'Serbia - Accounting',
-    'website': 'https://www.odoo.com/documentation/17.0/applications/finance/fiscal_localizations.html',
+    'website': 'https://www.odoo.com/documentation/master/applications/finance/fiscal_localizations.html',
     'icon': '/account/static/description/l10n.png',
     'countries': ['rs'],
     'version': '1.0',
@@ -16,6 +16,7 @@ Source: https://www.paragraf.rs/propisi/pravilnik-o-kontnom-okviru-sadrzini-racu
         'account',
         'base_vat',
     ],
+    'auto_install': ['account'],
     'data': [
         'data/account_tax_report_data.xml',
         'data/menuitem_data.xml',

@@ -1,10 +1,7 @@
-# -*- coding: utf-8 -*-
-
 from lxml import etree
 
-from odoo import fields
-from odoo.osv import expression
-from odoo.tests import users
+from odoo import Command, fields
+from odoo.tests import Form, users
 from odoo.tests.common import TransactionCase
 from odoo.exceptions import UserError
 
@@ -178,6 +175,54 @@ class TestProjectBase(TestProjectCommon):
         self.assertTrue(self.project_pigs.id < self.project_goats.id)
         self.assertEqual(Project.search(domain, order='id').ids, project_ids)
 
+    @users('bastien')
+    def test_edit_favorite(self):
+        project1, project2 = projects = self.env['project.project'].create([{
+            'name': 'Project Test1',
+        }, {
+            'name': 'Project Test2',
+            'is_favorite': True,
+        }])
+        self.assertFalse(project1.is_favorite)
+        self.assertTrue(project2.is_favorite)
+        project1.is_favorite = True
+        project2.is_favorite = False
+        projects.invalidate_recordset(['is_favorite']) # To force 'is_favorite' to recompute
+        self.assertTrue(project1.is_favorite)
+        self.assertFalse(project2.is_favorite)
+
+    @users('bastien')
+    def test_create_favorite_from_project_form(self):
+        Project = self.env['project.project']
+        form1 = Form(Project)
+        form1.name = 'Project Test1'
+        self.assertFalse(form1.is_favorite)
+        project1 = form1.save()
+        self.assertFalse(project1.is_favorite)
+
+        form2 = Form(Project)
+        form2.name = 'Project Test2'
+        form2.is_favorite = True
+        self.assertTrue(form2.is_favorite)
+        project2 = form2.save()
+        self.assertTrue(project2.is_favorite)
+
+    @users('bastien')
+    def test_edit_favorite_from_project_form(self):
+        project1, project2 = self.env['project.project'].create([{
+            'name': 'Project Test1',
+        }, {
+            'name': 'Project Test2',
+            'is_favorite': True,
+        }])
+        with Form(project1) as form:
+            form.is_favorite = True
+        self.assertTrue(project1.is_favorite)
+
+        with Form(project2) as form:
+            form.is_favorite = False
+        self.assertFalse(project2.is_favorite)
+
     def test_change_project_or_partner_company(self):
         """ Tests that it is impossible to change the company of a project
             if the company of the partner is different and vice versa if the company of the project is set.
@@ -347,3 +392,134 @@ class TestProjectBase(TestProjectCommon):
         for p in projects:
             self.assertEqual(fields.Date.to_string(p.date_start), '2021-09-25', f'The start date of {p.name} should be updated.')
             self.assertEqual(fields.Date.to_string(p.date), '2021-09-26', f'The expiration date of {p.name} should be updated.')
+
+    def test_create_task_in_batch_with_email_cc(self):
+        user_a, user_b, user_c = self.env['res.users'].create([{
+            'name': 'user A',
+            'login': 'loginA',
+            'email': 'email@bisous1',
+        }, {
+            'name': 'user B',
+            'login': 'loginB',
+            'email': 'email@bisous2',
+        }, {
+            'name': 'user C',
+            'login': 'loginC',
+            'email': 'email@bisous3',
+        }])
+        partner = self.env['res.partner'].create({
+            'name': 'partner',
+            'email': 'email@bisous4',
+        })
+        task_1, task_2 = self.env['project.task'].with_context({'mail_create_nolog': True}).create([{
+            'name': 'task 1',
+            'project_id': self.project_pigs.id,
+            'email_cc': 'email@bisous1, email@bisous2, email@bisous4'
+        }, {
+            'name': 'task 2',
+            'project_id': self.project_pigs.id,
+            'email_cc': 'email@bisous3, email@bisous2, email@bisous4'
+        }])
+        self.assertTrue(user_a.partner_id in task_1.message_partner_ids)
+        self.assertTrue(user_b.partner_id in task_1.message_partner_ids)
+        self.assertFalse(user_c.partner_id in task_1.message_partner_ids)
+        self.assertFalse(partner in task_1.message_partner_ids)
+        self.assertFalse(user_a.partner_id in task_2.message_partner_ids)
+        self.assertTrue(user_b.partner_id in task_2.message_partner_ids)
+        self.assertTrue(user_c.partner_id in task_2.message_partner_ids)
+        self.assertFalse(partner in task_2.message_partner_ids)
+
+    def test_create_private_task_in_batch(self):
+        """ This test ensures that copying private task in batch can be done correctly."""
+
+        task_0, task_1 = self.env['project.task'].create([{
+            'name': f'task {i}',
+            'user_ids': self.env.user.ids,
+            'project_id': False,
+        } for i in range(2)]).copy()
+        self.assertEqual(task_0.name, 'task 0 (copy)')
+        self.assertEqual(task_1.name, 'task 1 (copy)')
+
+    def test_duplicate_project_with_tasks(self):
+        """ Test to check duplication of projects tasks active state. """
+        project = self.env['project.project'].create({
+            'name': 'Project',
+        })
+        task = self.env['project.task'].create({
+            'name': 'Task',
+            'project_id': project.id,
+        })
+
+        # Duplicate active project with active task
+        project_dup = project.copy()
+        self.assertTrue(project_dup.active, "Active project should remain active when duplicating an active project")
+        self.assertEqual(project_dup.task_count, 1, "Duplicated project should have as many tasks as orginial project")
+        self.assertTrue(project_dup.tasks.active, "Active task should remain active when duplicating an active project")
+
+        # Duplicate active project with archived task
+        task.active = False
+        project_dup = project.copy()
+        self.assertTrue(project_dup.active, "Active project should remain active when duplicating an active project")
+        self.assertFalse(project_dup.tasks.active, "Archived task should remain archived when duplicating an active project")
+
+        # Duplicate archived project with archived task
+        project.active = False
+        project_dup = project.copy()
+        self.assertTrue(project_dup.active, "The new project should be active by default")
+        self.assertTrue(project_dup.tasks.active, "Archived task should be active when duplicating an archived project")
+
+    def test_create_analytic_account_batch(self):
+        """ This test will check that the '_create_analytic_account' method assigns the accounts to the projects in the right order. """
+        projects = self.env["project.project"].create([{
+            "name": f"Project {x}",
+        } for x in range(10)])
+        projects._create_analytic_account()
+        self.assertEqual(projects.mapped("name"), projects.account_id.mapped("name"), "The analytic accounts names should match with the projects.")
+
+    def test_task_count(self):
+        project1, project2 = self.env['project.project'].create([
+            {'name': 'project1'},
+            {'name': 'project2'},
+        ])
+        self.env['project.task'].with_context(default_project_id=project1.id).create([
+            {'name': 'task1'},
+            {'name': 'task2', 'state': '1_done'},
+            {'name': 'task3', 'child_ids': [
+                Command.create({'name': 'subtask1', 'project_id': project1.id}),
+                Command.create({'name': 'subtask2', 'project_id': project1.id, 'state': '1_canceled'}),
+                Command.create({'name': 'subtask3', 'project_id': project2.id}),
+                Command.create({'name': 'subtask4', 'project_id': project1.id, 'display_in_project': True}),
+                Command.create({'name': 'subtask5', 'project_id': project1.id, 'state': '1_canceled', 'display_in_project': True}),
+                Command.create({'name': 'subtask6', 'project_id': project1.id, 'child_ids': [
+                    Command.create({'name': 'subsubtask1', 'project_id': project2.id}),
+                    Command.create({'name': 'subsubtask1', 'project_id': project1.id, 'display_in_project': True})
+                ]}),
+                Command.create({'name': 'subtask7', 'state': '1_done', 'project_id': project1.id, 'child_ids': [
+                    Command.create({'name': 'subsubtask1', 'project_id': project1.id, 'state': '1_done'}),
+                    Command.create({'name': 'subsubtask1', 'project_id': project1.id, 'display_in_project': True, 'state': '1_done'}),
+                ]}),
+            ]}
+        ])
+        self.assertEqual(project1.task_count, 7)
+        self.assertEqual(project1.open_task_count, 4)
+        self.assertEqual(project1.closed_task_count, 3)
+        self.assertEqual(project2.task_count, 2)
+        self.assertEqual(project2.open_task_count, 2)
+        self.assertEqual(project2.closed_task_count, 0)
+
+    def test_archived_duplicate_task(self):
+        """ Test to check duplication of an archived task.
+            The duplicate of an archived task should be active.
+        """
+        project = self.env['project.project'].create({
+            'name': 'Project',
+        })
+        task = self.env['project.task'].create({
+            'name': 'Task',
+            'project_id': project.id,
+        })
+        copy_task1 = task.copy()
+        self.assertTrue(copy_task1.active, "Active task should be active when duplicating an active task")
+        task.active = False
+        copy_task2 = task.copy()
+        self.assertTrue(copy_task2.active, "Archived task should be active when duplicating an archived task")

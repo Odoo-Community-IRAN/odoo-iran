@@ -12,13 +12,15 @@ import math
 class TestPrintCheck(AccountTestInvoicingCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref=None):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.other_currency = cls.setup_other_currency('EUR')
 
         bank_journal = cls.company_data['default_journal_bank']
 
         cls.payment_method_line_check = bank_journal.outbound_payment_method_line_ids\
             .filtered(lambda l: l.code == 'check_printing')
+        cls.payment_method_line_check.payment_account_id = cls.inbound_payment_method_line.payment_account_id
 
     def test_in_invoice_check_manual_sequencing(self):
         ''' Test the check generation for vendor bills. '''
@@ -128,7 +130,7 @@ class TestPrintCheck(AccountTestInvoicingCommon):
         # Partial payment in foreign currency.
         payment = self.env['account.payment.register'].with_context(active_model='account.move', active_ids=invoice.ids).create({
             'payment_method_line_id': self.payment_method_line_check.id,
-            'currency_id': self.currency_data['currency'].id,
+            'currency_id': self.other_currency.id,
             'amount': 150.0,
             'payment_date': '2017-01-01',
         })._create_payments()
@@ -140,7 +142,7 @@ class TestPrintCheck(AccountTestInvoicingCommon):
             'number': invoice.name,
             'amount_total': f'${NON_BREAKING_SPACE}150.00',
             'amount_residual': f'${NON_BREAKING_SPACE}75.00',
-            'amount_paid': f'150.000{NON_BREAKING_SPACE}☺',
+            'amount_paid': f'150.00{NON_BREAKING_SPACE}€',
             'currency': invoice.currency_id,
         }]])
 
@@ -174,6 +176,20 @@ class TestPrintCheck(AccountTestInvoicingCommon):
         })._create_payments()
 
         self.assertEqual(set(payments.mapped('check_number')), {str(x) for x in range(11111, 11111 + nb_invoices_to_test)})
+
+    def test_check_label(self):
+        payment = self.env['account.payment'].create({
+            'check_number': '2147483647',
+            'payment_type': 'outbound',
+            'partner_type': 'supplier',
+            'amount': 100.0,
+            'journal_id': self.company_data['default_journal_bank'].id,
+            'payment_method_line_id': self.payment_method_line_check.id,
+        })
+        payment.action_post()
+
+        for move in payment.move_id:
+            self.assertRecordValues(move.line_ids, [{'name': "Checks - 2147483647"}] * len(move.line_ids))
 
     def test_print_great_pre_number_check(self):
         """

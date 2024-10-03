@@ -5,8 +5,11 @@
 <!-- ======   Template: Blogs Navbar   =========================================
 ============================================================================ -->
 <template id="blogs_nav" name="Blogs Bar Template">
+    <t t-set="wblog_nav_offcanvas" t-value="len(blogs) > 4"/>
+    <t t-set="wblog_all_title_string">All Blogs</t>
+
     <nav t-attf-class="navbar navbar-expand-lg navbar-light pt-4 pb-0 px-0 #{additionnal_classes}">
-        <div t-attf-class="container gap-2 w-100 #{len(blogs) > 4 and 'flex-nowrap' or 'flex-wrap flex-sm-nowrap'}" class="container">
+        <div t-attf-class="container gap-2 w-100 #{wblog_nav_offcanvas and 'flex-nowrap' or 'flex-wrap flex-sm-nowrap'}">
             <!-- Desktop -->
             <ul t-if="len(blogs) > 1" class="navbar-nav d-none d-lg-flex">
                 <li class="nav-item">
@@ -23,9 +26,6 @@
                 </li>
             </ul>
             <!-- Mobile -->
-            <t t-set="wblog_nav_offcanvas" t-value="len(blogs) > 4"/>
-            <t t-set="wblog_all_title_string">All Blogs</t>
-
             <div t-if="len(blogs) > 1" t-attf-class="order-2 d-lg-none #{not wblog_nav_offcanvas and 'dropdown flex-grow-1 flex-sm-grow-0 min-w-0'}">
                 <t t-if="wblog_nav_offcanvas">
                     <a class="btn btn-light"
@@ -83,7 +83,6 @@
             <!-- 'Search Box' -->
             <t t-call="website.website_search_box_input">
                 <t t-set="_form_classes" t-valuef="#{not len(blogs) &gt; 1 and 'ms-auto'} flex-grow-1 flex-lg-grow-0"/>
-                <t t-set="_classes" t-valuef=""/>
                 <t t-set="search_type" t-valuef="blogs"/>
                 <t t-set="action" t-value="blog_url(tag=tag,search=search)"/>
                 <t t-set="display_description" t-valuef="true"/>
@@ -103,12 +102,12 @@
         <div t-if="not hide_title and categ_title" class="text-muted mb-1 h6" t-esc="categ_title"/>
         <t t-foreach="tags" t-as="tag">
             <t t-if="tag.post_ids">
-                <span t-if="dismissibleBtn and tag.id in active_tag_ids" class="align-items-baseline border d-inline-flex ps-2 rounded mb-2">
-                    <i class="fa fa-tag me-2 text-muted"/>
+                <span t-if="dismissibleBtn and tag.id in active_tag_ids" t-attf-class="align-items-baseline d-inline-flex ps-2 rounded mb-2 o_filter_tag #{'o_color_%s' % tag.color}">
+                    <i class="fa fa-tag me-2"/>
                     <t t-esc="tag.name"/>
                     <a t-attf-href="#{blog_url(tag=tags_list(active_tag_ids, tag.id))}" class="btn border-0 py-1 post_link" t-att-rel="len(active_tag_ids) and 'nofollow'">&#215;</a>
                 </span>
-                <a t-elif="showInactive" t-attf-href="#{blog_url(tag=tags_list(active_tag_ids, tag.id))}" t-attf-class="badge mb-2 mw-100 text-truncate text-decoration-none #{tag.id in active_tag_ids and 'text-bg-primary' or 'border text-primary'} post_link" t-att-rel="len(active_tag_ids) and 'nofollow'" t-esc="tag.name"/>
+                <a t-elif="showInactive" t-attf-href="#{blog_url(tag=tags_list(active_tag_ids, tag.id))}" t-attf-class="badge mb-2 mw-100 text-truncate text-decoration-none o_tag o_color_#{tag.color} post_link" t-att-rel="len(active_tag_ids) and 'nofollow'" t-esc="tag.name"/>
             </t>
         </t>
     </t>
@@ -191,7 +190,7 @@ Options:
             <div class="o_wblog_social_links d-flex flex-wrap mx-n1 o_not_editable">
                 <t t-set="classes" t-translation="off">bg-100 border mx-1 mb-2 rounded-circle d-flex align-items-center justify-content-center text-decoration-none</t>
                 <a t-if="website.social_facebook" t-att-href="website.social_facebook" aria-label="Facebook" title="Facebook" t-att-class="classes"><i class="fa fa-facebook-square text-facebook"/></a>
-                <a t-if="website.social_twitter" t-att-href="website.social_twitter" t-att-class="classes"><i class="fa fa-twitter text-twitter" aria-label="Twitter" title="Twitter"/></a>
+                <a t-if="website.social_twitter" t-att-href="website.social_twitter" t-att-class="classes"><i class="fa fa-twitter text-twitter" aria-label="X" title="X"/></a>
                 <a t-if="website.social_linkedin" t-att-href="website.social_linkedin" t-att-class="classes"><i class="fa fa-linkedin text-linkedin" aria-label="LinkedIn" title="LinkedIn"/></a>
                 <a t-if="website.social_youtube" t-att-href="website.social_youtube" t-att-class="classes"><i class="fa fa-youtube-play text-youtube" aria-label="Youtube" title="Youtube"/></a>
                 <a t-if="website.social_github" t-att-href="website.social_github" t-att-class="classes"><i class="fa fa-github text-github" aria-label="Github" title="Github"/></a>
@@ -284,7 +283,7 @@ Display a sidebar beside the post content.
             <div class="o_wblog_social_links d-flex flex-wrap mx-n1 o_not_editable">
                 <t t-set="classes" t-translation="off">bg-100 border mx-1 mb-2 rounded-circle d-flex align-items-center justify-content-center text-decoration-none</t>
                 <a href="#" aria-label="Facebook" title="Share on Facebook" t-attf-class="o_facebook #{classes}"><i class="fa fa-facebook-square text-facebook"/></a>
-                <a href="#" aria-label="Twitter" title="Share on Twitter" t-attf-class="o_twitter #{classes}"><i class="fa fa-twitter text-twitter" aria-label="Twitter" title="Twitter"/></a>
+                <a href="#" aria-label="Twitter" title="Share on X" t-attf-class="o_twitter #{classes}"><i class="fa fa-twitter text-twitter" aria-label="X" title="X"/></a>
                 <a href="#" aria-label="LinkedIn" title="Share on LinkedIn" t-attf-class="o_linkedin #{classes}"><i class="fa fa-linkedin text-linkedin" aria-label="LinkedIn" title="LinkedIn"/></a>
             </div>
         </div>
@@ -301,14 +300,14 @@ Display a sidebar beside the post content.
             <t t-if="blog_post.tag_ids">
                 <div class="h5">
                     <t t-foreach="blog_post.tag_ids" t-as="one_tag">
-                        <a class="badge border post_link text-decoration-none text-primary" t-attf-href="#{blog_url(tag=slug(one_tag))}" t-esc="one_tag.name"/>
+                        <a t-attf-class="badge post_link text-decoration-none o_tag o_color_#{one_tag.color}" t-attf-href="#{blog_url(tag=slug(one_tag))}" t-esc="one_tag.name"/>
                     </t>
                 </div>
             </t>
             <t t-else="">
                 <div class="mb-4 bg-100 py-2 px-3 border" groups="website.group_website_designer">
                     <h6 class="text-muted"><em>No tags defined</em></h6>
-                    <a role="menuitem" t-attf-href="/web#view_type=form&amp;model=#{main_object._name}&amp;id=#{main_object.id}&amp;action=#{action}&amp;menu_id=#{menu or main_object.env.ref('website.menu_website_configuration').id}"
+                    <a role="menuitem" t-attf-href="/odoo/action-{{action}}/{{main_object.id}}?menu_id={{menu or main_object.env.ref('website.menu_website_configuration').id}}"
                         title='Edit in backend' id="edit-in-backend">Add some</a>
                 </div>
             </t>

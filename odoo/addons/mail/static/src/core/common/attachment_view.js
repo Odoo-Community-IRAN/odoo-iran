@@ -1,8 +1,15 @@
-/* @odoo-module */
+import {
+    Component,
+    onWillUpdateProps,
+    onPatched,
+    onWillUnmount,
+    onMounted,
+    useEffect,
+    useRef,
+    useState,
+} from "@odoo/owl";
 
-import { Component, onWillUpdateProps, useEffect, useRef, useState } from "@odoo/owl";
-
-import { useService } from "@web/core/utils/hooks";
+import { useBus, useService } from "@web/core/utils/hooks";
 import { hidePDFJSButtons } from "@web/libs/pdfjs";
 
 /**
@@ -17,8 +24,10 @@ export class AttachmentView extends Component {
     static props = ["threadId", "threadModel"];
 
     setup() {
-        this.threadService = useService("mail.thread");
+        super.setup();
         this.store = useState(useService("mail.store"));
+        this.uiService = useService("ui");
+        this.mailPopoutService = useService("mail.popout");
         this.iframeViewerPdfRef = useRef("iframeViewerPdf");
         this.state = useState({
             /** @type {import("models").Thread|undefined} */
@@ -31,14 +40,18 @@ export class AttachmentView extends Component {
         });
         this.updateFromProps(this.props);
         onWillUpdateProps((props) => this.updateFromProps(props));
+
+        useBus(this.uiService.bus, "resize", this.updatePopup);
+        onMounted(this.updatePopup);
+        onPatched(this.updatePopup);
+        onWillUnmount(this.mailPopoutService.reset);
     }
 
     onClickNext() {
         const index = this.state.thread.attachmentsInWebClientView.findIndex((attachment) =>
             attachment.eq(this.state.thread.mainAttachment)
         );
-        this.threadService.setMainAttachmentFromIndex(
-            this.state.thread,
+        this.state.thread.setMainAttachmentFromIndex(
             index === this.state.thread.attachmentsInWebClientView.length - 1 ? 0 : index + 1
         );
     }
@@ -47,8 +60,7 @@ export class AttachmentView extends Component {
         const index = this.state.thread.attachmentsInWebClientView.findIndex((attachment) =>
             attachment.eq(this.state.thread.mainAttachment)
         );
-        this.threadService.setMainAttachmentFromIndex(
-            this.state.thread,
+        this.state.thread.setMainAttachmentFromIndex(
             index === 0 ? this.state.thread.attachmentsInWebClientView.length - 1 : index - 1
         );
     }
@@ -58,6 +70,16 @@ export class AttachmentView extends Component {
             id: props.threadId,
             model: props.threadModel,
         });
+    }
+
+    popoutAttachment() {
+        this.mailPopoutService.popout(this.__owl__.bdom.parentEl).focus();
+    }
+
+    updatePopup() {
+        if (this.mailPopoutService.externalWindow) {
+            this.mailPopoutService.popout(this.__owl__.bdom.parentEl, false);
+        }
     }
 
     get displayName() {

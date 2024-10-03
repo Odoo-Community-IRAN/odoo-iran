@@ -6,25 +6,8 @@
         <field name="model">payment.provider</field>
         <field name="arch" type="xml">
             <form string="Payment provider">
-                <field name="company_id" invisible="1"/>
+                <!-- Prevent considering the field readonly and thus allow writing on it. -->
                 <field name="is_published" invisible="1"/>
-                <field name="main_currency_id" invisible="1"/>
-                <field name="support_manual_capture" invisible="1"/>
-                <field name="support_tokenization" invisible="1"/>
-                <field name="support_express_checkout" invisible="1"/>
-                <field name="module_id" invisible="1"/>
-                <field name="module_state" invisible="1"/>
-                <field name="module_to_buy" invisible="1"/>
-                <field name="show_credentials_page" invisible="1"/>
-                <field name="show_allow_express_checkout" invisible="1"/>
-                <field name="show_allow_tokenization" invisible="1"/>
-                <field name="show_pre_msg" invisible="1"/>
-                <field name="show_pending_msg" invisible="1"/>
-                <field name="show_auth_msg" invisible="1"/>
-                <field name="show_done_msg" invisible="1"/>
-                <field name="show_cancel_msg" invisible="1"/>
-                <field name="require_currency" invisible="1"/>
-                <field name="code" invisible="1"/>
                 <sheet>
                     <!-- === Stat Buttons === -->
                     <div class="oe_button_box" name="button_box"
@@ -71,7 +54,7 @@
                         </group>
                     </group>
                     <notebook invisible="module_id and module_state != 'installed'">
-                        <page string="Credentials" name="credentials" invisible="code == 'none' or not show_credentials_page">
+                        <page string="Credentials" name="credentials" invisible="code == 'none'">
                             <group name="provider_credentials"/>
                         </page>
                         <page string="Configuration" name="configuration">
@@ -95,9 +78,9 @@
                                             Enable Payment Methods
                                         </a>
                                     </div>
-                                    <field name="allow_tokenization" invisible="not support_tokenization or not show_allow_tokenization"/>
+                                    <field name="allow_tokenization" invisible="not support_tokenization"/>
                                     <field name="capture_manually" invisible="not support_manual_capture"/>
-                                    <field name="allow_express_checkout" invisible="not support_express_checkout or not show_allow_express_checkout"/>
+                                    <field name="allow_express_checkout" invisible="not support_express_checkout"/>
                                 </group>
                                 <group string="Availability" name="availability">
                                     <field name="maximum_amount"/>
@@ -107,9 +90,7 @@
                                         <field name="available_currency_ids"
                                                widget="many2many_tags"
                                                placeholder="Select currencies. Leave empty not to restrict any."
-                                               context="{'active_test': False}"
-                                               options="{'no_create': True}"
-                                               required="require_currency and state != 'disabled'"/>
+                                               options="{'no_create': True}"/>
                                     </div>
                                     <field name="available_country_ids"
                                            widget="many2many_tags"
@@ -123,11 +104,11 @@
                             name="messages"
                             invisible="module_id and module_state != 'installed'">
                             <group>
-                                <field name="pre_msg" invisible="not show_pre_msg"/>
-                                <field name="pending_msg" invisible="not show_pending_msg"/>
-                                <field name="auth_msg" invisible="not support_manual_capture or not show_auth_msg"/>
-                                <field name="done_msg" invisible="not show_done_msg"/>
-                                <field name="cancel_msg" invisible="not show_cancel_msg"/>
+                                <field name="pre_msg"/>
+                                <field name="pending_msg"/>
+                                <field name="auth_msg" invisible="not support_manual_capture"/>
+                                <field name="done_msg"/>
+                                <field name="cancel_msg"/>
                             </group>
                         </page>
                     </notebook>
@@ -140,14 +121,14 @@
         <field name="name">payment.provider.list</field>
         <field name="model">payment.provider</field>
         <field name="arch" type="xml">
-            <tree string="Payment Providers" create="false">
+            <list string="Payment Providers" create="false">
                 <field name="sequence" widget="handle"/>
                 <field name="name"/>
                 <field name="code" groups="base.group_no_one"/>
                 <field name="state"/>
                 <field name="available_country_ids" widget="many2many_tags" optional="hide"/>
                 <field name="company_id" groups="base.group_multi_company" optional="show"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -155,57 +136,52 @@
         <field name="name">payment.provider.kanban</field>
         <field name="model">payment.provider</field>
         <field name="arch" type="xml">
-            <kanban create="false" quick_create="false" class="o_kanban_dashboard">
-                <field name="id"/>
-                <field name="name"/>
-                <field name="state"/>
+            <kanban create="false" quick_create="false">
                 <field name="is_published"/>
-                <field name="code"/>
                 <field name="module_id"/>
                 <field name="module_state"/>
                 <field name="module_to_buy"/>
-                <field name="color"/>
                 <templates>
-                    <t t-name="kanban-box">
+                    <t t-name="card" class="flex-row">
                         <t t-set="installed" t-value="!record.module_id.value || (record.module_id.value &amp;&amp; record.module_state.raw_value === 'installed')"/>
                         <t t-set="to_buy" t-value="record.module_to_buy.raw_value === true"/>
                         <t t-set="is_disabled" t-value="record.state.raw_value=='disabled'"/>
                         <t t-set="is_published" t-value="record.is_published.raw_value === true"/>
                         <t t-set="to_upgrade" t-value="!installed and to_buy"/>
-                        <div t-attf-class="oe_kanban_global_click" class="d-flex p-2">
-                            <div class="o_payment_provider_desc d-flex gap-2">
-                                <img type="open"
-                                     t-att-src="kanban_image('payment.provider', 'image_128', record.id.raw_value)"
-                                     class="mb-0 o_image_64_max"
-                                     alt="provider"/>
-                                <div class="d-flex flex-column justify-content-between w-100">
-                                    <div class="o_payment_kanban_info">
-                                        <h4 class="mb-0"><t t-esc="record.name.value"/></h4>
-                                        <t t-if="installed">
-                                            <field name="state"
-                                                   widget="label_selection"
-                                                   options="{'classes': {'enabled': 'success', 'test': 'warning', 'disabled' : 'light'}}"/>
-                                            <t t-if="!is_disabled">
-                                                <span t-if="is_published and installed"
-                                                      class="badge text-bg-success ms-1">
-                                                    Published
-                                                </span>
-                                                <span t-if="!is_published and installed"
-                                                      class="badge text-bg-info ms-1">
-                                                    Unpublished
-                                                </span>
-                                            </t>
-                                        </t>
-                                        <span t-if="to_upgrade" class="badge text-bg-primary ms-1">Enterprise</span>
-                                    </div>
-                                    <div class="o_payment_kanban_button text-end">
-                                        <button t-if="!installed and !selection_mode and !to_buy" type="object" class="btn btn-sm btn-primary float-end" name="button_immediate_install">Install</button>
-                                        <button t-if="installed and is_disabled and !selection_mode" type="edit" class="btn btn-sm btn-secondary float-end">Activate</button>
-                                        <button t-if="!installed and to_buy" href="https://odoo.com/pricing?utm_source=db&amp;utm_medium=module" target="_blank" class="btn btn-sm btn-primary float-end">Upgrade</button>
-                                    </div>
-                                </div>
+                        <aside>
+                            <field type="open"
+                                 name="image_128" widget="image"
+                                 class="mb-0 o_image_64_max"
+                                 alt="provider"/>
+                        </aside>
+                        <main class="ms-2">
+                            <field name="name" class="mb-0 fw-bold fs-4"/>
+                            <div class="d-flex">
+                                <t t-if="installed">
+                                    <field name="state"
+                                        widget="label_selection"
+                                        options="{'classes': {'enabled': 'success', 'test': 'warning', 'disabled' : 'light'}}"/>
+                                    <t t-if="!is_disabled">
+                                        <div>
+                                            <span t-if="is_published"
+                                                class="badge text-bg-success ms-1">
+                                                Published
+                                            </span>
+                                            <span t-else=""
+                                                class="badge text-bg-info ms-1">
+                                                Unpublished
+                                            </span>
+                                        </div>
+                                    </t>
+                                </t>
+                                <span t-if="to_upgrade" class="badge text-bg-primary">Enterprise</span>
                             </div>
-                        </div>
+                            <footer>
+                                <button t-if="!installed and !selection_mode and !to_buy" type="object" class="btn btn-sm btn-primary ms-auto" name="button_immediate_install">Install</button>
+                                <button t-if="installed and is_disabled and !selection_mode" type="edit" class="btn btn-sm btn-secondary ms-auto">Activate</button>
+                                <button t-if="!installed and to_buy" href="https://odoo.com/pricing?utm_source=db&amp;utm_medium=module" target="_blank" class="btn btn-sm btn-primary ms-auto">Upgrade</button>
+                            </footer>
+                        </main>
                     </t>
                 </templates>
             </kanban>
@@ -240,7 +216,7 @@
     <record id="action_payment_provider" model="ir.actions.act_window">
         <field name="name">Payment Providers</field>
         <field name="res_model">payment.provider</field>
-        <field name="view_mode">kanban,tree,form</field>
+        <field name="view_mode">kanban,list,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Create a new payment provider

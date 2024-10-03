@@ -8,8 +8,9 @@ from odoo.addons.l10n_it_edi.tests.common import TestItEdi
 class TestItEdiDoi(TestItEdi):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref='it'):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    @TestItEdi.setup_country('it')
+    def setUpClass(cls):
+        super().setUpClass()
 
         cls.declaration_1000 = cls.env['l10n_it_edi_doi.declaration_of_intent'].create({
             'company_id': cls.company.id,

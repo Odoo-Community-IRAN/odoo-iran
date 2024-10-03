@@ -89,7 +89,7 @@ class EventLeadRule(models.Model):
              'Attended: when attendance is confirmed and registration set to done;')
     # Filters
     event_type_ids = fields.Many2many(
-        'event.type', string='Event Categories',
+        'event.type', string='Event Templates',
         help='Filter the attendees to include those of this specific event category. If not set, no event category restriction will be applied.')
     event_id = fields.Many2one(
         'event.event', string='Event',
@@ -102,7 +102,7 @@ class EventLeadRule(models.Model):
     # Lead default_value fields
     lead_type = fields.Selection([
         ('lead', 'Lead'), ('opportunity', 'Opportunity')], string="Lead Type", required=True,
-        default=lambda self: 'lead' if self.env['res.users'].has_group('crm.group_use_lead') else 'opportunity',
+        default=lambda self: 'lead' if self.env.user.has_group('crm.group_use_lead') else 'opportunity',
         help="Default lead type when this rule is applied.")
     lead_sales_team_id = fields.Many2one(
         'crm.team', string='Sales Team', ondelete="set null",
@@ -142,8 +142,8 @@ class EventLeadRule(models.Model):
         # order by ID, ensure first created wins
         registrations = registrations.sorted('id')
 
-        # first: ensure no duplicate by searching existing registrations / rule
-        existing_leads = self.env['crm.lead'].search([
+        # first: ensure no duplicate by searching existing registrations / rule (include lost leads)
+        existing_leads = self.env['crm.lead'].with_context(active_test=False).search([
             ('registration_ids', 'in', registrations.ids),
             ('event_lead_rule_id', 'in', self.ids)
         ])

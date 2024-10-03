@@ -1,14 +1,11 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from psycopg2 import sql
 import re
 
-from odoo.addons.http_routing.models.ir_http import slugify
 from odoo.addons.website.tools import text_from_html
 from odoo import api, fields, models
 from odoo.osv import expression
-from odoo.tools import escape_psql
+from odoo.tools import escape_psql, SQL
 from odoo.tools.translate import _
 
 
@@ -27,11 +24,10 @@ class Page(models.Model):
     website_indexed = fields.Boolean('Is Indexed', default=True)
     date_publish = fields.Datetime('Publishing Date')
     menu_ids = fields.One2many('website.menu', 'page_id', 'Related Menus')
-    # This is needed to be able to control if page is a menu in page properties.
-    # TODO this should be reviewed entirely so that we use a transient model.
-    is_in_menu = fields.Boolean(compute='_compute_website_menu', inverse='_inverse_website_menu')
-    is_homepage = fields.Boolean(compute='_compute_is_homepage', inverse='_set_is_homepage', string='Homepage')
+    is_in_menu = fields.Boolean(compute='_compute_website_menu')
+    is_homepage = fields.Boolean(compute='_compute_is_homepage', string='Homepage')
     is_visible = fields.Boolean(compute='_compute_visible', string='Is Visible')
+    is_new_page_template = fields.Boolean(string="New Page Template", help='Add this page to the "+New" page templates. It will be added to the "Custom" category.')
 
     # Page options
     header_overlay = fields.Boolean()
@@ -49,16 +45,6 @@ class Page(models.Model):
         for page in self:
             page.is_homepage = page.url == (website.homepage_url or page.website_id == website and '/')
 
-    def _set_is_homepage(self):
-        website = self.env['website'].get_current_website()
-        for page in self:
-            if page.is_homepage:
-                if website.homepage_url != page.url:
-                    website.homepage_url = page.url
-            else:
-                if website.homepage_url == page.url:
-                    website.homepage_url = ''
-
     def _compute_visible(self):
         for page in self:
             page.is_visible = page.website_published and (
@@ -69,21 +55,6 @@ class Page(models.Model):
     def _compute_website_menu(self):
         for page in self:
             page.is_in_menu = bool(page.menu_ids)
-
-    def _inverse_website_menu(self):
-        for page in self:
-            if page.is_in_menu:
-                if not page.menu_ids:
-                    self.env['website.menu'].create({
-                        'name': page.name,
-                        'url': page.url,
-                        'page_id': page.id,
-                        'parent_id': page.website_id.menu_id.id,
-                        'website_id': page.website_id.id,
-                    })
-            elif page.menu_ids:
-                # If the page is no longer in menu, we should remove its website_menu
-                page.menu_ids.unlink()
 
     # This update was added to make sure the mixin calculations are correct
     # (page.website_url > page.url).
@@ -112,16 +83,17 @@ class Page(models.Model):
             previous_page = page
         return self.browse(ids)
 
-    @api.returns('self', lambda value: value.id)
-    def copy(self, default=None):
-        if default:
+    def copy_data(self, default=None):
+        vals_list = super().copy_data(default=default)
+        if not default:
+            return vals_list
+        for page, vals in zip(self, vals_list):
             if not default.get('view_id'):
-                view = self.env['ir.ui.view'].browse(self.view_id.id)
-                new_view = view.copy({'website_id': default.get('website_id')})
-                default['view_id'] = new_view.id
-
-            default['url'] = default.get('url', self.env['website'].get_unique_path(self.url))
-        return super(Page, self).copy(default=default)
+                new_view = page.view_id.copy({'website_id': default.get('website_id')})
+                vals['view_id'] = new_view.id
+                vals['key'] = new_view.key
+            vals['url'] = default.get('url', self.env['website'].get_unique_path(page.url))
+        return vals_list
 
     @api.model
     def clone_page(self, page_id, page_name=None, clone_menu=True):
@@ -131,7 +103,7 @@ class Page(models.Model):
         page = self.browse(int(page_id))
         copy_param = dict(name=page_name or page.name, website_id=self.env['website'].get_current_website().id)
         if page_name:
-            url = '/' + slugify(page_name, max_length=1024, path=True)
+            url = '/' + self.env['ir.http']._slugify(page_name, max_length=1024, path=True)
             copy_param['url'] = self.env['website'].get_unique_path(url)
 
         new_page = page.copy(copy_param)
@@ -169,24 +141,10 @@ class Page(models.Model):
             # If URL has been edited, slug it
             if 'url' in vals:
                 url = vals['url'] or ''
-                redirect_old_url = redirect_type = None
-                # TODO This should be done another way after the backend/frontend merge
-                if isinstance(url, dict):
-                    redirect_old_url = url.get('redirect_old_url')
-                    redirect_type = url.get('redirect_type')
-                    url = url.get('url')
-                url = '/' + slugify(url, max_length=1024, path=True)
+                url = '/' + self.env['ir.http']._slugify(url, max_length=1024, path=True)
                 if page.url != url:
                     url = self.env['website'].with_context(website_id=website_id).get_unique_path(url)
                     page.menu_ids.write({'url': url})
-                    if redirect_old_url:
-                        self.env['website.rewrite'].create({
-                            'name': vals.get('name') or page.name,
-                            'redirect_type': redirect_type,
-                            'url_from': page.url,
-                            'url_to': url,
-                            'website_id': website_id,
-                        })
                     # Sync website's homepage URL
                     website = self.env['website'].get_current_website()
                     page_url_normalized = {'homepage_url': page.url}
@@ -197,7 +155,7 @@ class Page(models.Model):
 
             # If name has changed, check for key uniqueness
             if 'name' in vals and page.name != vals['name']:
-                vals['key'] = self.env['website'].with_context(website_id=website_id).get_unique_key(slugify(vals['name']))
+                vals['key'] = self.env['website'].with_context(website_id=website_id).get_unique_key(self.env['ir.http']._slugify(vals['name']))
             if 'visibility' in vals:
                 if vals['visibility'] != 'restricted_group':
                     vals['groups_id'] = False
@@ -250,30 +208,27 @@ class Page(models.Model):
             domain=expression.AND(base_domain), order=order
         )
         results = most_specific_pages.filtered_domain(domain)  # already sudo
+        v_arch_db = self.env['ir.ui.view']._field_to_sql('v', 'arch_db')
 
         if with_description and search and most_specific_pages:
             # Perform search in translations
             # TODO Remove when domains will support xml_translate fields
-            query = sql.SQL("""
-                SELECT DISTINCT {table}.id
-                FROM {table}
-                LEFT JOIN ir_ui_view v ON {table}.view_id = v.id
-                WHERE (v.name ILIKE {search}
-                OR COALESCE(v.arch_db->>{lang}, v.arch_db->>'en_US') ILIKE {search})
-                AND {table}.id IN {ids}
-                LIMIT {limit}
-            """).format(
-                table=sql.Identifier(self._table),
-                search=sql.Placeholder('search'),
-                lang=sql.Literal(self.env.lang or 'en_US'),
-                ids=sql.Placeholder('ids'),
-                limit=sql.Placeholder('limit'),
-            )
-            self.env.cr.execute(query, {
-                'search': '%%%s%%' % escape_psql(search),
-                'ids': tuple(most_specific_pages.ids),
-                'limit': len(most_specific_pages.ids),
-            })
+            self.env.cr.execute(SQL(
+                """
+                SELECT DISTINCT %(table)s.id
+                FROM %(table)s
+                LEFT JOIN ir_ui_view v ON %(table)s.view_id = v.id
+                WHERE (v.name ILIKE %(search)s
+                OR %(v_arch_db)s ILIKE %(search)s)
+                AND %(table)s.id IN %(ids)s
+                LIMIT %(limit)s
+                """,
+                table=SQL.identifier(self._table),
+                search=f"%{escape_psql(search)}%",
+                v_arch_db=v_arch_db,
+                ids=tuple(most_specific_pages.ids),
+                limit=len(most_specific_pages.ids),
+            ))
             ids = {row[0] for row in self.env.cr.fetchall()}
             if ids:
                 ids.update(results.ids)

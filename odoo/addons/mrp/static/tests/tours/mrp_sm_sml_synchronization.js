@@ -6,60 +6,160 @@ import { stepUtils } from '@web_tour/tour_service/tour_utils';
 registry.category("web_tour.tours").add('test_manufacturing_and_byproduct_sm_to_sml_synchronization', {
     test: true,
     steps: () => [
-        { trigger: ".btn-primary[name=action_confirm]" },
-        { trigger: ".o_data_row > td:contains('product2')" },
-        { trigger: ".fa-list" },
-        { trigger: "h4:contains('Components')" },
-        { trigger: ".o_list_number:contains('5')" },
-        { trigger: ".o_form_button_save" },
-        { trigger: ".o_data_row > td:contains('product2')" },
+        {
+            trigger: ".btn-primary[name=action_confirm]",
+            run: "click",
+        },
+        {
+            trigger: ".o_data_row > td:contains('product2')",
+            run: "click",
+        },
+        {
+            trigger: ".fa-list",
+            run: "click",
+        },
+        {
+            trigger: "h4:contains('Components')",
+            run: "click",
+        },
+        {
+            trigger: ".o_list_number:contains('5')",
+            run: "click",
+        },
+        {
+            content: "Click Save",
+            trigger: ".modal .modal-footer .o_form_button_save",
+            run: "click",
+        },
+        {
+            trigger: ".o_data_row > td:contains('product2')",
+            run: "click",
+        },
         {
             trigger: ".o_field_widget[name=quantity] input",
-            run: 'text 21',
+            run: 'edit 21',
         },
-        { trigger: ".fa-list" },
-        { trigger: "h4:contains('Components')" },
-        { trigger: ".o_data_row > td:contains('WH/Stock')" },
+        {
+            trigger: ".fa-list",
+            run: "click",
+        },
+        {
+            trigger: "h4:contains('Components')",
+            run: "click",
+        },
+        {
+            trigger: ".modal .modal-body .o_data_row > td:contains('WH/Stock')",
+            run: "click",
+        },
+        {
+            trigger: ".modal .modal-body .o_field_widget[name=quantity] input",
+            run: 'edit 27',
+        },
+        {
+            content: "Click Save",
+            trigger: ".modal .modal-footer .o_form_button_save",
+            run: "click",
+        },
+        {
+            trigger: ".o_data_row > td:contains('43')",
+            run: "click",
+        },
         {
             trigger: ".o_field_widget[name=quantity] input",
-            run: 'text 27',
+            run: 'edit 7',
         },
-        { trigger: ".o_form_button_save" },
-        { trigger: ".o_data_row > td:contains('43')" },
+        {
+            trigger: ".fa-list",
+            run: "click",
+        },
+        {
+            trigger: ".o_data_row > td:contains('7')",
+            run: "click",
+        },
+        {
+            content: "Click Save",
+            trigger: ".modal .modal-footer .o_form_button_save",
+            run: "click",
+        },
+        {
+            trigger: ".nav-link[name=finished_products]",
+            run: "click",
+        },
+        {
+            trigger: ".o_data_row > td:contains('product2')",
+            run: "click",
+        },
+        {
+            trigger: ".fa-list",
+            run: "click",
+        },
+        {
+            trigger: "h4:contains('Move Byproduct')",
+            run: "click",
+        },
+        {
+            trigger: ".modal .modal-body .o_data_row > td:contains('WH/Stock')",
+            run: "click",
+        },
+        {
+            trigger: ".modal .modal-body .o_field_widget[name=quantity] input",
+            run: 'edit 2',
+        },
+        {
+            content: "Click Save",
+            trigger: ".modal .modal-footer .o_form_button_save",
+            run: "click",
+        },
+        {
+            trigger: ".o_data_row > td:contains('product2')",
+            run: "click",
+        },
         {
             trigger: ".o_field_widget[name=quantity] input",
-            run: 'text 7',
+            run: 'edit 5',
         },
-        { trigger: ".fa-list" },
-        { trigger: ".o_data_row > td:contains('7')" },
-        { trigger: ".o_form_button_save" },
-        { trigger: ".nav-link[name=finished_products]" },
-        { trigger: ".o_data_row > td:contains('product2')" },
-        { trigger: ".fa-list" },
-        { trigger: "h4:contains('Move Byproduct')" },
-        { trigger: ".o_list_number:contains('2')" },
-        { trigger: ".o_form_button_save" },
-        { trigger: ".o_data_row > td:contains('product2')" },
+        {
+            trigger: ".fa-list",
+            run: "click",
+        },
+        {
+            trigger: "h4:contains('Move Byproduct')",
+            run: "click",
+        },
+        {
+            trigger: ".modal .modal-body .o_data_row > td:contains('WH/Stock')",
+            run: "click",
+        },
+        {
+            trigger: ".modal .modal-body .o_field_widget[name=quantity] input",
+            run: 'edit 7',
+        },
+        {
+            content: "Click Save",
+            trigger: ".modal .modal-footer .o_form_button_save",
+            run: "click",
+        },
+        {
+            trigger: ".o_data_row > td:contains('10')",
+            run: "click",
+        },
         {
             trigger: ".o_field_widget[name=quantity] input",
-            run: 'text 5',
+            run: 'edit 7',
         },
-        { trigger: ".fa-list" },
-        { trigger: "h4:contains('Move Byproduct')" },
-        { trigger: ".o_data_row > td:contains('WH/Stock')" },
         {
-            trigger: ".o_field_widget[name=quantity] input",
-            run: 'text 7',
+            trigger: ".fa-list",
+            run: "click",
         },
-        { trigger: ".o_form_button_save" },
-        { trigger: ".o_data_row > td:contains('10')" },
         {
-            trigger: ".o_field_widget[name=quantity] input",
-            run: 'text 8',
+            trigger: ".o_list_footer .o_list_number > span:contains('7')",
+            run: "click",
         },
-        { trigger: ".fa-list" },
-        { trigger: ".o_list_footer .o_list_number > span:contains('8')" },
-        { trigger: ".o_form_button_save" },
+        {
+            content: "Click Save",
+            trigger: ".modal .modal-footer .o_form_button_save",
+            run: "click",
+        },
         ...stepUtils.saveForm(),
     ]
 });

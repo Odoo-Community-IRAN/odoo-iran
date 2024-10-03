@@ -9,31 +9,33 @@ from odoo.addons.pos_self_order.tests.self_order_common_test import SelfOrderCom
 class TestSelfOrderMobile(SelfOrderCommonTest):
     def test_self_order_mobile(self):
         self.pos_config.write({
+            'takeaway': True,
             'self_ordering_takeaway': True,
             'self_ordering_mode': 'mobile',
             'self_ordering_pay_after': 'each',
             'self_ordering_service_mode': 'table',
         })
 
-        floor_main = self.env["restaurant.floor"].create({
+        floor = self.env["restaurant.floor"].create({
             "name": 'Main Floor',
             "background_color": 'rgb(249,250,251)',
-            "pos_config_ids": [(6, 0, self.pos_config.ids)],
+            "table_ids": [(0, 0, {
+                "table_number": 1,
+            }), (0, 0, {
+                "table_number": 2,
+            }), (0, 0, {
+                "table_number": 3,
+            })],
         })
 
-        self.env["restaurant.table"].create({
-            "name": '3',
-            "floor_id": floor_main.id,
-            "seats": 2,
-            "color": 'rgb(53,211,116)',
-            "shape": 'square',
-            "width": '100',
-            "height": '100',
-            "position_h": '374',
-            "position_v": '50',
+        # Only set one floor to the pos_config, otherwise it can have two table with the same name
+        # which will cause the test to fail
+        self.pos_config.write({
+            "floor_ids": [(6, 0, [floor.id])],
         })
 
         self.pos_config.with_user(self.pos_user).open_ui()
+        self.pos_config.current_session_id.set_opening_control(0, "")
         self_route = self.pos_config._get_self_order_route()
 
         # Mobile, each, table

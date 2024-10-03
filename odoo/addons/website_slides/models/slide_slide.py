@@ -14,7 +14,6 @@ from markupsafe import Markup
 from werkzeug import urls
 
 from odoo import api, fields, models, _
-from odoo.addons.http_routing.models.ir_http import slug, url_for
 from odoo.exceptions import RedirectWarning, UserError, AccessError
 from odoo.http import request
 from odoo.tools import html2plaintext, sql
@@ -308,13 +307,6 @@ class Slide(models.Model):
         for slide in self:
             slide.questions_count = len(slide.question_ids)
 
-    def _has_additional_resources(self, resource_type=None):
-        """Sudo required for public user to know if the course has additional
-        resources that they will be able to access once a member."""
-        self.ensure_one()
-        domain = [('resource_type', '=', resource_type)] if resource_type else []
-        return bool(self.sudo().slide_resource_ids.filtered_domain(domain))
-
     @api.depends('website_message_ids.res_id', 'website_message_ids.model', 'website_message_ids.message_type')
     def _compute_comments_count(self):
         for slide in self:
@@ -497,8 +489,8 @@ class Slide(models.Model):
             elif slide.slide_category in ['infographic', 'document'] and slide.source_type == 'external' and slide.google_drive_id:
                 embed_code = Markup('<iframe src="//drive.google.com/file/d/%s/preview" allowFullScreen="true" frameborder="0" aria-label="%s"></iframe>') % (slide.google_drive_id, _('Google Drive'))
             elif slide.slide_category == 'document' and slide.source_type == 'local_file':
-                slide_url = base_url + url_for('/slides/embed/%s?page=1' % slide.id)
-                slide_url_external = base_url + url_for('/slides/embed_external/%s?page=1' % slide.id)
+                slide_url = base_url + self.env['ir.http']._url_for('/slides/embed/%s?page=1' % slide.id)
+                slide_url_external = base_url + self.env['ir.http']._url_for('/slides/embed_external/%s?page=1' % slide.id)
                 base_embed_code = Markup('<iframe src="%s" class="o_wslides_iframe_viewer" allowFullScreen="true" height="%s" width="%s" frameborder="0" aria-label="%s"></iframe>')
                 iframe_aria_label = _('Embed code')
                 embed_code = base_embed_code % (slide_url, 315, 420, iframe_aria_label)
@@ -603,7 +595,7 @@ class Slide(models.Model):
         for slide in self:
             if slide.id:  # avoid to perform a slug on a not yet saved record in case of an onchange.
                 base_url = slide.channel_id.get_base_url()
-                slide.website_url = '%s/slides/slide/%s' % (base_url, slug(slide))
+                slide.website_url = '%s/slides/slide/%s' % (base_url, self.env['ir.http']._slug(slide))
 
     @api.depends('is_published')
     def _compute_website_share_url(self):
@@ -702,13 +694,12 @@ class Slide(models.Model):
 
         return res
 
-    @api.returns('self', lambda value: value.id)
-    def copy(self, default=None):
+    def copy_data(self, default=None):
         """Sets the sequence to zero so that it always lands at the beginning
         of the newly selected course as an uncategorized slide"""
-        rec = super(Slide, self).copy(default)
-        rec.sequence = 0
-        return rec
+        default = dict(default or {})
+        default['sequence'] = 0
+        return super().copy_data(default=default)
 
     def unlink(self):
         for category in self.filtered(lambda slide: slide.is_category):
@@ -839,7 +830,7 @@ class Slide(models.Model):
                 fullscreen=fullscreen
             )
             email_values = {'email_to': email}
-            if self.env.user.has_group('base.group_portal'):
+            if self.env.user._is_portal():
                 template = template.sudo()
                 email_values['email_from'] = self.env.company.catchall_formatted or self.env.company.email_formatted
 
@@ -847,13 +838,11 @@ class Slide(models.Model):
         return mail_ids
 
     def action_like(self):
-        self.check_access_rights('read')
-        self.check_access_rule('read')
+        self.check_access('read')
         return self._action_vote(upvote=True)
 
     def action_dislike(self):
-        self.check_access_rights('read')
-        self.check_access_rule('read')
+        self.check_access('read')
         return self._action_vote(upvote=False)
 
     def _action_vote(self, upvote=True):
@@ -1407,4 +1396,4 @@ class Slide(models.Model):
         """ Overridden to use a relative URL instead of an absolute when website_id is False. """
         if self.website_id:
             return super().open_website_url()
-        return self.env['website'].get_client_action(f'/slides/slide/{slug(self)}')
+        return self.env['website'].get_client_action(f'/slides/slide/{self.env["ir.http"]._slug(self)}')

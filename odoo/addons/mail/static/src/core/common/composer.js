@@ -1,8 +1,6 @@
-/* @odoo-module */
-
 import { AttachmentList } from "@mail/core/common/attachment_list";
 import { useAttachmentUploader } from "@mail/core/common/attachment_uploader_hook";
-import { useDropzone } from "@mail/core/common/dropzone_hook";
+import { useDropzone } from "@web/core/dropzone/dropzone_hook";
 import { Picker, usePicker } from "@mail/core/common/picker";
 import { MessageConfirmDialog } from "@mail/core/common/message_confirm_dialog";
 import { NavigableList } from "@mail/core/common/navigable_list";
@@ -10,7 +8,10 @@ import { useSuggestion } from "@mail/core/common/suggestion_hook";
 import { prettifyMessageContent } from "@mail/utils/common/format";
 import { useSelection } from "@mail/utils/common/hooks";
 import { isDragSourceExternalFile } from "@mail/utils/common/misc";
+import { rpc } from "@web/core/network/rpc";
 import { isEventHandled, markEventHandled } from "@web/core/utils/misc";
+import { browser } from "@web/core/browser/browser";
+import { useDebounced } from "@web/core/utils/timing";
 
 import {
     Component,
@@ -20,12 +21,15 @@ import {
     useEffect,
     useRef,
     useState,
+    useExternalListener,
+    toRaw,
 } from "@odoo/owl";
 
 import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
 import { FileUploader } from "@web/views/fields/file_handler";
 import { escape, sprintf } from "@web/core/utils/strings";
+import { isMobileOS } from "@web/core/browser/feature_detection";
 
 const EDIT_CLICK_TYPE = {
     CANCEL: "cancel",
@@ -43,7 +47,6 @@ const EDIT_CLICK_TYPE = {
  * @property {string} [className]
  * @property {function} [onDiscardCallback]
  * @property {function} [onPostCallback]
- * @property {Component} [messageComponent]
  * @property {number} [autofocus]
  * @property {import("@web/core/utils/hooks").Ref} [dropzoneRef]
  * @extends {Component<Props, Env>}
@@ -66,13 +69,13 @@ export class Composer extends Component {
         "composer",
         "autofocus?",
         "messageToReplyTo?",
+        "onCloseFullComposerCallback?",
         "onDiscardCallback?",
         "onPostCallback?",
         "mode?",
         "placeholder?",
         "dropzoneRef?",
         "messageEdition?",
-        "messageComponent?",
         "className?",
         "sidebar?",
         "type?",
@@ -82,22 +85,22 @@ export class Composer extends Component {
     static template = "mail.Composer";
 
     setup() {
+        super.setup();
+        this.isMobileOS = isMobileOS();
         this.SEND_KEYBIND_TO_SEND = markup(
             _t("<samp>%(send_keybind)s</samp><i> to send</i>", { send_keybind: this.sendKeybind })
         );
         this.store = useState(useService("mail.store"));
         this.attachmentUploader = useAttachmentUploader(
-            this.thread ?? this.props.composer.message.originThread,
+            this.thread ?? this.props.composer.message.thread,
             { composer: this.props.composer }
         );
-        this.messageService = useState(useService("mail.message"));
-        this.threadService = useService("mail.thread");
         this.ui = useState(useService("ui"));
-        this.rpc = useService("rpc");
         this.mainActionsRef = useRef("main-actions");
         this.ref = useRef("textarea");
         this.fakeTextarea = useRef("fakeTextarea");
         this.emojiButton = useRef("emoji-button");
+        this.inputContainerRef = useRef("input-container");
         this.state = useState({
             active: true,
         });
@@ -117,9 +120,13 @@ export class Composer extends Component {
                 );
             },
         });
-        this.suggestion = this.store.user ? useSuggestion() : undefined;
+        this.suggestion = useSuggestion();
         this.markEventHandled = markEventHandled;
         this.onDropFile = this.onDropFile.bind(this);
+        this.saveContentDebounced = useDebounced(this.saveContent, 5000, {
+            execBeforeUnmount: true,
+        });
+        useExternalListener(window, "beforeunload", this.saveContent.bind(this));
         if (this.props.dropzoneRef) {
             useDropzone(
                 this.props.dropzoneRef,
@@ -154,9 +161,12 @@ export class Composer extends Component {
         );
         useEffect(
             () => {
-                this.ref.el.style.height = this.fakeTextarea.el.scrollHeight + "px";
+                if (this.fakeTextarea.el.scrollHeight) {
+                    this.ref.el.style.height = this.fakeTextarea.el.scrollHeight + "px";
+                }
+                this.saveContentDebounced();
             },
-            () => [this.props.composer.textInputContent, this.ref.el]
+            () => [this.props.composer.text, this.ref.el]
         );
         useEffect(
             () => {
@@ -170,6 +180,9 @@ export class Composer extends Component {
         );
         onMounted(() => {
             this.ref.el.scrollTo({ top: 0, behavior: "instant" });
+            if (!this.props.composer.text) {
+                this.restoreContent();
+            }
         });
     }
 
@@ -183,7 +196,13 @@ export class Composer extends Component {
                 }
             },
             pickers: { emoji: (emoji) => this.addEmoji(emoji) },
-            position: this.props.mode === "extended" ? "bottom-start" : "top-end",
+            position:
+                this.props.mode === "extended"
+                    ? "bottom-start"
+                    : this.props.composer.message
+                    ? "bottom-start"
+                    : "top-end",
+            fixed: !this.props.composer.message,
         };
     }
 
@@ -192,8 +211,14 @@ export class Composer extends Component {
             return this.props.placeholder;
         }
         if (this.thread) {
-            if (this.thread.type === "channel") {
-                return _t("Message #%(thread name)s…", { "thread name": this.thread.displayName });
+            if (this.thread.channel_type === "channel") {
+                const threadName = this.thread.displayName;
+                if (this.thread.parent_channel_id) {
+                    return _t(`Message "%(subChannelName)s"`, {
+                        subChannelName: threadName,
+                    });
+                }
+                return _t("Message #%(threadName)s…", { threadName });
             }
             return _t("Message %(thread name)s…", { "thread name": this.thread.displayName });
         }
@@ -201,10 +226,11 @@ export class Composer extends Component {
     }
 
     onClickCancelOrSaveEditText(ev) {
-        if (this.props.composer.message && ev.target.dataset?.type === EDIT_CLICK_TYPE.CANCEL) {
+        const composer = toRaw(this.props.composer);
+        if (composer.message && ev.target.dataset?.type === EDIT_CLICK_TYPE.CANCEL) {
             this.props.onDiscardCallback(ev);
         }
-        if (this.props.composer.message && ev.target.dataset?.type === EDIT_CLICK_TYPE.SAVE) {
+        if (composer.message && ev.target.dataset?.type === EDIT_CLICK_TYPE.SAVE) {
             this.editMessage(ev);
         }
     }
@@ -268,10 +294,12 @@ export class Composer extends Component {
         return this.props.mode === "extended" ? _t("CTRL-Enter") : _t("Enter");
     }
 
+    get showComposerAvatar() {
+        return !this.compact && this.props.sidebar;
+    }
+
     get thread() {
-        return (
-            this.props.messageToReplyTo?.message?.originThread ?? this.props.composer.thread ?? null
-        );
+        return this.props.messageToReplyTo?.message?.thread ?? this.props.composer.thread ?? null;
     }
 
     get allowUpload() {
@@ -282,13 +310,21 @@ export class Composer extends Component {
         return this.props.composer.message ?? null;
     }
 
+    get extraData() {
+        return this.thread.rpcParams;
+    }
+
     get isSendButtonDisabled() {
         const attachments = this.props.composer.attachments;
         return (
             !this.state.active ||
-            (!this.props.composer.textInputContent && attachments.length === 0) ||
+            (!this.props.composer.text && attachments.length === 0) ||
             attachments.some(({ uploading }) => Boolean(uploading))
         );
+    }
+
+    get hasSendButtonNonEditing() {
+        return !this.extended;
     }
 
     get hasSuggestions() {
@@ -297,33 +333,39 @@ export class Composer extends Component {
 
     get navigableListProps() {
         const props = {
-            anchorRef: this.ref.el,
+            anchorRef: this.inputContainerRef.el,
             position: this.env.inChatter ? "bottom-fit" : "top-fit",
-            placeholder: _t("Loading"),
             onSelect: (ev, option) => {
                 this.suggestion.insert(option);
                 markEventHandled(ev, "composer.selectSuggestion");
             },
+            isLoading: !!this.suggestion.search.term && this.suggestion.state.isFetching,
             options: [],
         };
         if (!this.hasSuggestions) {
             return props;
         }
-        const suggestions = Array(
-            ...this.suggestion.state.items.mainSuggestions,
-            ...this.suggestion.state.items.extraSuggestions
-        );
+        const suggestions = this.suggestion.state.items.suggestions;
         switch (this.suggestion.state.items.type) {
             case "Partner":
                 return {
                     ...props,
                     optionTemplate: "mail.Composer.suggestionPartner",
                     options: suggestions.map((suggestion) => {
-                        return {
-                            label: suggestion.name,
-                            partner: suggestion,
-                            classList: "o-mail-Composer-suggestion",
-                        };
+                        if (suggestion.isSpecial) {
+                            return {
+                                ...suggestion,
+                                group: 1,
+                                optionTemplate: "mail.Composer.suggestionSpecial",
+                                classList: "o-mail-Composer-suggestion",
+                            };
+                        } else {
+                            return {
+                                label: suggestion.name,
+                                partner: suggestion,
+                                classList: "o-mail-Composer-suggestion",
+                            };
+                        }
                     }),
                 };
             case "Thread":
@@ -350,9 +392,11 @@ export class Composer extends Component {
                         };
                     }),
                 };
-            case "CannedResponse":
+            case "mail.canned.response":
                 return {
                     ...props,
+                    autoSelectFirst: false,
+                    hint: _t("Tab to select"),
                     optionTemplate: "mail.Composer.suggestionCannedResponse",
                     options: suggestions.map((suggestion) => {
                         return {
@@ -376,6 +420,14 @@ export class Composer extends Component {
         }
     }
 
+    onCloseFullComposerCallback() {
+        if (this.props.onCloseFullComposerCallback) {
+            this.props.onCloseFullComposerCallback();
+        } else {
+            this.thread?.fetchNewMessages();
+        }
+    }
+
     /**
      * This doesn't work on firefox https://bugzilla.mozilla.org/show_bug.cgi?id=1699743
      */
@@ -396,10 +448,11 @@ export class Composer extends Component {
     }
 
     onKeydown(ev) {
+        const composer = toRaw(this.props.composer);
         switch (ev.key) {
             case "ArrowUp":
-                if (this.props.messageEdition && this.props.composer.textInputContent === "") {
-                    const messageToEdit = this.props.composer.thread.lastEditableMessageOfSelf;
+                if (this.props.messageEdition && composer.text === "") {
+                    const messageToEdit = composer.thread.lastEditableMessageOfSelf;
                     if (messageToEdit) {
                         this.props.messageEdition.editingMessage = messageToEdit;
                     }
@@ -415,7 +468,7 @@ export class Composer extends Component {
                     return;
                 }
                 ev.preventDefault(); // to prevent useless return
-                if (this.props.composer.message) {
+                if (composer.message) {
                     this.editMessage();
                 } else {
                     this.sendMessage();
@@ -435,8 +488,9 @@ export class Composer extends Component {
     }
 
     onClickAddAttachment(ev) {
+        const composer = toRaw(this.props.composer);
         markEventHandled(ev, "composer.clickOnAddAttachment");
-        this.props.composer.autofocus++;
+        composer.autofocus++;
     }
 
     async onClickFullComposer(ev) {
@@ -450,10 +504,9 @@ export class Composer extends Component {
                 const recipientAdditionalValues = {};
                 newPartners.forEach((recipient) => {
                     recipientEmails.push(recipient.email);
-                    recipientAdditionalValues[recipient.email] =
-                        recipient.defaultCreateValues || {};
+                    recipientAdditionalValues[recipient.email] = recipient.create_values || {};
                 });
-                const partners = await this.rpc("/mail/partner/from_email", {
+                const partners = await rpc("/mail/partner/from_email", {
                     emails: recipientEmails,
                     additional_values: recipientAdditionalValues,
                 });
@@ -469,13 +522,11 @@ export class Composer extends Component {
             }
         }
         const attachmentIds = this.props.composer.attachments.map((attachment) => attachment.id);
-        const body = this.props.composer.textInputContent;
-        const validMentions = this.store.user
-            ? this.messageService.getMentionsFromText(body, {
-                  mentionedChannels: this.props.composer.mentionedChannels,
-                  mentionedPartners: this.props.composer.mentionedPartners,
-              })
-            : undefined;
+        const body = this.props.composer.text;
+        const validMentions = this.store.getMentionsFromText(body, {
+            mentionedChannels: this.props.composer.mentionedChannels,
+            mentionedPartners: this.props.composer.mentionedPartners,
+        });
         const context = {
             default_attachment_ids: attachmentIds,
             default_body: await prettifyMessageContent(body, validMentions),
@@ -505,21 +556,30 @@ export class Composer extends Component {
                 // args === { special: true } : click on 'discard'
                 const isDiscard = args.length === 0 || args[0]?.special;
                 // otherwise message is posted (args === [undefined])
-                if (!isDiscard && this.props.composer.thread.type === "mailbox") {
+                if (!isDiscard && this.props.composer.thread.model === "mail.box") {
                     this.notifySendFromMailbox();
                 }
-                this.clear();
-                this.props.messageToReplyTo?.cancel();
-                if (this.thread) {
-                    this.threadService.fetchNewMessages(this.thread);
+                if (
+                    args.length === 0 &&
+                    document
+                        .querySelector(".o_mail_composer_form_view .note-editable")
+                        .innerText.replace(/^\s*$/gm, "")
+                ) {
+                    this.saveContent();
+                    this.restoreContent();
+                } else {
+                    this.clear();
                 }
+                this.props.messageToReplyTo?.cancel();
+                this.onCloseFullComposerCallback();
             },
         };
         await this.env.services.action.doAction(action, options);
     }
 
     clear() {
-        this.threadService.clearComposer(this.props.composer);
+        this.props.composer.clear();
+        browser.localStorage.removeItem(this.props.composer.localId);
     }
 
     notifySendFromMailbox() {
@@ -540,45 +600,50 @@ export class Composer extends Component {
     async processMessage(cb) {
         const el = this.ref.el;
         const attachments = this.props.composer.attachments;
-        if (
-            this.props.composer.textInputContent.trim() ||
-            (attachments.length > 0 && attachments.every(({ uploading }) => !uploading)) ||
-            (this.message && this.message.attachments.length > 0)
+        if (attachments.some(({ uploading }) => uploading)) {
+            this.env.services.notification.add(_t("Please wait while the file is uploading."), {
+                type: "warning",
+            });
+        } else if (
+            this.props.composer.text.trim() ||
+            attachments.length > 0 ||
+            (this.message && this.message.attachment_ids.length > 0)
         ) {
             if (!this.state.active) {
                 return;
             }
             this.state.active = false;
-            await cb(this.props.composer.textInputContent);
+            await cb(this.props.composer.text);
             if (this.props.onPostCallback) {
                 this.props.onPostCallback();
             }
             this.clear();
             this.state.active = true;
             el.focus();
-        } else if (attachments.some(({ uploading }) => Boolean(uploading))) {
-            this.env.services.notification.add(_t("Please wait while the file is uploading."), {
-                type: "warning",
-            });
         }
     }
 
     async sendMessage() {
-        if (this.props.composer.message) {
+        const composer = toRaw(this.props.composer);
+        if (composer.message) {
             this.editMessage();
             return;
         }
         await this.processMessage(async (value) => {
-            const postData = {
-                attachments: this.props.composer.attachments,
-                isNote: this.props.type === "note",
-                mentionedChannels: this.props.composer.mentionedChannels,
-                mentionedPartners: this.props.composer.mentionedPartners,
-                cannedResponseIds: this.props.composer.cannedResponses.map((c) => c.id),
-                parentId: this.props.messageToReplyTo?.message?.id,
-            };
-            await this._sendMessage(value, postData);
+            await this._sendMessage(value, this.postData, this.extraData);
         });
+    }
+
+    get postData() {
+        const composer = toRaw(this.props.composer);
+        return {
+            attachments: composer.attachments || [],
+            isNote: this.props.type === "note",
+            mentionedChannels: composer.mentionedChannels || [],
+            mentionedPartners: composer.mentionedPartners || [],
+            cannedResponseIds: composer.cannedResponses.map((c) => c.id),
+            parentId: this.props.messageToReplyTo?.message?.id,
+        };
     }
 
     /**
@@ -593,11 +658,19 @@ export class Composer extends Component {
     /**
      * @param {string} value message body
      * @param {postData} postData Message meta data info
+     * @param {extraData} extraData Message extra meta data info needed by other modules
      */
-    async _sendMessage(value, postData) {
-        const thread = this.props.composer.thread;
-        await this.threadService.post(this.thread, value, postData);
-        if (thread.type === "mailbox") {
+    async _sendMessage(value, postData, extraData) {
+        const thread = toRaw(this.props.composer.thread);
+        const postThread = toRaw(this.thread);
+        const post = postThread.post.bind(postThread, value, postData, extraData);
+        if (postThread.model === "discuss.channel") {
+            // feature of (optimistic) temp message
+            post();
+        } else {
+            await post();
+        }
+        if (thread.model === "mail.box") {
             this.notifySendFromMailbox();
         }
         this.suggestion?.clearRawMentions();
@@ -606,26 +679,18 @@ export class Composer extends Component {
     }
 
     async editMessage() {
-        if (
-            this.props.composer.textInputContent ||
-            this.props.composer.message.attachments.length > 0
-        ) {
+        const composer = toRaw(this.props.composer);
+        if (composer.text || composer.message.attachment_ids.length > 0) {
             await this.processMessage(async (value) =>
-                this.messageService.edit(
-                    this.props.composer.message,
-                    value,
-                    this.props.composer.attachments,
-                    {
-                        mentionedChannels: this.props.composer.mentionedChannels,
-                        mentionedPartners: this.props.composer.mentionedPartners,
-                    }
-                )
+                composer.message.edit(value, composer.attachments, {
+                    mentionedChannels: composer.mentionedChannels,
+                    mentionedPartners: composer.mentionedPartners,
+                })
             );
         } else {
             this.env.services.dialog.add(MessageConfirmDialog, {
-                message: this.props.composer.message,
-                messageComponent: this.props.messageComponent,
-                onConfirm: () => this.messageService.delete(this.message),
+                message: composer.message,
+                onConfirm: () => this.message.remove(),
                 prompt: _t("Are you sure you want to delete this message?"),
             });
         }
@@ -633,20 +698,37 @@ export class Composer extends Component {
     }
 
     addEmoji(str) {
-        const textContent = this.props.composer.textInputContent;
-        const firstPart = textContent.slice(0, this.props.composer.selection.start);
-        const secondPart = textContent.slice(this.props.composer.selection.end, textContent.length);
-        this.props.composer.textInputContent = firstPart + str + secondPart;
+        const composer = toRaw(this.props.composer);
+        const text = composer.text;
+        const firstPart = text.slice(0, composer.selection.start);
+        const secondPart = text.slice(composer.selection.end, text.length);
+        composer.text = firstPart + str + secondPart;
         this.selection.moveCursor((firstPart + str).length);
         if (!this.ui.isSmall) {
-            this.props.composer.autofocus++;
+            composer.autofocus++;
         }
     }
 
     onFocusin() {
-        this.props.composer.isFocused = true;
-        if (this.props.composer.thread) {
-            this.threadService.markAsRead(this.props.composer.thread);
+        const composer = toRaw(this.props.composer);
+        composer.isFocused = true;
+        composer.thread?.markAsRead();
+    }
+
+    saveContent() {
+        const composer = toRaw(this.props.composer);
+        const fullComposerContent =
+            document
+                .querySelector(".o_mail_composer_form_view .note-editable")
+                ?.innerText.replace(/(\t|\n)+/g, "\n") ?? composer.text;
+        browser.localStorage.setItem(composer.localId, fullComposerContent);
+    }
+
+    restoreContent() {
+        const composer = toRaw(this.props.composer);
+        const fullComposerContent = browser.localStorage.getItem(composer.localId);
+        if (fullComposerContent) {
+            composer.text = fullComposerContent;
         }
     }
 }

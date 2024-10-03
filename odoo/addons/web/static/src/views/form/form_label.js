@@ -1,5 +1,3 @@
-/**@odoo-module */
-
 import { fieldVisualFeedback } from "@web/views/fields/field";
 import { session } from "@web/session";
 import { getTooltipInfo } from "@web/views/fields/field_tooltip";
@@ -7,6 +5,17 @@ import { _t } from "@web/core/l10n/translation";
 import { Component } from "@odoo/owl";
 
 export class FormLabel extends Component {
+    static template = "web.FormLabel";
+    static props = {
+        fieldInfo: { type: Object },
+        record: { type: Object },
+        fieldName: { type: String },
+        className: { type: String, optional: true },
+        string: { type: String },
+        id: { type: String },
+        notMuttedLabel: { type: Boolean, optional: true },
+    };
+
     get className() {
         const { invalid, empty, readonly } = fieldVisualFeedback(
             this.props.fieldInfo.field,
@@ -56,13 +65,3 @@ export class FormLabel extends Component {
         });
     }
 }
-FormLabel.template = "web.FormLabel";
-FormLabel.props = {
-    fieldInfo: { type: Object },
-    record: { type: Object },
-    fieldName: { type: String },
-    className: { type: String, optional: true },
-    string: { type: String },
-    id: { type: String },
-    notMuttedLabel: { type: Boolean, optional: true },
-};

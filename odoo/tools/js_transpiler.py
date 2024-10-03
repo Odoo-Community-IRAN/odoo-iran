@@ -662,23 +662,31 @@ def relative_path_to_module_path(url, path_rel):
 
 
 ODOO_MODULE_RE = re.compile(r"""
-    \s*                                       # some starting space
-    \/(\*|\/).*\s*                            # // or /*
-    @odoo-module                              # @odoo-module
-    (\s+alias=(?P<alias>[\w.]+))?             # alias=web.AbstractAction (optional)
-    (\s+default=(?P<default>False|false|0))?  # default=False or false or 0 (optional)
+    \s*                             # starting white space
+    \/(\*|\/)                       # /* or //
+    .*                              # any comment in between (optional)
+    @odoo-module                    # '@odoo-module' statement
+    (?P<ignore>\s+ignore)?          # module in src | tests which should not be transpiled (optional)
+    (\s+alias=(?P<alias>[^\s*]+))?  # alias (e.g. alias=web.Widget, alias=@web/../tests/utils) (optional)
+    (\s+default=(?P<default>\w+))?  # no implicit default export (e.g. default=false) (optional)
 """, re.VERBOSE)
 
 
-def is_odoo_module(content):
+def is_odoo_module(url, content):
     """
     Detect if the file is a native odoo module.
     We look for a comment containing @odoo-module.
 
+    :param url:
     :param content: source code
     :return: is this a odoo module that need transpilation ?
     """
     result = ODOO_MODULE_RE.match(content)
+    if result and result['ignore']:
+        return False
+    addon = url.split('/')[1]
+    if url.startswith(f'/{addon}/static/src') or url.startswith(f'/{addon}/static/tests'):
+        return True
     return bool(result)
 
 

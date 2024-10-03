@@ -4,6 +4,8 @@ The module :mod:`odoo.tests.common` provides unittest test cases and a few
 helpers and classes to write tests.
 
 """
+from __future__ import annotations
+
 import base64
 import concurrent.futures
 import contextlib
@@ -25,21 +27,26 @@ import sys
 import tempfile
 import threading
 import time
+import traceback
 import unittest
 import warnings
 from collections import defaultdict, deque
 from concurrent.futures import Future, CancelledError, wait
+from contextlib import contextmanager, ExitStack
+from datetime import datetime
+from functools import lru_cache, partial
+from itertools import zip_longest as izip_longest
+from passlib.context import CryptContext
+from typing import Optional, Iterable
+from unittest.mock import patch, _patch, Mock
+from xmlrpc import client as xmlrpclib
+
 try:
     from concurrent.futures import InvalidStateError
 except ImportError:
     InvalidStateError = NotImplementedError
-from contextlib import contextmanager, ExitStack
-from datetime import datetime
-from functools import lru_cache
-from itertools import zip_longest as izip_longest
-from unittest.mock import patch, _patch
-from xmlrpc import client as xmlrpclib
 
+import freezegun
 import requests
 import werkzeug.urls
 from lxml import etree, html
@@ -48,13 +55,15 @@ from urllib3.util import Url, parse_url
 
 import odoo
 from odoo import api
-from odoo.models import BaseModel
 from odoo.exceptions import AccessError
+from odoo.fields import Command
 from odoo.modules.registry import Registry
 from odoo.service import security
 from odoo.sql_db import BaseCursor, Cursor
-from odoo.tools import float_compare, single_email_re, profiler, lower_logging, SQL
-from odoo.tools.misc import find_in_path, mute_logger
+from odoo.tools import config, float_compare, mute_logger, profiler, SQL, DotDict
+from odoo.tools.mail import single_email_re
+from odoo.tools.misc import find_in_path, lower_logging
+from odoo.tools.xml_utils import _validate_xml
 
 from . import case
 
@@ -76,7 +85,20 @@ except ImportError:
     # chrome headless tests will be skipped
     websocket = None
 
+try:
+    import freezegun
+except ImportError:
+    freezegun = None
+
 _logger = logging.getLogger(__name__)
+if config['test_enable'] or config['test_file']:
+    _logger.info("Importing test framework", stack_info=_logger.isEnabledFor(logging.DEBUG))
+else:
+    _logger.error(
+        "Importing test framework"
+        ", avoid importing from business modules and when not running in test mode",
+        stack_info=True,
+    )
 
 
 # backward compatibility: Form was defined in this file
@@ -88,8 +110,8 @@ def __getattr__(name):
     from .form import Form
 
     warnings.warn(
-        "Since 17.0: odoo.tests.common.Form is deprecated, use odoo.tests.Form",
-        category=PendingDeprecationWarning,
+        "Since 18.0: odoo.tests.common.Form is deprecated, use odoo.tests.Form",
+        category=DeprecationWarning,
         stacklevel=2,
     )
     return Form
@@ -104,6 +126,7 @@ ADMIN_USER_ID = odoo.SUPERUSER_ID
 CHECK_BROWSER_SLEEP = 0.1 # seconds
 CHECK_BROWSER_ITERATIONS = 100
 BROWSER_WAIT = CHECK_BROWSER_SLEEP * CHECK_BROWSER_ITERATIONS # seconds
+DEFAULT_SUCCESS_SIGNAL = 'test successful'
 
 def get_db_name():
     db = odoo.tools.config['db_name']
@@ -139,6 +162,16 @@ def standalone(*tags):
     return register
 
 
+def test_xsd(url=None, path=None, skip=False):
+    def decorator(func):
+        def wrapped_f(self, *args, **kwargs):
+            if not skip:
+                xmls = func(self, *args, **kwargs)
+                _validate_xml(self.env, url, path, xmls)
+        return wrapped_f
+    return decorator
+
+
 # For backwards-compatibility - get_db_name() should be used instead
 DB = get_db_name()
 
@@ -169,7 +202,7 @@ def new_test_user(env, login='', groups='base.group_user', context=None, **kwarg
     if context is None:
         context = {}
 
-    groups_id = [(6, 0, [env.ref(g.strip()).id for g in groups.split(',')])]
+    groups_id = [Command.set(kwargs.pop('groups_id', False) or [env.ref(g.strip()).id for g in groups.split(',')])]
     create_values = dict(kwargs, login=login, groups_id=groups_id)
     # automatically generate a name as "Login (groups)" to ease user comprehension
     if not create_values.get('name'):
@@ -259,6 +292,8 @@ class BaseCase(case.TestCase, metaclass=MetaCase):
     warm = True             # False during warm-up phase (see :func:`warmup`)
     _python_version = sys.version_info
 
+    _tests_run_count = int(os.environ.get('ODOO_TEST_FAILURE_RETRIES', 0)) + 1
+
     def __init__(self, methodName='runTest'):
         super().__init__(methodName)
         self.addTypeEqualityFunc(etree._Element, self.assertTreesEqual)
@@ -282,13 +317,14 @@ class BaseCase(case.TestCase, metaclass=MetaCase):
         testMethod = getattr(self, self._testMethodName)
 
         if getattr(testMethod, '_retry', True) and getattr(self, '_retry', True):
-            tests_run_count = int(os.environ.get('ODOO_TEST_FAILURE_RETRIES', 0)) + 1
+            tests_run_count = self._tests_run_count
         else:
             tests_run_count = 1
             _logger.info('Auto retry disabled for %s', self)
 
-        failure = False
+        quiet_log = None
         for retry in range(tests_run_count):
+            result.had_failure = False  # reset in case of retry without soft_fail
             if retry:
                 _logger.runbot(f'Retrying a failed test: {self}')
             if retry < tests_run_count-1:
@@ -296,11 +332,13 @@ class BaseCase(case.TestCase, metaclass=MetaCase):
                         result.soft_fail(), \
                         lower_logging(25, logging.INFO) as quiet_log:
                     super().run(result)
-                    failure = result.had_failure or quiet_log.had_error_log
+                if not (result.had_failure or quiet_log.had_error_log):
+                    break
             else:  # last try
                 super().run(result)
-            if not failure:
-                break
+                if not result.wasSuccessful() and BaseCase._tests_run_count != 1:
+                    _logger.runbot('Disabling auto-retry after a failed test')
+                    BaseCase._tests_run_count = 1
 
     @classmethod
     def setUpClass(cls):
@@ -400,20 +438,24 @@ class BaseCase(case.TestCase, metaclass=MetaCase):
 
     @contextmanager
     def debug_mode(self):
-        """ Enable the effects of group 'base.group_no_one'; mainly useful with :class:`Form`. """
-        origin_user_has_groups = BaseModel.user_has_groups
-
-        def user_has_groups(self, groups):
-            group_set = set(groups.split(','))
-            if '!base.group_no_one' in group_set:
-                return False
-            elif 'base.group_no_one' in group_set:
-                group_set.remove('base.group_no_one')
-                return not group_set or origin_user_has_groups(self, ','.join(group_set))
-            return origin_user_has_groups(self, groups)
-
-        with patch('odoo.models.BaseModel.user_has_groups', user_has_groups):
+        """ Enable the effects of debug mode (in particular for group ``base.group_no_one``). """
+        request = Mock(
+            httprequest=Mock(host='localhost'),
+            db=self.env.cr.dbname,
+            env=self.env,
+            session=DotDict(odoo.http.get_default_session(), debug='1'),
+        )
+        try:
+            self.env.flush_all()
+            self.env.invalidate_all()
+            odoo.http._request_stack.push(request)
             yield
+            self.env.flush_all()
+            self.env.invalidate_all()
+        finally:
+            popped_request = odoo.http._request_stack.pop()
+            if popped_request is not request:
+                raise Exception('Wrong request stack cleanup.')
 
     @contextmanager
     def _assertRaises(self, exception, *, msg=None):
@@ -445,18 +487,25 @@ class BaseCase(case.TestCase, metaclass=MetaCase):
         else:
             return self._assertRaises(exception, **kwargs)
 
-    if sys.version_info < (3, 10):
-        # simplified backport of assertNoLogs()
-        @contextmanager
-        def assertNoLogs(self, logger: str, level: str):
-            # assertLogs ensures there is at least one log record when
-            # exiting the context manager. We insert one dummy record just
-            # so we pass that silly test while still capturing the logs.
-            with self.assertLogs(logger, level) as capture:
-                logging.getLogger(logger).log(getattr(logging, level), "Dummy log record")
-                yield
-                if len(capture.output) > 1:
-                    raise self.failureException(f"Unexpected logs found: {capture.output[1:]}")
+    def _patchExecute(self, actual_queries, flush=True):
+        Cursor_execute = Cursor.execute
+
+        def execute(self, query, params=None, log_exceptions=None):
+            actual_queries.append(query.code if isinstance(query, SQL) else query)
+            return Cursor_execute(self, query, params, log_exceptions)
+
+        if flush:
+            self.env.flush_all()
+            self.env.cr.flush()
+
+        with (
+            patch('odoo.sql_db.Cursor.execute', execute),
+            patch.object(self.env.registry, 'unaccent', lambda x: x),
+        ):
+            yield actual_queries
+            if flush:
+                self.env.flush_all()
+                self.env.cr.flush()
 
     @contextmanager
     def assertQueries(self, expected, flush=True):
@@ -464,26 +513,9 @@ class BaseCase(case.TestCase, metaclass=MetaCase):
         of strings representing the expected queries being made. Query strings
         are matched against each other, ignoring case and whitespaces.
         """
-        Cursor_execute = Cursor.execute
         actual_queries = []
 
-        def execute(self, query, params=None, log_exceptions=None):
-            actual_queries.append(query.code if isinstance(query, SQL) else query)
-            return Cursor_execute(self, query, params, log_exceptions)
-
-        def get_unaccent_wrapper(cr):
-            return lambda x: x
-
-        if flush:
-            self.env.flush_all()
-            self.env.cr.flush()
-
-        with patch('odoo.sql_db.Cursor.execute', execute):
-            with patch('odoo.osv.expression.get_unaccent_wrapper', get_unaccent_wrapper):
-                yield actual_queries
-                if flush:
-                    self.env.flush_all()
-                    self.env.cr.flush()
+        yield from self._patchExecute(actual_queries, flush)
 
         if not self.warm:
             return
@@ -499,6 +531,32 @@ class BaseCase(case.TestCase, metaclass=MetaCase):
                 "".join(actual_query.lower().split()),
                 "".join(expect_query.lower().split()),
                 "\n---- actual query:\n%s\n---- not like:\n%s" % (actual_query, expect_query),
+            )
+
+    @contextmanager
+    def assertQueriesContain(self, expected, flush=True):
+        """ Check the queries made by the current cursor. ``expected`` is a list
+        of strings representing the expected queries being made. Query strings
+        are matched against each other, ignoring case and whitespaces.
+        """
+        actual_queries = []
+
+        yield from self._patchExecute(actual_queries, flush)
+
+        if not self.warm:
+            return
+
+        self.assertEqual(
+            len(actual_queries), len(expected),
+            "\n---- actual queries:\n%s\n---- expected queries:\n%s" % (
+                "\n".join(actual_queries), "\n".join(expected),
+            )
+        )
+        for actual_query, expect_query in zip(actual_queries, expected):
+            self.assertIn(
+                "".join(expect_query.lower().split()),
+                "".join(actual_query.lower().split()),
+                "\n---- actual query:\n%s\n---- doesn't contain:\n%s" % (actual_query, expect_query),
             )
 
     @contextmanager
@@ -554,110 +612,90 @@ class BaseCase(case.TestCase, metaclass=MetaCase):
                 self.env.flush_all()
                 self.env.cr.flush()
 
-    def assertRecordValues(self, records, expected_values):
+    def assertRecordValues(
+            self,
+            records: odoo.models.BaseModel,
+            expected_values: list[dict],
+            *,
+            field_names: Optional[Iterable[str]] = None,
+    ) -> None:
         ''' Compare a recordset with a list of dictionaries representing the expected results.
         This method performs a comparison element by element based on their index.
         Then, the order of the expected values is extremely important.
 
-        Note that:
-          - Comparison between falsy values is supported: False match with None.
-          - Comparison between monetary field is also treated according the currency's rounding.
-          - Comparison between x2many field is done by ids. Then, empty expected ids must be [].
-          - Comparison between many2one field id done by id. Empty comparison can be done using any falsy value.
+        .. note::
 
-        :param records:               The records to compare.
-        :param expected_values:       List of dicts expected to be exactly matched in records
+            - ``None`` expected values can be used for empty fields.
+            - x2many fields are expected by ids (so the expected value should be
+              a ``list[int]``
+            - many2one fields are expected by id (so the expected value should
+              be an ``int``
+
+        :param records: The records to compare.
+        :param expected_values: Items to check the ``records`` against.
+        :param field_names: list of fields to check during comparison, if
+                            unspecified all expected_values must have the same
+                            keys and all are checked
         '''
+        if not field_names:
+            field_names = expected_values[0].keys()
+            for i, v in enumerate(expected_values):
+                self.assertEqual(
+                    v.keys(), field_names,
+                    f"All expected values must have the same keys, found differences between records 0 and {i}",
+                )
 
-        def _compare_candidate(record, candidate, field_names):
-            ''' Compare all the values in `candidate` with a record.
-            :param record:      record being compared
-            :param candidate:   dict of values to compare
-            :return:            A dictionary will encountered difference in values.
-            '''
-            diff = {}
+        expected_reformatted = []
+        for vs in expected_values:
+            r = {}
+            for f in field_names:
+                t = records._fields[f].type
+                if t in ('one2many', 'many2many'):
+                    r[f] = sorted(vs[f])
+                elif t == 'float':
+                    r[f] = float(vs[f])
+                elif t == 'integer':
+                    r[f] = int(vs[f])
+                elif vs[f] is None:
+                    r[f] = False
+                else:
+                    r[f] = vs[f]
+            expected_reformatted.append(r)
+
+        record_reformatted = []
+        for record in records:
+            r = {}
             for field_name in field_names:
                 record_value = record[field_name]
-                field = record._fields[field_name]
-                field_type = field.type
-                if field_type == 'monetary':
-                    # Compare monetary field.
-                    currency_field_name = record._fields[field_name].get_currency_field(record)
-                    record_currency = record[currency_field_name]
-                    if field_name not in candidate:
-                        diff[field_name] = (record_value, None)
-                    elif record_currency:
-                        if record_currency.compare_amounts(candidate[field_name], record_value):
-                            diff[field_name] = (record_value, record_currency.round(candidate[field_name]))
-                    elif candidate[field_name] != record_value:
-                        diff[field_name] = (record_value, candidate[field_name])
-                elif field_type == 'float' and field.get_digits(record.env):
-                    prec = field.get_digits(record.env)[1]
-                    if float_compare(candidate[field_name], record_value, precision_digits=prec) != 0:
-                        diff[field_name] = (record_value, candidate[field_name])
-                elif field_type in ('one2many', 'many2many'):
-                    # Compare x2many relational fields.
-                    # Empty comparison must be an empty list to be True.
-                    if field_name not in candidate:
-                        diff[field_name] = (sorted(record_value.ids), None)
-                    elif set(record_value.ids) != set(candidate[field_name]):
-                        diff[field_name] = (sorted(record_value.ids), sorted(candidate[field_name]))
-                elif field_type == 'many2one':
-                    # Compare many2one relational fields.
-                    # Every falsy value is allowed to compare with an empty record.
-                    if field_name not in candidate:
-                        diff[field_name] = (record_value.id, None)
-                    elif (record_value or candidate[field_name]) and record_value.id != candidate[field_name]:
-                        diff[field_name] = (record_value.id, candidate[field_name])
-                else:
-                    # Compare others fields if not both interpreted as falsy values.
-                    if field_name not in candidate:
-                        diff[field_name] = (record_value, None)
-                    elif (candidate[field_name] or record_value) and record_value != candidate[field_name]:
-                        diff[field_name] = (record_value, candidate[field_name])
-            return diff
+                match (field := record._fields[field_name]).type:
+                    case 'many2one':
+                        record_value = record_value.id
+                    case 'one2many' | 'many2many':
+                        record_value = sorted(record_value.ids)
+                    case 'float' if digits := field.get_digits(record.env):
+                        record_value = Approx(record_value, digits[1], decorate=False)
+                    case 'monetary' if currency_field_name := field.get_currency_field(record):
+                        # don't round if there's no currency set
+                        if c := record[currency_field_name]:
+                            record_value = Approx(record_value, c, decorate=False)
+                r[field_name] = record_value
+            record_reformatted.append(r)
 
-        # Compare records with candidates.
-        different_values = []
-        field_names = list(expected_values[0].keys())
-        for index, record in enumerate(records):
-            is_additional_record = index >= len(expected_values)
-            candidate = {} if is_additional_record else expected_values[index]
-            diff = _compare_candidate(record, candidate, field_names)
-            if diff:
-                different_values.append((index, 'additional_record' if is_additional_record else 'regular_diff', diff))
-        for index in range(len(records), len(expected_values)):
-            diff = {}
-            for field_name in field_names:
-                diff[field_name] = (None, expected_values[index][field_name])
-            different_values.append((index, 'missing_record', diff))
-
-        # Build error message.
-        if not different_values:
+        try:
+            self.assertSequenceEqual(expected_reformatted, record_reformatted, seq_type=list)
             return
+        except AssertionError as e:
+            standardMsg, _, diffMsg = str(e).rpartition('\n')
+            if 'self.maxDiff' not in diffMsg:
+                raise
+            # move out of handler to avoid exception chaining
 
-        errors = ['The records and expected_values do not match.']
-        if len(records) != len(expected_values):
-            errors.append('Wrong number of records to compare: %d records versus %d expected values.' % (len(records), len(expected_values)))
-
-        for index, diff_type, diff in different_values:
-            if diff_type == 'regular_diff':
-                errors.append('\n==== Differences at index %s ====' % index)
-                record_diff = ['%s:%s' % (k, v[0]) for k, v in diff.items()]
-                candidate_diff = ['%s:%s' % (k, v[1]) for k, v in diff.items()]
-                errors.append('\n'.join(difflib.unified_diff(record_diff, candidate_diff)))
-            elif diff_type == 'additional_record':
-                errors += [
-                    '\n==== Additional record ====',
-                    pprint.pformat(dict((k, v[0]) for k, v in diff.items())),
-                ]
-            elif diff_type == 'missing_record':
-                errors += [
-                    '\n==== Missing record ====',
-                    pprint.pformat(dict((k, v[1]) for k, v in diff.items())),
-                ]
-
-        self.fail('\n'.join(errors))
+        diffMsg = "".join(difflib.unified_diff(
+            pprint.pformat(expected_reformatted).splitlines(keepends=True),
+            pprint.pformat(record_reformatted).splitlines(keepends=True),
+            fromfile="expected", tofile="records",
+        ))
+        self.fail(self._formatMessage(None, standardMsg + '\n' + diffMsg))
 
     # turns out this thing may not be quite as useful as we thought...
     def assertItemsEqual(self, a, b, msg=None):
@@ -704,11 +742,83 @@ class BaseCase(case.TestCase, metaclass=MetaCase):
         test_method = getattr(self, '_testMethodName', 'Unknown test method')
         if not hasattr(self, 'profile_session'):
             self.profile_session = profiler.make_session(test_method)
+        if 'db' not in kwargs:
+            kwargs['db'] = self.env.cr.dbname
         return profiler.Profiler(
             description='%s uid:%s %s %s' % (test_method, self.env.user.id, 'warm' if self.warm else 'cold', description),
-            db=self.env.cr.dbname,
             profile_session=self.profile_session,
             **kwargs)
+
+
+class Like:
+    """
+        A string-like object comparable to other strings but where the substring
+        '...' can match anything in the other string.
+
+        Example of usage:
+
+            self.assertEqual("SELECT field1, field2, field3 FROM model", Like('SELECT ... FROM model'))
+            self.assertIn(Like('Company ... (SF)'), ['TestPartner', 'Company 8 (SF)', 'SomeAdress'])
+            self.assertEqual([
+                'TestPartner',
+                'Company 8 (SF)',
+                'Anything else'
+            ], [
+                'TestPartner',
+                Like('Company ... (SF)'),
+                Like('...'),
+            ])
+
+        In case of mismatch, here is an example of error message
+
+            AssertionError: Lists differ: ['TestPartner', 'Company 8 (LA)', 'Anything else'] != ['TestPartner', ~Company ... (SF), ~...]
+
+            First differing element 1:
+            'Company 8 (LA)'
+            ~Company ... (SF)~
+
+            - ['TestPartner', 'Company 8 (LA)', 'Anything else']
+            + ['TestPartner', ~Company ... (SF), ~...]
+
+
+        """
+    def __init__(self, pattern):
+        self.pattern = pattern
+        self.regex = '.*'.join([re.escape(part.strip()) for part in self.pattern.split('...')])
+
+    def __eq__(self, other):
+        return re.fullmatch(self.regex, other.strip(), re.DOTALL)
+
+    def __repr__(self):
+        return repr(self.pattern)
+
+
+class Approx:  # noqa: PLW1641
+    """A wrapper for approximate float comparisons. Uses float_compare under
+    the hood.
+
+    Most of the time, :meth:`TestCase.assertAlmostEqual` is more useful, but it
+    doesn't work for all helpers.
+    """
+    def __init__(self, value: float, rounding: int | float | odoo.addons.base.models.res_currency.Currency, /, decorate: bool) -> None:  # noqa: PYI041
+        self.value = value
+        self.decorate = decorate
+        if isinstance(rounding, int):
+            self.cmp = partial(float_compare, precision_digits=rounding)
+        elif isinstance(rounding, float):
+            self.cmp = partial(float_compare, precision_rounding=rounding)
+        else:
+            self.cmp = rounding.compare_amounts
+
+    def __repr__(self) -> str:
+        if self.decorate:
+            return f"~{self.value!r}"
+        return repr(self.value)
+
+    def __eq__(self, other: object) -> bool | NotImplemented:
+        if not isinstance(other, (float, int)):
+            return NotImplemented
+        return self.cmp(self.value, other) == 0
 
 
 savepoint_seq = itertools.count()
@@ -733,7 +843,7 @@ class TransactionCase(BaseCase):
     env: api.Environment = None
     cr: Cursor = None
     muted_registry_logger = mute_logger(odoo.modules.registry._logger.name)
-
+    freeze_time = None
 
     @classmethod
     def _gc_filestore(cls):
@@ -741,39 +851,80 @@ class TransactionCase(BaseCase):
         # they can addup during test and take some disc space.
         # since cron are not running during tests, we need to gc manually
         # We need to check the status of the file system outside of the test cursor
-        with odoo.registry(get_db_name()).cursor() as cr:
+        with Registry(get_db_name()).cursor() as cr:
             gc_env = api.Environment(cr, odoo.SUPERUSER_ID, {})
             gc_env['ir.attachment']._gc_file_store_unsafe()
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-
         cls.addClassCleanup(cls._gc_filestore)
-        cls.registry = odoo.registry(get_db_name())
+        cls.registry = Registry(get_db_name())
+        cls.registry_start_invalidated = cls.registry.registry_invalidated
         cls.registry_start_sequence = cls.registry.registry_sequence
+        cls.registry_cache_sequences = dict(cls.registry.cache_sequences)
+
         def reset_changes():
             if (cls.registry_start_sequence != cls.registry.registry_sequence) or cls.registry.registry_invalidated:
                 with cls.registry.cursor() as cr:
                     cls.registry.setup_models(cr)
-            cls.registry.registry_invalidated = False
+            cls.registry.registry_invalidated = cls.registry_start_invalidated
             cls.registry.registry_sequence = cls.registry_start_sequence
             with cls.muted_registry_logger:
                 cls.registry.clear_all_caches()
             cls.registry.cache_invalidated.clear()
+            cls.registry.cache_sequences = cls.registry_cache_sequences
         cls.addClassCleanup(reset_changes)
+
+        def signal_changes():
+            if not cls.registry.ready:
+                _logger.info('Skipping signal changes during tests')
+                return
+            _logger.info('Simulating signal changes during tests')
+            if cls.registry.registry_invalidated:
+                cls.registry.registry_sequence += 1
+            for cache_name in cls.registry.cache_invalidated or ():
+                cls.registry.cache_sequences[cache_name] += 1
+            cls.registry.registry_invalidated = False
+            cls.registry.cache_invalidated.clear()
+
+        cls._signal_changes_patcher = patch.object(cls.registry, 'signal_changes', signal_changes)
+        cls.startClassPatcher(cls._signal_changes_patcher)
 
         cls.cr = cls.registry.cursor()
         cls.addClassCleanup(cls.cr.close)
 
+        if cls.freeze_time:
+            cls.startClassPatcher(freezegun.freeze_time(cls.freeze_time))
+
+        def forbidden(*args, **kwars):
+            traceback.print_stack()
+            raise AssertionError('Cannot commit or rollback a cursor from inside a test, this will lead to a broken cursor when trying to rollback the test. Please rollback to a specific savepoint instead or open another cursor if really necessary')
+
+        cls.commit_patcher = patch.object(cls.cr, 'commit', forbidden)
+        cls.startClassPatcher(cls.commit_patcher)
+        cls.rollback_patcher = patch.object(cls.cr, 'rollback', forbidden)
+        cls.startClassPatcher(cls.rollback_patcher)
+        cls.close_patcher = patch.object(cls.cr, 'close', forbidden)
+        cls.startClassPatcher(cls.close_patcher)
+
+
         cls.env = api.Environment(cls.cr, odoo.SUPERUSER_ID, {})
+
+        # speedup CryptContext. Many user an password are done during tests, avoid spending time hasing password with many rounds
+        def _crypt_context(self):  # noqa: ARG001
+            return CryptContext(
+                ['pbkdf2_sha512', 'plaintext'],
+                pbkdf2_sha512__rounds=1,
+            )
+        cls._crypt_context_patcher = patch('odoo.addons.base.models.res_users.Users._crypt_context', _crypt_context)
+        cls.startClassPatcher(cls._crypt_context_patcher)
 
     def setUp(self):
         super().setUp()
-
         # restore environments after the test to avoid invoking flush() with an
         # invalid environment (inexistent user id) from another test
-        envs = self.env.all.envs
+        envs = self.env.transaction.envs
         for env in list(envs):
             self.addCleanup(env.clear)
         # restore the set of known environments as it was at setUp
@@ -815,7 +966,7 @@ class SingleTransactionCase(BaseCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.registry = odoo.registry(get_db_name())
+        cls.registry = Registry(get_db_name())
         cls.addClassCleanup(cls.registry.reset_changes)
         cls.addClassCleanup(cls.registry.clear_all_caches)
 
@@ -832,45 +983,26 @@ class SingleTransactionCase(BaseCase):
 class ChromeBrowserException(Exception):
     pass
 
-def fmap(future, map_fun):
-    """Maps a future's result through a callback.
-
-    Resolves to the application of ``map_fun`` to the result of ``future``.
-
-    .. warning:: this does *not* recursively resolve futures, if that's what
-                 you need see :func:`fchain`
-    """
-    fmap_future = Future()
-    @future.add_done_callback
-    def _(f):
+def run(gen_func):
+    def done(f):
         try:
-            fmap_future.set_result(map_fun(f.result()))
-        except Exception as e:
-            fmap_future.set_exception(e)
-    return fmap_future
+            try:
+                r = f.result()
+            except Exception as e:
+                f = coro.throw(e)
+            else:
+                f = coro.send(r)
+        except StopIteration:
+            return
 
-def fchain(future, next_callback):
-    """Chains a future's result to a new future through a callback.
+        assert isinstance(f, Future), f"coroutine must yield futures, got {f}"
+        f.add_done_callback(done)
 
-    Corresponds to the ``bind`` monadic operation (aka flatmap aka then...
-    kinda).
-    """
-    new_future = Future()
-    @future.add_done_callback
-    def _(f):
-        try:
-            n = next_callback(f.result())
-            @n.add_done_callback
-            def _(f):
-                try:
-                    new_future.set_result(f.result())
-                except Exception as e:
-                    new_future.set_exception(e)
-
-        except Exception as e:
-            new_future.set_exception(e)
-
-    return new_future
+    coro = gen_func()
+    try:
+        next(coro).add_done_callback(done)
+    except StopIteration:
+        return
 
 def save_test_file(test_name, content, prefix, extension='png', logger=_logger, document_type='Screenshot', date_format="%Y%m%d_%H%M%S_%f"):
     assert re.fullmatch(r'\w*_', prefix)
@@ -891,9 +1023,10 @@ class ChromeBrowser:
     """ Helper object to control a Chrome headless process. """
     remote_debugging_port = 0  # 9222, change it in a non-git-tracked file
 
-    def __init__(self, test_class, headless=True):
-        self._logger = test_class._logger
-        self.test_class = test_class
+    def __init__(self, test_case: HttpCase, success_signal: str = DEFAULT_SUCCESS_SIGNAL, headless: bool = True, debug: bool = False):
+        self._logger = test_case._logger
+        self.test_case = test_case
+        self.success_signal = success_signal
         if websocket is None:
             self._logger.warning("websocket-client module is not installed")
             raise unittest.SkipTest("websocket-client module is not installed")
@@ -912,13 +1045,14 @@ class ChromeBrowser:
         else:
             self.sigxcpu_handler = None
 
-        test_class.browser_size = test_class.browser_size.replace('x', ',')
+        test_case.browser_size = test_case.browser_size.replace('x', ',')
 
         self.chrome, self.devtools_port = self._chrome_start(
             user_data_dir=self.user_data_dir,
-            window_size=test_class.browser_size,
-            touch_enabled=test_class.touch_enabled,
+            window_size=test_case.browser_size,
+            touch_enabled=test_case.touch_enabled,
             headless=headless,
+            debug=debug,
         )
         self.ws = self._open_websocket()
         self._request_id = itertools.count()
@@ -948,7 +1082,10 @@ class ChromeBrowser:
 
     @property
     def screencasts_frames_dir(self):
-        return os.path.join(self.screencasts_dir, 'frames')
+        if screencasts_dir := self.screencasts_dir:
+            return os.path.join(screencasts_dir, 'frames')
+        else:
+            return None
 
     def signal_handler(self, sig, frame):
         if sig == signal.SIGXCPU:
@@ -959,8 +1096,7 @@ class ChromeBrowser:
     def stop(self):
         if hasattr(self, 'ws'):
             self._websocket_send('Page.stopScreencast')
-            if self.screencasts_dir:
-                screencasts_frames_dir = self.screencasts_frames_dir
+            if screencasts_frames_dir := self.screencasts_frames_dir:
                 self.screencasts_dir = None
                 if os.path.isdir(screencasts_frames_dir):
                     shutil.rmtree(screencasts_frames_dir, ignore_errors=True)
@@ -1024,7 +1160,8 @@ class ChromeBrowser:
             self,
             user_data_dir: str,
             window_size: str, touch_enabled: bool,
-            headless=True
+            headless=True,
+            debug=False,
     ):
         headless_switches = {
             '--headless': '',
@@ -1053,14 +1190,14 @@ class ChromeBrowser:
             '--user-data-dir': user_data_dir,
             '--window-size': window_size,
             '--no-first-run': '',
-            # '--enable-precise-memory-info': '',  # uncomment to debug memory leaks in unit tests
-            # FIXME: the next flag is temporarily uncommented to allow client
+            # FIXME: these next 2 flags are temporarily uncommented to allow client
             # code to manually run garbage collection. This is done as currently
             # the Chrome unit test process doesn't have access to its available
             # memory, so it cannot run the GC efficiently and may run out of memory
             # and crash. These should be re-commented when the process is correctly
             # configured.
-            '--js-flags': '--expose-gc',  # uncomment to debug memory leaks in unit tests
+            '--enable-precise-memory-info': '',
+            '--js-flags': '--expose-gc',
         }
         if headless:
             switches.update(headless_switches)
@@ -1068,6 +1205,9 @@ class ChromeBrowser:
             # enable Chrome's Touch mode, useful to detect touch capabilities using
             # "'ontouchstart' in window"
             switches['--touch-events'] = ''
+        if debug is not False:
+            switches['--auto-open-devtools-for-tabs'] = ''
+            switches['--start-maximized'] = ''
 
         cmd = [self.executable]
         cmd += ['%s=%s' % (k, v) if v else k for k, v in switches.items()]
@@ -1283,23 +1423,28 @@ class ChromeBrowser:
                         "Trying to set result to failed (%s) but found the future settled (%s)",
                         message, self._result
                     )
-        elif 'test successful' in message:
-            if self.test_class.allow_end_on_form:
+        elif message == self.success_signal:
+            @run
+            def _get_heap():
+                yield self._websocket_send("HeapProfiler.collectGarbage", with_future=True)
+                r = yield self._websocket_send("Runtime.getHeapUsage", with_future=True)
+                _logger.info("heap %d (allocated %d)", r['usedSize'], r['totalSize'])
+
+            if self.test_case.allow_end_on_form:
                 self._result.set_result(True)
                 return
 
-            qs = fchain(
-                self._websocket_send('DOM.getDocument', params={'depth': 0}, with_future=True),
-                lambda d: self._websocket_send("DOM.querySelector", params={
-                    'nodeId': d['root']['nodeId'],
-                    'selector': '.o_form_dirty',
-                }, with_future=True)
-            )
-            @qs.add_done_callback
-            def _qs_result(fut):
+            @run
+            def _check_form():
                 node_id = 0
+
                 with contextlib.suppress(Exception):
-                    node_id = fut.result()['nodeId']
+                    d = yield self._websocket_send('DOM.getDocument', params={'depth': 0}, with_future=True)
+                    form = yield self._websocket_send("DOM.querySelector", params={
+                        'nodeId': d['root']['nodeId'],
+                        'selector': '.o_form_dirty',
+                    }, with_future=True)
+                    node_id = form['nodeId']
 
                 if node_id:
                     self.take_screenshot("unsaved_form_")
@@ -1355,12 +1500,11 @@ which leads to stray network requests and inconsistencies."""
             wait()
 
     def _handle_screencast_frame(self, sessionId, data, metadata):
-        if not self.screencasts_frames_dir:
+        frames_dir = self.screencasts_frames_dir
+        if not frames_dir:
             return
         self._websocket_send('Page.screencastFrameAck', params={'sessionId': sessionId})
-        if not self.screencasts_dir:
-            return
-        outfile = os.path.join(self.screencasts_frames_dir, 'frame_%05d.b64' % len(self.screencast_frames))
+        outfile = os.path.join(frames_dir, 'frame_%05d.b64' % len(self.screencast_frames))
         try:
             with open(outfile, 'w') as f:
                 f.write(data)
@@ -1377,6 +1521,7 @@ which leads to stray network requests and inconsistencies."""
         'info': logging.INFO,
         'warning': logging.WARNING,
         'error': logging.ERROR,
+        'dir': logging.RUNBOT,
         # TODO: what do with
         # dir, dirxml, table, trace, clear, startGroup, startGroupCollapsed,
         # endGroup, assert, profile, profileEnd, count, timeEnd
@@ -1389,7 +1534,7 @@ which leads to stray network requests and inconsistencies."""
                 self._logger.warning("Couldn't capture screenshot: expected image data, got ?? error ??")
                 return
             decoded = base64.b64decode(base_png, validate=True)
-            save_test_file(self.test_class.__name__, decoded, prefix, logger=self._logger)
+            save_test_file(type(self.test_case).__name__, decoded, prefix, logger=self._logger)
 
         self._logger.info('Asking for screenshot')
         f = self._websocket_send('Page.captureScreenshot', with_future=True)
@@ -1686,22 +1831,34 @@ class HttpCase(TransactionCase):
     def setUpClass(cls):
         super().setUpClass()
         if cls.registry_test_mode:
-            cls.registry.enter_test_mode(cls.cr)
+            cls.registry.enter_test_mode(cls.cr, not hasattr(cls, 'readonly_enabled') or cls.readonly_enabled)
             cls.addClassCleanup(cls.registry.leave_test_mode)
 
         ICP = cls.env['ir.config_parameter']
         ICP.set_param('web.base.url', cls.base_url())
         ICP.env.flush_all()
         # v8 api with correct xmlrpc exception handling.
-        cls.xmlrpc_url = f'http://{HOST}:{odoo.tools.config["http_port"]:d}/xmlrpc/2/'
+        cls.xmlrpc_url = f'{cls.base_url()}/xmlrpc/2/'
         cls._logger = logging.getLogger('%s.%s' % (cls.__module__, cls.__name__))
+
+    @classmethod
+    def base_url(cls):
+        return f"http://{HOST}:{cls.http_port():d}"
+
+    @classmethod
+    def http_port(cls):
+        if odoo.service.server.server is None:
+            return None
+        return odoo.service.server.server.httpd.server_port
 
     def setUp(self):
         super().setUp()
 
+        self._logger = self._logger.getChild(self._testMethodName)
+
         self.xmlrpc_common = xmlrpclib.ServerProxy(self.xmlrpc_url + 'common', transport=Transport(self.cr))
         self.xmlrpc_db = xmlrpclib.ServerProxy(self.xmlrpc_url + 'db', transport=Transport(self.cr))
-        self.xmlrpc_object = xmlrpclib.ServerProxy(self.xmlrpc_url + 'object', transport=Transport(self.cr))
+        self.xmlrpc_object = xmlrpclib.ServerProxy(self.xmlrpc_url + 'object', transport=Transport(self.cr), use_datetime=True)
         # setup an url opener helper
         self.opener = Opener(self.cr)
 
@@ -1785,7 +1942,15 @@ class HttpCase(TransactionCase):
             # than this transaction.
             self.cr.flush()
             self.cr.clear()
-            uid = self.registry['res.users'].authenticate(session.db, user, password, {'interactive': False})
+
+            def patched_check_credentials(self, credential, env):
+                return {'uid': self.id, 'auth_method': 'password', 'mfa': 'default'}
+
+            # patching to speedup the check in case the password is hashed with many hashround + avoid to update the password
+            with patch('odoo.addons.base.models.res_users.Users._check_credentials', new=patched_check_credentials):
+                credential = {'login': user, 'password': password, 'type': 'password'}
+                auth_info = self.registry['res.users'].authenticate(session.db, credential, {'interactive': False})
+            uid = auth_info['uid']
             env = api.Environment(self.cr, uid, {})
             session.uid = uid
             session.login = user
@@ -1814,14 +1979,14 @@ class HttpCase(TransactionCase):
 
         return session
 
-    def browser_js(self, url_path, code, ready='', login=None, timeout=60, cookies=None, error_checker=None, watch=False, **kw):
+    def browser_js(self, url_path, code, ready='', login=None, timeout=60, cookies=None, error_checker=None, watch=False, success_signal=DEFAULT_SUCCESS_SIGNAL, debug=False, **kw):
         """ Test js code running in the browser
         - optionnally log as 'login'
         - load page given by url_path
         - wait for ready object to be available
         - eval(code) inside the page
 
-        To signal success test do: console.log('test successful')
+        To signal success test do: console.log() with the expected success signal ("test successful" by default)
         To signal test failure raise an exception or call console.error with a message.
         Test will stop when a failure occurs if error_checker is not defined or returns True for this message
 
@@ -1833,10 +1998,13 @@ class HttpCase(TransactionCase):
         if any(f.filename.endswith('/coverage/execfile.py') for f in inspect.stack()  if f.filename):
             timeout = timeout * 1.5
 
+        if debug is not False:
+            watch = True
+            timeout = 1e6
         if watch:
-            _logger.warning('watch mode is only suitable for local testing')
+            self._logger.warning('watch mode is only suitable for local testing')
 
-        browser = ChromeBrowser(type(self), headless=not watch)
+        browser = ChromeBrowser(self, headless=not watch, success_signal=success_signal, debug=debug)
         try:
             self.authenticate(login, login, browser=browser)
             # Flush and clear the current transaction.  This is useful in case
@@ -1849,6 +2017,8 @@ class HttpCase(TransactionCase):
                 parsed = werkzeug.urls.url_parse(url)
                 qs = parsed.decode_query()
                 qs['watch'] = '1'
+                if debug is not False:
+                    qs['debug'] = "assets"
                 url = parsed.replace(query=werkzeug.urls.url_encode(qs)).to_url()
             self._logger.info('Open "%s" in browser', url)
 
@@ -1881,22 +2051,19 @@ class HttpCase(TransactionCase):
             browser.stop()
             self._wait_remaining_requests()
 
-    @classmethod
-    def base_url(cls):
-        return f"http://{HOST}:{odoo.tools.config['http_port']}"
-
     def start_tour(self, url_path, tour_name, step_delay=None, **kwargs):
         """Wrapper for `browser_js` to start the given `tour_name` with the
         optional delay between steps `step_delay`. Other arguments from
         `browser_js` can be passed as keyword arguments."""
         options = {
-            'stepDelay': step_delay if step_delay else 0,
+            'stepDelay': step_delay or 0,
             'keepWatchBrowser': kwargs.get('watch', False),
+            'debug': kwargs.get('debug', False),
             'startUrl': url_path,
         }
-        code = kwargs.pop('code', "odoo.startTour('%s', %s)" % (tour_name, json.dumps(options)))
-        ready = kwargs.pop('ready', "odoo.isTourReady('%s')" % tour_name)
-        return self.browser_js(url_path=url_path, code=code, ready=ready, **kwargs)
+        code = kwargs.pop('code', f"odoo.startTour({tour_name!r}, {json.dumps(options)})")
+        ready = kwargs.pop('ready', f"odoo.isTourReady({tour_name!r})")
+        return self.browser_js(url_path=url_path, code=code, ready=ready, success_signal="tour succeeded", **kwargs)
 
     def profile(self, **kwargs):
         """
@@ -1905,7 +2072,9 @@ class HttpCase(TransactionCase):
         sup = super()
         _profiler = sup.profile(**kwargs)
         def route_profiler(request):
-            return sup.profile(description=request.httprequest.full_path)
+            _route_profiler = sup.profile(description=request.httprequest.full_path, db=_profiler.db)
+            _profiler.sub_profilers.append(_route_profiler)
+            return _route_profiler
         return profiler.Nested(_profiler, patch('odoo.http.Request._get_profiler_context_manager', route_profiler))
 
     def make_jsonrpc_request(self, route, params=None, headers=None):
@@ -1921,7 +2090,7 @@ class HttpCase(TransactionCase):
             'id': 0,
             'jsonrpc': '2.0',
             'method': 'call',
-            'params': params,
+            'params': params or {},
         }).encode()
         headers = headers or {}
         headers['Content-Type'] = 'application/json'
@@ -1972,10 +2141,16 @@ def users(*logins):
 
 @decorator
 def warmup(func, *args, **kwargs):
-    """ Decorate a test method to run it twice: once for a warming up phase, and
-        a second time for real.  The test attribute ``warm`` is set to ``False``
-        during warm up, and ``True`` once the test is warmed up.  Note that the
-        effects of the warmup phase are rolled back thanks to a savepoint.
+    """
+    Stabilize assertQueries and assertQueryCount assertions.
+
+    Reset the cache to a stable state by flushing pending changes and
+    invalidating the cache.
+
+    Warmup the ormcaches by running the decorated function an extra time
+    before the actual test runs. The extra execution ignores
+    assertQueries and assertQueryCount assertions, it also discardes all
+    changes but the ormcaches ones.
     """
     self = args[0]
     self.env.flush_all()
@@ -2031,3 +2206,35 @@ def tagged(*tags):
             _logger.warning('A tests should be either at_install or post_install, which is not the case of %r', obj)
         return obj
     return tags_decorator
+
+
+class freeze_time:
+    """ Object to replace the freezegun in Odoo test suites
+        It properly handles the test classes decoration
+        Also, it can be used like the usual method decorator or context manager
+    """
+
+    def __init__(self, time_to_freeze):
+        self.freezer = None
+        self.time_to_freeze = time_to_freeze
+
+    def __call__(self, func):
+        if isinstance(func, MetaCase):
+            func.freeze_time = self.time_to_freeze
+            return func
+        else:
+            if freezegun:
+                return freezegun.freeze_time(self.time_to_freeze)(func)
+            else:
+                _logger.warning("freezegun package missing")
+
+    def __enter__(self):
+        if freezegun:
+            self.freezer = freezegun.freeze_time(self.time_to_freeze)
+            return self.freezer.start()
+        else:
+            _logger.warning("freezegun package missing")
+
+    def __exit__(self, *args):
+        if self.freezer:
+            self.freezer.stop()

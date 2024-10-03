@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { Deferred } from "@web/core/utils/concurrency";
 import { sprintf } from "@web/core/utils/strings";
 
@@ -11,13 +9,8 @@ export const translationIsReady = new Deferred();
 /**
  * Translate a term, or return the term if no translation can be found.
  *
- * Note that it translates eagerly, which means that if the translations have
- * not been loaded yet, it will return the untranslated term. If it cannot be
- * guaranteed that translations are ready, one should use the _lt function
- * instead (see below)
- *
  * @param {string} term
- * @returns {string}
+ * @returns {string|LazyTranslatedString}
  */
 export function _t(term, ...values) {
     if (translatedTerms[translationLoaded]) {
@@ -30,18 +23,6 @@ export function _t(term, ...values) {
         return new LazyTranslatedString(term, ...values);
     }
 }
-
-/**
- * Lazy translation function, only performs the translation when actually
- * printed (e.g. inserted into a template).
- * Useful when defining translatable strings in code evaluated before the
- * translations are loaded, as class attributes or at the top-level of
- * an Odoo Web module
- *
- * @param {string} term
- * @returns {LazyTranslatedString}
- */
-export const _lt = (term, ...values) => _t(term, ...values);
 
 class LazyTranslatedString extends String {
     constructor(term, ...values) {

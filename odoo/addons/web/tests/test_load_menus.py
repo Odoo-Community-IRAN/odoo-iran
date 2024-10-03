@@ -21,18 +21,20 @@ class LoadMenusTests(HttpCase):
             str(self.menu.id): {
                 "actionID": False,
                 "actionModel": False,
+                "actionPath": False,
                 "appID": self.menu.id,
                 "children": [],
                 "id": self.menu.id,
                 "name": "test_menu",
                 "webIcon": False,
-                "webIconData": False,
+                "webIconData": "/web/static/img/default_icon_app.png",
                 "webIconDataMimetype": False,
                 "xmlid": ""
             },
             "root": {
                 "actionID": False,
                 "actionModel": False,
+                "actionPath": False,
                 "appID": False,
                 "children": [
                     self.menu.id,

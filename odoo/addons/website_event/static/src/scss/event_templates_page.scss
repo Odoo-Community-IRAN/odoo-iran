@@ -10,14 +10,39 @@
     }
 
     // Ensure menu labels are not split
-    #o_wevent_event_submenu {
-        li.nav-item {
-            white-space: nowrap;
-            
-            > a {
+    #o_wevent_submenu_desktop {
+        .nav {
+            column-gap: map-get($spacers, 3);
+
+            .nav-link {
                 padding: 0;
-                padding-right: 1rem;
+
+                &.active {
+                    color: rgba($body-color, .7);
+                    cursor: default;
+                }
             }
+        }
+    }
+
+    // Custom utility classes to be applied on day numbers and to
+    // be used in conjunction with `small` side-content.
+    .o_wevent_day_header_number {
+        font-size: 2em + ($line-height-base - 1);
+    }
+
+    .o_wevent_add_to_ical i {
+        scale: 1.4;
+    }
+
+    .o_wevent_add_to_outlook,
+    .o_wevent_add_to_google_calendar {
+        --btn-padding-x: 0.7rem;
+    }
+
+    #o_wevent_event_main_sidebar {
+        @include media-breakpoint-up(lg) {
+            max-width: 19rem;
         }
     }
 
@@ -44,18 +69,6 @@
         font-weight: $font-weight-bold;
         text-transform: uppercase;
     }
-
-    .o_wevent_registration_btn {
-        transition: none;
-
-        &:not(.collapsed) {
-            box-shadow: none;
-        }
-
-        &.collapsed {
-            flex: 0 0 33%;
-        }
-    }
 }
 
 .o_wevent_event {
@@ -66,6 +79,10 @@
 
         .o_record_cover_component {
             z-index: -1;
+        }
+
+        &.o_wevent_event_main_cover {
+            min-height: 12rem;
         }
     }
 }
@@ -88,54 +105,17 @@
 }
 
 /*
- * EVENT PAGE VIEW
- */
-
-.o_wevent_event .event_color_0 {
-    background-color: $o-wevent-bg-color-base;
-    color: $o-wevent-color;
-}
-.o_wevent_event .event_color_1 {
-    background-color: #cccccc;
-    color: #424242;
-}
-.o_wevent_event .event_color_2 {
-    background-color: #ffc7c7;
-    color: #7a3737;
-}
-.o_wevent_event .event_color_3 {
-    background-color: #fff1c7;
-    color: #756832;
-}
-.o_wevent_event .event_color_4 {
-    background-color: #e3ffc7;
-    color: #5d6937;
-}
-.o_wevent_event .event_color_5 {
-    background-color: #c7ffd5;
-    color: #1a7759;
-}
-.o_wevent_event .event_color_6 {
-    background-color: #c7ffff;
-    color: #1a5d83;
-}
-.o_wevent_event .event_color_7 {
-    background-color: #c7d5ff;
-    color: #3b3e75;
-}
-.o_wevent_event .event_color_8 {
-    background-color: #e3c7ff;
-    color: #4c3668;
-}
-.o_wevent_event .event_color_9 {
-    background-color: #ffc7f1;
-    color: #6d2c70;
-}
-
-/*
  * SPONSORS
  */
 
 .o_wevent_hide_sponsors .o_wevent_sponsor_wrapper {
     display: none !important;
+}
+
+// Used in wevent and wevent_sale
+.o_event_add_to_calendar_btns a {
+    border: 1px solid #DEE2E6;
+    &:hover {
+        background-color: $gray-200;
+    }
 }

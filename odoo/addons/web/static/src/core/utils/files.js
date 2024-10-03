@@ -1,10 +1,9 @@
-/** @odoo-module **/
-
 import { humanNumber } from "@web/core/utils/numbers";
+import { useService } from "@web/core/utils/hooks";
 import { session } from "@web/session";
 import { _t } from "@web/core/l10n/translation";
 
-const DEFAULT_MAX_FILE_SIZE = 128 * 1024 * 1024;
+export const DEFAULT_MAX_FILE_SIZE = 128 * 1024 * 1024;
 
 /**
  * @param {Services["notification"]} notificationService
@@ -17,9 +16,8 @@ export function checkFileSize(fileSize, notificationService) {
     if (fileSize > maxUploadSize) {
         notificationService.add(
             _t(
-                "The selected file (%sB) is over the maximum allowed file size (%sB).",
-                humanNumber(fileSize),
-                humanNumber(maxUploadSize)
+                "The selected file (%(size)sB) is larger than the maximum allowed file size (%(maxSize)sB).",
+                { size: humanNumber(fileSize), maxSize: humanNumber(maxUploadSize) }
             ),
             {
                 type: "danger",
@@ -28,4 +26,31 @@ export function checkFileSize(fileSize, notificationService) {
         return false;
     }
     return true;
+}
+
+/**
+ * Hook to upload a file to the server.
+ * @returns {function}
+ */
+export function useFileUploader() {
+    const http = useService("http");
+    const notification = useService("notification");
+    /**
+     * @param {string} route
+     * @param {Object} params
+     */
+    return async (route, params) => {
+        if ((params.ufile && params.ufile.length) || params.file) {
+            const fileSize = (params.ufile && params.ufile[0].size) || params.file.size;
+            if (!checkFileSize(fileSize, notification)) {
+                return null;
+            }
+        }
+        const fileData = await http.post(route, params, "text");
+        const parsedFileData = JSON.parse(fileData);
+        if (parsedFileData.error) {
+            throw new Error(parsedFileData.error);
+        }
+        return parsedFileData;
+    };
 }

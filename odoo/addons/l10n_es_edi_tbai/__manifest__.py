@@ -6,7 +6,7 @@
 
 {
     'name': "Spain - TicketBAI",
-    'version': '1.0',
+    'version': '1.1',
     'category': 'Accounting/Localizations/EDI',
     'description': """
 This module sends invoices and vendor bills to the "Diputaciones
@@ -21,14 +21,18 @@ bills and tickets to allow anyone to check they have been declared.
 You need to configure your certificate and the tax agency.
     """,
     'depends': [
-        'l10n_es_edi_sii',
+        'l10n_es',
+        'certificate',
     ],
     'data': [
-        'data/account_edi_data.xml',
         'data/template_invoice.xml',
         'data/template_LROE_bizkaia.xml',
 
+        'security/ir.model.access.csv',
+        'security/l10n_es_edi_tbai_security.xml',
+
         'views/account_move_view.xml',
+        'views/l10n_es_edi_tbai_certificate_views.xml',
         'views/report_invoice.xml',
         'views/res_config_settings_views.xml',
         'views/res_company_views.xml',
@@ -36,6 +40,7 @@ You need to configure your certificate and the tax agency.
         'wizards/account_move_reversal_views.xml',
     ],
     'demo': [
+        'demo/demo_certificate.xml',
         'demo/demo_res_partner.xml',
         'demo/demo_company.xml',
     ],

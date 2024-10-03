@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { Record } from "@mail/core/common/record";
 
 export class RtcSession extends Record {
@@ -43,7 +41,40 @@ export class RtcSession extends Record {
     dataChannel;
     audioError;
     videoError;
-    isTalking;
+    isTalking = Record.attr(false, {
+        /** @this {import("models").RtcSession} */
+        onUpdate() {
+            if (this.isTalking && !this.isMute) {
+                this.talkingTime = this.store.nextTalkingTime++;
+            }
+        },
+    });
+    isActuallyTalking = Record.attr(false, {
+        /** @this {import("models").RtcSession} */
+        compute() {
+            return this.isTalking && !this.isMute;
+        },
+    });
+    isVideoStreaming = Record.attr(false, {
+        /** @this {import("models").RtcSession} */
+        compute() {
+            return this.isScreenSharingOn || this.isCameraOn;
+        },
+    });
+    shortStatus = Record.attr(undefined, {
+        compute() {
+            if (this.isScreenSharingOn) {
+                return "live";
+            }
+            if (this.isDeaf) {
+                return "deafen";
+            }
+            if (this.isMute) {
+                return "mute";
+            }
+        },
+    });
+    talkingTime = 0;
     localVolume;
     /** @type {RTCPeerConnection} */
     peerConnection;
@@ -160,48 +191,6 @@ export class RtcSession extends Record {
             this.isCameraOn = state;
         } else if (type === "screen") {
             this.isScreenSharingOn = state;
-        }
-    }
-
-    async updateStats() {
-        delete this.localCandidateType;
-        delete this.remoteCandidateType;
-        delete this.dataChannelState;
-        delete this.packetsReceived;
-        delete this.packetsSent;
-        delete this.dtlsState;
-        delete this.iceState;
-        delete this.iceGatheringState;
-        if (!this.peerConnection) {
-            return;
-        }
-        let stats;
-        try {
-            stats = await this.peerConnection.getStats();
-        } catch {
-            return;
-        }
-        this.iceGatheringState = this.peerConnection.iceGatheringState;
-        for (const value of stats.values() || []) {
-            switch (value.type) {
-                case "candidate-pair":
-                    if (value.state === "succeeded" && value.localCandidateId) {
-                        this.localCandidateType =
-                            stats.get(value.localCandidateId)?.candidateType || "";
-                        this.remoteCandidateType =
-                            stats.get(value.remoteCandidateId)?.candidateType || "";
-                    }
-                    break;
-                case "data-channel":
-                    this.dataChannelState = value.state;
-                    break;
-                case "transport":
-                    this.dtlsState = value.dtlsState;
-                    this.iceState = value.iceState;
-                    this.packetsReceived = value.packetsReceived;
-                    this.packetsSent = value.packetsSent;
-                    break;
-            }
         }
     }
 }

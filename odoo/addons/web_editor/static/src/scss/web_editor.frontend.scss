@@ -1,21 +1,3 @@
-@include media-breakpoint-down(md) {
-    img, .media_iframe_video {
-        &:not(.o_animate) {
-            transform: none !important;
-        }
-    }
-
-    // For RTL (Right-to-Left) purposes, don't disable the transform directive
-    // for Font Awesome icons that are flipped by 180deg.
-    $not-selectors: '';
-    @each $class in $rtl-fa-classes {
-        $not-selectors: '#{$not-selectors}:not(.#{$class})';
-    }
-    .fa:where(#{$not-selectors}:not(.o_animate)) {
-        transform: none !important;
-    }
-}
-
 .o_wysiwyg_loader {
     @extend :disabled;
     pointer-events: none;
@@ -45,8 +27,7 @@
 // GRID LAYOUT
 .o_grid_mode {
     @include media-breakpoint-down(lg) {
-        // No gaps in mobile view.
-        row-gap: 0px !important;
+        // No horizontal gap in mobile view.
         column-gap: 0px !important;
     }
     --grid-item-padding-y: 10px;

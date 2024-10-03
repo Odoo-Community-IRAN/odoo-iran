@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from odoo import _, api, Command, fields, models, modules, tools
 from odoo.tools import email_normalize
+from odoo.addons.mail.tools.discuss import Store
 
 
 class Users(models.Model):
@@ -78,7 +79,7 @@ class Users(models.Model):
         log_portal_access = not self._context.get('mail_create_nolog') and not self._context.get('mail_notrack')
         if log_portal_access:
             for user in users:
-                if user.has_group('base.group_portal'):
+                if user._is_portal():
                     body = user._get_portal_access_update_body(True)
                     user.partner_id.message_post(
                         body=body,
@@ -90,7 +91,7 @@ class Users(models.Model):
     def write(self, vals):
         log_portal_access = 'groups_id' in vals and not self._context.get('mail_create_nolog') and not self._context.get('mail_notrack')
         user_portal_access_dict = {
-            user.id: user.has_group('base.group_portal')
+            user.id: user._is_portal()
             for user in self
         } if log_portal_access else {}
 
@@ -101,13 +102,15 @@ class Users(models.Model):
                 for user in self.filtered(lambda user: bool(email_normalize(user.email)))
                 if email_normalize(user.email) != email_normalize(vals['email'])
             }
+        if 'notification_type' in vals:
+            user_notification_type_modified = self.filtered(lambda user: user.notification_type != vals['notification_type'])
 
         write_res = super(Users, self).write(vals)
 
         # log a portal status change (manual tracking)
         if log_portal_access:
             for user in self:
-                user_has_group = user.has_group('base.group_portal')
+                user_has_group = user._is_portal()
                 portal_access_changed = user_has_group != user_portal_access_dict[user.id]
                 if portal_access_changed:
                     body = user._get_portal_access_update_body(user_has_group)
@@ -140,6 +143,14 @@ class Users(models.Model):
                     mail_values={'email_to': previous_email},
                     suggest_password_reset=False,
                 )
+        if 'notification_type' in vals:
+            for user in user_notification_type_modified:
+                user._bus_send_store(
+                    user.partner_id,
+                    fields=["notification_type"],
+                    main_user_by_partner={user.partner_id: user},
+                )
+
         return write_res
 
     def action_archive(self):
@@ -248,30 +259,68 @@ class Users(models.Model):
     # DISCUSS
     # ------------------------------------------------------------
 
-    def _init_messaging(self):
+    @api.model
+    def _init_store_data(self, store: Store, /):
+        """Initialize the store of the user."""
+        xmlid_to_res_id = self.env["ir.model.data"]._xmlid_to_res_id
+        store.add(
+            {
+                "action_discuss_id": xmlid_to_res_id("mail.action_discuss"),
+                "hasLinkPreviewFeature": self.env["mail.link.preview"]._is_link_preview_enabled(),
+                "internalUserGroupId": self.env.ref("base.group_user").id,
+                "mt_comment_id": xmlid_to_res_id("mail.mt_comment"),
+                # sudo: res.partner - exposing OdooBot data is considered acceptable
+                "odoobot": Store.one(self.env.ref("base.partner_root").sudo()),
+            }
+        )
+        if not self.env.user._is_public():
+            settings = self.env["res.users.settings"]._find_or_create_for_user(self.env.user)
+            store.add(
+                {
+                    "self": Store.one(
+                        self.env.user.partner_id,
+                        fields=[
+                            "active",
+                            "isAdmin",
+                            "name",
+                            "notification_type",
+                            "user",
+                            "write_date",
+                        ],
+                        main_user_by_partner={self.env.user.partner_id: self.env.user},
+                    ),
+                    "settings": settings._res_users_settings_format(),
+                }
+            )
+        elif guest := self.env["mail.guest"]._get_guest_from_context():
+            store.add({"self": Store.one(guest, fields=["name", "write_date"])})
+
+    def _init_messaging(self, store):
         self.ensure_one()
-        odoobot = self.env.ref('base.partner_root')
-        values = {
-            'action_discuss_id': self.env["ir.model.data"]._xmlid_to_res_id("mail.action_discuss"),
-            'companyName': self.env.company.name,
-            'currentGuest': False,
-            'current_partner': self.partner_id.mail_partner_format().get(self.partner_id),
-            'current_user_id': self.id,
-            'current_user_settings': self.env['res.users.settings']._find_or_create_for_user(self)._res_users_settings_format(),
-            'hasLinkPreviewFeature': self.env['mail.link.preview']._is_link_preview_enabled(),
-            'initBusId': self.env['bus.bus'].sudo()._bus_last_id(),
-            'internalUserGroupId': self.env.ref('base.group_user').id,
-            'menu_id': self.env['ir.model.data']._xmlid_to_res_id('mail.menu_root_discuss'),
-            'mt_comment_id': self.env['ir.model.data']._xmlid_to_res_id('mail.mt_comment'),
-            'needaction_inbox_counter': self.partner_id._get_needaction_count(),
-            'odoobot': odoobot.sudo().mail_partner_format().get(odoobot),
-            'shortcodes': self.env['mail.shortcode'].sudo().search_read([], ['source', 'substitution']),
-            'starred_counter': self.env['mail.message'].search_count([('starred_partner_ids', 'in', self.partner_id.ids)]),
-        }
-        return values
+        self = self.with_user(self)
+        # sudo: bus.bus: reading non-sensitive last id
+        bus_last_id = self.env["bus.bus"].sudo()._bus_last_id()
+        store.add(
+            {
+                "inbox": {
+                    "counter": self.partner_id._get_needaction_count(),
+                    "counter_bus_id": bus_last_id,
+                    "id": "inbox",
+                    "model": "mail.box",
+                },
+                "starred": {
+                    "counter": self.env["mail.message"].search_count(
+                        [("starred_partner_ids", "in", self.partner_id.ids)]
+                    ),
+                    "counter_bus_id": bus_last_id,
+                    "id": "starred",
+                    "model": "mail.box",
+                },
+            }
+        )
 
     @api.model
-    def systray_get_activities(self):
+    def _get_activity_groups(self):
         search_limit = int(self.env['ir.config_parameter'].sudo().get_param('mail.activity.systray.limit', 1000))
         activities = self.env["mail.activity"].search(
             [("user_id", "=", self.env.uid)], order='id desc', limit=search_limit)
@@ -280,16 +329,25 @@ class Users(models.Model):
             record = self.env[activity.res_model].browse(activity.res_id)
             activities_by_record_by_model_name[activity.res_model][record] += activity
         activities_by_model_name = defaultdict(lambda: self.env["mail.activity"])
+        user_company_ids = self.env.user.company_ids.ids
+        is_all_user_companies_allowed = set(user_company_ids) == set(self.env.context.get('allowed_company_ids') or [])
         for model_name, activities_by_record in activities_by_record_by_model_name.items():
-            if self.env[model_name].check_access_rights('read', raise_exception=False):
-                res_ids = [r.id for r in activities_by_record]
-                allowed_records = self.env[model_name].browse(res_ids)._filter_access_rules('read')
+            res_ids = [r.id for r in activities_by_record]
+            Model = self.env[model_name].with_context(**self.env.context)
+            has_model_access_right = self.env[model_name].has_access('read')
+            if has_model_access_right:
+                allowed_records = Model.browse(res_ids)._filtered_access('read')
             else:
                 allowed_records = self.env[model_name]
+            unallowed_records = Model.browse(res_ids) - allowed_records
+            # We remove from not allowed records, records that the user has access to through others of his companies
+            if has_model_access_right and unallowed_records and not is_all_user_companies_allowed:
+                unallowed_records -= unallowed_records.with_context(
+                    allowed_company_ids=user_company_ids)._filtered_access('read')
             for record, activities in activities_by_record.items():
-                if record not in allowed_records:
+                if record in unallowed_records:
                     activities_by_model_name['mail.activity'] += activities
-                else:
+                elif record in allowed_records:
                     activities_by_model_name[model_name] += activities
         model_ids = [self.env["ir.model"]._get_id(name) for name in activities_by_model_name]
         user_activities = {}

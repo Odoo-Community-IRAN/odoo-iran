@@ -3,12 +3,14 @@
 
 import odoo.tests
 from odoo.addons.pos_self_order.tests.self_order_common_test import SelfOrderCommonTest
+from odoo import Command
 
 
 @odoo.tests.tagged("post_install", "-at_install")
 class TestSelfOrderKiosk(SelfOrderCommonTest):
     def test_self_order_kiosk(self):
         self.pos_config.write({
+            'takeaway': True,
             'self_ordering_takeaway': True,
             'self_ordering_mode': 'kiosk',
             'self_ordering_pay_after': 'each',
@@ -16,6 +18,7 @@ class TestSelfOrderKiosk(SelfOrderCommonTest):
         })
 
         self.pos_config.with_user(self.pos_user).open_ui()
+        self.pos_config.current_session_id.set_opening_control(0, "")
         self_route = self.pos_config._get_self_order_route()
 
         # Kiosk, each, table
@@ -40,7 +43,34 @@ class TestSelfOrderKiosk(SelfOrderCommonTest):
             'self_ordering_pay_after': 'each',
         })
         self.pos_config.with_user(self.pos_user).open_ui()
+        self.pos_config.current_session_id.set_opening_control(0, "")
         self_route = self.pos_config._get_self_order_route()
         self.start_tour(self_route, "self_simple_order")
-        orders = self.pos_config.current_session_id.order_ids
-        self.assertEqual(len(orders.export_for_ui_shared_order(self.pos_config.id)), 1)
+        orders = self.env['pos.order'].search(['&', ('state', '=', 'draft'), '|', ('config_id', '=', self.pos_config.id), ('config_id', 'in', self.pos_config.trusted_config_ids.ids)])
+        self.assertEqual(len(orders), 1)
+
+    def test_order_price_null(self):
+        self.cola.list_price = 0.00
+        self.pos_config.write({
+            'self_ordering_takeaway': False,
+            'self_ordering_mode': 'kiosk',
+            'self_ordering_pay_after': 'each',
+        })
+
+        self.pos_config.with_user(self.pos_user).open_ui()
+        self.pos_config.current_session_id.set_opening_control(0, "")
+        self_route = self.pos_config._get_self_order_route()
+        self.start_tour(self_route, "self_order_price_null")
+
+    def test_self_order_language_changes(self):
+        self.env['res.lang']._activate_lang('fr_FR')
+        self.pos_config.write({
+            'self_ordering_available_language_ids': [Command.link(lang.id) for lang in self.env['res.lang'].search([])],
+            'self_ordering_takeaway': False,
+            'self_ordering_mode': 'kiosk',
+            'self_ordering_pay_after': 'each'
+        })
+
+        self.pos_config.with_user(self.pos_user).open_ui()
+        self_route = self.pos_config._get_self_order_route()
+        self.start_tour(self_route, "self_order_language_changes")

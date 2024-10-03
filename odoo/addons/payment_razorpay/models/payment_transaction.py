@@ -121,7 +121,7 @@ class PaymentTransaction(models.Model):
         payload = {
             'amount': converted_amount,
             'currency': self.currency_id.name,
-            **({'method': pm_code} if pm_code != 'wallets_india' else {}),
+            **({'method': pm_code} if pm_code not in const.FALLBACK_PAYMENT_METHOD_CODES else {}),
         }
         if self.operation in ['online_direct', 'validation']:
             payload['customer_id'] = customer_id  # Required for only non-subsequent payments.
@@ -154,12 +154,13 @@ class PaymentTransaction(models.Model):
         """ Return the eMandate's maximum amount to define.
 
         :return: The eMandate's maximum amount.
-        :rtype: int
+        :rtype: float
         """
         pm_code = (
             self.payment_method_id.primary_payment_method_id or self.payment_method_id
         ).code
-        pm_max_amount = const.MANDATE_MAX_AMOUNT.get(pm_code, 100000)
+        pm_max_amount_INR = const.MANDATE_MAX_AMOUNT.get(pm_code, 100000)
+        pm_max_amount = self._razorpay_convert_inr_to_currency(pm_max_amount_INR, self.currency_id)
         mandate_values = self._get_mandate_values()  # The linked document's values.
         if 'amount' in mandate_values and 'MRR' in mandate_values:
             max_amount = min(
@@ -168,6 +169,20 @@ class PaymentTransaction(models.Model):
         else:
             max_amount = pm_max_amount
         return max_amount
+
+    @api.model
+    def _razorpay_convert_inr_to_currency(self, amount, currency_id):
+        """ Convert the amount from INR to the given currency.
+
+        :param float amount: The amount to converted, in INR.
+        :param currency_id: The currency to which the amount should be converted.
+        :return: The converted amount in the given currency.
+        :rtype: float
+        """
+        inr_currency = self.env['res.currency'].with_context(active_test=False).search([
+            ('name', '=', 'INR'),
+        ], limit=1)
+        return inr_currency._convert(amount, currency_id)
 
     def _send_payment_request(self):
         """ Override of `payment` to send a payment request to Razorpay.
@@ -370,7 +385,7 @@ class PaymentTransaction(models.Model):
 
         if 'id' in notification_data:  # We have the full entity data (S2S request or webhook).
             entity_data = notification_data
-        else:  # The payment data are not complete (redirect from checkout).
+        else:  # The payment data are not complete (Payments made by a token).
             # Fetch the full payment data.
             entity_data = self.provider_id._razorpay_make_request(
                 f'payments/{notification_data["razorpay_payment_id"]}', method='GET'

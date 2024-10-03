@@ -10,16 +10,9 @@ class ResConfigSettings(models.TransientModel):
     module_hr_timesheet = fields.Boolean(string="Task Logs")
     group_project_rating = fields.Boolean("Customer Ratings", implied_group='project.group_project_rating')
     group_project_stages = fields.Boolean("Project Stages", implied_group="project.group_project_stages")
-    group_project_recurring_tasks = fields.Boolean("Recurring Tasks", implied_group="project.group_project_recurring_tasks")
+    group_project_recurring_tasks = fields.Boolean("Recurring Tasks", implied_group="project.group_project_recurring_tasks", group='base.group_portal,base.group_user')
     group_project_task_dependencies = fields.Boolean("Task Dependencies", implied_group="project.group_project_task_dependencies")
     group_project_milestone = fields.Boolean('Milestones', implied_group='project.group_project_milestone', group='base.group_portal,base.group_user')
-
-    # Analytic Accounting
-    analytic_plan_id = fields.Many2one(
-        comodel_name='account.analytic.plan',
-        string="Analytic Plan",
-        config_parameter="analytic.analytic_plan_projects",
-    )
 
     @api.model
     def _get_basic_project_domain(self):
@@ -40,7 +33,7 @@ class ResConfigSettings(models.TransientModel):
         for (config_flag, is_global), project_flag in features.items():
             config_flag_global = f"project.{config_flag}"
             config_feature_enabled = self[config_flag]
-            if self.user_has_groups(config_flag_global) != config_feature_enabled:
+            if self.env.user.has_group(config_flag_global) != config_feature_enabled:
                 if config_feature_enabled and not is_global:
                     basic_projects[project_flag] = config_feature_enabled
                 else:

@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
 import { PivotArchParser } from "@web/views/pivot/pivot_arch_parser";
@@ -12,15 +10,13 @@ const viewRegistry = registry.category("views");
 
 export const pivotView = {
     type: "pivot",
-    display_name: _t("Pivot"),
-    icon: "oi oi-view-pivot",
-    multiRecord: true,
     Controller: PivotController,
     Renderer: PivotRenderer,
     Model: PivotModel,
     ArchParser: PivotArchParser,
     SearchModel: PivotSearchModel,
     searchMenuTypes: ["filter", "groupBy", "comparison", "favorite"],
+    buttonTemplate: "web.PivotView.Buttons",
 
     props: (genericProps, view) => {
         const modelParams = {};
@@ -56,6 +52,7 @@ export const pivotView = {
             Model: view.Model,
             modelParams,
             Renderer: view.Renderer,
+            buttonTemplate: view.buttonTemplate,
         };
     },
 };

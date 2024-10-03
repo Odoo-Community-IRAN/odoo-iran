@@ -3,15 +3,16 @@
 # 	* hr_skills_survey
 # 
 # Translators:
-# Wil Odoo, 2023
+# Tiffany Chang, 2024
+# Wil Odoo, 2024
 # Thi Huong Nguyen, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:55+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
+"POT-Creation-Date: 2024-09-26 08:55+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
 "Last-Translator: Thi Huong Nguyen, 2024\n"
 "Language-Team: Vietnamese (https://app.transifex.com/odoo/teams/41243/vi/)\n"
 "MIME-Version: 1.0\n"
@@ -30,7 +31,7 @@ msgstr "AWS Cloud"
 #: model:ir.model.fields.selection,name:hr_skills_survey.selection__hr_resume_line__display_type__certification
 #: model_terms:ir.ui.view,arch_db:hr_skills_survey.hr_resume_line_view_search
 msgid "Certification"
-msgstr "Certification"
+msgstr "Chứng nhận"
 
 #. module: hr_skills_survey
 #: model:ir.ui.menu,name:hr_skills_survey.hr_employee_certication_report_menu
@@ -41,7 +42,7 @@ msgstr "Chứng nhận"
 #: model:ir.model.fields,field_description:hr_skills_survey.field_hr_resume_line__department_id
 #: model_terms:ir.ui.view,arch_db:hr_skills_survey.hr_resume_line_view_search
 msgid "Department"
-msgstr "Bộ phận"
+msgstr "Phòng ban"
 
 #. module: hr_skills_survey
 #: model:ir.model.fields,field_description:hr_skills_survey.field_hr_resume_line__display_type
@@ -85,6 +86,11 @@ msgid "Expiring Soon"
 msgstr "Sắp hết hạn"
 
 #. module: hr_skills_survey
+#: model:hr.resume.line.type,name:hr_skills_survey.resume_type_certification
+msgid "Internal Certification"
+msgstr "Chứng nhận nội bộ"
+
+#. module: hr_skills_survey
 #: model:hr.resume.line,name:hr_skills_survey.resume_line_expiring
 msgid "MongoDB Developer"
 msgstr "Nhà phát triển MongoDB"
@@ -100,6 +106,20 @@ msgid "Resume line of an employee"
 msgstr "Dòng CV của một nhân viên"
 
 #. module: hr_skills_survey
+#: model:ir.model.fields,help:hr_skills_survey.field_survey_survey__certification_validity_months
+msgid ""
+"Specify the number of months the certification is valid after being awarded."
+" Enter 0 for certifications that never expire."
+msgstr ""
+"Xác định số tháng chứng nhận có hiệu lực sau khi được cấp. Nhập 0 cho các "
+"chứng nhận không có ngày hết hạn."
+
+#. module: hr_skills_survey
+#: model:ir.model,name:hr_skills_survey.model_survey_survey
+msgid "Survey"
+msgstr "Khảo sát"
+
+#. module: hr_skills_survey
 #: model:ir.model,name:hr_skills_survey.model_survey_user_input
 msgid "Survey User Input"
 msgstr "Dữ liệu người dùng nhập vào khảo sát"
@@ -113,6 +133,11 @@ msgstr "Hợp lệ"
 #: model_terms:ir.ui.view,arch_db:hr_skills_survey.hr_resume_line_view_search
 msgid "Valid Until"
 msgstr "Có hiệu lực đến"
+
+#. module: hr_skills_survey
+#: model:ir.model.fields,field_description:hr_skills_survey.field_survey_survey__certification_validity_months
+msgid "Validity"
+msgstr "Xác nhận"
 
 #. module: hr_skills_survey
 #: model_terms:ir.ui.view,arch_db:hr_skills_survey.hr_employee_certification_report_view_list

@@ -1,7 +1,7 @@
-/** @odoo-module **/
-
 import { Dropdown } from "@web/core/dropdown/dropdown";
 import { DropdownItem } from "@web/core/dropdown/dropdown_item";
+import { DropdownGroup } from "@web/core/dropdown/dropdown_group";
+import { Transition } from "@web/core/transition";
 import { useService } from "@web/core/utils/hooks";
 import { registry } from "@web/core/registry";
 import { debounce } from "@web/core/utils/timing";
@@ -13,42 +13,27 @@ import {
     useExternalListener,
     useEffect,
     useRef,
+    useState,
     onWillUnmount,
 } from "@odoo/owl";
 const systrayRegistry = registry.category("systray");
 
 const getBoundingClientRect = Element.prototype.getBoundingClientRect;
 
-class NavBarDropdownItem extends DropdownItem {}
-NavBarDropdownItem.template = "web.NavBar.DropdownItem";
-NavBarDropdownItem.props = {
-    ...DropdownItem.props,
-    style: { type: String, optional: true },
-};
+const SWIPE_ACTIVATION_THRESHOLD = 100;
 
-export class MenuDropdown extends Dropdown {
-    setup() {
-        super.setup();
-        useEffect(
-            () => {
-                if (this.props.xmlid) {
-                    this.togglerRef.el.dataset.menuXmlid = this.props.xmlid;
-                }
-            },
-            () => []
-        );
-    }
-}
-MenuDropdown.props.xmlid = {
-    type: String,
-    optional: true,
-};
+export class MenuDropdown extends Dropdown {}
 
 export class NavBar extends Component {
+    static template = "web.NavBar";
+    static components = { Dropdown, DropdownItem, DropdownGroup, MenuDropdown, ErrorHandler, Transition };
+    static props = {};
+
     setup() {
         this.currentAppSectionsExtra = [];
         this.actionService = useService("action");
         this.menuService = useService("menu");
+        this.pwa = useService("pwa");
         this.root = useRef("root");
         this.appSubMenus = useRef("appSubMenus");
         const debouncedAdapt = debounce(this.adapt.bind(this), 250);
@@ -77,6 +62,11 @@ export class NavBar extends Component {
             },
             () => [adaptCounter]
         );
+
+        this.state = useState({
+            isAllAppsMenuOpened: false,
+            isAppMenuSidebarOpened: false,
+        });
     }
 
     handleItemError(error, item) {
@@ -101,6 +91,10 @@ export class NavBar extends Component {
     // This dummy setter is only here to prevent conflicts between the
     // Enterprise NavBar extension and the Website NavBar patch.
     set currentAppSections(_) {}
+
+    get isScopedApp() {
+        return this.pwa.isScopedApp;
+    }
 
     get systrayItems() {
         return systrayRegistry
@@ -207,13 +201,35 @@ export class NavBar extends Component {
     }
 
     getMenuItemHref(payload) {
-        const parts = [`menu_id=${payload.id}`];
-        if (payload.actionID) {
-            parts.push(`action=${payload.actionID}`);
+        return `/odoo/${payload.actionPath || "action-" + payload.actionID}`;
+    }
+
+    _closeAppMenuSidebar() {
+        this.state.isAllAppsMenuOpened = false;
+        this.state.isAppMenuSidebarOpened = false;
+    }
+    _openAppMenuSidebar() {
+        this.state.isAppMenuSidebarOpened = !this.state.isAppMenuSidebarOpened;
+    }
+    onAllAppsBtnClick() {
+        this.state.isAllAppsMenuOpened = !this.state.isAllAppsMenuOpened;
+    }
+    async _onMenuClicked(menu) {
+        await this.menuService.selectMenu(menu);
+        this._closeAppMenuSidebar();
+    }
+    _onSwipeStart(ev) {
+        this.swipeStartX = ev.changedTouches[0].clientX;
+    }
+    _onSwipeEnd(ev) {
+        if (!this.swipeStartX) {
+            return;
         }
-        return "#" + parts.join("&");
+        const deltaX = this.swipeStartX - ev.changedTouches[0].clientX;
+        if (deltaX < SWIPE_ACTIVATION_THRESHOLD) {
+            return;
+        }
+        this._closeAppMenuSidebar();
+        this.swipeStartX = null;
     }
 }
-NavBar.template = "web.NavBar";
-NavBar.components = { Dropdown, DropdownItem: NavBarDropdownItem, MenuDropdown, ErrorHandler };
-NavBar.props = {};

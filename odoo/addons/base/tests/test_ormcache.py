@@ -1,11 +1,28 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo.tests.common import TransactionCase
-from odoo.tools import get_cache_key_counter
+from odoo.tests.common import TransactionCase, tagged
+from odoo.tools.cache import get_cache_key_counter
 from threading import Thread, Barrier
 
-class TestOrmcache(TransactionCase):
+
+@tagged('-at_install', 'post_install')
+class TestOrmCache(TransactionCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        if cls.registry.registry_invalidated:
+            raise AssertionError('Registry should not be invalidated when starting this test')
+        if cls.registry.cache_invalidated:
+            raise AssertionError('Cache should not be invalidated when starting this test')
+
+        # this test verifies the actual side effects of signaling changes
+        cls._signal_changes_patcher.stop()
+        # if something invalidate the cache or registry before test_signaling_01_multiple,
+        # the test may fail the first time but succeed on retry
+        # disabling autoretry to avoid hidding "real" errrors
+        cls._retry = False
+
     def test_ormcache(self):
         """ Test the effectiveness of the ormcache() decorator. """
         IMD = self.env['ir.model.data']

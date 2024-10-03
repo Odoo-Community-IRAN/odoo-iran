@@ -21,15 +21,18 @@
             <field name="model">mail.activity.plan</field>
             <field name="inherit_id" ref="mail.mail_activity_plan_view_form"/>
             <field name="arch" type="xml">
-                <xpath expr="//field[@name='template_ids']/tree/field[@name='responsible_type']" position="replace">
+                <xpath expr="//field[@name='template_ids']/list/field[@name='responsible_type']" position="replace">
                     <!-- We can hide selection options specific to employee because employee plan templates are never
                          edited in the list view, so that there are not present for other model that are edited in the
                          list view. -->
                     <field name="responsible_type" widget="filterable_selection"
                            options="{'whitelisted_values': ['on_demand', 'other']}"/>
                 </xpath>
-                <xpath expr="//group[@name='group_plan_fields']" position="inside">
-                    <field name="department_id" invisible="res_model != 'hr.employee'"/>
+                <xpath expr="//group[@name='group_plan_fields']/group[@name='company_id']" position="before">
+                    <field name="department_assignable" invisible="1"/>
+                    <group invisible="not department_assignable">
+                        <field name="department_id"/>
+                    </group>
                 </xpath>
             </field>
         </record>
@@ -41,40 +44,45 @@
             <field name="priority">32</field>
             <field name="inherit_id" ref="mail.mail_activity_plan_view_form_fixed_model"/>
             <field name="arch" type="xml">
-                <xpath expr="//tree" position="attributes">
+                <xpath expr="//list" position="attributes">
                     <attribute name="editable"/>
                 </xpath>
             </field>
         </record>
 
         <record id="mail_activity_plan_view_tree" model="ir.ui.view">
-            <field name="name">mail.activity.plan.view.tree.inherit.hr</field>
+            <field name="name">mail.activity.plan.view.list.inherit.hr</field>
             <field name="model">mail.activity.plan</field>
             <field name="inherit_id" ref="mail.mail_activity_plan_view_tree"/>
             <field name="arch" type="xml">
-                <xpath expr="//field[@name='steps_count']" position="after">
-                    <field name="department_id" optional="show"/>
+                <xpath expr="//field[@name='steps_count']" position="before">
+                    <field name="department_id" optional="show"
+                           column_invisible="context.get('default_res_model') != 'hr.employee'"/>
                 </xpath>
             </field>
         </record>
 
         <record id="mail_activity_plan_action" model="ir.actions.act_window">
-            <field name="name">On/Offboarding Plans</field>
+            <field name="name">Employee Plans</field>
             <field name="res_model">mail.activity.plan</field>
-            <field name="view_mode">tree,form</field>
+            <field name="view_mode">list,kanban,form</field>
             <field name="search_view_id" ref="mail.mail_activity_plan_view_search"/>
             <field name="context">{'default_res_model': 'hr.employee'}</field>
             <field name="domain">[('res_model', '=', 'hr.employee')]</field>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">
-                    Add a new plan
+                    Create an Activity Plan
+                </p>
+                <p>
+                    Activity plans are used to assign a list of activities in just a few clicks
+                    (e.g. "Onboarding", "Offboarding", ...)
                 </p>
             </field>
         </record>
 
         <record id="mail_activity_plan_action_employee_view_tree" model="ir.actions.act_window.view">
             <field name="sequence">1</field>
-            <field name="view_mode">tree</field>
+            <field name="view_mode">list</field>
             <field name="view_id" ref="mail.mail_activity_plan_view_tree"/>
             <field name="act_window_id" ref="hr.mail_activity_plan_action"/>
         </record>

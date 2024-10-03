@@ -1,35 +1,78 @@
-/* @odoo-module */
-
 import { Thread } from "@mail/core/common/thread_model";
 
 import { patch } from "@web/core/utils/patch";
 import { Record } from "../common/record";
+import { compareDatetime } from "@mail/utils/common/misc";
 
 patch(Thread.prototype, {
     /** @type {integer|undefined} */
     recipientsCount: undefined,
-    /** @type {Number} */
-    mt_comment_id: undefined,
     setup() {
         super.setup();
         this.recipients = Record.many("Follower");
+        this.activities = Record.many("Activity", {
+            sort: (a, b) => compareDatetime(a.date_deadline, b.date_deadline) || a.id - b.id,
+            onDelete(r) {
+                r.remove();
+            },
+        });
     },
     get recipientsFullyLoaded() {
         return this.recipientsCount === this.recipients.length;
     },
-    /**
-     * @returns {import("models").Activity[]}
-     */
-    get activities() {
-        return Object.values(this._store.Activity.records)
-            .filter((activity) => {
-                return activity.res_model === this.model && activity.res_id === this.id;
-            })
-            .sort(function (a, b) {
-                if (a.date_deadline === b.date_deadline) {
-                    return a.id - b.id;
-                }
-                return a.date_deadline < b.date_deadline ? -1 : 1;
+    closeChatWindow() {
+        const chatWindow = this.store.ChatWindow.get({ thread: this });
+        chatWindow?.close({ notifyState: false });
+    },
+    computeIsDisplayed() {
+        if (this.store.discuss.isActive && !this.store.env.services.ui.isSmall) {
+            return this.eq(this.store.discuss.thread);
+        }
+        return super.computeIsDisplayed();
+    },
+    async leave() {
+        this.closeChatWindow();
+        super.leave(...arguments);
+    },
+    async loadMoreFollowers() {
+        const data = await this.store.env.services.orm.call(this.model, "message_get_followers", [
+            [this.id],
+            this.followers.at(-1).id,
+        ]);
+        this.store.insert(data);
+    },
+    async loadMoreRecipients() {
+        const data = await this.store.env.services.orm.call(
+            this.model,
+            "message_get_followers",
+            [[this.id], this.recipients.at(-1).id],
+            { filter_recipients: true }
+        );
+        this.store.insert(data);
+    },
+    open(options) {
+        if (!this.store.discuss.isActive && !this.store.env.services.ui.isSmall) {
+            this.openChatWindow(options);
+            return;
+        }
+        if (this.store.env.services.ui.isSmall && this.model === "discuss.channel") {
+            this.openChatWindow(options);
+            return;
+        }
+        if (this.model !== "discuss.channel") {
+            this.store.env.services.action.doAction({
+                type: "ir.actions.act_window",
+                res_id: this.id,
+                res_model: this.model,
+                views: [[false, "form"]],
             });
+            return;
+        }
+        super.open();
+    },
+    async unpin() {
+        const chatWindow = this.store.ChatWindow.get({ thread: this });
+        await chatWindow?.close();
+        super.unpin(...arguments);
     },
 });

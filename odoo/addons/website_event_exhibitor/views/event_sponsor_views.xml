@@ -22,11 +22,11 @@
         <field name="name">Sponsor Levels</field>
         <field name="model">event.sponsor.type</field>
         <field name="arch" type="xml">
-            <tree editable="bottom" string="Event Sponsor Level">
+            <list editable="bottom" string="Event Sponsor Level">
                 <field name="sequence" widget="handle"/>
                 <field name="name"/>
                 <field name="display_ribbon_style"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -120,7 +120,7 @@
                         <page string="Description"
                             name="page_description"
                             invisible="exhibitor_type == 'sponsor'">
-                            <field name="website_description" nolabel="1" options="{'noVideos': False}" 
+                            <field name="website_description" nolabel="1" options="{'disableVideo': False}"
                                 placeholder='e.g. "Openwood specializes in home decoration..."'/>
                         </page>
                         <page string="Online"
@@ -137,20 +137,16 @@
                         </page>
                     </notebook>
                 </sheet>
-                <div class="oe_chatter">
-                    <field name="message_follower_ids" groups="base.group_user"/>
-                    <field name="activity_ids"/>
-                    <field name="message_ids"/>
-                </div>
+                <chatter/>
             </form>
         </field>
     </record>
 
     <record id="event_sponsor_view_tree" model="ir.ui.view">
-        <field name="name">event.sponsor.view.tree</field>
+        <field name="name">event.sponsor.view.list</field>
         <field name="model">event.sponsor</field>
         <field name="arch" type="xml">
-            <tree multi_edit="1" sample="1">
+            <list multi_edit="1" sample="1">
                 <field name="sequence" widget="handle"/>
                 <field name="partner_id" readonly="1"/>
                 <field name="name"/>
@@ -161,7 +157,7 @@
                 <field name="sponsor_type_id"/>
                 <field name="is_published" optional="show"/>
                 <field name="exhibitor_type"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -170,26 +166,19 @@
         <field name="model">event.sponsor</field>
         <field name="arch" type="xml">
             <kanban sample="1">
-                <field name="id"/>
-                <field name="url"/>
-                <field name="partner_email"/>
-                <field name="sponsor_type_id"/>
                 <templates>
-                    <t t-name="kanban-box">
-                        <div class="oe_kanban_global_click overflow-hidden">
-                            <div class="d-flex align-items-center">
-                                <div class="w-25 d-flex justify-content-center">
-                                    <img t-att-src="kanban_image('event.sponsor', 'image_128', record.id.raw_value)" class="img-fluid" alt="Sponsor image"/>
-                                </div>
-                                <div class="w-75 d-flex flex-column ms-3">
-                                    <h1 class="o_kanban_record_title"><field name="name"/></h1>
-                                    <strong>Level: <field name="sponsor_type_id"/></strong>
-                                    <span class="text-muted"><field name="exhibitor_type"/></span>
-                                    <span class="o_text_overflow" t-out="record.partner_email.value"/>
-                                    <span class="o_text_overflow" t-out="record.url.value"/>
-                                </div>
-                            </div>
-                        </div>
+                    <t t-name="card" class="row g-0">
+                        <widget name="web_ribbon" title="Published" bg_color="text-bg-success" invisible="not is_published or not active"/>
+                        <aside class="col-3 o_kanban_aside_full ms-1">
+                            <field name="image_128" widget="image" options="{'img_class': 'object-fit-contain'}" alt="Sponsor image"/>
+                        </aside>
+                        <main class="col ms-3">
+                            <field name="name" class="fw-bolder fs-5"/>
+                            <strong>Level: <field name="sponsor_type_id"/></strong>
+                            <field name="exhibitor_type" class="text-muted"/>
+                            <field name="partner_email" class="text-truncate"/>
+                            <field name="url" class="text-truncate"/>
+                        </main>
                     </t>
                 </templates>
             </kanban>
@@ -199,7 +188,7 @@
     <record id="event_sponsor_action" model="ir.actions.act_window">
         <field name="name">Event Sponsors</field>
         <field name="res_model">event.sponsor</field>
-        <field name="view_mode">kanban,tree,form</field>
+        <field name="view_mode">kanban,list,form</field>
         <field name="help" type="html">
 <p class="o_view_nocontent_smiling_face">
     Create a Sponsor / Exhibitor
@@ -213,7 +202,7 @@
     <record id="event_sponsor_action_from_event" model="ir.actions.act_window">
         <field name="name">Event Sponsors</field>
         <field name="res_model">event.sponsor</field>
-        <field name="view_mode">kanban,tree,form</field>
+        <field name="view_mode">kanban,list,form</field>
         <field name="context">{'search_default_event_id': active_id, 'default_event_id': active_id}</field>
         <field name="help" type="html">
 <p class="o_view_nocontent_smiling_face">

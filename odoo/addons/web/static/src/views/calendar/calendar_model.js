@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import {
     serializeDate,
     serializeDateTime,
@@ -9,15 +7,14 @@ import {
 import { localization } from "@web/core/l10n/localization";
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
+import { user } from "@web/core/user";
 import { KeepLast } from "@web/core/utils/concurrency";
 import { Model } from "@web/model/model";
 import { extractFieldsFromArchInfo } from "@web/model/relational_model/utils";
+import { browser } from "@web/core/browser/browser";
 
 export class CalendarModel extends Model {
     setup(params, services) {
-        /** @protected */
-        this.user = services.user;
-
         /** @protected */
         this.keepLast = new KeepLast();
 
@@ -32,7 +29,7 @@ export class CalendarModel extends Model {
             firstDayOfWeek: (localization.weekStart || 0) % 7,
             formViewId: params.formViewId || formViewIdFromConfig,
         };
-
+        this.meta.scale = this.getLocalStorageScale();
         this.data = {
             filters: {},
             filterSections: {},
@@ -47,13 +44,14 @@ export class CalendarModel extends Model {
         if (!this.meta.date) {
             this.meta.date =
                 params.context && params.context.initial_date
-                    ? deserializeDateTime(params.context.initial_date)
-                    : luxon.DateTime.local();
+                    ? deserializeDateTime(params.context.initial_date).startOf("day")
+                    : luxon.DateTime.local().startOf("day");
         }
         // Prevent picking a scale that is not supported by the view
         if (!this.meta.scales.includes(this.meta.scale)) {
             this.meta.scale = this.meta.scales[0];
         }
+        browser.localStorage.setItem(this.storageKey, this.meta.scale);
         const data = { ...this.data };
         await this.keepLast.add(this.updateData(data));
         this.data = data;
@@ -74,7 +72,7 @@ export class CalendarModel extends Model {
         return this.meta.canDelete;
     }
     get canEdit() {
-        return !this.meta.fields[this.meta.fieldMapping.date_start].readonly;
+        return this.meta.canEdit && !this.meta.fields[this.meta.fieldMapping.date_start].readonly;
     }
     get eventLimit() {
         return this.meta.eventLimit;
@@ -139,6 +137,9 @@ export class CalendarModel extends Model {
     get scales() {
         return this.meta.scales;
     }
+    get storageKey() {
+        return `scaleOf-viewId-${this.env.config.viewId}`;
+    }
     get unusualDays() {
         return this.data.unusualDays;
     }
@@ -155,17 +156,24 @@ export class CalendarModel extends Model {
 
     async createFilter(fieldName, filterValue) {
         const info = this.meta.filtersInfo[fieldName];
-        if (info && info.writeFieldName && info.writeResModel) {
+        if (!info || !info.writeFieldName || !info.writeResModel) {
+            return;
+        }
+
+        const normalizedFilterValue = Array.isArray(filterValue) ? filterValue : [filterValue];
+        const dataArray = normalizedFilterValue.map((value) => {
             const data = {
-                user_id: this.user.userId,
-                [info.writeFieldName]: filterValue,
+                user_id: user.userId,
+                [info.writeFieldName]: value,
             };
             if (info.filterFieldName) {
                 data[info.filterFieldName] = true;
             }
-            await this.orm.create(info.writeResModel, [data]);
-            await this.load();
-        }
+            return data;
+        });
+
+        await this.orm.create(info.writeResModel, dataArray);
+        await this.load();
     }
     async createRecord(record) {
         const rawRecord = this.buildRawRecord(record);
@@ -236,7 +244,7 @@ export class CalendarModel extends Model {
                 end = start;
             } else {
                 // in week mode or day mode, convert allday event to event
-                end = start.plus({ hours: 1 });
+                end = start.plus({ hours: options.duration_hour || 1 });
             }
         }
 
@@ -311,10 +319,7 @@ export class CalendarModel extends Model {
      */
     async updateData(data) {
         if (data.hasCreateRight === null) {
-            data.hasCreateRight = await this.orm.call(this.meta.resModel, "check_access_rights", [
-                "create",
-                false,
-            ]);
+            data.hasCreateRight = await user.checkAccessRight(this.meta.resModel, "create");
         }
         data.range = this.computeRange();
         if (this.meta.showUnusualDays) {
@@ -479,7 +484,9 @@ export class CalendarModel extends Model {
      */
     fetchRecords(data) {
         const { fieldNames, resModel } = this.meta;
-        return this.orm.searchRead(resModel, this.computeDomain(data), fieldNames);
+        return this.orm.searchRead(resModel, this.computeDomain(data), [
+            ...new Set([...fieldNames, ...Object.keys(this.meta.activeFields)]),
+        ]);
     }
     /**
      * @protected
@@ -570,8 +577,14 @@ export class CalendarModel extends Model {
      * @protected
      */
     fetchFilters(resModel, fieldNames) {
-        return this.orm.searchRead(resModel, [["user_id", "=", this.user.userId]], fieldNames);
+        return this.orm.searchRead(resModel, [["user_id", "=", user.userId]], fieldNames);
     }
+
+    getLocalStorageScale() {
+        const localScaleId = browser.localStorage.getItem(this.storageKey);
+        return this.meta.scales.includes(localScaleId) ? localScaleId : this.meta.scale;
+    }
+
     /**
      * @protected
      */
@@ -810,7 +823,7 @@ export class CalendarModel extends Model {
     makeFilterUser(filterInfo, previousFilter, fieldName, rawRecords) {
         const field = this.meta.fields[fieldName];
         const userFieldName = field.relation === "res.partner" ? "partnerId" : "userId";
-        const value = this.user[userFieldName];
+        const value = user[userFieldName];
 
         let colorIndex = value;
         const rawRecord = rawRecords.find((r) => r[filterInfo.writeFieldName][0] === value);
@@ -823,7 +836,7 @@ export class CalendarModel extends Model {
             type: "user",
             recordId: null,
             value,
-            label: this.user.name,
+            label: user.name,
             active: previousFilter ? previousFilter.active : true,
             canRemove: false,
             colorIndex,
@@ -839,11 +852,12 @@ export class CalendarModel extends Model {
             recordId: null,
             value: "all",
             label: isUserOrPartner ? _t("Everybody's calendars") : _t("Everything"),
-            active: previousAllFilter ? previousAllFilter.active : this.meta.allFilter[sectionLabel] || false,
+            active: previousAllFilter
+                ? previousAllFilter.active
+                : this.meta.allFilter[sectionLabel] || false,
             canRemove: false,
             colorIndex: null,
             hasAvatar: false,
         };
     }
 }
-CalendarModel.services = ["user", "rpc"];

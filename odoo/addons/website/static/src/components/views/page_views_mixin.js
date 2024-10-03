@@ -1,8 +1,9 @@
 /** @odoo-module **/
 
 import { _t } from "@web/core/l10n/translation";
-import { AddPageDialog } from "@website/components/dialog/add_page_dialog";
+import { rpc } from "@web/core/network/rpc";
 import {useService} from "@web/core/utils/hooks";
+import { AddPageDialog } from "@website/components/dialog/add_page_dialog";
 import { onWillStart, useState } from "@odoo/owl";
 
 /**
@@ -20,7 +21,6 @@ export const PageControllerMixin = (component) => class extends component {
         super.setup();
         this.website = useService('website');
         this.dialog = useService('dialog');
-        this.rpc = useService('rpc');
         this.orm = useService('orm');
 
         this.websiteSelection = odoo.debug ? [{id: 0, name: _t("All Websites")}] : [];
@@ -49,7 +49,7 @@ export const PageControllerMixin = (component) => class extends component {
         const action = this.props.context.create_action;
         if (action) {
             if (/^\//.test(action)) {
-                const url = await this.rpc(action);
+                const url = await rpc(action);
                 this.website.goToWebsite({ path: url, edition: true });
                 return;
             }
@@ -77,24 +77,5 @@ export const PageControllerMixin = (component) => class extends component {
     onSelectWebsite(website) {
         this.state.activeWebsite = website;
         this.env.searchModel.notifyWebsiteChange(website.id);
-    }
-};
-
-// TODO: Remove in master, records are not hidden through `t-if` anymore.
-export const PageRendererMixin = (component) => class extends component {
-    /**
-     * The goal here is to tweak the renderer to display records following some
-     * rules:
-     * - All websites (props.activeWebsite.id === 0):
-     *     -> Show all generic/specific records.
-     * - A website is selected:
-     *     -> Display website-specific records & generic ones (only those without
-     *        specific clones).
-     */
-    recordFilter(record, records) {
-        const websiteId = record.data.website_id && record.data.website_id[0];
-        return !this.props.activeWebsite.id
-            || this.props.activeWebsite.id === websiteId
-            || !websiteId && records.filter(rec => rec.data.website_url === record.data.website_url).length === 1;
     }
 };

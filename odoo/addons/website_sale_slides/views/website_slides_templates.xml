@@ -83,7 +83,7 @@
         <div t-if="channel.enroll == 'payment' and not channel.product_id.is_published"
             class="alert alert-info" role="alert" groups="website_slides.group_website_slides_officer">
             This course cannot be bought because its linked product
-            <a t-attf-href="/web#id=#{channel.product_id.product_tmpl_id.id}&amp;view_type=form&amp;model=#{channel.product_id.product_tmpl_id._name}&amp;action=website_sale.product_template_action_website"
+            <a t-attf-href="/odoo/action-website_sale.product_template_action_website/{{channel.product_id.product_tmpl_id.id}}"
                 class="alert-link" t-out="channel.product_id.name"/>
             is not published.
         </div>
@@ -154,6 +154,7 @@
             <div class="add_to_cart_button">
                 <form action="/shop/cart/update" method="POST">
                     <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()" />
+                    <input type="hidden" name="product_template_id" t-att-value="channel.product_id.product_tmpl_id.id"/>
                     <input type="hidden" class="product_id" name="product_id" t-att-value="channel.product_id.id"/>
                     <a id="add_to_cart" role="button" href="#"
                        class="btn btn-primary d-block js_check_product o_js_add_to_cart a-submit"
@@ -175,7 +176,7 @@
 <template name="Display 'Buy Now'" id="course_option_buy_course_now" inherit_id="website_sale_slides.course_buy_course_button" active="False">
     <xpath expr="//div[hasclass('add_to_cart_button')]" position="before">
         <div class="mb-1">
-            <a role="button" class="post_link btn btn-primary d-block" t-attf-href="/shop/cart/update?product_id={{channel.product_id.id}}&amp;express=1">
+            <a role="button" class="post_link btn btn-primary d-block" t-attf-href="/shop/cart/update?product_id={{channel.product_id.id}}&amp;try_skip_step=true">
                 <i class="fa fa-bolt"></i> Buy Now
             </a>
         </div>

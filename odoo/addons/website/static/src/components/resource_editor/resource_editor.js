@@ -6,7 +6,9 @@ import { Dropdown } from "@web/core/dropdown/dropdown";
 import { CheckboxItem } from "@web/core/dropdown/checkbox_item";
 import { DropdownItem } from "@web/core/dropdown/dropdown_item";
 import { _t } from "@web/core/l10n/translation";
+import { rpc } from "@web/core/network/rpc";
 import { SelectMenu } from "@web/core/select_menu/select_menu";
+import { user } from "@web/core/user";
 import { sortBy } from "@web/core/utils/arrays";
 import { KeepLast } from "@web/core/utils/concurrency";
 import { useService } from "@web/core/utils/hooks";
@@ -41,9 +43,7 @@ export class ResourceEditor extends Component {
 
     setup() {
         this.website = useService("website");
-        this.user = useService("user");
         this.orm = useService("orm");
-        this.rpc = useService("rpc");
         this.dialog = useService("dialog");
 
         this.keepLast = new KeepLast();
@@ -60,6 +60,12 @@ export class ResourceEditor extends Component {
             scss: "SCSS (CSS)",
             js: "JS",
         };
+        this.typeToCodeEditorModeMap = {
+            xml: "qweb",
+            scss: "scss",
+            js: "javascript",
+        };
+
         this.xmlFilters = {
             views: _t("Only Views"),
             all: _t("Views and Assets bundles"),
@@ -110,7 +116,7 @@ export class ResourceEditor extends Component {
 
     get context() {
         return {
-            ...this.user.context,
+            ...user.context,
             website_id: this.website.currentWebsite.id,
         };
     }
@@ -177,7 +183,7 @@ export class ResourceEditor extends Component {
 
     async loadResources() {
         const resources = await this.keepLast.add(
-            this.rpc("/web_editor/get_assets_editor_resources", {
+            rpc("/web_editor/get_assets_editor_resources", {
                 key: this.viewKey,
                 bundles: this.state.xmlFilter === "all",
                 bundles_restriction: BUNDLES_RESTRICTION,

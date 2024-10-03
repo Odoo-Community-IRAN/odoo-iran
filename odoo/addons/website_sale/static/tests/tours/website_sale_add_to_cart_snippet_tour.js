@@ -1,76 +1,60 @@
 /** @odoo-module **/
 
-import wsTourUtils from '@website_sale/js/tours/tour_utils';
-import wTourUtils from '@website/js/tours/tour_utils';
+import { goToCart, assertCartContains } from '@website_sale/js/tours/tour_utils';
+import { registerWebsitePreviewTour, clickOnEditAndWaitEditMode, clickOnSnippet, insertSnippet, selectElementInWeSelectWidget, clickOnSave, clickOnElement, assertPathName } from '@website/js/tours/tour_utils';
+
 
 function editAddToCartSnippet() {
     return [
-        ...wTourUtils.clickOnEditAndWaitEditMode(),
-        wTourUtils.clickOnSnippet({id: 's_add_to_cart'})
+        ...clickOnEditAndWaitEditMode(),
+        ...clickOnSnippet({id: 's_add_to_cart'})
     ]
 }
 
-wTourUtils.registerWebsitePreviewTour('add_to_cart_snippet_tour', {
+registerWebsitePreviewTour('add_to_cart_snippet_tour', {
         url: '/',
         edition: true,
         test: true,
     },
     () => [
-        wTourUtils.dragNDrop({name: 'Add to Cart Button'}),
+        ...insertSnippet({name: 'Add to Cart Button'}),
 
         // Basic product with no variants
-        wTourUtils.clickOnSnippet({id: 's_add_to_cart'}),
-        ...wTourUtils.selectElementInWeSelectWidget('product_template_picker_opt', 'Acoustic Bloc Screens', true),
-        ...wTourUtils.clickOnSave(),
-        wTourUtils.clickOnElement('add to cart button', 'iframe .s_add_to_cart_btn'),
-        {
-            trigger: "iframe nav li.o_wsale_my_cart sup:contains(1)",
-            run: () => null,
-        },
+        ...clickOnSnippet({id: 's_add_to_cart'}),
+        ...selectElementInWeSelectWidget('product_template_picker_opt', 'Pedal Bin', true),
+        ...clickOnSave(),
+        clickOnElement('add to cart button', ':iframe .s_add_to_cart_btn'),
+
         // Product with 2 variants with visitor choice (will open modal)
         ...editAddToCartSnippet(),
-        ...wTourUtils.selectElementInWeSelectWidget('product_template_picker_opt', 'Conference Chair', true),
-        ...wTourUtils.clickOnSave(),
-        wTourUtils.clickOnElement('add to cart button', 'iframe .s_add_to_cart_btn'),
-        wTourUtils.clickOnElement('continue shopping', 'iframe span:contains(Continue Shopping)'),
-        {
-            trigger: "body:not(:has(.modal))",
-            run: () => null,
-        },
-        {
-            trigger: "iframe nav li.o_wsale_my_cart sup:contains(2)",
-            run: () => null,
-        },
+        ...selectElementInWeSelectWidget('product_template_picker_opt', 'Conference Chair', true),
+        ...clickOnSave(),
+        clickOnElement('add to cart button', ':iframe .s_add_to_cart_btn'),
+        clickOnElement('continue shopping', ':iframe span:contains(Continue Shopping)'),
 
         // Product with 2 variants with a variant selected
-        // ...editAddToCartSnippet(),
-        // ...wTourUtils.selectElementInWeSelectWidget('product_template_picker_opt', 'Conference Chair', true),
-        // ...wTourUtils.selectElementInWeSelectWidget('product_variant_picker_opt', 'Conference Chair (Aluminium)'),
-        // ...wTourUtils.clickOnSave(),
-        // wTourUtils.clickOnElement('add to cart button', 'iframe .s_add_to_cart_btn'),
-        // TODO edm: re-enable this part when this isn't an indeterminist error anymore
+        ...editAddToCartSnippet(),
+        ...selectElementInWeSelectWidget('product_template_picker_opt', 'Conference Chair', true),
+        ...selectElementInWeSelectWidget('product_variant_picker_opt', 'Conference Chair (Aluminium)'),
+        ...clickOnSave(),
+        clickOnElement('add to cart button', ':iframe .s_add_to_cart_btn'),
 
         // Basic product with no variants and action=buy now
         ...editAddToCartSnippet(),
-        ...wTourUtils.selectElementInWeSelectWidget('product_template_picker_opt', 'Acoustic Bloc Screens', true),
+        ...selectElementInWeSelectWidget('product_template_picker_opt', 'Pedal Bin', true),
+        ...selectElementInWeSelectWidget('action_picker_opt', 'Buy Now'),
+        ...clickOnSave(),
+        clickOnElement('add to cart button', ':iframe .s_add_to_cart_btn'),
         {
-            trigger: `we-select[data-name=action_picker_opt] we-toggler:contains("Add to Cart")`,
-            run: () => null,
-        },
-        ...wTourUtils.selectElementInWeSelectWidget('action_picker_opt', 'Buy Now'),
-        ...wTourUtils.clickOnSave(),
-        wTourUtils.clickOnElement('add to cart button', 'iframe .s_add_to_cart_btn'),
-        {
+            // wait for the page to load, as the next check was sometimes too fast
             content: "Wait for the redirection to the payment page",
-            trigger: "iframe h3:contains('Confirm order')",
-            timeout: 20000,
-            run: () => null,
+            trigger: 'body',
         },
-        wTourUtils.assertPathName('/shop/payment', 'iframe a[href="/shop/cart"]'),
+        assertPathName('/shop/payment', ':iframe a[href="/shop/cart"]'),
 
-        wsTourUtils.goToCart({quantity: 3, backend: true}),
-        wsTourUtils.assertCartContains({productName: 'Acoustic Bloc Screens', backend: true}),
-        wsTourUtils.assertCartContains({productName: 'Conference Chair (Steel)', backend: true}),
-        // wsTourUtils.assertCartContains({productName: 'Conference Chair (Aluminium)', backend: true}),
+        goToCart({quantity: 4, backend: true}),
+        assertCartContains({productName: 'Pedal Bin', backend: true}),
+        assertCartContains({productName: 'Conference Chair (Steel)', backend: true}),
+        assertCartContains({productName: 'Conference Chair (Aluminium)', backend: true}),
     ],
 );

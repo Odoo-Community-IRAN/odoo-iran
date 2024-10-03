@@ -15,7 +15,7 @@ import base64
 import odoo
 from odoo import api, http
 from odoo.addons import __path__ as ADDONS_PATH
-from odoo.addons.base.models.assetsbundle import AssetsBundle, ANY_UNIQUE
+from odoo.addons.base.models.assetsbundle import AssetsBundle, XMLAssetError, ANY_UNIQUE
 from odoo.addons.base.models.ir_asset import AssetPaths
 from odoo.addons.base.models.ir_attachment import IrAttachment
 from odoo.modules.module import get_manifest
@@ -647,25 +647,46 @@ class TestXMLAssetsBundle(FileTouchable):
         """ Checks that a bundle don't try hard to parse broken xml, and returns a comprehensive
         error message.
         """
-        self.bundle = self._get_asset('test_assetsbundle.broken_xml')
+        with mute_logger('odoo.addons.base.models.assetsbundle'):
+            self.bundle = self._get_asset('test_assetsbundle.broken_xml')
 
-        # there shouldn't be any test_assetsbundle.invalid_xml template.
-        # there should be an parsing_error template with the parsing error message.
-        self.assertEqual(self.bundle.xml(),
-                         '<t t-name="parsing_error_test_assetsbundle_static_invalid_src_xml_invalid_xml.xml"><parsererror>Invalid XML template: /test_assetsbundle/static/invalid_src/xml/invalid_xml.xml \n Opening and ending tag mismatch: SomeComponent line 4 and t, line 5, column 7 </parsererror></t>',
-                         "the parsing error should be shown")
+            # there shouldn't be any test_assetsbundle.invalid_xml template.
+            # there should be an parsing_error template with the parsing error message.
+            with self.assertRaisesRegex(XMLAssetError, "Invalid XML template: Opening and ending tag mismatch: SomeComponent line 4 and t, line 5, column 7\' in file \'/test_assetsbundle/static/invalid_src/xml/invalid_xml.xml"):
+                self.bundle.xml()
 
     def test_02_multiple_broken_xml(self):
         """ Checks that a bundle with multiple broken xml returns a comprehensive error message.
         """
-        self.bundle = self._get_asset('test_assetsbundle.multiple_broken_xml')
+        with mute_logger('odoo.addons.base.models.assetsbundle'):
+            self.bundle = self._get_asset('test_assetsbundle.multiple_broken_xml')
 
-        # there shouldn't be any test_assetsbundle.invalid_xml template or test_assetsbundle.second_invalid_xml template.
-        # there should be two parsing_error templates with the parsing error message for each file.
-        self.assertEqual(self.bundle.xml(),
-                         '<t t-name="parsing_error_test_assetsbundle_static_invalid_src_xml_invalid_xml.xml"><parsererror>Invalid XML template: /test_assetsbundle/static/invalid_src/xml/invalid_xml.xml \n Opening and ending tag mismatch: SomeComponent line 4 and t, line 5, column 7 </parsererror></t><t t-name="parsing_error_test_assetsbundle_static_invalid_src_xml_second_invalid_xml.xml"><parsererror>Invalid XML template: /test_assetsbundle/static/invalid_src/xml/second_invalid_xml.xml \n XML declaration allowed only at the start of the document, line 2, column 6 </parsererror></t>',
-                         "the parsing error should be shown")
+            # there shouldn't be any test_assetsbundle.invalid_xml template or test_assetsbundle.second_invalid_xml template.
+            # there should be one parsing_error templates with the parsing error message for the first file.
+            with self.assertRaisesRegex(XMLAssetError, "Invalid XML template: Opening and ending tag mismatch: SomeComponent line 4 and t, line 5, column 7\' in file \'/test_assetsbundle/static/invalid_src/xml/invalid_xml.xml"):
+                self.bundle.xml()
 
+    def test_04_template_wo_name(self):
+        """ Checks that a bundle with template without name returns a comprehensive error message.
+        """
+        with mute_logger('odoo.addons.base.models.assetsbundle'):
+            self.bundle = self._get_asset('test_assetsbundle.wo_name')
+
+            # there shouldn't be raise a ValueError, there should a parsing_error template with
+            # the error message.
+            with self.assertRaisesRegex(XMLAssetError, "'Template name is missing.' in file \'/test_assetsbundle/static/invalid_src/xml/template_wo_name.xml\'"):
+                self.bundle.xml()
+
+    def test_05_file_not_found(self):
+        """ Checks that a bundle with a file in error (file not found, encoding error, or other) returns a comprehensive error message.
+        """
+        with mute_logger('odoo.addons.base.models.assetsbundle'):
+            self.bundle = self._get_asset('test_assetsbundle.file_not_found')
+
+            # there shouldn't be raise a ValueError, there should a parsing_error template with
+            # the error message.
+            with self.assertRaisesRegex(XMLAssetError, "Could not get content for test_assetsbundle/static/invalid_src/xml/file_not_found.xml."):
+                self.bundle.xml()
 
 @tagged('-at_install', 'post_install')
 class TestAssetsBundleInBrowser(HttpCase):
@@ -1719,8 +1740,9 @@ class TestAssetsManifest(AddonManifestPatched):
             'path': '/test_assetsbundle/%s' % path_to_dummy,
         })
         bundle = self.env['ir.qweb']._get_asset_bundle('test_assetsbundle.irassetsec')
-        attach = bundle.js()
-        self.assertIn(b"Could not get content for /test_assetsbundle/../../tests/dummy.js", attach.exists().raw)
+        with mute_logger('odoo.addons.base.models.assetsbundle'):
+            attach = bundle.js()
+            self.assertIn(b"Could not get content for /test_assetsbundle/../../tests/dummy.js", attach.exists().raw)
 
     @mute_logger('odoo.addons.base.models.ir_asset')
     def test_32_a_relative_path_in_addon(self):
@@ -2000,5 +2022,15 @@ class TestErrorManagement(HttpCase):
         })
 
         with mute_logger('odoo.addons.base.models.assetsbundle'):
-            self.start_tour('/web', 'css_error_tour', login='admin')
+            self.start_tour('/odoo', 'css_error_tour', login='admin')
 
+    def test_assets_bundle_css_error_frontend(self):
+        whatever = {'website_id': website.search([], limit=1).id} if (website := self.env.get('website')) else {}
+        self.env['ir.qweb']._get_asset_bundle('web.assets_frontend', assets_params=whatever).css()  # force pregeneration so that we have the base style
+        self.env['ir.asset'].create({
+            'name': 'Css error',
+            'bundle': 'web.assets_frontend',
+            'path': 'test_assetsbundle/static/src/css/test_error.scss',
+        })
+        with mute_logger('odoo.addons.base.models.assetsbundle'):
+            self.start_tour('/', 'css_error_tour_frontend', login='admin')

@@ -20,7 +20,6 @@ from .. import SUPERUSER_ID, api, tools
 from .module import adapt_version, initialize_sys_path, load_openerp_module
 
 _logger = logging.getLogger(__name__)
-_test_logger = logging.getLogger('odoo.tests')
 
 
 def load_data(env, idref, mode, kind, package):
@@ -273,14 +272,14 @@ def load_module_graph(env, graph, status=None, perform_checks=True,
         test_time = test_queries = 0
         test_results = None
         if tools.config.options['test_enable'] and (needs_update or not updating):
-            loader = odoo.tests.loader
+            from odoo.tests import loader  # noqa: PLC0415
             suite = loader.make_suite([module_name], 'at_install')
             if suite.countTestCases():
                 if not needs_update:
                     registry.setup_models(env.cr)
                 # Python tests
                 tests_t0, tests_q0 = time.time(), odoo.sql_db.sql_counter
-                test_results = loader.run_suite(suite, module_name)
+                test_results = loader.run_suite(suite)
                 report.update(test_results)
                 test_time = time.time() - tests_t0
                 test_queries = odoo.sql_db.sql_counter - tests_q0
@@ -410,7 +409,7 @@ def load_modules(registry, force_demo=False, status=None, update_module=False):
             _logger.critical('module base cannot be loaded! (hint: verify addons-path)')
             raise ImportError('Module `base` cannot be loaded! (hint: verify addons-path)')
 
-        if update_module and odoo.tools.table_exists(cr, 'ir_model_fields'):
+        if update_module and odoo.tools.sql.table_exists(cr, 'ir_model_fields'):
             # determine the fields which are currently translated in the database
             cr.execute("SELECT model || '.' || name FROM ir_model_fields WHERE translate IS TRUE")
             registry._database_translated_fields = {row[0] for row in cr.fetchall()}
@@ -430,7 +429,7 @@ def load_modules(registry, force_demo=False, status=None, update_module=False):
 
         if load_lang:
             for lang in load_lang.split(','):
-                tools.load_language(cr, lang)
+                tools.translate.load_language(cr, lang)
 
         # STEP 2: Mark other modules to be loaded/updated
         if update_module:
@@ -586,9 +585,9 @@ def load_modules(registry, force_demo=False, status=None, update_module=False):
                 try:
                     View._validate_custom_views(model)
                 except Exception as e:
-                    _logger.warning('invalid custom view(s) for model %s: %s', model, tools.ustr(e))
+                    _logger.warning('invalid custom view(s) for model %s: %s', model, e)
 
-        if report.wasSuccessful():
+        if not registry._assertion_report or registry._assertion_report.wasSuccessful():
             _logger.info('Modules loaded.')
         else:
             _logger.error('At least one test failed when loading the modules.')

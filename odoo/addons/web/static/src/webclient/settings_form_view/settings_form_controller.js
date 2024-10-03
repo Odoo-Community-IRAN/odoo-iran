@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
 import { useAutofocus } from "@web/core/utils/hooks";
 import { pick } from "@web/core/utils/objects";
@@ -10,17 +8,17 @@ import { SettingsFormRenderer } from "./settings_form_renderer";
 import { useSubEnv, useState, useRef, useEffect } from "@odoo/owl";
 
 export class SettingsFormController extends formView.Controller {
+    static template = "web.SettingsFormView";
+    static components = {
+        ...formView.Controller.components,
+        Renderer: SettingsFormRenderer,
+    };
+
     setup() {
         super.setup();
         useAutofocus();
         this.state = useState({ displayNoContent: false });
-        // Deprecated warning: a new way to point to sections or items will be
-        // developed so that putting a default search value won't be necessary
-        if ("default_search_setting" in this.props.context){
-            this.searchState = useState({value: this.props.context.default_search_setting});
-        } else {
-            this.searchState = useState({value: ""});
-        }
+        this.searchState = useState({ value: "" });
         this.rootRef = useRef("root");
         this.canCreate = false;
         useSubEnv({ searchState: this.searchState });
@@ -59,6 +57,7 @@ export class SettingsFormController extends formView.Controller {
         return {
             ...super.modelParams,
             headerFields,
+            onChangeHeaderFields: () => this._confirmSave(),
         };
     }
 
@@ -94,8 +93,8 @@ export class SettingsFormController extends formView.Controller {
     //This is needed to avoid the auto save when unload
     beforeUnload() {}
 
-    //This is needed to avoid writing the id on the url
-    updateURL() {}
+    //This is needed to avoid the auto save when visibility change
+    beforeVisibilityChange() {}
 
     async save() {
         await this.env.onClickViewButton({
@@ -147,9 +146,3 @@ export class SettingsFormController extends formView.Controller {
         return _continue;
     }
 }
-
-SettingsFormController.components = {
-    ...formView.Controller.components,
-    Renderer: SettingsFormRenderer,
-};
-SettingsFormController.template = "web.SettingsFormView";

@@ -4,15 +4,17 @@ import { AWAY_DELAY, imStatusService } from "@bus/im_status_service";
 import { patch } from "@web/core/utils/patch";
 
 export const imStatusServicePatch = {
-    dependencies: [...imStatusService.dependencies, "mail.store"],
-
     start(env, services) {
-        const { bus_service, "mail.store": store, presence } = services;
+        const { bus_service, presence } = services;
         const API = super.start(env, services);
 
         bus_service.subscribe(
             "bus.bus/im_status_updated",
             ({ im_status, partner_id, guest_id }) => {
+                const store = env.services["mail.store"];
+                if (!store) {
+                    return;
+                }
                 const persona = store.Persona.get({
                     type: partner_id ? "partner" : "guest",
                     id: partner_id ?? guest_id,

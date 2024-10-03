@@ -1,16 +1,26 @@
 
 .s_hr {
     line-height: 0;
+
     hr {
         padding: 0;
-        // TODO we already change the way the color is applied (using a border)
-        // in website.css. In master, we should just let that system work the
-        // way it is and not force something here.
-        border: 0;
-        border-top: 1px solid $border-color;
         margin: 0;
-        // Bootstrap sets a configurable "opacity" on hr tag, we remove that
-        // here to let users set the color as they want.
+        // Bootstrap sets an "opacity" on hr elements, it is removed here to let
+        // users set the color as they want with the editor.
         opacity: 1;
+    }
+}
+
+// Allows clicking on the separator when it has no padding and has a low height.
+.editor_enable .s_hr {
+    position: relative;
+
+    &::after {
+        content: '';
+        @include o-position-absolute(50%, 0, 0, 0);
+        z-index: 1;
+        transform: translateY(-50%);
+        height: 6px;
+        padding: inherit;
     }
 }

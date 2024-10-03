@@ -1,8 +1,4 @@
-/** @odoo-module */
-import { Component, whenReady, App } from "@odoo/owl";
-import { makeEnv, startServices } from "@web/env";
-import { templates } from "@web/core/assets";
-import { _t } from "@web/core/l10n/translation";
+import { Component, whenReady } from "@odoo/owl";
 import { MainComponentsContainer } from "@web/core/main_components_container";
 import { useSelfOrder } from "@pos_self_order/app/self_order_service";
 import { Router } from "@pos_self_order/app/router";
@@ -17,8 +13,10 @@ import { EatingLocationPage } from "@pos_self_order/app/pages/eating_location_pa
 import { StandNumberPage } from "@pos_self_order/app/pages/stand_number_page/stand_number_page";
 import { OrdersHistoryPage } from "@pos_self_order/app/pages/order_history_page/order_history_page";
 import { LoadingOverlay } from "@pos_self_order/app/components/loading_overlay/loading_overlay";
+import { mountComponent } from "@web/env";
+import { hasTouch } from "@web/core/browser/feature_detection";
 
-class selfOrderIndex extends Component {
+export class selfOrderIndex extends Component {
     static template = "pos_self_order.selfOrderIndex";
     static props = [];
     static components = {
@@ -39,25 +37,15 @@ class selfOrderIndex extends Component {
 
     setup() {
         this.selfOrder = useSelfOrder();
+        window.posmodel = this.selfOrder;
+
+        // Disable cursor on touch devices (required on IoT Box Kiosk)
+        if (hasTouch()) {
+            document.body.classList.add("touch-device");
+        }
     }
     get selfIsReady() {
-        return Object.values(this.selfOrder.productByIds).length > 0;
+        return this.selfOrder.models["product.product"].length > 0;
     }
 }
-
-export async function createPublicRoot() {
-    await whenReady();
-    const env = makeEnv();
-    await startServices(env);
-    const app = new App(selfOrderIndex, {
-        templates,
-        env: env,
-        dev: env.debug,
-        translateFn: _t,
-        translatableAttributes: ["data-tooltip"],
-    });
-    return app.mount(document.body);
-}
-
-createPublicRoot();
-export default { selfOrderIndex, createPublicRoot };
+whenReady(() => mountComponent(selfOrderIndex, document.body));

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from contextlib import contextmanager
+from freezegun import freeze_time
 from unittest.mock import patch
 
 from odoo import exceptions, tools
@@ -10,11 +11,28 @@ from odoo.addons.sms.models.sms_sms import SmsApi, SmsSms
 from odoo.tests import common
 
 
-class MockSMS(common.BaseCase):
+class MockSMS(common.TransactionCase):
 
     def tearDown(self):
         super(MockSMS, self).tearDown()
         self._clear_sms_sent()
+
+    # ------------------------------------------------------------
+    # UTILITY MOCKS
+    # ------------------------------------------------------------
+
+    @contextmanager
+    def mock_datetime_and_now(self, mock_dt):
+        """ Used when synchronization date (using env.cr.now()) is important
+        in addition to standard datetime mocks. Used mainly to detect sync
+        issues. """
+        with freeze_time(mock_dt), \
+             patch.object(self.env.cr, 'now', lambda: mock_dt):
+            yield
+
+    # ------------------------------------------------------------
+    # GATEWAY MOCK
+    # ------------------------------------------------------------
 
     @contextmanager
     def mockSMSGateway(self, sms_allow_unlink=False, sim_error=None, nbr_t_error=None, moderated=False, force_delivered=False):
@@ -113,6 +131,12 @@ class SMSCase(MockSMS):
     """ Main test class to use when testing SMS integrations. Contains helpers and tools related
     to notification sent by SMS. """
 
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # This is called to make sure that an iap_account for sms already exists or if not is created.
+        cls.env['iap.account'].get('sms')
+
     def _find_sms_sent(self, partner, number):
         if number is None and partner:
             number = partner._phone_format()
@@ -197,9 +221,8 @@ class SMSCase(MockSMS):
         self.assertEqual(self.env['mail.notification'].search(base_domain), self.env['mail.notification'])
         self.assertEqual(self._sms, [])
 
-    def assertSMSNotification(self, recipients_info, content, messages=None, check_sms=True, sent_unlink=False,
-                              mail_message_values=None):
-        """ Check content of notifications and sms.
+    def assertSMSNotification(self, recipients_info, content, messages=None, check_sms=True, sent_unlink=False):
+        """ Check content of notifications.
 
           :param recipients_info: list[{
             'partner': res.partner record (may be empty),
@@ -207,8 +230,6 @@ class SMSCase(MockSMS):
             'state': ready / pending / sent / exception / canceled (pending by default),
             'failure_type': optional: sms_number_missing / sms_number_format / sms_credit / sms_server
             }, { ... }]
-          :param content: SMS content
-          :param mail_message_values: dictionary of expected mail message fields values
         """
         partners = self.env['res.partner'].concat(*list(p['partner'] for p in recipients_info if p.get('partner')))
         numbers = [p['number'] for p in recipients_info if p.get('number')]
@@ -243,8 +264,7 @@ class SMSCase(MockSMS):
                 )
             self.assertTrue(notif, 'SMS: not found notification for %s (number: %s, state: %s)\n%s' % (partner, number, state, debug_info))
             self.assertEqual(notif.author_id, notif.mail_message_id.author_id, 'SMS: Message and notification should have the same author')
-            for field_name, expected_value in (mail_message_values or {}).items():
-                self.assertEqual(notif.mail_message_id[field_name], expected_value)
+
             if state not in {'process', 'sent', 'ready', 'canceled', 'pending'}:
                 self.assertEqual(notif.failure_type, recipient_info['failure_type'])
             if check_sms:
@@ -263,11 +283,8 @@ class SMSCase(MockSMS):
                     raise NotImplementedError('Not implemented')
 
         if messages is not None:
-            sanitize_tags = {**tools.mail.SANITIZE_TAGS}
-            sanitize_tags['remove_tags'] = [*sanitize_tags['remove_tags'] + ['a']]
-            with patch('odoo.tools.mail.SANITIZE_TAGS', sanitize_tags):
-                for message in messages:
-                    self.assertEqual(content, tools.html2plaintext(tools.html_sanitize(message.body)).rstrip('\n'))
+            for message in messages:
+                self.assertEqual(content, tools.html2plaintext(message.body).rstrip('\n'))
 
     def assertSMSLogged(self, records, body):
         for record in records:

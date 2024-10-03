@@ -3,27 +3,6 @@
 import options from '@web_editor/js/editor/snippets.options';
 import { _t } from "@web/core/l10n/translation";
 
-const Many2oneUserValueWidget = options.userValueWidgetsRegistry['we-many2one'];
-
-const Many2oneDefaultMessageWidget = Many2oneUserValueWidget.extend({
-
-    // defaultMessage: default message to display when no records are selected
-    configAttributes: [...Many2oneUserValueWidget.prototype.configAttributes, 'defaultMessage'],
-
-    /**
-     * @override
-     */
-    async setValue(value, methodName) {
-        await this._super(...arguments);
-
-        if (value === '') {
-            this.menuTogglerEl.textContent = this.options.defaultMessage;
-        }
-    },
-});
-
-options.userValueWidgetsRegistry['we-many2one-default-message'] = Many2oneDefaultMessageWidget;
-
 options.registry.AddToCart = options.Class.extend({
     events: Object.assign({}, options.Class.prototype.events || {}, {
         'click .reset-variant-picker': '_onClickResetVariantPicker',
@@ -148,22 +127,13 @@ options.registry.AddToCart = options.Class.extend({
         const variantIds = this._variantIds();
         const buttonEl = this._buttonEl();
 
-        let productVariantId = variantIds[0];
-        buttonEl.dataset.visitorChoice = false;
-
-        if (variantIds.length > 1) {
-            // If there is more than 1 variant, that means that there are variants for the product template
-            // and we check if there is one selected and assign it. If not, visitorChoice is set to true
-            if (this.$target[0].dataset.productVariant) {
-                productVariantId = this.$target[0].dataset.productVariant;
-            } else {
-                buttonEl.dataset.visitorChoice = true;
-            }
-        }
-        buttonEl.dataset.productVariantId = productVariantId;
+        buttonEl.dataset.productTemplateId = this.$target[0].dataset.productTemplate;
+        // TODO(loti,vcr): we're aware that getting the product id this way is too simplistic, but
+        // it mimics the previous logic. We'll fix this later on.
+        buttonEl.dataset.productVariantId =
+            variantIds.length > 1 ? this.$target[0].dataset.productVariant : variantIds[0];
         buttonEl.dataset.action = this.$target[0].dataset.action;
         this._updateButtonContent();
-        this._createHiddenFormInput(productVariantId);
     },
 
     _updateButtonContent() {
@@ -178,24 +148,6 @@ options.registry.AddToCart = options.Class.extend({
 
         this._buttonEl().replaceChildren(iconEl, buttonContentElement.text);
     },
-    /**
-     * Because sale_product_configurator._handleAdd() requires a hidden input to retrieve the productId,
-     * this method creates a hidden input in the form of the button to make the modal behaviour possible.
-     */
-    _createHiddenFormInput(productVariantId) {
-        const inputEl = this._buttonEl().querySelector('input[type="hidden"][name="product_id"]');
-        if (inputEl) {
-            // If the input already exists, we change its value
-            inputEl.setAttribute('value', productVariantId);
-        } else {
-            // Otherwise, we create the input element
-            let inputEl = document.createElement('input');
-            inputEl.setAttribute('type', 'hidden');
-            inputEl.setAttribute('name', 'product_id');
-            inputEl.setAttribute('value', productVariantId);
-            this._buttonEl().append(inputEl);
-        }
-    },
 
     /**
      * Called when the template is chosen and that we want to update the m2o variant widget with the right variants.
@@ -203,7 +155,7 @@ options.registry.AddToCart = options.Class.extend({
     async _renderCustomXML(uiFragment) {
         if (this.$target[0].dataset.productTemplate) {
             // That means that a template was selected and we want to update the content of the variant picker based on the template id
-            const productVariantPickerEl = uiFragment.querySelector('we-many2one-default-message[data-name="product_variant_picker_opt"]');
+            const productVariantPickerEl = uiFragment.querySelector('we-many2one[data-name="product_variant_picker_opt"]');
             productVariantPickerEl.dataset.domain = `[["product_tmpl_id", "=", ${this.$target[0].dataset.productTemplate}]]`;
         }
     },

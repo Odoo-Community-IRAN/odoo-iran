@@ -2,11 +2,11 @@
 
 import logging
 
-from psycopg2 import sql
-
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
-from odoo.osv import expression
+
+from odoo.addons.payment import utils as payment_utils
+from odoo.addons.payment.const import REPORT_REASONS_MAPPING
 
 _logger = logging.getLogger(__name__)
 
@@ -143,13 +143,13 @@ class PaymentProvider(models.Model):
         default=lambda self: _("Your payment has been successfully processed."),
         translate=True)
     cancel_msg = fields.Html(
-        string="Canceled Message",
-        help="The message displayed if the order is canceled during the payment process",
+        string="Cancelled Message",
+        help="The message displayed if the order is cancelled during the payment process",
         default=lambda self: _("Your payment has been cancelled."), translate=True)
 
     # Feature support fields
     support_tokenization = fields.Boolean(
-        string="Tokenization Supported", compute='_compute_feature_support_fields'
+        string="Tokenization", compute='_compute_feature_support_fields'
     )
     support_manual_capture = fields.Selection(
         string="Manual Capture Supported",
@@ -157,11 +157,16 @@ class PaymentProvider(models.Model):
         compute='_compute_feature_support_fields',
     )
     support_express_checkout = fields.Boolean(
-        string="Express Checkout Supported", compute='_compute_feature_support_fields'
+        string="Express Checkout", compute='_compute_feature_support_fields'
     )
     support_refund = fields.Selection(
-        string="Type of Refund Supported",
-        selection=[('full_only', "Full Only"), ('partial', "Partial")],
+        string="Refund",
+        help="Refund is a feature allowing to refund customers directly from the payment in Odoo.",
+        selection=[
+            ('none', "Unsupported"),
+            ('full_only', "Full Only"),
+            ('partial', "Full & Partial"),
+        ],
         compute='_compute_feature_support_fields',
     )
 
@@ -173,20 +178,8 @@ class PaymentProvider(models.Model):
 
     # Module-related fields
     module_id = fields.Many2one(string="Corresponding Module", comodel_name='ir.module.module')
-    module_state = fields.Selection(
-        string="Installation State", related='module_id.state', store=True)  # Stored for sorting.
+    module_state = fields.Selection(string="Installation State", related='module_id.state')
     module_to_buy = fields.Boolean(string="Odoo Enterprise Module", related='module_id.to_buy')
-
-    # View configuration fields
-    show_credentials_page = fields.Boolean(compute='_compute_view_configuration_fields')
-    show_allow_tokenization = fields.Boolean(compute='_compute_view_configuration_fields')
-    show_allow_express_checkout = fields.Boolean(compute='_compute_view_configuration_fields')
-    show_pre_msg = fields.Boolean(compute='_compute_view_configuration_fields')
-    show_pending_msg = fields.Boolean(compute='_compute_view_configuration_fields')
-    show_auth_msg = fields.Boolean(compute='_compute_view_configuration_fields')
-    show_done_msg = fields.Boolean(compute='_compute_view_configuration_fields')
-    show_cancel_msg = fields.Boolean(compute='_compute_view_configuration_fields')
-    require_currency = fields.Boolean(compute='_compute_view_configuration_fields')
 
     #=== COMPUTE METHODS ===#
 
@@ -223,42 +216,6 @@ class PaymentProvider(models.Model):
                 provider.color = 7  # green
 
     @api.depends('code')
-    def _compute_view_configuration_fields(self):
-        """ Compute the view configuration fields based on the provider.
-
-        View configuration fields are used to hide specific elements (notebook pages, fields, etc.)
-        from the form view of payment providers. These fields are set to `True` by default and are
-        as follows:
-
-        - `show_credentials_page`: Whether the "Credentials" notebook page should be shown.
-        - `show_allow_tokenization`: Whether the `allow_tokenization` field should be shown.
-        - `show_allow_express_checkout`: Whether the `allow_express_checkout` field should be shown.
-        - `show_pre_msg`: Whether the `pre_msg` field should be shown.
-        - `show_pending_msg`: Whether the `pending_msg` field should be shown.
-        - `show_auth_msg`: Whether the `auth_msg` field should be shown.
-        - `show_done_msg`: Whether the `done_msg` field should be shown.
-        - `show_cancel_msg`: Whether the `cancel_msg` field should be shown.
-        - `require_currency`: Whether the `available_currency_ids` field shoud be required.
-
-        For a provider to hide specific elements of the form view, it must override this method and
-        set the related view configuration fields to `False` on the appropriate `payment.provider`
-        records.
-
-        :return: None
-        """
-        self.update({
-            'show_credentials_page': True,
-            'show_allow_tokenization': True,
-            'show_allow_express_checkout': True,
-            'show_pre_msg': True,
-            'show_pending_msg': True,
-            'show_auth_msg': True,
-            'show_done_msg': True,
-            'show_cancel_msg': True,
-            'require_currency': False,
-        })
-
-    @api.depends('code')
     def _compute_feature_support_fields(self):
         """ Compute the feature support fields based on the provider.
 
@@ -280,12 +237,12 @@ class PaymentProvider(models.Model):
 
         :return: None
         """
-        self.update(dict.fromkeys((
-            'support_express_checkout',
-            'support_manual_capture',
-            'support_refund',
-            'support_tokenization',
-        ), None))
+        self.update({
+            'support_express_checkout': None,
+            'support_manual_capture': None,
+            'support_tokenization': None,
+            'support_refund': 'none',
+        })
 
     #=== ONCHANGE METHODS ===#
 
@@ -317,7 +274,7 @@ class PaymentProvider(models.Model):
                         'title': _("Warning"),
                         'message': _(
                             "This action will also archive %s tokens that are registered with this "
-                            "provider. Archiving tokens is irreversible.", len(related_tokens)
+                            "provider. ", len(related_tokens)
                         )
                     }
                 }
@@ -329,7 +286,7 @@ class PaymentProvider(models.Model):
         :return: None
         :raise UserError: If transactions are linked to the provider.
         """
-        if self._origin.company_id != self.company_id and self.env['payment.transaction'].search(
+        if self._origin.company_id != self.company_id and self.env['payment.transaction'].search_count(
             [('provider_id', '=', self._origin.id)], limit=1
         ):
             raise UserError(_(
@@ -466,9 +423,9 @@ class PaymentProvider(models.Model):
             'type': 'ir.actions.act_window',
             'name': _("Payment Methods"),
             'res_model': 'payment.method',
-            'view_mode': 'tree,kanban,form',
+            'view_mode': 'list,kanban,form',
             'domain': [('id', 'in', self.with_context(active_test=False).payment_method_ids.ids)],
-            'context': {'active_test': False},
+            'context': {'active_test': False, 'create': False},
         }
 
     #=== BUSINESS METHODS ===#
@@ -476,7 +433,7 @@ class PaymentProvider(models.Model):
     @api.model
     def _get_compatible_providers(
         self, company_id, partner_id, amount, currency_id=None, force_tokenization=False,
-        is_express_checkout=False, is_validation=False, **kwargs
+        is_express_checkout=False, is_validation=False, report=None, **kwargs
     ):
         """ Search and return the providers matching the compatibility criteria.
 
@@ -492,30 +449,39 @@ class PaymentProvider(models.Model):
         :param bool force_tokenization: Whether only providers allowing tokenization can be matched.
         :param bool is_express_checkout: Whether the payment is made through express checkout.
         :param bool is_validation: Whether the operation is a validation.
+        :param dict report: The report in which each provider's availability status and reason must
+                            be logged.
         :param dict kwargs: Optional data. This parameter is not used here.
         :return: The compatible providers.
         :rtype: payment.provider
         """
-        # Compute the base domain for compatible providers.
-        domain = [
+        # Search compatible providers with the base domain.
+        providers = self.env['payment.provider'].search([
             *self.env['payment.provider']._check_company_domain(company_id),
             ('state', 'in', ['enabled', 'test']),
-        ]
+        ])
+        payment_utils.add_to_report(report, providers)
 
-        # Handle the is_published state.
+        # Filter by `is_published` state.
         if not self.env.user._is_internal():
-            domain = expression.AND([domain, [('is_published', '=', True)]])
+            providers = providers.filtered('is_published')
 
         # Handle the partner country; allow all countries if the list is empty.
         partner = self.env['res.partner'].browse(partner_id)
         if partner.country_id:  # The partner country must either not be set or be supported.
-            domain = expression.AND([
-                domain, [
-                    '|',
-                    ('available_country_ids', '=', False),
-                    ('available_country_ids', 'in', [partner.country_id.id]),
-                ]
-            ])
+            unfiltered_providers = providers
+            providers = providers.filtered(
+                lambda p: (
+                    not p.available_country_ids
+                    or partner.country_id.id in p.available_country_ids.ids
+                )
+            )
+            payment_utils.add_to_report(
+                report,
+                unfiltered_providers - providers,
+                available=False,
+                reason=REPORT_REASONS_MAPPING['incompatible_country'],
+            )
 
         # Handle the maximum amount.
         currency = self.env['res.currency'].browse(currency_id).exists()
@@ -523,36 +489,59 @@ class PaymentProvider(models.Model):
             company = self.env['res.company'].browse(company_id).exists()
             date = fields.Date.context_today(self)
             converted_amount = currency._convert(amount, company.currency_id, company, date)
-            domain = expression.AND([
-                domain, [
-                    '|', '|',
-                    ('maximum_amount', '>=', converted_amount),
-                    ('maximum_amount', '=', False),
-                    ('maximum_amount', '=', 0.),
-                ]
-            ])
+            unfiltered_providers = providers
+            providers = providers.filtered(
+                lambda p: (
+                    not p.maximum_amount
+                    or currency.compare_amounts(p.maximum_amount, converted_amount) != -1
+                )
+            )
+            payment_utils.add_to_report(
+                report,
+                unfiltered_providers - providers,
+                available=False,
+                reason=REPORT_REASONS_MAPPING['exceed_max_amount'],
+            )
 
         # Handle the available currencies; allow all currencies if the list is empty.
         if currency:
-            domain = expression.AND([
-                domain, [
-                    '|',
-                    ('available_currency_ids', '=', False),
-                    ('available_currency_ids', 'in', [currency.id]),
-                ]
-            ])
+            unfiltered_providers = providers
+            providers = providers.filtered(
+                lambda p: (
+                    not p.available_currency_ids
+                    or currency.id in p.available_currency_ids.ids
+                )
+            )
+            payment_utils.add_to_report(
+                report,
+                unfiltered_providers - providers,
+                available=False,
+                reason=REPORT_REASONS_MAPPING['incompatible_currency'],
+            )
 
         # Handle tokenization support requirements.
         if force_tokenization or self._is_tokenization_required(**kwargs):
-            domain = expression.AND([domain, [('allow_tokenization', '=', True)]])
+            unfiltered_providers = providers
+            providers = providers.filtered('allow_tokenization')
+            payment_utils.add_to_report(
+                report,
+                unfiltered_providers - providers,
+                available=False,
+                reason=REPORT_REASONS_MAPPING['tokenization_not_supported'],
+            )
 
         # Handle express checkout.
         if is_express_checkout:
-            domain = expression.AND([domain, [('allow_express_checkout', '=', True)]])
+            unfiltered_providers = providers
+            providers = providers.filtered('allow_express_checkout')
+            payment_utils.add_to_report(
+                report,
+                unfiltered_providers - providers,
+                available=False,
+                reason=REPORT_REASONS_MAPPING['express_checkout_not_supported'],
+            )
 
-        # Search the providers matching the compatibility criteria.
-        compatible_providers = self.env['payment.provider'].search(domain)
-        return compatible_providers
+        return providers
 
     def _get_supported_currencies(self):
         """ Return the supported currencies for the payment provider.
@@ -669,17 +658,17 @@ class PaymentProvider(models.Model):
         return
 
     @api.model
-    def _get_removal_domain(self, provider_code):
+    def _get_removal_domain(self, provider_code, **kwargs):
         return [('code', '=', provider_code)]
 
     @api.model
-    def _remove_provider(self, provider_code):
+    def _remove_provider(self, provider_code, **kwargs):
         """ Remove the module-specific data of the given provider.
 
         :param str provider_code: The code of the provider whose data to remove.
         :return: None
         """
-        providers = self.search(self._get_removal_domain(provider_code))
+        providers = self.search(self._get_removal_domain(provider_code, **kwargs))
         providers.write(self._get_removal_values())
 
     def _get_removal_values(self):
@@ -729,7 +718,7 @@ class PaymentProvider(models.Model):
         Note: self.ensure_one()
 
         :return: The default payment method codes.
-        :rtype: list
+        :rtype: set
         """
         self.ensure_one()
-        return []
+        return set()

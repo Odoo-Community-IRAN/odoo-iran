@@ -9,7 +9,7 @@
                     <field name="company_id" invisible="1"/>
                     <sheet>
                         <div class="oe_button_box" name="button_box" invisible="not id">
-                            <button class="oe_stat_button" type="action" name="%(hr.act_employee_from_department)d" icon="fa-users">
+                            <button class="oe_stat_button" name="action_employee_from_department" type="object" icon="fa-users">
                                 <field string="Employees" name="total_employee" widget="statinfo"/>
                             </button>
                             <button class="oe_stat_button" type="object" name="action_plan_from_department" icon="fa-list-ul">
@@ -18,10 +18,15 @@
                         </div>
                         <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
                         <field name="active" invisible="1"/>
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name"/>
+                            </h1>
+                        </div>
                         <group>
                             <group>
                                 <field name="name"/>
-                                <field name="manager_id" widget="many2one_avatar_user"/>
+                                <field name="manager_id" widget="many2one_avatar_employee"/>
                                 <field name="parent_id"/>
                                 <field name="child_ids" invisible="1"/>
                                 <field name="company_id" options="{'no_create': True}" groups="base.group_multi_company"/>
@@ -32,27 +37,24 @@
                             </div>
                         </group>
                     </sheet>
-                    <div class="oe_chatter">
-                        <field name="message_follower_ids" groups="base.group_user"/>
-                        <field name="message_ids"/>
-                    </div>
+                    <chatter/>
                 </form>
             </field>
         </record>
 
         <record id="view_department_tree" model="ir.ui.view">
-            <field name="name">hr.department.tree</field>
+            <field name="name">hr.department.list</field>
             <field name="model">hr.department</field>
             <field name="arch" type="xml">
-                <tree string="Companies" sample="1" editable="bottom">
+                <list string="Companies" multi_edit="1">
                     <field name="company_id" column_invisible="True"/>
                     <field name="name"/>
                     <field name="company_id" groups="base.group_multi_company" readonly="1"/>
-                    <field name="manager_id" widget="many2one_avatar_user"/>
+                    <field name="manager_id" widget="many2one_avatar_employee"/>
                     <field name="total_employee" string="Employees"/>
                     <field name="parent_id"/>
                     <field name="color" widget="color_picker" string="Color"/>
-                </tree>
+                </list>
             </field>
         </record>
 
@@ -74,51 +76,59 @@
             <field name="name">hr.department.kanban</field>
             <field name="model">hr.department</field>
             <field name="arch" type="xml">
-                <kanban class="o_kanban_dashboard o_hr_department_kanban o_kanban_small_column" sample="1">
-                    <field name="name"/>
-                    <field name="company_id"/>
-                    <field name="manager_id"/>
-                    <field name="color"/>
-                    <field name="total_employee"/>
+                <kanban highlight_color="color" class="o_hr_department_kanban o_kanban_small_column" can_open="0" sample="1">
+                    <field name="active"/>
                     <templates>
-                        <t t-name="kanban-menu" t-if="!selection_mode">
-                            <div class="o_kanban_card_manage_section">
-                                <div role="menuitem" class="o_kanban_manage_reports">
-                                    <div class="o_kanban_card_manage_title ps-4 pb-1">
-                                        <span class="fw-bolder">Reporting</span>
+                        <t t-name="menu" t-if="!selection_mode">
+                            <div class="container">
+                                <div class="row">
+                                    <div class="col-6">
+                                        <h5 role="menuitem" class="o_kanban_card_manage_title">
+                                            <span>View</span>
+                                        </h5>
+                                        <div role="menuitem">
+                                            <a name="action_employee_from_department" type="object">Employees</a>
+                                        </div>
+                                        <div role="menuitem">
+                                            <a name="action_open_view_child_departments" type="object">Child departments</a>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 o_kanban_manage_reports">
+                                        <h5 role="menuitem" class="o_kanban_card_manage_title">
+                                            <span>Reporting</span>
+                                        </h5>
+                                    </div>
+                                </div>
+                                <div class="o_kanban_card_manage_settings row" groups="hr.group_hr_user">
+                                    <div t-if="widget.editable" role="menuitem" aria-haspopup="true" class="col-6">
+                                        <field name="color" widget="kanban_color_picker"/>
+                                    </div>
+                                    <div class="col-6">
+                                        <a t-if="widget.editable" role="menuitem" class="dropdown-item" type="open">Configuration</a>
+                                        <a t-if="record.active.raw_value" role="menuitem" type="archive" class="dropdown-item">Archive</a>
+                                        <a t-if="!record.active.raw_value" role="menuitem" type="unarchive" class="dropdown-item">Unarchive</a>
                                     </div>
                                 </div>
                             </div>
-                            <a t-if="widget.editable" role="menuitem" class="dropdown-item" type="edit">Configuration</a>
-                            <ul t-if="widget.editable" class="oe_kanban_colorpicker" data-field="color" role="menu"/>
                         </t>
-                        <t t-name="kanban-box">
-                            <div t-attf-class="#{!selection_mode ? kanban_color(record.color.raw_value) : ''}">
-                                <div t-attf-class="o_kanban_card_header oe_kanban_details">
-                                    <div class="o_kanban_card_header_title">
-                                        <div class="o_primary"><a type="edit"><field name="name"/></a></div>
-                                        <div class="o_secondary" groups="base.group_multi_company">
-                                            <small>
-                                                <i class="fa fa-building-o" role="img" aria-label="Company" title="Company"/> <field name="company_id"/>
-                                            </small>
-                                        </div>
-                                    </div>
+                        <t t-name="card">
+                            <a type="open"><field name="name" class="fw-bold fs-4 d-bolck ms-2"/></a>
+                            <field name="manager_id" widget="many2one_avatar_employee" options="{'display_avatar_name': True}" readonly="1" class="text-muted ms-2"/>
+                            <div class="small mt-1 ms-2" groups="base.group_multi_company">
+                                <i class="fa fa-building-o" role="img" aria-label="Company" title="Company"/> <field name="company_id"/>
+                            </div>
+                            <div class="row g-0 mt-3 mb-2 ms-2" t-if="!selection_mode">
+                                <div class="col-6">
+                                    <button class="btn btn-primary" name="action_employee_from_department" type="object">
+                                        <field name="total_employee"/> Employees
+                                    </button>
                                 </div>
-                                <div class="container o_kanban_card_content" t-if="!selection_mode">
-                                    <div class="row o_kanban_card_upper_content">
-                                        <div class="col-6 o_kanban_primary_left">
-                                            <button class="btn btn-primary" name="%(act_employee_from_department)d" type="action">
-                                                <t t-out="record.total_employee.raw_value"/> Employees
-                                            </button>
-                                        </div>
-                                        <div class="col-6 o_kanban_primary_right">
-                                        </div>
-                                    </div>
-                                    <div class="o_kanban_card_lower_content"
-                                         style="justify-content: end">
-                                        <!-- placeholder for bottom content -->
-                                    </div>
+                                <div name="kanban_primary_right" class="col-6">
+                                    <!-- placeholder for xpaths -->
                                 </div>
+                            </div>
+                            <div name="kanban_card_lower_content" class="mt-auto" t-if="!selection_mode">
+                                <!-- placeholder for bottom content -->
                             </div>
                         </t>
                     </templates>
@@ -126,35 +136,71 @@
             </field>
         </record>
 
-        <record id="hr_department_kanban_action" model="ir.actions.act_window">
-            <field name="name">Departments</field>
-            <field name="res_model">hr.department</field>
-            <field name="view_mode">kanban,tree,form</field>
-            <field name="search_view_id" ref="view_department_filter"/>
-            <field name="help" type="html">
-              <p class="o_view_nocontent_smiling_face">
-                Create a new department
-              </p><p>
-                Odoo's department structure is used to manage all documents
-                related to employees by departments: expenses, timesheets,
-                time off, recruitments, etc.
-              </p>
-            </field>
-        </record>
         <record id="hr_department_tree_action" model="ir.actions.act_window">
             <field name="name">Departments</field>
             <field name="res_model">hr.department</field>
-            <field name="view_mode">tree,form,kanban</field>
+            <field name="search_view_id" ref="view_department_filter"/>
+            <field name="domain">[("has_read_access", "=", True)]</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Create a new department
+                </p><p>
+                    Structure Employees per department and have an overview of e.g.
+                    expenses, timesheets, time off, recruitment, etc.
+                </p>
+            </field>
+        </record>
+
+        <record id="hr_department_tree_view_tree_action" model="ir.actions.act_window.view">
+            <field name="sequence" eval="10"/>
+            <field name="view_mode">list</field>
+            <field name="act_window_id" ref="hr.hr_department_tree_action"/>
+        </record>
+
+        <record id="hr_department_form_view_tree_action" model="ir.actions.act_window.view">
+            <field name="sequence" eval="15"/>
+            <field name="view_mode">form</field>
+            <field name="act_window_id" ref="hr.hr_department_tree_action"/>
+        </record>
+
+        <record id="hr_department_kanban_view_tree_action" model="ir.actions.act_window.view">
+            <field name="sequence" eval="20"/>
+            <field name="view_mode">kanban</field>
+            <field name="act_window_id" ref="hr.hr_department_tree_action"/>
+        </record>
+
+        <record id="hr_department_kanban_action" model="ir.actions.act_window">
+            <field name="name">Departments</field>
+            <field name="res_model">hr.department</field>
+            <field name="path">departments</field>
+            <field name="domain">[("has_read_access", "=", True)]</field>
             <field name="search_view_id" ref="view_department_filter"/>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">
                     Create a new department
                 </p><p>
-                    Odoo's department structure is used to manage all documents
-                    related to employees by departments: expenses, timesheets,
-                    leaves, recruitments, etc.
+                    Structure Employees per department and have an overview of e.g.
+                    expenses, timesheets, time off, recruitment, etc.
                 </p>
             </field>
+        </record>
+
+        <record id="hr_department_kanban_view_kanban_action" model="ir.actions.act_window.view">
+            <field name="sequence" eval="10"/>
+            <field name="view_mode">kanban</field>
+            <field name="act_window_id" ref="hr.hr_department_kanban_action"/>
+        </record>
+
+        <record id="hr_department_tree_view_kanban_action" model="ir.actions.act_window.view">
+            <field name="sequence" eval="15"/>
+            <field name="view_mode">list</field>
+            <field name="act_window_id" ref="hr.hr_department_kanban_action"/>
+        </record>
+
+        <record id="hr_department_form_view_kanban_action" model="ir.actions.act_window.view">
+            <field name="sequence" eval="20"/>
+            <field name="view_mode">form</field>
+            <field name="act_window_id" ref="hr.hr_department_kanban_action"/>
         </record>
     </data>
 </odoo>

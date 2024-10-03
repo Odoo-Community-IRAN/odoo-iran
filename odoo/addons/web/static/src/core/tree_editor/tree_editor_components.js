@@ -1,7 +1,6 @@
-/** @odoo-module **/
-
 import { Component } from "@odoo/owl";
 import { TagsList } from "@web/core/tags_list/tags_list";
+import { _t } from "@web/core/l10n/translation";
 
 export class Input extends Component {
     static props = ["value", "update", "startEmpty?"];
@@ -25,6 +24,23 @@ export class Range extends Component {
     static props = ["value", "update", "editorInfo"];
     static template = "web.TreeEditor.Range";
 
+    update(index, newValue) {
+        const result = [...this.props.value];
+        result[index] = newValue;
+        return this.props.update(result);
+    }
+}
+
+export class Within extends Component {
+    static props = ["value", "update", "amountEditorInfo", "optionEditorInfo"];
+    static template = "web.TreeEditor.Within";
+    static components = { Input, Select };
+    static options = [
+        ["days", _t("days")],
+        ["weeks", _t("weeks")],
+        ["months", _t("months")],
+        ["years", _t("years")],
+    ];
     update(index, newValue) {
         const result = [...this.props.value];
         result[index] = newValue;

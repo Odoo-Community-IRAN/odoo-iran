@@ -1,8 +1,8 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo import fields, models, api
 from odoo.osv.expression import OR
+
 import uuid
 from werkzeug.urls import url_join
 
@@ -13,8 +13,6 @@ class ResCompany(models.Model):
     def _default_company_token(self):
         return str(uuid.uuid4())
 
-    hr_attendance_overtime = fields.Boolean(string="Count Extra Hours")
-    overtime_start_date = fields.Date(string="Extra Hours Starting Date")
     overtime_company_threshold = fields.Integer(string="Tolerance Time In Favor Of Company", default=0)
     overtime_employee_threshold = fields.Integer(string="Tolerance Time In Favor Of Employee", default=0)
     hr_attendance_display_overtime = fields.Boolean(string="Display Extra Hours")
@@ -33,6 +31,13 @@ class ResCompany(models.Model):
     attendance_kiosk_url = fields.Char(compute="_compute_attendance_kiosk_url")
     attendance_kiosk_use_pin = fields.Boolean(string='Employee PIN Identification')
     attendance_from_systray = fields.Boolean(string='Attendance From Systray', default=True)
+    attendance_overtime_validation = fields.Selection([
+        ('no_validation', 'Automatically Approved'),
+        ('by_manager', 'Approved by Manager'),
+    ], string='Extra Hours Validation', default='no_validation')
+    auto_check_out = fields.Boolean(string="Automatic Check Out", default=False)
+    auto_check_out_tolerance = fields.Float(default=2, export_string_translation=False)
+    absence_management = fields.Boolean(string="Absence Management", default=False)
 
     @api.depends("attendance_kiosk_key")
     def _compute_attendance_kiosk_url(self):
@@ -63,50 +68,18 @@ class ResCompany(models.Model):
             self.env.cr.execute_values(query, values_args)
 
     def write(self, vals):
-        search_domain = False  # Overtime to generate
-        delete_domain = False  # Overtime to delete
-
-        overtime_enabled_companies = self.filtered('hr_attendance_overtime')
-        # Prevent any further logic if we are disabling the feature
-        is_disabling_overtime = False
-        # If we disable overtime
-        if 'hr_attendance_overtime' in vals and not vals['hr_attendance_overtime'] and overtime_enabled_companies:
-            delete_domain = [('company_id', 'in', overtime_enabled_companies.ids)]
-            vals['overtime_start_date'] = False
-            is_disabling_overtime = True
-
-        start_date = vals.get('hr_attendance_overtime') and vals.get('overtime_start_date')
+        search_domains = []  # Overtime to generate
         # Also recompute if the threshold have changed
-        if not is_disabling_overtime and (
-            start_date or 'overtime_company_threshold' in vals or 'overtime_employee_threshold' in vals):
+        if 'overtime_company_threshold' in vals or 'overtime_employee_threshold' in vals:
             for company in self:
                 # If we modify the thresholds only
-                if start_date == company.overtime_start_date and \
-                    (vals.get('overtime_company_threshold') != company.overtime_company_threshold) or\
+                if (vals.get('overtime_company_threshold') != company.overtime_company_threshold) or\
                     (vals.get('overtime_employee_threshold') != company.overtime_employee_threshold):
-                    search_domain = OR([search_domain, [('employee_id.company_id', '=', company.id)]])
-                # If we enabled the overtime with a start date
-                elif not company.overtime_start_date and start_date:
-                    search_domain = OR([search_domain, [
-                        ('employee_id.company_id', '=', company.id),
-                        ('check_in', '>=', start_date)]])
-                # If we move the start date into the past
-                elif start_date and company.overtime_start_date > start_date:
-                    search_domain = OR([search_domain, [
-                        ('employee_id.company_id', '=', company.id),
-                        ('check_in', '>=', start_date),
-                        ('check_in', '<=', company.overtime_start_date)]])
-                # If we move the start date into the future
-                elif start_date and company.overtime_start_date < start_date:
-                    delete_domain = OR([delete_domain, [
-                        ('company_id', '=', company.id),
-                        ('date', '<', start_date)]])
+                    search_domains.append([('employee_id.company_id', '=', company.id)])
 
         res = super().write(vals)
-        if delete_domain:
-            self.env['hr.attendance.overtime'].search(delete_domain).unlink()
-        if search_domain:
-            self.env['hr.attendance'].search(search_domain)._update_overtime()
+        if search_domains:
+            self.env['hr.attendance'].search(OR(search_domains))._update_overtime()
 
         return res
 
@@ -116,9 +89,10 @@ class ResCompany(models.Model):
             'attendance_kiosk_key': uuid.uuid4().hex
         })
 
-    def _action_open_kiosk_mode(self):
-        return {
-            'type': 'ir.actions.act_url',
-            'target': 'self',
-            'url': f'/hr_attendance/kiosk_mode_menu/{self.env.company.id}',
-        }
+    def _check_hr_presence_control(self, at_install):
+        companies = self.env.companies
+        for company in companies:
+            if at_install and company.hr_presence_control_login:
+                company.hr_presence_control_attendance = True
+            if not at_install and company.hr_presence_control_attendance:
+                company.hr_presence_control_login = True

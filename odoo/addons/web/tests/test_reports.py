@@ -37,13 +37,13 @@ class TestReports(odoo.tests.HttpCase):
         result = {}
         origin_find_record = self.env.registry['ir.binary']._find_record
 
-        def _find_record(self, xmlid=None, res_model='ir.attachment', res_id=None, access_token=None):
+        def _find_record(self, xmlid=None, res_model='ir.attachment', res_id=None, access_token=None, field=None):
             if res_model == 'ir.attachment' and res_id == image.id:
                 result['uid'] = self.env.uid
-                record = origin_find_record(self, xmlid, res_model, res_id, access_token)
+                record = origin_find_record(self, xmlid, res_model, res_id, access_token, field)
                 result.update({'record_id': record.id, 'data': record.datas})
             else:
-                record = origin_find_record(self, xmlid, res_model, res_id, access_token)
+                record = origin_find_record(self, xmlid, res_model, res_id, access_token, field)
             return record
 
         self.patch(self.env.registry['ir.binary'], '_find_record', _find_record)

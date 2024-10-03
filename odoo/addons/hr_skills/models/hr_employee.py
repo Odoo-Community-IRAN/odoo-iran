@@ -1,15 +1,16 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo import api, fields, models
+from odoo.tools import convert
 
 
 class Employee(models.Model):
     _inherit = 'hr.employee'
 
     resume_line_ids = fields.One2many('hr.resume.line', 'employee_id', string="Resume lines")
-    employee_skill_ids = fields.One2many('hr.employee.skill', 'employee_id', string="Skills")
-    skill_ids = fields.Many2many('hr.skill', compute='_compute_skill_ids', store=True)
+    employee_skill_ids = fields.One2many('hr.employee.skill', 'employee_id', string="Skills",
+        domain=[('skill_type_id.active', '=', True)])
+    skill_ids = fields.Many2many('hr.skill', compute='_compute_skill_ids', store=True, groups="hr.group_hr_user")
 
     @api.depends('employee_skill_ids.skill_id')
     def _compute_skill_ids(self):
@@ -39,3 +40,10 @@ class Employee(models.Model):
         if 'department_id' in vals:
             self.employee_skill_ids._create_logs()
         return res
+
+    def _load_scenario(self):
+        super()._load_scenario()
+        demo_tag = self.env.ref('hr_skills.employee_resume_line_emp_eg_1', raise_if_not_found=False)
+        if demo_tag:
+            return
+        convert.convert_file(self.env, 'hr_skills', 'data/scenarios/hr_skills_scenario.xml', None, mode='init', kind='data')

@@ -37,11 +37,9 @@
                                 <field name="currency_id" options="{'no_create': True}" groups="base.group_multi_currency"/>
                             </group>
                         </group>
+                        <notebook></notebook>
                     </sheet>
-                    <div class="oe_chatter">
-                        <field name="message_follower_ids"/>
-                        <field name="message_ids"/>
-                    </div>
+                    <chatter/>
                 </form>
             </field>
         </record>
@@ -51,7 +49,7 @@
             <field name="model">account.analytic.account</field>
             <field eval="8" name="priority"/>
             <field name="arch" type="xml">
-                <tree string="Analytic Accounts" multi_edit="1">
+                <list string="Analytic Accounts" multi_edit="1">
                     <field name="company_id" column_invisible="True"/>
                     <field name="currency_id" column_invisible="True"/>
                     <field name="name" string="Name"/>
@@ -63,7 +61,7 @@
                     <field name="debit" sum="Debit" column_invisible="True"/>
                     <field name="credit" sum="Credit" column_invisible="True"/>
                     <field name="balance" sum="Balance"/>
-                </tree>
+                </list>
             </field>
         </record>
 
@@ -74,9 +72,9 @@
             <field eval="18" name="priority"/>
             <field name="inherit_id" ref="analytic.view_account_analytic_account_list"/>
             <field name="arch" type="xml">
-                <tree position="attributes">
+                <list position="attributes">
                     <attribute name="multi_edit">0</attribute>
-                </tree>
+                </list>
             </field>
         </record>
 
@@ -85,23 +83,15 @@
             <field name="model">account.analytic.account</field>
             <field name="arch" type="xml">
                <kanban class="o_kanban_mobile">
-                   <field name="display_name"/>
-                   <field name="balance"/>
                    <field name="currency_id"/>
                    <templates>
-                        <t t-name="kanban-box">
-                            <div t-attf-class="oe_kanban_card oe_kanban_global_click">
-                                <div t-attf-class="#{!selection_mode ? 'text-center' : ''}">
-                                   <strong><span><field name="display_name"/></span></strong>
-                                </div>
-                                <hr class="mt8 mb8"/>
-                                <div class="row">
-                                    <div t-attf-class="col-12 #{!selection_mode ? 'text-center' : ''}">
-                                        <span>
-                                            Balance: <field name="balance" widget="monetary"/>
-                                        </span>
-                                    </div>
-                                </div>
+                        <t t-name="card">
+                            <div t-attf-class="#{!selection_mode ? 'text-center' : ''}">
+                                <field class="fw-bold fs-5" name="display_name"/>
+                            </div>
+                            <hr class="mt-2 mb-2"/>
+                            <div t-attf-class="#{!selection_mode ? 'text-center' : ''}">
+                                Balance: <field name="balance" widget="monetary"/>
                             </div>
                         </t>
                     </templates>
@@ -128,7 +118,7 @@
         <record id="action_analytic_account_form" model="ir.actions.act_window">
             <field name="name">Chart of Analytic Accounts</field>
             <field name="res_model">account.analytic.account</field>
-            <field name="view_mode">tree,kanban,form</field>
+            <field name="view_mode">list,kanban,form</field>
             <field name="search_view_id" ref="view_account_analytic_account_search"/>
             <field name="context">{'search_default_active':1}</field>
             <field name="view_id" ref="view_account_analytic_account_list"/>
@@ -144,7 +134,7 @@
             <field name="res_model">account.analytic.account</field>
             <field name="search_view_id" ref="view_account_analytic_account_search"/>
             <field name="context">{'search_default_active':1}</field>
-            <field name="view_mode">tree,kanban,form</field>
+            <field name="view_mode">list,kanban,form</field>
             <field name="help" type="html">
               <p class="o_view_nocontent_smiling_face">
                 Add a new analytic account

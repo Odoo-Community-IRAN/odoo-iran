@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { useHotkey } from "@web/core/hotkeys/hotkey_hook";
 import { useActiveElement } from "../ui/ui_service";
 import { useForwardRefToParent } from "@web/core/utils/hooks";
@@ -32,6 +30,44 @@ const useDialogDraggable = makeDraggableHook({
 });
 
 export class Dialog extends Component {
+    static template = "web.Dialog";
+    static props = {
+        contentClass: { type: String, optional: true },
+        bodyClass: { type: String, optional: true },
+        fullscreen: { type: Boolean, optional: true },
+        footer: { type: Boolean, optional: true },
+        header: { type: Boolean, optional: true },
+        size: {
+            type: String,
+            optional: true,
+            validate: (s) => ["sm", "md", "lg", "xl", "fs", "fullscreen"].includes(s),
+        },
+        technical: { type: Boolean, optional: true },
+        title: { type: String, optional: true },
+        modalRef: { type: Function, optional: true },
+        slots: {
+            type: Object,
+            shape: {
+                default: Object, // Content is not optional
+                header: { type: Object, optional: true },
+                footer: { type: Object, optional: true },
+            },
+        },
+        withBodyPadding: { type: Boolean, optional: true },
+        onExpand: { type: Function, optional: true },
+    };
+    static defaultProps = {
+        contentClass: "",
+        bodyClass: "",
+        fullscreen: false,
+        footer: true,
+        header: true,
+        size: "lg",
+        technical: true,
+        title: "Odoo",
+        withBodyPadding: true,
+    };
+
     setup() {
         this.modalRef = useForwardRefToParent("modalRef");
         useActiveElement("modalRef");
@@ -55,21 +91,24 @@ export class Dialog extends Component {
         );
         this.id = `dialog_${this.data.id}`;
         useChildSubEnv({ inDialog: true, dialogId: this.id });
-        this.position = useState({ left: 0, top: 0 });
-        useDialogDraggable({
-            enable: () => !this.env.isSmall,
-            ref: this.modalRef,
-            elements: ".modal-content",
-            handle: ".modal-header",
-            ignore: "button",
-            edgeScrolling: { enabled: false },
-            onDrop: ({ top, left }) => {
-                this.position.left += left;
-                this.position.top += top;
-            },
-        });
-        const throttledResize = throttleForAnimation(this.onResize.bind(this));
-        useExternalListener(window, "resize", throttledResize);
+        this.isMovable = this.props.header;
+        if (this.isMovable) {
+            this.position = useState({ left: 0, top: 0 });
+            useDialogDraggable({
+                enable: () => !this.env.isSmall,
+                ref: this.modalRef,
+                elements: ".modal-content",
+                handle: ".modal-header",
+                ignore: "button, input",
+                edgeScrolling: { enabled: false },
+                onDrop: ({ top, left }) => {
+                    this.position.left += left;
+                    this.position.top += top;
+                },
+            });
+            const throttledResize = throttleForAnimation(this.onResize.bind(this));
+            useExternalListener(window, "resize", throttledResize);
+        }
         onWillDestroy(() => {
             if (this.env.isSmall) {
                 this.data.scrollToOrigin();
@@ -82,7 +121,10 @@ export class Dialog extends Component {
     }
 
     get contentStyle() {
-        return `top: ${this.position.top}px; left: ${this.position.left}px;`;
+        if (this.isMovable) {
+            return `top: ${this.position.top}px; left: ${this.position.left}px;`;
+        }
+        return "";
     }
 
     onResize() {
@@ -101,39 +143,3 @@ export class Dialog extends Component {
         return this.data.close();
     }
 }
-Dialog.template = "web.Dialog";
-Dialog.props = {
-    contentClass: { type: String, optional: true },
-    bodyClass: { type: String, optional: true },
-    fullscreen: { type: Boolean, optional: true },
-    footer: { type: Boolean, optional: true },
-    header: { type: Boolean, optional: true },
-    size: {
-        type: String,
-        optional: true,
-        validate: (s) => ["sm", "md", "lg", "xl", "fs", "fullscreen"].includes(s),
-    },
-    technical: { type: Boolean, optional: true },
-    title: { type: String, optional: true },
-    modalRef: { type: Function, optional: true },
-    slots: {
-        type: Object,
-        shape: {
-            default: Object, // Content is not optional
-            header: { type: Object, optional: true },
-            footer: { type: Object, optional: true },
-        },
-    },
-    withBodyPadding: { type: Boolean, optional: true },
-};
-Dialog.defaultProps = {
-    contentClass: "",
-    bodyClass: "",
-    fullscreen: false,
-    footer: true,
-    header: true,
-    size: "lg",
-    technical: true,
-    title: "Odoo",
-    withBodyPadding: true,
-};

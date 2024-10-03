@@ -1,7 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo import _, api, fields, models
-from odoo.osv.expression import OR
+from odoo.osv.expression import AND
 
 from odoo.addons.payment_custom import const
 
@@ -32,20 +32,6 @@ class PaymentProvider(models.Model):
         providers.filtered(lambda p: p.custom_mode == 'wire_transfer').pending_msg = None
         return providers
 
-    @api.depends('code')
-    def _compute_view_configuration_fields(self):
-        """ Override of payment to hide the credentials page.
-
-        :return: None
-        """
-        super()._compute_view_configuration_fields()
-        self.filtered(lambda p: p.code == 'custom').update({
-            'show_credentials_page': False,
-            'show_pre_msg': False,
-            'show_done_msg': False,
-            'show_cancel_msg': False,
-        })
-
     def action_recompute_pending_msg(self):
         """ Recompute the pending message to include the existing bank accounts. """
         account_payment_module = self.env['ir.module.module']._get('account_payment')
@@ -66,11 +52,11 @@ class PaymentProvider(models.Model):
                     f'</div>'
 
     @api.model
-    def _get_removal_domain(self, provider_code):
-        return OR([
-            super()._get_removal_domain(provider_code),
-            [('code', '=', 'custom'), ('custom_mode', '=', provider_code)],
-        ])
+    def _get_removal_domain(self, provider_code, custom_mode='', **kwargs):
+        res = super()._get_removal_domain(provider_code, custom_mode=custom_mode, **kwargs)
+        if provider_code == 'custom' and custom_mode:
+            return AND([res, [('custom_mode', '=', custom_mode)]])
+        return res
 
     @api.model
     def _get_removal_values(self):
@@ -89,6 +75,6 @@ class PaymentProvider(models.Model):
     def _get_default_payment_method_codes(self):
         """ Override of `payment` to return the default payment method codes. """
         default_codes = super()._get_default_payment_method_codes()
-        if self.custom_mode != 'wire_transfer':
+        if self.code != 'custom' or self.custom_mode != 'wire_transfer':
             return default_codes
         return const.DEFAULT_PAYMENT_METHOD_CODES

@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { Component, useExternalListener, useState } from "@odoo/owl";
 import { browser } from "@web/core/browser/browser";
 import { isEventHandled } from "@web/core/utils/misc";
@@ -55,19 +53,13 @@ export class Picker extends Component {
         "pickers",
         "position?",
         "storeScroll",
+        "fixed?",
     ];
     static template = "mail.Picker";
 
     setup() {
         this.ui = useState(useService("ui"));
-        this.popover = usePopover(PickerContent, {
-            position: this.props.position,
-            fixedPosition: true,
-            onClose: () => this.close(),
-            closeOnClickAway: false,
-            animation: false,
-            arrow: false,
-        });
+        this.popover = usePopover(PickerContent, this.popoverSettings);
         useExternalListener(
             browser,
             "click",
@@ -89,6 +81,17 @@ export class Picker extends Component {
                 async (ev) => this.toggle(this.props.anchor?.el ?? button.el, ev)
             );
         }
+    }
+
+    get popoverSettings() {
+        return {
+            position: this.props.position,
+            fixedPosition: this.props.fixed,
+            onClose: () => this.close(),
+            closeOnClickAway: false,
+            animation: false,
+            arrow: false,
+        };
     }
 
     get contentProps() {

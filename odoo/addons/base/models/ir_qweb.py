@@ -24,7 +24,7 @@ which executes its directive but doesn't generate any output in and of
 itself.
 
 To create new XML template, please see :doc:`QWeb Templates documentation
-<https://www.odoo.com/documentation/17.0/developer/reference/frontend/qweb.html>`
+<https://www.odoo.com/documentation/master/developer/reference/frontend/qweb.html>`
 
 Rendering process
 =================
@@ -190,7 +190,7 @@ Only validate the **input**, the compilation if inside the ``t-if`` directive.
 **Values**: name of the allowed odoo user group, or preceded by ``!`` for
 prohibited groups
 
-The generated code uses ``user_has_groups`` Odoo method.
+The generated code uses ``has_group`` Odoo method from ``res.users`` model.
 
 ``t-foreach``
 ~~~~~~~~~~~~~
@@ -380,6 +380,7 @@ import traceback
 import warnings
 import werkzeug
 
+import psycopg2.errors
 from markupsafe import Markup, escape
 from collections.abc import Sized, Mapping
 from itertools import count, chain
@@ -764,6 +765,8 @@ class IrQWeb(models.AbstractModel):
                     except Exception as e:
                         if isinstance(e, TransactionRollbackError):
                             raise
+                        if isinstance(e, ReadOnlySqlTransaction):
+                            raise
                         raise QWebException("Error while render the template",
                             self, template, ref={compile_context['ref']!r}, code=code) from e
                     """, 0)]
@@ -958,6 +961,7 @@ class IrQWeb(models.AbstractModel):
             'QWebException': QWebException,
             'Exception': Exception,
             'TransactionRollbackError': TransactionRollbackError, # for SerializationFailure in assets
+            'ReadOnlySqlTransaction': psycopg2.errors.ReadOnlySqlTransaction,
             'ValueError': ValueError,
             'UserError': UserError,
             'AccessDenied': AccessDenied,
@@ -1237,7 +1241,15 @@ class IrQWeb(models.AbstractModel):
         """ Generates a text value (an instance of text_type) from an arbitrary
             source.
         """
-        return pycompat.to_text(expr)
+        if expr is None or expr is False:
+            return ''
+
+        if isinstance(expr, str):
+            return expr
+        elif isinstance(expr, bytes):
+            return expr.decode()
+        else:
+            return str(expr)
 
     # order
 
@@ -1836,14 +1848,14 @@ class IrQWeb(models.AbstractModel):
         """Compile `t-groups` expressions into a python code as a list of
         strings.
 
-        The code will contain the condition `if self.user_has_groups(groups)`
+        The code will contain the condition `if self.env.user.has_groups(groups)`
         part that wrap the rest of the compiled code of this element.
         """
         groups = el.attrib.pop('t-groups', el.attrib.pop('groups', None))
 
         strip = self._rstrip_text(compile_context)
         code = self._flush_text(compile_context, level)
-        code.append(indent_code(f"if self.user_has_groups({groups!r}):", level))
+        code.append(indent_code(f"if self.env.user.has_groups({groups!r}):", level))
         if strip and el.tag.lower() != 't':
             self._append_text(strip, compile_context)
         code.extend([
@@ -2419,7 +2431,7 @@ class IrQWeb(models.AbstractModel):
         inherit_branding = (
                 self.env.context['inherit_branding']
                 if 'inherit_branding' in self.env.context
-                else self.env.context.get('inherit_branding_auto') and record.check_access_rights('write', False))
+                else self.env.context.get('inherit_branding_auto') and record.has_access('write'))
         field_options['inherit_branding'] = inherit_branding
         translate = self.env.context.get('edit_translations') and values.get('translatable') and field.translate
         field_options['translate'] = translate
@@ -2474,7 +2486,7 @@ class IrQWeb(models.AbstractModel):
         If debug=assets, the assets will be regenerated when a file which composes them has been modified.
         Else, the assets will be generated only once and then stored in cache.
         """
-        rtl = self.env['res.lang'].sudo()._lang_get_direction(self.env.context.get('lang') or self.env.user.lang) == 'rtl'
+        rtl = self.env['res.lang'].sudo()._get_data(code=(self.env.lang or self.env.user.lang)).direction == 'rtl'
         assets_params = self.env['ir.asset']._get_asset_params() # website_id
         debug_assets = debug and 'assets' in debug
 

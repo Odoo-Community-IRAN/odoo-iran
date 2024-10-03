@@ -2,7 +2,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo.addons.mail.tests.common import mail_new_test_user
-from odoo.tests.common import Form, TransactionCase
+from odoo.tests import Form, TransactionCase
 from odoo.exceptions import AccessError, UserError
 
 
@@ -18,17 +18,17 @@ class TestEditableQuant(TransactionCase):
         Location = cls.env['stock.location']
         cls.product = Product.create({
             'name': 'Product A',
-            'type': 'product',
+            'is_storable': True,
             'categ_id': cls.env.ref('product.product_category_all').id,
         })
         cls.product2 = Product.create({
             'name': 'Product B',
-            'type': 'product',
+            'is_storable': True,
             'categ_id': cls.env.ref('product.product_category_all').id,
         })
         cls.product_tracked_sn = Product.create({
             'name': 'Product tracked by SN',
-            'type': 'product',
+            'is_storable': True,
             'tracking': 'serial',
             'categ_id': cls.env.ref('product.product_category_all').id,
         })
@@ -272,7 +272,6 @@ class TestEditableQuant(TransactionCase):
         sn1 = self.env['stock.lot'].create({
             'name': 'serial1',
             'product_id': self.product_tracked_sn.id,
-            'company_id': self.env.company.id,
         })
 
         self.Quant.create({
@@ -327,36 +326,3 @@ class TestEditableQuant(TransactionCase):
         self.assertEqual(len(move_lines), 2, "Two inventory adjustment move lines should have been created")
         move_lines.action_revert_inventory()
         self.assertEqual(self.product.qty_available, 0, "After revert multi inventory adjustment qty is not zero")
-
-    def test_group_quants(self):
-        """
-        Check that the `inventory_quantity_auto_apply` is read in read_group even
-        if it is not stored.
-        """
-        self.Quant.create([
-            {
-            'product_id': self.product.id,
-            'location_id': self.env.ref('stock.warehouse0').lot_stock_id.id,
-            'quantity': 100,
-            },
-            {
-            'product_id': self.product2.id,
-            'location_id': self.env.ref('stock.warehouse0').lot_stock_id.id,
-            'quantity': 50,
-            },
-        ])
-        fields = [
-            "product_id",
-            "inventory_quantity_auto_apply",
-            "reserved_quantity",
-        ]
-        context = {
-            "inventory_mode": True,
-            "inventory_report_mode": True
-        }
-        groupby = ['product_id']
-        groups = self.Quant.with_context(**context).read_group(domain=[('product_id', 'in', (self.product.id, self.product2.id))], fields=fields, groupby=groupby, limit=2)
-        group1 = next(filter(lambda g: g['product_id'][0] == self.product.id, groups))
-        self.assertEqual(group1['inventory_quantity_auto_apply'], 100)
-        group2 = next(filter(lambda g: g['product_id'][0] == self.product2.id, groups))
-        self.assertEqual(group2['inventory_quantity_auto_apply'], 50)

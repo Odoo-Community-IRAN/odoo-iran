@@ -5,9 +5,10 @@
             <SuggestedRecipient
                 t-foreach="suggestedRecipients"
                 t-as="recipient"
-                t-key="recipient.id"
+                t-key="recipient_index"
                 thread="props.thread"
                 recipient="recipient"
+                onSuggestedRecipientAdded="props.onSuggestedRecipientAdded"
             />
             <t t-if="props.thread.suggestedRecipients.length > 3">
                 <button t-if="!state.showMore" class="btn btn-sm btn-link" t-on-click="() => this.state.showMore = true">

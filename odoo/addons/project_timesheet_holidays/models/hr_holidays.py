@@ -65,7 +65,7 @@ class Holidays(models.Model):
         vals_list = []
         leave_ids = []
         for leave in self:
-            if leave.holiday_type != 'employee' or not leave.holiday_status_id.timesheet_generate:
+            if not leave.holiday_status_id.timesheet_generate:
                 continue
 
             if leave.holiday_status_id.company_id:
@@ -80,9 +80,9 @@ class Holidays(models.Model):
             if not leave.employee_id:
                 continue
 
-            work_hours_data = leave.employee_id.list_work_time_per_day(
+            work_hours_data = leave.employee_id._list_work_time_per_day(
                 leave.date_from,
-                leave.date_to)
+                leave.date_to)[leave.employee_id.id]
 
             for index, (day_date, work_hours_count) in enumerate(work_hours_data):
                 vals_list.append(leave._timesheet_prepare_line_values(index, work_hours_data, day_date, work_hours_count, project, task))
@@ -100,10 +100,10 @@ class Holidays(models.Model):
     def _timesheet_prepare_line_values(self, index, work_hours_data, day_date, work_hours_count, project, task):
         self.ensure_one()
         return {
-            'name': _("Time Off (%s/%s)", index + 1, len(work_hours_data)),
+            'name': _("Time Off (%(index)s/%(total)s)", index=index + 1, total=len(work_hours_data)),
             'project_id': project.id,
             'task_id': task.id,
-            'account_id': project.sudo().analytic_account_id.id,
+            'account_id': project.sudo().account_id.id,
             'unit_amount': work_hours_count,
             'user_id': self.employee_id.user_id.id,
             'date': day_date,
@@ -126,7 +126,7 @@ class Holidays(models.Model):
             ("company_id.leave_timesheet_task_id", "!=", False),
         ])
         if global_leaves:
-            global_leaves._generate_public_time_off_timesheets(self.sudo().employee_ids)
+            global_leaves._generate_public_time_off_timesheets(self.employee_id)
 
     def action_refuse(self):
         """ Remove the timesheets linked to the refused holidays """

@@ -1,20 +1,18 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
-import { Component, onWillStart, onWillUpdateProps, useState } from "@odoo/owl";
+import { Component, useState } from "@odoo/owl";
 import { Domain, InvalidDomainError } from "@web/core/domain";
 import { DomainSelector } from "@web/core/domain_selector/domain_selector";
 import { DomainSelectorDialog } from "@web/core/domain_selector_dialog/domain_selector_dialog";
 import { EvaluationError } from "@web/core/py_js/py_builtin";
+import { rpc } from "@web/core/network/rpc";
 import { registry } from "@web/core/registry";
 import { SelectCreateDialog } from "@web/views/view_dialogs/select_create_dialog";
 import { standardFieldProps } from "../standard_field_props";
 import { useBus, useService, useOwnedDialogs } from "@web/core/utils/hooks";
-import {
-    useGetDomainTreeDescription,
-    useGetDefaultLeafDomain,
-} from "@web/core/domain_selector/utils";
+import { useGetTreeDescription, useMakeGetFieldDef } from "@web/core/tree_editor/utils";
+import { useGetDefaultLeafDomain } from "@web/core/domain_selector/utils";
 import { treeFromDomain } from "@web/core/tree_editor/condition_tree";
+import { useRecordObserver } from "@web/model/relational_model/utils";
 
 export class DomainField extends Component {
     static template = "web.DomainField";
@@ -34,9 +32,9 @@ export class DomainField extends Component {
     };
 
     setup() {
-        this.rpc = useService("rpc");
         this.orm = useService("orm");
-        this.getDomainTreeDescription = useGetDomainTreeDescription();
+        this.getDomainTreeDescription = useGetTreeDescription();
+        this.makeGetFieldDef = useMakeGetFieldDef();
         this.getDefaultLeafDomain = useGetDefaultLeafDomain();
         this.addDialog = useOwnedDialogs();
 
@@ -47,23 +45,18 @@ export class DomainField extends Component {
             facets: [],
         });
 
-        this.isDebugEdited = false;
-        onWillStart(() => {
-            this.checkProps(); // not awaited
-            if (this.props.isFoldable) {
-                this.loadFacets();
+        this.debugDomain = null;
+        useRecordObserver(async (record, nextProps) => {
+            nextProps = { ...nextProps, record };
+            if (this.debugDomain && this.props.readonly !== nextProps.readonly) {
+                this.debugDomain = null;
             }
-        });
-        onWillUpdateProps((nextProps) => {
-            if (this.isDebugEdited) {
-                this.quickValidityCheck(nextProps).then((isValid) => {
-                    this.state.isValid = isValid;
-                    this.isDebugEdited = false; // will allow the count to be loaded if needed
-                    if (!isValid) {
-                        this.state.recordCount = 0;
-                        nextProps.record.setInvalidField(nextProps.name);
-                    }
-                });
+            if (this.debugDomain) {
+                this.state.isValid = await this.quickValidityCheck(nextProps);
+                if (!this.state.isValid) {
+                    this.state.recordCount = 0;
+                    nextProps.record.setInvalidField(nextProps.name);
+                }
             } else {
                 this.checkProps(nextProps); // not awaited
             }
@@ -73,19 +66,20 @@ export class DomainField extends Component {
         });
 
         useBus(this.props.record.model.bus, "NEED_LOCAL_CHANGES", async (ev) => {
-            if (this.isDebugEdited) {
+            if (this.debugDomain) {
                 const props = this.props;
-                ev.detail.proms.push(
-                    this.quickValidityCheck(props).then((isValid) => {
-                        if (isValid) {
-                            this.isDebugEdited = false; // will allow the count to be loaded if needed
-                        } else {
-                            this.state.isValid = false;
-                            this.state.recordCount = 0;
-                            props.record.setInvalidField(props.name);
-                        }
-                    })
-                );
+                const handleChanges = async () => {
+                    await props.record.update({ [props.name]: this.debugDomain });
+                    const isValid = await this.quickValidityCheck(props);
+                    if (isValid) {
+                        this.debugDomain = null; // will allow the count to be loaded if needed
+                    } else {
+                        this.state.isValid = false;
+                        this.state.recordCount = 0;
+                        props.record.setInvalidField(props.name);
+                    }
+                };
+                ev.detail.proms.push(handleChanges());
             }
         });
     }
@@ -146,12 +140,10 @@ export class DomainField extends Component {
         let promises = [];
         const domain = this.getDomain(props);
         try {
-            const tree = treeFromDomain(domain, { distributeNot: !this.env.debug });
+            const getFieldDef = await this.makeGetFieldDef(resModel, treeFromDomain(domain));
+            const tree = treeFromDomain(domain, { distributeNot: !this.env.debug, getFieldDef });
             const trees = !tree.negate && tree.value === "&" ? tree.children : [tree];
-            promises = trees.map(async (tree) => {
-                const description = await this.getDomainTreeDescription(resModel, tree);
-                return description;
-            });
+            promises = trees.map((tree) => this.getDomainTreeDescription(resModel, tree));
         } catch (error) {
             if (error.data?.name === "builtins.KeyError" && error.data.message === resModel) {
                 // we don't want to support invalid models
@@ -236,12 +228,24 @@ export class DomainField extends Component {
         if (domain.isInvalid) {
             return false;
         }
-        return this.rpc("/web/domain/validate", { model: resModel, domain });
+        return rpc("/web/domain/validate", { model: resModel, domain });
     }
 
     update(domain, isDebugEdited = false) {
-        this.isDebugEdited = isDebugEdited;
-        return this.props.record.update({ [this.props.name]: domain });
+        if (!isDebugEdited) {
+            this.debugDomain = null;
+        }
+        this.props.record.update({ [this.props.name]: domain });
+        this.props.record.model.bus.trigger("FIELD_IS_DIRTY", false);
+    }
+
+    debugUpdate(domain) {
+        const isDirty = domain !== this.getDomain();
+        this.debugDomain = isDirty ? domain : null;
+        this.props.record.model.bus.trigger("FIELD_IS_DIRTY", isDirty);
+        if (!this.props.record.isValid) {
+            this.props.record.resetFieldValidity(this.props.name);
+        }
     }
 
     fold() {

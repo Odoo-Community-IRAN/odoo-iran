@@ -3,16 +3,16 @@
 # 	* website_slides_survey
 # 
 # Translators:
-# Wil Odoo, 2023
 # Rasareeyar Lappiam, 2024
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:56+0000\n"
-"PO-Revision-Date: 2023-10-26 23:10+0000\n"
-"Last-Translator: Rasareeyar Lappiam, 2024\n"
+"POT-Creation-Date: 2024-09-26 08:56+0000\n"
+"PO-Revision-Date: 2024-09-25 09:42+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Thai (https://app.transifex.com/odoo/teams/41243/th/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -21,11 +21,15 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0;\n"
 
 #. module: website_slides_survey
+#: model:ir.model.fields,field_description:website_slides_survey.field_slide_channel__members_certified_count
+msgid "# Certified Attendees"
+msgstr "# ผู้เข้าร่วมที่ผ่านการรับรอง"
+
+#. module: website_slides_survey
 #. odoo-python
 #: code:addons/website_slides_survey/models/survey_survey.py:0
-#, python-format
-msgid "- %s (Courses - %s)"
-msgstr "- %s (หลักสูตร - %s)"
+msgid "- %(certification)s (Courses - %(courses)s)"
+msgstr ""
 
 #. module: website_slides_survey
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.survey_survey_view_kanban
@@ -133,12 +137,8 @@ msgstr "<span class=\"ms-1\">ใบรับรอง</span>"
 
 #. module: website_slides_survey
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.slide_channel_view_form
-msgid ""
-"<span class=\"o_stat_text\" invisible=\"nbr_certification &gt; 0\">Finished</span>\n"
-"                <span class=\"o_stat_text\" invisible=\"nbr_certification == 0\">Certified</span>"
-msgstr ""
-"<span class=\"o_stat_text\" invisible=\"nbr_certification &gt; 0\">เสร็จสิ้น</span>\n"
-"                <span class=\"o_stat_text\" invisible=\"nbr_certification == 0\">ได้รับการรับรอง</span>"
+msgid "<span class=\"o_stat_text\">Certified</span>"
+msgstr "<span class=\"o_stat_text\">รับรองแล้ว</span>"
 
 #. module: website_slides_survey
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.all_user_card
@@ -149,16 +149,6 @@ msgstr "<span class=\"text-muted small fw-bold\">ใบรับรอง</span>
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.top3_user_card
 msgid "<span class=\"text-muted\">Certifications</span>"
 msgstr "<span class=\"text-muted\">ใบรับรอง</span>"
-
-#. module: website_slides_survey
-#: model_terms:ir.ui.view,arch_db:website_slides_survey.slide_channel_view_kanban
-msgid "<span class=\"text-muted\">Certified</span>"
-msgstr "<span class=\"text-muted\">รับรอง</span>"
-
-#. module: website_slides_survey
-#: model_terms:ir.ui.view,arch_db:website_slides_survey.slide_channel_view_kanban
-msgid "<span class=\"text-muted\">Finished</span>"
-msgstr "<span class=\"text-muted\">เสร็จแล้ว</span>"
 
 #. module: website_slides_survey
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.course_main
@@ -177,6 +167,8 @@ msgid "A slide of type certification cannot be previewed."
 msgstr "ไม่สามารถดูตัวอย่างสไลด์ประเภทการรับรองได้"
 
 #. module: website_slides_survey
+#. odoo-javascript
+#: code:addons/website_slides_survey/static/src/js/public/components/slide_upload_dialog/slide_upload_dialog.js:0
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.slide_channel_view_form
 msgid "Add Certification"
 msgstr "เพิ่มการรับรอง"
@@ -184,7 +176,6 @@ msgstr "เพิ่มการรับรอง"
 #. module: website_slides_survey
 #. odoo-javascript
 #: code:addons/website_slides_survey/static/src/xml/website_slides_fullscreen.xml:0
-#, python-format
 msgid "Add Questions to this Survey"
 msgstr "เพิ่มคำถามในแบบสอบถามนี้"
 
@@ -201,7 +192,6 @@ msgstr "อนุญาตให้ดูตัวอย่าง"
 #. module: website_slides_survey
 #. odoo-python
 #: code:addons/website_slides_survey/models/survey_survey.py:0
-#, python-format
 msgid ""
 "Any Survey listed below is currently used as a Course Certification and cannot be deleted:\n"
 "%s"
@@ -247,7 +237,6 @@ msgstr "บีช"
 #. odoo-javascript
 #: code:addons/website_slides_survey/static/src/xml/website_slides_fullscreen.xml:0
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.slide_content_detailed
-#, python-format
 msgid "Begin Certification"
 msgstr "เริ่มการรับรอง"
 
@@ -263,13 +252,10 @@ msgstr "หมวดหมู่"
 
 #. module: website_slides_survey
 #. odoo-javascript
-#: code:addons/website_slides_survey/static/src/js/slides_upload.js:0
-#: code:addons/website_slides_survey/static/src/js/slides_upload.js:0
-#: code:addons/website_slides_survey/static/src/xml/website_slide_upload.xml:0
+#: code:addons/website_slides_survey/static/src/js/public/components/slide_upload_dialog/slide_upload_dialog.js:0
 #: model:ir.model.fields,field_description:website_slides_survey.field_slide_slide__survey_id
 #: model:ir.model.fields.selection,name:website_slides_survey.selection__slide_slide__slide_category__certification
 #: model:ir.model.fields.selection,name:website_slides_survey.selection__slide_slide__slide_type__certification
-#, python-format
 msgid "Certification"
 msgstr "ใบรับรอง"
 
@@ -322,7 +308,6 @@ msgstr "ไอคอนใบรับรอง"
 #. module: website_slides_survey
 #. odoo-python
 #: code:addons/website_slides_survey/controllers/slides.py:0
-#, python-format
 msgid "Certification slides are completed when the survey is succeeded."
 msgstr "สไลด์การรับรองจะเสร็จสมบูรณ์เมื่อทำแบบสอบถามเสร็จ"
 
@@ -346,17 +331,27 @@ msgid "Certifications you have passed cannot be marked as not done"
 msgstr "การรับรองที่คุณผ่านแล้วไม่สามารถทำเครื่องหมายว่ายังไม่เสร็จสิ้นได้"
 
 #. module: website_slides_survey
+#: model:ir.model.fields,field_description:website_slides_survey.field_slide_channel_partner__survey_certification_success
+#: model_terms:ir.ui.view,arch_db:website_slides_survey.slide_channel_partner_view_search
+msgid "Certified"
+msgstr "ได้รับการรับรอง"
+
+#. module: website_slides_survey
 #: model:survey.question.answer,value:website_slides_survey.furniture_certification_page_1_question_2_choice_1
 msgid "Chair"
 msgstr "เก้าอี้"
 
 #. module: website_slides_survey
+#: model:ir.model,name:website_slides_survey.model_slide_channel_partner
+msgid "Channel / Partners (Members)"
+msgstr "ช่องทาง/พาร์ทเนอร์ (สมาชิก)"
+
+#. module: website_slides_survey
 #. odoo-javascript
 #: code:addons/website_slides_survey/static/src/xml/website_slides_fullscreen.xml:0
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.slide_content_detailed
-#, python-format
 msgid "Congratulations, you passed the Certification!"
-msgstr "ขอแสดงความยินดี คุณผ่านการรับรองแล้ว!"
+msgstr "ขอแสดงความยินดี คุณผ่านการรับรอง!"
 
 #. module: website_slides_survey
 #: model:ir.model,name:website_slides_survey.model_slide_channel
@@ -367,7 +362,6 @@ msgstr "คอร์ส"
 #. odoo-python
 #: code:addons/website_slides_survey/models/survey_survey.py:0
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.survey_survey_view_form
-#, python-format
 msgid "Courses"
 msgstr "คอร์ส"
 
@@ -394,9 +388,6 @@ msgstr "โต๊ะทำงาน"
 #. module: website_slides_survey
 #. odoo-javascript
 #: code:addons/website_slides_survey/static/src/xml/website_slides_fullscreen.xml:0
-#: code:addons/website_slides_survey/static/src/xml/website_slides_fullscreen.xml:0
-#: code:addons/website_slides_survey/static/src/xml/website_slides_fullscreen.xml:0
-#, python-format
 msgid "Download certification"
 msgstr "ดาวน์โหลดใบรับรอง"
 
@@ -423,8 +414,7 @@ msgstr "กลับไปที่คอร์ส"
 
 #. module: website_slides_survey
 #. odoo-javascript
-#: code:addons/website_slides_survey/static/src/xml/website_slide_upload.xml:0
-#, python-format
+#: code:addons/website_slides_survey/static/src/js/public/components/slide_upload_dialog/slide_upload_dialog.xml:0
 msgid "How to upload a certification on your course?"
 msgstr "จะอัปโหลดใบรับรองในหลักสูตรของคุณได้อย่างไร?"
 
@@ -444,6 +434,12 @@ msgid "Mark To Do"
 msgstr "ทำเครื่องหมายเป็นสิ่งที่ต้องทำ"
 
 #. module: website_slides_survey
+#. odoo-python
+#: code:addons/website_slides_survey/models/slide_channel.py:0
+msgid "No Attendee passed this course certification yet!"
+msgstr "ยังไม่มีผู้เข้าร่วมผ่านการรับรองหลักสูตรนี้!"
+
+#. module: website_slides_survey
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.user_profile_content
 msgid "No certification found for the given search term."
 msgstr "ไม่พบการรับรองสำหรับข้อความค้นหาที่ระบุ"
@@ -461,6 +457,7 @@ msgstr "เมื่อคุณเรียนจบหลักสูตรแ
 
 #. module: website_slides_survey
 #: model:ir.model.fields,field_description:website_slides_survey.field_slide_channel__nbr_certification
+#: model:ir.model.fields,field_description:website_slides_survey.field_slide_channel_partner__nbr_certification
 #: model:ir.model.fields,field_description:website_slides_survey.field_slide_slide__nbr_certification
 msgid "Number of Certifications"
 msgstr "จำนวนการรับรอง"
@@ -472,8 +469,7 @@ msgstr "โอ๊ค"
 
 #. module: website_slides_survey
 #. odoo-javascript
-#: code:addons/website_slides_survey/static/src/xml/website_slide_upload.xml:0
-#, python-format
+#: code:addons/website_slides_survey/static/src/js/public/components/slide_upload_dialog/slide_upload_category.xml:0
 msgid "Please select a certification."
 msgstr "โปรดเลือกใบรับรอง"
 
@@ -495,12 +491,28 @@ msgstr "ค้นหา"
 #. module: website_slides_survey
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.user_profile_content
 msgid "Search Attempts..."
-msgstr "ครั้งในการค้นหา..."
+msgstr "ความพยายามในการค้นหา..."
+
+#. module: website_slides_survey
+#. odoo-javascript
+#: code:addons/website_slides_survey/static/src/js/public/components/slide_upload_dialog/slide_upload_category.js:0
+msgid "Select a certification"
+msgstr ""
 
 #. module: website_slides_survey
 #: model:survey.question,title:website_slides_survey.furniture_certification_page_1_question_2
 msgid "Select all the furniture shown in the video"
 msgstr "เลือกเฟอร์นิเจอร์ทั้งหมดที่แสดงในวิดีโอ"
+
+#. module: website_slides_survey
+#. odoo-javascript
+#: code:addons/website_slides_survey/static/src/js/public/components/slide_upload_dialog/slide_upload_dialog.xml:0
+msgid ""
+"Select an existing certification from the list. Creating or editing a "
+"certification can be done from the backend."
+msgstr ""
+"เลือกใบรับรองที่มีอยู่จากรายการ "
+"การสร้างหรือแก้ไขใบรับรองสามารถทำได้จากแบ็กเอนด์"
 
 #. module: website_slides_survey
 #: model:mail.template,description:website_slides_survey.mail_template_user_input_certification_failed
@@ -580,7 +592,6 @@ msgstr "ทำแบบทดสอบ"
 #. odoo-javascript
 #: code:addons/website_slides_survey/static/src/xml/website_slides_fullscreen.xml:0
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.slide_content_detailed
-#, python-format
 msgid "Test Certification"
 msgstr "ใบรับรองการทดสอบ"
 
@@ -633,27 +644,14 @@ msgstr "ไม้ชนิดใดเหมาะที่สุดสำหร
 #. module: website_slides_survey
 #. odoo-python
 #: code:addons/website_slides_survey/controllers/slides.py:0
-#, python-format
 msgid "You are not allowed to create a survey."
 msgstr "คุณไม่ได้รับอนุญาตให้สร้างแบบสอบถาม"
 
 #. module: website_slides_survey
 #. odoo-python
 #: code:addons/website_slides_survey/controllers/slides.py:0
-#, python-format
 msgid "You are not allowed to link a certification."
 msgstr "คุณไม่ได้รับอนุญาตให้เชื่อมโยงการรับรอง"
-
-#. module: website_slides_survey
-#. odoo-javascript
-#: code:addons/website_slides_survey/static/src/xml/website_slide_upload.xml:0
-#, python-format
-msgid ""
-"You can create your certification from here or use an existing one. Once "
-"your certification is created, you can still edit it in backend."
-msgstr ""
-"คุณสามารถสร้างการรับรองของคุณจากที่นี้หรือใช้ใบรับรองที่มีอยู่ "
-"เมื่อสร้างการรับรองแล้ว คุณยังคงแก้ไขในส่วนหลังได้"
 
 #. module: website_slides_survey
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.badge_content

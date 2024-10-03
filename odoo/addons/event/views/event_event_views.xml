@@ -4,6 +4,7 @@
         <field name="name">Barcode Interface</field>
         <field name="tag">event.event_barcode_scan_view</field>
         <field name="target">fullscreen</field>
+        <field name="path">registration-desk</field>
     </record>
 
     <record model="ir.ui.view" id="view_event_form">
@@ -14,6 +15,8 @@
                 <header>
                     <button name="%(event_barcode_action_main_view)d"
                         type="action"
+                        class="btn btn-primary"
+                        invisible="not seats_taken"
                         context="{'default_event_id': id}">
                         Registration Desk
                     </button>
@@ -37,17 +40,6 @@
                                 help="Total Registrations for this Event">
                             <field name="seats_taken" widget="statinfo" string="Attendees"/>
                         </button>
-
-                        <button name="%(event_barcode_action_main_view)d"
-                            type="action"
-                            class="oe_stat_button"
-                            icon="fa-mobile"
-                            context="{'default_event_id': id}">
-                            <div class="o_stat_info">
-                                <span class="o_stat_text">Registration Desk</span>
-                            </div>
-                        </button>
-
                     </div>
                     <field name="active" invisible="1"/>
                     <field name="company_id" invisible="1"/>
@@ -74,7 +66,7 @@
                             <field name="organizer_id"/>
                             <field name="user_id" widget="many2one_avatar_user" domain="[('share', '=', False)]"/>
                             <field name="company_id" groups="base.group_multi_company"/>
-                            <field name="address_id" context="{'show_address': 1}"/>
+                            <field name="address_id" context="{'show_address': 1}" placeholder="Online if not set"/>
                             <label for="seats_limited" string="Limit Registrations"/>
                             <div>
                                 <field name="seats_limited"/>
@@ -88,17 +80,15 @@
                         <page string="Tickets" name="tickets">
                             <field name="event_ticket_ids" context="{
                                 'default_event_name': name,
-                                'tree_view_ref': 'event.event_event_ticket_view_tree_from_event',
+                                'list_view_ref': 'event.event_event_ticket_view_tree_from_event',
                                 'form_view_ref': 'event.event_event_ticket_view_form_from_event',
-                                'kanban_view_ref': 'event.event_event_ticket_view_kanban_from_event'}" mode="tree,kanban"/>
+                                'kanban_view_ref': 'event.event_event_ticket_view_kanban_from_event'}" mode="list,kanban"/>
                         </page>
                         <page string="Communication" name="event_communication">
                             <field name="event_mail_ids">
-                                <tree string="Communication" editable="bottom">
+                                <list string="Communication" editable="bottom">
                                     <field name="sequence" widget="handle"/>
-                                    <field name="notification_type"/>
-                                    <field name="template_model_id" column_invisible="True"/>
-                                    <field name="template_ref" options="{'hide_model': True, 'no_quick_create': True}" context="{'filter_template_on_event': True, 'default_model': 'event.registration'}"/>
+                                    <field name="template_ref" options="{'no_quick_create': True}" context="{'filter_template_on_event': True, 'default_model': 'event.registration'}" widget="EventMailTemplateReferenceField"/>
                                     <field name="interval_nbr" readonly="interval_unit == 'now'"/>
                                     <field name="interval_unit"/>
                                     <field name="interval_type"/>
@@ -106,7 +96,51 @@
                                     <field name="mail_count_done"/>
                                     <field name="mail_state" widget="event_icon_selection" string=" " nolabel="1"
                                         options="{'sent': 'fa fa-check', 'scheduled': 'fa fa-hourglass-half', 'running': 'fa fa-cogs'}"/>
-                                </tree>
+                                </list>
+                            </field>
+                        </page>
+                         <page string="Questions" name="questions">
+                            <field name="question_ids" string="Question" nolabel="1">
+                                <list>
+                                    <field name="sequence" widget="handle" />
+                                    <field name="title"/>
+                                    <field name="is_mandatory_answer" string="Mandatory"/>
+                                    <field name="once_per_order" string="Once per Order"/>
+                                    <field name="question_type" string="Type" />
+                                    <field name="answer_ids" widget="many2many_tags"
+                                        invisible="question_type != 'simple_choice'" />
+                                    <button name="action_view_question_answers" type="object" class="p-0" icon="fa-bar-chart pe-1" string="Stats"
+                                            title="Answer Breakdown" invisible="question_type not in ['simple_choice', 'text_box']"/>
+                                </list>
+                                <!-- Need to repeat the whole tree form here to be able to create answers properly
+                                    Without this, the sub-fields of answer_ids are unknown to the web framework.
+                                    We need this because we create questions and answers when the event type changes. -->
+                                <form string="Question">
+                                    <sheet>
+                                        <h1 class="d-flex"><field name="title" placeholder='e.g. "Do you have any diet restrictions?"' class="flex-grow-1"/></h1>
+                                        <group>
+                                            <group>
+                                                <field name="is_mandatory_answer"/>
+                                                <field name="question_type" widget="radio"/>
+                                            </group>
+                                            <group>
+                                                <field name="once_per_order"/>
+                                            </group>
+                                        </group>
+                                        <notebook invisible="question_type != 'simple_choice'">
+                                            <page string="Answers" name="answers">
+                                                <field name="answer_ids">
+                                                    <list editable="bottom">
+                                                        <!-- 'display_name' is necessary for the many2many_tags to work on the event view -->
+                                                        <field name="display_name" column_invisible="True" />
+                                                        <field name="sequence" widget="handle" />
+                                                        <field name="name"/>
+                                                    </list>
+                                                </field>
+                                            </page>
+                                        </notebook>
+                                    </sheet>
+                                </form>
                             </field>
                         </page>
                         <page string="Notes" name="event_notes">
@@ -123,20 +157,16 @@
                         </page>
                     </notebook>
                 </sheet>
-                <div class="oe_chatter">
-                    <field name="message_follower_ids" groups="base.group_user"/>
-                    <field name="activity_ids"/>
-                    <field name="message_ids"/>
-                </div>
+                <chatter/>
             </form>
         </field>
     </record>
 
     <record model="ir.ui.view" id="view_event_tree">
-        <field name="name">event.event.tree</field>
+        <field name="name">event.event.list</field>
         <field name="model">event.event</field>
         <field name="arch" type="xml">
-            <tree string="Events"
+            <list string="Events"
                 multi_edit="1"
                 sample="1">
                 <field name="name"/>
@@ -144,8 +174,8 @@
                 <field name="organizer_id" readonly="1" optional="hide"/>
                 <field name="user_id" readonly="1" widget="many2one_avatar_user"/>
                 <field name="company_id" groups="base.group_multi_company" readonly="1" optional="show"/>
-                <field name="date_begin" readonly="1" widget="date"/>
-                <field name="date_end" readonly="1" widget="date"/>
+                <field name="date_begin" readonly="1"/>
+                <field name="date_end" readonly="1"/>
                 <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" optional="hide"/>
                 <field name="seats_taken" string="Total Attendees" sum="Total" readonly="1"/>
                 <field name="seats_used" sum="Total" readonly="1"/>
@@ -154,7 +184,7 @@
                 <field name="stage_id" readonly="1"/>
                 <field name="message_needaction" readonly="1" column_invisible="True"/>
                 <field name="activity_exception_decoration" widget="activity_exception" readonly="1"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -198,61 +228,46 @@
         <field name="model">event.event</field>
         <field name="arch" type="xml">
             <kanban class="o_event_kanban_view" default_group_by="stage_id" quick_create_view="event.event_event_view_form_quick_create" sample="1">
-                <field name="user_id"/>
-                <field name="name"/>
                 <field name="stage_id" options='{"group_by_tooltip": {"description": "Description"}}'/>
-                <field name="address_id"/>
                 <field name="date_begin"/>
                 <field name="date_end"/>
-                <field name="seats_reserved"/>
-                <field name="seats_used"/>
-                <field name="seats_taken"/>
-                <field name="legend_blocked"/>
-                <field name="legend_normal"/>
                 <field name="legend_done"/>
-                <field name="activity_ids"/>
-                <field name="activity_state"/>
                 <templates>
-                    <t t-name="kanban-box">
-                        <div t-attf-class="d-flex flex-column p-0 oe_kanban_card oe_kanban_global_click">
-                            <div class="o_kanban_content p-0 m-0 position-relative row d-flex flex-fill">
-                                <div class="col-4 text-bg-primary p-2 text-center d-flex flex-column justify-content-center">
-                                    <div t-esc="luxon.DateTime.fromISO(record.date_begin.raw_value).toFormat('d')" class="o_event_fontsize_20"/>
-                                    <div>
-                                        <t t-esc="luxon.DateTime.fromISO(record.date_begin.raw_value).toFormat('MMM yyyy')"/>
-                                    </div>
-                                    <div><t t-esc="luxon.DateTime.fromISO(record.date_begin.raw_value).toFormat('t')"/></div>
-                                        <div t-if="record.date_begin.raw_value !== record.date_end.raw_value">
-                                            <i class="oi oi-arrow-right me-2 o_event_fontsize_09" title="End date"/>
-                                            <t t-esc="luxon.DateTime.fromISO(record.date_end.raw_value).toFormat('d MMM')"/>
-                                        </div>
+                    <t t-name="card" class="p-0 row">
+                        <aside class="col-4 text-bg-primary p-2 text-center d-flex flex-column justify-content-center">
+                            <div t-esc="luxon.DateTime.fromISO(record.date_begin.raw_value).toFormat('d')" class="fs-1"/>
+                            <div>
+                                <t t-esc="luxon.DateTime.fromISO(record.date_begin.raw_value).toFormat('MMM yyyy')"/>
+                            </div>
+                            <div><t t-esc="luxon.DateTime.fromISO(record.date_begin.raw_value).toFormat('t')"/></div>
+                                <div t-if="record.date_begin.raw_value !== record.date_end.raw_value">
+                                    <i class="oi oi-arrow-right me-2" title="End date"/>
+                                    <t t-esc="luxon.DateTime.fromISO(record.date_end.raw_value).toFormat('d MMM')"/>
                                 </div>
-                                <div class="col-8 py-2 px-3 d-flex flex-column justify-content-between pt-3">
-                                    <div>
-                                        <div class="o_kanban_record_title o_text_overflow" t-att-title="record.name.value">
-                                            <field name="name"/>
-                                        </div>
-                                        <div t-if="record.address_id.value" class="d-flex ps-1">
-                                            <i class="fa fa-map-marker mt-1 me-2 text-center ps-1" title="Location"/>
-                                            <span t-esc="record.address_id.value" class="ms-1"/>
-                                        </div>
-                                        <div class="d-flex ps-1">
-                                            <i class="fa fa-group mt-1 me-2 text-center" title="Attendees"/>
-                                            <span t-out="record.seats_taken.raw_value" class="me-1"/> Attendees
-                                        </div>
-                                    </div>
-                                    <div class="o_kanban_record_bottom">
-                                        <div class="oe_kanban_bottom_left">
-                                            <field name="activity_ids" widget="kanban_activity"/>
-                                        </div>
-                                        <div class="oe_kanban_bottom_right">
-                                            <field name="kanban_state" widget="state_selection"/>
-                                            <field name="user_id" widget="many2one_avatar_user"/>
-                                        </div>
-                                    </div>
+                        </aside>
+                        <main class="col pt-3 pb-2 px-3 justify-content-between">
+                            <div>
+                                <div class="fw-bold fs-5 o_text_overflow" t-att-title="record.name.value">
+                                    <field name="name"/>
+                                </div>
+                                <div class="d-flex ps-1">
+                                    <i class="fa fa-map-marker mt-1 me-2 text-center ps-1" title="Location"/>
+                                    <field t-if="record.address_id.value" name="address_id" class="ms-1"/>
+                                    <span t-else="" class="ms-1">Online Event</span>
+                                </div>
+                                <div t-if="record.seats_taken.raw_value" class="d-flex ps-1">
+                                    <i class="fa fa-group mt-1 me-2 text-center" title="Attendees"/>
+                                    <field name="seats_taken" class="me-1"/> Attendees
                                 </div>
                             </div>
-                        </div>
+                            <footer class="pt-1 p-0 m-0">
+                                <field name="activity_ids" widget="kanban_activity"/>
+                                <div class="d-flex ms-auto">
+                                    <field class="mt-1 mr4" name="kanban_state" widget="state_selection"/>
+                                    <field name="user_id" widget="many2one_avatar_user"/>
+                                </div>
+                            </footer>
+                        </main>
                     </t>
                 </templates>
             </kanban>
@@ -300,11 +315,13 @@
                     domain="[('my_activity_date_deadline', '=', context_today().strftime('%Y-%m-%d'))]"/>
                 <filter invisible="1" string="Future Activities" name="activities_upcoming_all"
                     domain="[('my_activity_date_deadline', '&gt;', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter string="Online" name="filter_online" domain="[('address_id', '=', False)]"/>
                 <group expand="0" string="Group By">
                     <filter string="Responsible" name="responsible" context="{'group_by': 'user_id'}"/>
                     <filter string="Template" name="event_type_id" context="{'group_by': 'event_type_id'}"/>
                     <filter string="Stage" name="stage_id" context="{'group_by': 'stage_id'}"/>
                     <filter string="Start Date" name="date_begin" domain="[]" context="{'group_by': 'date_begin'}"/>
+                    <filter string="Venue" name="venue" context="{'group_by': 'address_id'}"/>
                 </group>
             </search>
         </field>
@@ -314,8 +331,9 @@
 
     <record model="ir.actions.act_window" id="action_event_view">
        <field name="name">Events</field>
+       <field name="path">events</field>
        <field name="res_model">event.event</field>
-       <field name="view_mode">kanban,calendar,tree,form,pivot,graph,activity</field>
+       <field name="view_mode">kanban,calendar,list,form,pivot,graph,activity</field>
        <field name="search_view_id" ref="view_event_search"/>
        <field name="help" type="html">
           <p class="o_view_nocontent_smiling_face">
@@ -331,10 +349,21 @@
     </record>
 
     <!-- EVENT.EVENT HEADER: REGISTRATION DESK MENU -->
-    <menuitem name="Registration Desk"
-        id="menu_event_registration_desk"   
+
+    <record id="event_action_install_kiosk_pwa" model="ir.actions.client">
+        <field name="name">Registration Desk</field>
+        <field name="target">new</field>
+        <field name="res_model">event.event</field>
+        <field name="tag">install_kiosk_pwa</field>
+        <field name="context">{'app_id': 'event', 'footer': false}</field>
+    </record>
+
+    <menuitem
+        id="menu_event_registration_desk"
+        name="Registration Desk"
         sequence="30"
-        action="event.event_barcode_action_main_view"
+        action="event_action_install_kiosk_pwa"
         parent="event.event_main_menu"
-        groups="event.group_event_registration_desk"/>
+        groups="event.group_event_registration_desk"
+    />
 </data></odoo>

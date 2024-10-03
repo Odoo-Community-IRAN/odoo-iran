@@ -8,6 +8,7 @@
             <meta http-equiv="pragma" content="no-cache" />
             <link rel="stylesheet" type="text/css" t-att-href="origin + '/web/static/src/libs/fontawesome/css/font-awesome.css'"/>
             <link rel="stylesheet" type="text/css" t-att-href="origin + '/point_of_sale/static/src/css/customer_facing_display.css'"/>
+            <link rel="stylesheet" type="text/css" t-att-href="origin + '/web/static/lib/bootstrap/dist/css/bootstrap.css'"/>
             <!-- The scroll to the last selected order line (in the POS UI) is made using scroll-snap-* css properties, but the JS code below checks and does an alternative attempt with scrollIntoView if the css properties are not supported or not behaving correctly. (this JS script is in the xml template to be accessible for local and remote displays) -->
             <script type="text/javascript" id="old_browser_fix_auto_scroll">
                 function isCentered(el) {
@@ -28,7 +29,7 @@
     </t>
 
     <t t-name="point_of_sale.CustomerFacingDisplayNoOrder">
-        <t t-set="backgroundImageURL" t-value="pos.config.iface_customer_facing_display_background_image_1920 ? 'url(/web/image/pos.config/' + pos.config.id + '/iface_customer_facing_display_background_image_1920)' : 'none'" />
+        <t t-set="backgroundImageURL" t-value="pos.config.customer_display_bg_img ? 'url(/web/image/pos.config/' + pos.config.id + '/customer_display_bg_img)' : 'none'" />
         <t t-call="point_of_sale.CustomerFacingDisplayHead" />
 
         <div class="pos-customer_facing_display pos-no-order pos-palette_01" t-attf-style="background-image: #{backgroundImageURL};">
@@ -41,7 +42,7 @@
     </t>
 
     <t t-name="point_of_sale.CustomerFacingDisplayOrder">
-        <t t-set="backgroundImageURL" t-value="pos.config.iface_customer_facing_display_background_image_1920 ? 'url(/web/image/pos.config/' + pos.config.id + '/iface_customer_facing_display_background_image_1920)' : 'none'" />
+        <t t-set="backgroundImageURL" t-value="pos.config.customer_display_bg_img ? 'url(/web/image/pos.config/' + pos.config.id + '/customer_display_bg_img)' : 'none'" />
         <!-- Header -->
         <t t-call="point_of_sale.CustomerFacingDisplayHead" />
 
@@ -88,7 +89,31 @@
         </div>
     </t>
 
+    <t t-name="point_of_sale.CustomerFacingQR">
+        <div class="overlay" />
+        <div class="pos-customer_payment_popup rounded border border-dark">
+            <div class="text-center">
+                <p>Please scan the QR code with <t t-esc="order.uiState.PaymentScreen.qrPaymentData.name"/></p>
+                <img class="pos-customer_payment_qr_code my-1" t-att-src="order.uiState.PaymentScreen.qrPaymentData.qrCode" alt="QR Code" />
+            </div>
+            <div class="text-center">
+                <div>
+                    <strong>Amount: </strong>
+                    <span t-esc="order.uiState.PaymentScreen.qrPaymentData.amount" />
+                </div>
+                <div>
+                    <strong>Order reference: </strong>
+                    <span t-esc="order.name" />
+                </div>
+            </div>
+        </div>
+
+    </t>
+
     <t t-name="point_of_sale.CustomerFacingDisplayMainContainer">
+        <t t-if="order.get_current_screen_data().name === 'PaymentScreen' and order.uiState.PaymentScreen?.qrPaymentData">
+            <t t-call="point_of_sale.CustomerFacingQR"/>
+        </t>
         <div class="pos_orderlines">
             <t t-if="order">
                 <t t-if="order.get_current_screen_data().name != 'ReceiptScreen'">
@@ -122,12 +147,12 @@
                     <tbody>
                         <tr t-foreach="order.get_orderlines()" t-key="orderline.id" t-as="orderline" class="pos_orderlines_item" t-att-class="{ 'selected_orderline': orderline.id === order.get_selected_orderline().id }">
                             <td class="product_img">
-                                <img t-attf-src="#{productImages[orderline.product.id]}" />
+                                <img t-attf-src="#{productImages[orderline.product_id.id]}" />
                             </td>
                             <td class="product_text_info">
                                 <ul>
                                     <li t-esc="orderline.get_full_product_name()" />
-                                    <t t-if="orderline.get_discount_str() !== '0'">
+                                    <t t-if="orderline.get_discount_str()">
                                         <li class="product_details">
                                             <i class="fa fa-tag" role="img" aria-label="Discount" title="Discount" />
                                         <t t-esc="orderline.get_discount_str()" />% <span class="gray">discount</span>
@@ -170,9 +195,9 @@
     <t t-name="point_of_sale.CustomerFacingDisplayPaymentLines">
         <div class="pos-paymentlines">
             <t t-if="order">
-                <t t-foreach="order.get_paymentlines()" t-as="paymentline"  t-key="paymentline_index">
+                <t t-foreach="order.payment_ids" t-as="paymentline"  t-key="paymentline_index">
                     <div class="pos-amount-container pos-spaced-line-container">
-                        <span class="name"><t t-esc="paymentline.name" />:</span>
+                        <span class="name"><t t-esc="paymentline.payment_method_id.name" />:</span>
                         <div class="spacer" />
                         <div class="pos-spaced-line-container">
                             <div class="spacer" />

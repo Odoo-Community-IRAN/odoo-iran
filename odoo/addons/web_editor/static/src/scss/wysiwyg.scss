@@ -298,10 +298,6 @@ $o-we-zindex: $o-we-overlay-zindex + 1 !default;
             min-width: 0;
         }
 
-        &:not(.colorpicker-menu) > li:last-child {
-            margin-bottom: 1em;
-        }
-
         &.colorpicker-menu {
             margin-top: 0;
             min-width: 222px !important;
@@ -552,9 +548,13 @@ img.o_we_selected_image {
         margin-bottom: 1rem;
         overflow-y: visible;
 
-        .dropdown-menu {
+        #style .dropdown-menu {
             max-height: 200px;
             overflow: auto;
+        }
+
+        .dropdown-menu {
+            overflow: visible;
 
             &.colorpicker-menu {
                 bottom: auto;
@@ -765,7 +765,9 @@ textarea.o_codeview {
 button.o-message-insert {
     line-height: 1;
 }
-.o-chatgpt-message > div > *:last-child, .o-chatgpt-alternative > *:last-child {
+.o-chatgpt-message > div > *:last-child,
+.o-chatgpt-alternative > *:last-child,
+.o-chatgpt-translated > *:last-child {
     margin-bottom: 0;
 }
 .o-message-error {

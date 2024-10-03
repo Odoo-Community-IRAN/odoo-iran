@@ -1,36 +1,24 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from collections import defaultdict
 
-from odoo import Command
 from odoo.exceptions import ValidationError
+from odoo.fields import Command
 
-from odoo.addons.sale.tests.test_sale_product_attribute_value_config import TestSaleProductAttributeValueCommon
+from odoo.addons.sale.tests.common import SaleCommon
 
 
-class TestSaleCouponCommon(TestSaleProductAttributeValueCommon):
+class TestSaleCouponCommon(SaleCommon):
 
     @classmethod
     def setUpClass(cls):
-        super(TestSaleCouponCommon, cls).setUpClass()
+        super().setUpClass()
+
         # set currency to not rely on demo data and avoid possible race condition
         cls.currency_ratio = 1.0
 
         # Set all the existing programs to active=False to avoid interference
         cls.env['loyalty.program'].search([]).sudo().write({'active': False})
-
-        # create partner for sale order.
-        cls.steve = cls.env['res.partner'].create({
-            'name': 'Steve Bucknor',
-            'email': 'steve.bucknor@example.com',
-        })
-
-        cls.empty_order = cls.env['sale.order'].create({
-            'partner_id': cls.steve.id
-        })
-
-        cls.uom_unit = cls.env.ref('uom.product_uom_unit')
 
         # Taxes
         cls.tax_15pc_excl = cls.env['account.tax'].create({
@@ -44,14 +32,14 @@ class TestSaleCouponCommon(TestSaleProductAttributeValueCommon):
             'name': "10% Tax incl",
             'amount_type': 'percent',
             'amount': 10,
-            'price_include': True,
+            'price_include_override': 'tax_included',
         })
 
         cls.tax_10pc_base_incl = cls.env['account.tax'].create({
             'name': "10% Tax incl base amount",
             'amount_type': 'percent',
             'amount': 10,
-            'price_include': True,
+            'price_include_override': 'tax_included',
             'include_base_amount': True,
         })
 
@@ -59,14 +47,14 @@ class TestSaleCouponCommon(TestSaleProductAttributeValueCommon):
             'name': "10% Tax excl",
             'amount_type': 'percent',
             'amount': 10,
-            'price_include': False,
+            'price_include_override': 'tax_excluded',
         })
 
         cls.tax_20pc_excl = cls.env['account.tax'].create({
             'name': "20% Tax excl",
             'amount_type': 'percent',
             'amount': 20,
-            'price_include': False,
+            'price_include_override': 'tax_excluded',
         })
 
         cls.tax_group = cls.env['account.tax'].create({
@@ -106,7 +94,7 @@ class TestSaleCouponCommon(TestSaleProductAttributeValueCommon):
 
         cls.product_gift_card = cls.env['product.product'].create({
             'name': 'Gift Card 50',
-            'detailed_type': 'service',
+            'type': 'service',
             'list_price': 50,
             'sale_ok': True,
             'taxes_id': False,
@@ -264,14 +252,6 @@ class TestSaleCouponNumbersCommon(TestSaleCouponCommon):
             'name': 'Large Meeting Table',
             'list_price': 40000.0,
             'taxes_id': False,
-        })
-
-        cls.steve = cls.env['res.partner'].create({
-            'name': 'Steve Bucknor',
-            'email': 'steve.bucknor@example.com',
-        })
-        cls.empty_order = cls.env['sale.order'].create({
-            'partner_id': cls.steve.id
         })
 
         cls.p1 = cls.env['loyalty.program'].create({

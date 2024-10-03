@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { registry } from "@web/core/registry";
 import { propertiesField, PropertiesField } from "./properties_field";
 
@@ -19,3 +17,4 @@ export const cardPropertiesField = {
 
 registry.category("fields").add("calendar.properties", cardPropertiesField);
 registry.category("fields").add("kanban.properties", cardPropertiesField);
+registry.category("fields").add("hierarchy.properties", cardPropertiesField);

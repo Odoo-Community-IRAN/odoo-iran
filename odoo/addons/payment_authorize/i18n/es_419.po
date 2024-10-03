@@ -3,16 +3,15 @@
 # 	* payment_authorize
 # 
 # Translators:
-# Wil Odoo, 2023
-# Iran Villalobos López, 2023
+# Wil Odoo, 2024
 # Fernanda Alvarez, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:56+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
+"POT-Creation-Date: 2024-09-26 08:56+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
 "Last-Translator: Fernanda Alvarez, 2024\n"
 "Language-Team: Spanish (Latin America) (https://app.transifex.com/odoo/teams/41243/es_419/)\n"
 "MIME-Version: 1.0\n"
@@ -104,7 +103,6 @@ msgstr "Código"
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/models/payment_provider.py:0
-#, python-format
 msgid ""
 "Could not fetch merchant details:\n"
 "%s"
@@ -115,13 +113,12 @@ msgstr ""
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/models/payment_transaction.py:0
-#, python-format
 msgid ""
-"Could not retrieve the transaction details. (error code: %s; error_details: "
-"%s)"
+"Could not retrieve the transaction details. (error code: %(error_code)s; "
+"error_details: %(error_message)s)"
 msgstr ""
-"No fue posible obtener los detalles de la transacción. (Código de error: %s;"
-" detalles del error: %s) "
+"No fue posible obtener los detalles de la transacción. (Código de error: "
+"%(error_code)s; detalles del error: %(error_message)s) "
 
 #. module: payment_authorize
 #: model_terms:ir.ui.view,arch_db:payment_authorize.inline_form
@@ -131,7 +128,6 @@ msgstr "Vencimiento"
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/models/payment_provider.py:0
-#, python-format
 msgid ""
 "Failed to authenticate.\n"
 "%s"
@@ -162,14 +158,12 @@ msgstr "Nombre en la cuenta"
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/models/payment_transaction.py:0
-#, python-format
 msgid "No transaction found matching reference %s."
 msgstr "No se encontró ninguna transacción que coincida con la referencia %s."
 
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/models/payment_provider.py:0
-#, python-format
 msgid "Only one currency can be selected by Authorize.Net account."
 msgstr "Solo puede seleccionar una divisa por cuenta de Authorize.Net. "
 
@@ -191,15 +185,12 @@ msgstr "Transacción de pago"
 #. module: payment_authorize
 #. odoo-javascript
 #: code:addons/payment_authorize/static/src/js/payment_form.js:0
-#: code:addons/payment_authorize/static/src/js/payment_form.js:0
-#, python-format
 msgid "Payment processing failed"
 msgstr "Error al procesar el pago"
 
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with status code \"%(status)s\" and error code \"%(error)s\""
 msgstr ""
 "Se recibió información con el código de estado \"%(status)s\" y código de "
@@ -208,7 +199,6 @@ msgstr ""
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/controllers/main.py:0
-#, python-format
 msgid "Received tampered payment request data."
 msgstr "Datos recibidos de solicitud de pago manipulados."
 
@@ -239,17 +229,16 @@ msgstr "El código técnico de este proveedor de pagos."
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/models/payment_transaction.py:0
-#, python-format
 msgid ""
-"The transaction is not in a status to be refunded. (status: %s, details: %s)"
+"The transaction is not in a status to be refunded. (status: %(status)s, "
+"details: %(message)s)"
 msgstr ""
 "La transacción no está en un estado en el que se pueda reembolsar. (Estado: "
-"%s, detalles: %s)"
+"%(status)s, detalles: %(message)s)"
 
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/models/payment_transaction.py:0
-#, python-format
 msgid "The transaction is not linked to a token."
 msgstr "La transacción no está vinculada a un token."
 
@@ -265,7 +254,6 @@ msgstr ""
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/models/payment_provider.py:0
-#, python-format
 msgid "This action cannot be performed while the provider is disabled."
 msgstr "Esta acción no se puede realizar si el proveedor está deshabilitado."
 

@@ -15,12 +15,7 @@ function identity(cmd) {
     return [cmd];
 }
 
-const {
-    coreTypes,
-    invalidateEvaluationCommands,
-    invalidateCFEvaluationCommands,
-    invalidateDependenciesCommands,
-} = spreadsheet;
+const { coreTypes, invalidateEvaluationCommands } = spreadsheet;
 
 const { cellMenuRegistry } = spreadsheet.registries;
 
@@ -29,37 +24,36 @@ coreTypes.add("RENAME_ODOO_LIST");
 coreTypes.add("REMOVE_ODOO_LIST");
 coreTypes.add("RE_INSERT_ODOO_LIST");
 coreTypes.add("UPDATE_ODOO_LIST_DOMAIN");
+coreTypes.add("UPDATE_ODOO_LIST");
 coreTypes.add("ADD_LIST_DOMAIN");
+coreTypes.add("DUPLICATE_ODOO_LIST");
 
 invalidateEvaluationCommands.add("UPDATE_ODOO_LIST_DOMAIN");
+invalidateEvaluationCommands.add("UPDATE_ODOO_LIST");
 invalidateEvaluationCommands.add("INSERT_ODOO_LIST");
 invalidateEvaluationCommands.add("REMOVE_ODOO_LIST");
 
-invalidateDependenciesCommands.add("UPDATE_ODOO_LIST_DOMAIN");
-invalidateDependenciesCommands.add("INSERT_ODOO_LIST");
-invalidateDependenciesCommands.add("REMOVE_ODOO_LIST");
-
-invalidateCFEvaluationCommands.add("UPDATE_ODOO_LIST_DOMAIN");
-invalidateCFEvaluationCommands.add("INSERT_ODOO_LIST");
-invalidateCFEvaluationCommands.add("REMOVE_ODOO_LIST");
-
-cellMenuRegistry.add("list_see_record", {
-    name: _t("See record"),
-    sequence: 200,
-    execute: async (env) => {
-        const position = env.model.getters.getActivePosition();
-        await SEE_RECORD_LIST(position, env);
-    },
-    isVisible: (env) => {
-        const position = env.model.getters.getActivePosition();
-        return SEE_RECORD_LIST_VISIBLE(position, env);
-    },
-    icon: "o-spreadsheet-Icon.SEE_RECORDS",
-});
+cellMenuRegistry.add(
+    "list_see_record",
+    /** @type {import("@odoo/o-spreadsheet").ActionSpec}*/ ({
+        name: _t("See record"),
+        sequence: 200,
+        execute: async (env) => {
+            const position = env.model.getters.getActivePosition();
+            await SEE_RECORD_LIST(position, env);
+        },
+        isVisible: (env) => {
+            const position = env.model.getters.getActivePosition();
+            return SEE_RECORD_LIST_VISIBLE(position, env.model.getters);
+        },
+        icon: "o-spreadsheet-Icon.SEE_RECORDS",
+    })
+);
 
 inverseCommandRegistry
     .add("INSERT_ODOO_LIST", identity)
     .add("UPDATE_ODOO_LIST_DOMAIN", identity)
+    .add("UPDATE_ODOO_LIST", identity)
     .add("RE_INSERT_ODOO_LIST", identity)
     .add("RENAME_ODOO_LIST", identity)
     .add("REMOVE_ODOO_LIST", identity);

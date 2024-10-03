@@ -1,19 +1,21 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+import logging
 import random
-import requests
 import string
 
-from lxml import html
 from werkzeug import urls
 
 from odoo import tools, models, fields, api, _
+from odoo.addons.mail.tools import link_preview
 from odoo.exceptions import UserError
 from odoo.osv import expression
-from odoo.addons.mail.tools import link_preview
+from odoo.tools.mail import validate_url
 
-LINK_TRACKER_MIN_CODE_LENGTH = 3
+LINK_TRACKER_UNIQUE_FIELDS = ('url', 'campaign_id', 'medium_id', 'source_id', 'label')
+
+_logger = logging.getLogger(__name__)
 
 
 class LinkTracker(models.Model):
@@ -27,7 +29,7 @@ class LinkTracker(models.Model):
     _name = "link.tracker"
     _rec_name = "short_url"
     _description = "Link Tracker"
-    _order="count DESC"
+    _order = "count DESC"
     _inherit = ["utm.mixin"]
 
     # URL info
@@ -40,7 +42,7 @@ class LinkTracker(models.Model):
     label = fields.Char(string='Button label')
     # Tracking
     link_code_ids = fields.One2many('link.tracker.code', 'link_id', string='Codes')
-    code = fields.Char(string='Short URL code', compute='_compute_code')
+    code = fields.Char(string='Short URL code', compute='_compute_code', inverse="_inverse_code", readonly=False)
     link_click_ids = fields.One2many('link.tracker.click', 'link_id', string='Clicks')
     count = fields.Integer(string='Number of Clicks', compute='_compute_count', store=True)
     # UTMs - enforcing the fact that we want to 'set null' when relation is unlinked
@@ -82,6 +84,14 @@ class LinkTracker(models.Model):
             record = self.env['link.tracker.code'].search([('link_id', '=', tracker.id)], limit=1, order='id DESC')
             tracker.code = record.code
 
+    def _inverse_code(self):
+        self.ensure_one()
+        if not self.code:
+            return
+        record = self.env['link.tracker.code'].search([('link_id', '=', self.id)], limit=1, order='id DESC')
+        if record:
+            record.code = self.code
+
     @api.depends('url')
     def _compute_redirected_url(self):
         """Compute the URL to which we will redirect the user.
@@ -118,9 +128,14 @@ class LinkTracker(models.Model):
             return preview['og_title']
         return url
 
-    @api.constrains('url', 'campaign_id', 'medium_id', 'source_id')
+    @api.constrains(*LINK_TRACKER_UNIQUE_FIELDS)
     def _check_unicity(self):
         """Check that the link trackers are unique."""
+        def _format_value(tracker, field_name):
+            if field_name == 'label' and not tracker[field_name]:
+                return False
+            return tracker[field_name]
+
         # build a query to fetch all needed link trackers at once
         search_query = expression.OR([
             expression.AND([
@@ -128,28 +143,27 @@ class LinkTracker(models.Model):
                 [('campaign_id', '=', tracker.campaign_id.id)],
                 [('medium_id', '=', tracker.medium_id.id)],
                 [('source_id', '=', tracker.source_id.id)],
+                [('label', '=', tracker.label) if tracker.label else ('label', 'in', (False, ''))],
             ])
             for tracker in self
         ])
 
-        # Can not be implemented with a SQL constraint because we want to care about null values.
-        all_link_trackers = self.search(search_query)
-
-        # check for unicity
-        for tracker in self:
-            if all_link_trackers.filtered(
-                lambda l: l.url == tracker.url
-                and l.campaign_id == tracker.campaign_id
-                and l.medium_id == tracker.medium_id
-                and l.source_id == tracker.source_id
-            ) != tracker:
-                raise UserError(_(
-                    'Link Tracker values (URL, campaign, medium and source) must be unique (%s, %s, %s, %s).',
-                    tracker.url,
-                    tracker.campaign_id.name,
-                    tracker.medium_id.name,
-                    tracker.source_id.name,
-                ))
+        # Can not be implemented with a SQL constraint because we care about null values.
+        potential_duplicates = self.search(search_query)
+        duplicates = self.browse()
+        seen = set()
+        for tracker in potential_duplicates:
+            unique_fields = tuple(_format_value(tracker, field_name) for field_name in LINK_TRACKER_UNIQUE_FIELDS)
+            if unique_fields in seen or seen.add(unique_fields):
+                duplicates += tracker
+        if duplicates:
+            error_lines = '\n- '.join(
+                str((tracker.url, tracker.campaign_id.name, tracker.medium_id.name, tracker.source_id.name, tracker.label or '""'))
+                for tracker in duplicates
+            )
+            raise UserError(
+                _('Combinations of Link Tracker values (URL, campaign, medium, source, and label) must be unique.\n'
+                  'The following combinations are already used: \n- %(error_lines)s', error_lines=error_lines))
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -159,8 +173,8 @@ class LinkTracker(models.Model):
                 raise ValueError(_('Creating a Link Tracker without URL is not possible'))
 
             if vals['url'].startswith(('?', '#')):
-                raise UserError(_("%r is not a valid link, links cannot redirect to the current page.", vals['url']))
-            vals['url'] = tools.validate_url(vals['url'])
+                raise UserError(_("“%s” is not a valid link, links cannot redirect to the current page.", vals['url']))
+            vals['url'] = validate_url(vals['url'])
 
             if not vals.get('title'):
                 vals['title'] = self._get_title_from_url(vals['url'])
@@ -184,24 +198,55 @@ class LinkTracker(models.Model):
         return links
 
     @api.model
-    def search_or_create(self, vals):
-        if 'url' not in vals:
-            raise ValueError(_('Creating a Link Tracker without URL is not possible'))
-        if vals['url'].startswith(('?', '#')):
-            raise UserError(_("%r is not a valid link, links cannot redirect to the current page.", vals['url']))
-        vals['url'] = tools.validate_url(vals['url'])
+    def search_or_create(self, vals_list):
+        """Get existing or newly created records matching vals_list items in preserved order supporting duplicates."""
+        if not isinstance(vals_list, list):
+            _logger.warning("Deprecated usage of LinkTracker.search_or_create which now expects a list of dictionaries as input.")
+            vals_list = [vals_list]
 
-        search_domain = [
-            (fname, '=', value)
-            for fname, value in vals.items()
-            if fname in ['url', 'campaign_id', 'medium_id', 'source_id']
-        ]
-        result = self.search(search_domain, limit=1)
+        def _format_key(obj):
+            """Generate unique 'key' of trackers, allowing to find duplicates."""
+            return tuple(
+                (field_name, obj[field_name].id if isinstance(obj[field_name], models.BaseModel) else obj[field_name])
+                for field_name in LINK_TRACKER_UNIQUE_FIELDS
+            )
 
-        if result:
-            return result
+        def _format_key_domain(field_values):
+            """Handle "label" being False / '' and be defensive."""
+            return expression.AND([
+                [(field_name, '=', value) if value or field_name != 'label' else ('label', 'in', (False, ''))]
+                for field_name, value in field_values
+            ])
 
-        return self.create(vals)
+        errors = set()
+        for vals in vals_list:
+            if 'url' not in vals:
+                raise ValueError(_('Creating a Link Tracker without URL is not possible'))
+            if vals['url'].startswith(('?', '#')):
+                errors.add(_("“%s” is not a valid link, links cannot redirect to the current page.", vals['url']))
+            vals['url'] = validate_url(vals['url'])
+            # fill vals to use direct accessor in _format_key
+            self._add_missing_default_values(vals)
+            vals.update({key: False for key in LINK_TRACKER_UNIQUE_FIELDS if not vals.get(key)})
+        if errors:
+            raise UserError("\n".join(errors))
+
+        # Find unique keys of trackers, then fetch existing trackers
+        unique_keys = {_format_key(vals) for vals in vals_list}
+        found_trackers = self.search(expression.OR([_format_key_domain(key) for key in unique_keys]))
+        key_to_trackers_map = {_format_key(tracker): tracker for tracker in found_trackers}
+
+        if len(unique_keys) != len(found_trackers):
+            # Create trackers for values with unique keys not found
+            seen_keys = set(key_to_trackers_map.keys())
+            new_trackers = self.create([
+                vals for vals in vals_list
+                if (key := _format_key(vals)) not in seen_keys and not seen_keys.add(key)
+            ])
+            key_to_trackers_map.update((_format_key(tracker), tracker) for tracker in new_trackers)
+
+        # Build final recordset following input order
+        return self.browse([key_to_trackers_map[_format_key(vals)].id for vals in vals_list])
 
     @api.model
     def convert_links(self, html, vals, blacklist=None):
@@ -229,7 +274,7 @@ class LinkTracker(models.Model):
         if filter == 'newest':
             return self.search_read([], order='create_date DESC, id DESC', limit=limit)
         elif filter == 'most-clicked':
-            return self.search_read([('count', '!=', 0)], order='count DESC', limit=limit)
+            return self.search_read([('count', '!=', 0)], order='count DESC, id DESC', limit=limit)
         elif filter == 'recently-used':
             return self.search_read([('count', '!=', 0)], order='write_date DESC, id DESC', limit=limit)
         else:
@@ -259,14 +304,14 @@ class LinkTrackerCode(models.Model):
 
     @api.model
     def _get_random_code_strings(self, n=1):
-        size = LINK_TRACKER_MIN_CODE_LENGTH
+        size = 3
         while True:
             code_propositions = [
                 ''.join(random.choices(string.ascii_letters + string.digits, k=size))
                 for __ in range(n)
             ]
 
-            if len(set(code_propositions)) != n or self.search([('code', 'in', code_propositions)]):
+            if len(set(code_propositions)) != n or self.search_count([('code', 'in', code_propositions)], limit=1):
                 size += 1
             else:
                 return code_propositions

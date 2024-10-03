@@ -8,7 +8,6 @@ from operator import itemgetter
 from markupsafe import Markup
 
 from odoo import _, api, fields, models
-from odoo.addons.http_routing.models.ir_http import slug
 from odoo.tools.translate import html_translate
 
 MOST_USED_TAGS_COUNT = 5  # Number of tags to track as "most used" to display on frontend
@@ -64,7 +63,6 @@ class Forum(models.Model):
         help="Public: Forum is public\nSigned In: Forum is visible for signed in users\nSome users: Forum and their content are hidden for non members of selected group",
         default='public')
     authorized_group_id = fields.Many2one('res.groups', 'Authorized Group')
-    menu_id = fields.Many2one('website.menu', 'Menu', copy=False)
     active = fields.Boolean(default=True)
     faq = fields.Html(
         'Guidelines', translate=html_translate,
@@ -123,10 +121,10 @@ class Forum(models.Model):
     karma_answer_accept_all = fields.Integer(string='Accept an answer to all questions', default=500)
     karma_comment_own = fields.Integer(string='Comment own posts', default=1)
     karma_comment_all = fields.Integer(string='Comment all posts', default=1)
-    karma_comment_convert_own = fields.Integer(string='Convert own answers to comments and vice versa', default=50)
-    karma_comment_convert_all = fields.Integer(string='Convert all answers to comments and vice versa', default=500)
-    karma_comment_unlink_own = fields.Integer(string='Unlink own comments', default=50)
-    karma_comment_unlink_all = fields.Integer(string='Unlink all comments', default=500)
+    karma_comment_convert_own = fields.Integer(string='Convert own comments to answers', default=50)
+    karma_comment_convert_all = fields.Integer(string='Convert all comments to answers', default=500)
+    karma_comment_unlink_own = fields.Integer(string='Delete own comments', default=50)
+    karma_comment_unlink_all = fields.Integer(string='Delete all comments', default=500)
     karma_flag = fields.Integer(string='Flag a post as offensive', default=500)
     karma_dofollow = fields.Integer(string='Nofollow links', help='If the author has not enough karma, a nofollow attribute is added to links', default=500)
     karma_editor = fields.Integer(string='Editor Features: image and links',
@@ -244,7 +242,7 @@ class Forum(models.Model):
     def _compute_website_url(self):
         if not self.id:
             return False
-        return f'/forum/{slug(self)}'
+        return f'/forum/{self.env["ir.http"]._slug(self)}'
 
     # ----------------------------------------------------------------------
     # CRUD
@@ -266,13 +264,7 @@ class Forum(models.Model):
 
     def write(self, vals):
         if 'privacy' in vals:
-            if not vals['privacy']:
-                # The forum is neither public, neither private, remove menu to avoid conflict
-                self.menu_id.unlink()
-            elif vals['privacy'] == 'public':
-                # The forum is public, the menu must be also public
-                vals['authorized_group_id'] = False
-            elif vals['privacy'] == 'connected':
+            if vals['privacy'] in ('public', 'connected'):
                 vals['authorized_group_id'] = False
 
         res = super().write(vals)

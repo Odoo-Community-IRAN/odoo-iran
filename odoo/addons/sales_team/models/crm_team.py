@@ -11,6 +11,7 @@ from dateutil.relativedelta import relativedelta
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 from odoo.release import version
+from odoo.tools import SQL
 
 
 class CrmTeam(models.Model):
@@ -35,11 +36,6 @@ class CrmTeam(models.Model):
           3- default from context
           4- any team matching my company and domain (based on company rule)
           5- any team matching my company (based on company rule)
-
-        Note: ResPartner.team_id field is explicitly not taken into account. We
-        think this field causes a lot of noises compared to its added value.
-        Think notably: team not in responsible teams, team company not matching
-        responsible or lead company, asked domain not matching, ...
 
         :param user_id: salesperson to target, fallback on env.uid;
         :domain: optional domain to filter teams (like use_lead = True);
@@ -97,8 +93,7 @@ class CrmTeam(models.Model):
     sequence = fields.Integer('Sequence', default=10)
     active = fields.Boolean(default=True, help="If the active field is set to false, it will allow you to hide the Sales Team without removing it.")
     company_id = fields.Many2one(
-        'res.company', string='Company', index=True,
-        default=lambda self: self.env.company)
+        'res.company', string='Company', index=True)
     currency_id = fields.Many2one(
         "res.currency", string="Currency",
         related='company_id.currency_id', readonly=True)
@@ -247,7 +242,6 @@ class CrmTeam(models.Model):
         default_teams = [
             self.env.ref('sales_team.salesteam_website_sales'),
             self.env.ref('sales_team.pos_sales_team'),
-            self.env.ref('sales_team.ebay_sales_team')
         ]
         for team in self:
             if team in default_teams:
@@ -274,7 +268,7 @@ class CrmTeam(models.Model):
     # GRAPH
     # ------------------------------------------------------------
 
-    def _graph_get_model(self):
+    def _graph_get_model(self) -> str:
         """ skeleton function defined here because it'll be called by crm and/or sale
         """
         raise UserError(_('Undefined graph model for Sales Team: %s', self.name))
@@ -288,20 +282,20 @@ class CrmTeam(models.Model):
         start_date += relativedelta(days=8 - start_date.isocalendar()[2])
         return [start_date, today]
 
-    def _graph_date_column(self):
-        return 'create_date'
+    def _graph_date_column(self) -> SQL:
+        return SQL('create_date')
 
-    def _graph_get_table(self, GraphModel):
-        return GraphModel._table
+    def _graph_get_table(self, GraphModel) -> SQL:
+        return SQL(GraphModel._table)
 
-    def _graph_x_query(self):
-        return 'EXTRACT(WEEK FROM %s)' % self._graph_date_column()
+    def _graph_x_query(self) -> SQL:
+        return SQL('EXTRACT(WEEK FROM %s)', self._graph_date_column())
 
-    def _graph_y_query(self):
+    def _graph_y_query(self) -> SQL:
         raise UserError(_('Undefined graph model for Sales Team: %s', self.name))
 
-    def _extra_sql_conditions(self):
-        return ''
+    def _extra_sql_conditions(self) -> SQL:
+        return SQL()
 
     def _graph_title_and_key(self):
         """ Returns an array containing the appropriate graph title and key respectively.
@@ -315,37 +309,36 @@ class CrmTeam(models.Model):
             x_values should be weeks.
             y_values are floats.
         """
-        query = """SELECT %(x_query)s as x_value, %(y_query)s as y_value
-                     FROM %(table)s
-                    WHERE team_id = %(team_id)s
-                      AND DATE(%(date_column)s) >= %(start_date)s
-                      AND DATE(%(date_column)s) <= %(end_date)s
-                      %(extra_conditions)s
-                    GROUP BY x_value;"""
-
         # apply rules
+        extra_conditions = self._extra_sql_conditions() or SQL("TRUE")
         dashboard_graph_model = self._graph_get_model()
         GraphModel = self.env[dashboard_graph_model]
-        graph_table = self._graph_get_table(GraphModel)
-        extra_conditions = self._extra_sql_conditions()
         where_query = GraphModel._where_calc([])
         GraphModel._apply_ir_rules(where_query, 'read')
-        from_clause, where_clause, where_clause_params = where_query.get_sql()
-        if where_clause:
-            extra_conditions += " AND " + where_clause
+        if where_clause := where_query.where_clause:
+            extra_conditions = SQL("%s AND (%s)", extra_conditions, where_clause)
 
-        query = query % {
-            'x_query': self._graph_x_query(),
-            'y_query': self._graph_y_query(),
-            'table': graph_table,
-            'team_id': "%s",
-            'date_column': self._graph_date_column(),
-            'start_date': "%s",
-            'end_date': "%s",
-            'extra_conditions': extra_conditions
-        }
+        sql = SQL(
+            """
+            SELECT %(x_query)s as x_value, %(y_query)s as y_value
+            FROM %(table)s
+            WHERE team_id = %(team_id)s
+                AND DATE(%(date_column)s) >= %(start_date)s
+                AND DATE(%(date_column)s) <= %(end_date)s
+                AND %(extra_conditions)s
+            GROUP BY x_value
+            """,
+            x_query=self._graph_x_query(),
+            y_query=self._graph_y_query(),
+            table=self._graph_get_table(GraphModel),
+            team_id=self.id,
+            date_column=self._graph_date_column(),
+            start_date=start_date,
+            end_date=end_date,
+            extra_conditions=extra_conditions,
+        )
 
-        self._cr.execute(query, [self.id, start_date, end_date] + where_clause_params)
+        self._cr.execute(sql)
         return self.env.cr.dictfetchall()
 
     def _get_dashboard_graph_data(self):

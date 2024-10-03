@@ -105,6 +105,17 @@ class MailTestGatewayCompany(models.Model):
     company_id = fields.Many2one('res.company', 'Company')
 
 
+class MailTestGatewayMainAttachment(models.Model):
+    """ A very simple model only inheriting from mail.thread to test pure mass
+    mailing features and base performances, with a company field and main
+    attachment management. """
+    _description = 'Simple Chatter Model for Mail Gateway with company'
+    _name = 'mail.test.gateway.main.attachment'
+    _inherit = ['mail.test.gateway', 'mail.thread.main.attachment']
+
+    company_id = fields.Many2one('res.company', 'Company')
+
+
 class MailTestGatewayGroups(models.Model):
     """ A model looking like discussion channels / groups (flat thread and
     alias). Used notably for advanced gatewxay tests. """
@@ -299,22 +310,21 @@ class MailTestTicket(models.Model):
 
     def _message_get_suggested_recipients(self):
         recipients = super()._message_get_suggested_recipients()
-        for ticket in self:
-            if ticket.customer_id:
-                ticket.customer_id._message_add_suggested_recipient(
-                    recipients,
-                    partner=ticket.customer_id,
-                    lang=None,
-                    reason=_('Customer'),
-                )
-            elif ticket.email_from:
-                ticket._message_add_suggested_recipient(
-                    recipients,
-                    partner=None,
-                    email=self.email_from,
-                    lang=None,
-                    reason=_('Customer Email'),
-                )
+        if self.customer_id:
+            self.customer_id._message_add_suggested_recipient(
+                recipients,
+                partner=self.customer_id,
+                lang=None,
+                reason=_('Customer'),
+            )
+        elif self.email_from:
+            self._message_add_suggested_recipient(
+                recipients,
+                partner=None,
+                email=self.email_from,
+                lang=None,
+                reason=_('Customer Email'),
+            )
         return recipients
 
 class MailTestTicketEL(models.Model):

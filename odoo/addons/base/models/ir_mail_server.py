@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
-
-from email.message import EmailMessage
-from email.utils import make_msgid
 import base64
 import datetime
 import email
@@ -12,19 +9,18 @@ import logging
 import re
 import smtplib
 import ssl
-import sys
-import threading
-
+from email.message import EmailMessage
+from email.utils import make_msgid
 from socket import gaierror, timeout
+
 from OpenSSL import crypto as SSLCrypto
 from OpenSSL.crypto import Error as SSLCryptoError, FILETYPE_PEM
 from OpenSSL.SSL import Error as SSLError
 from urllib3.contrib.pyopenssl import PyOpenSSLContext
 
-from odoo import api, fields, models, tools, _
+from odoo import api, fields, models, tools, _, modules
 from odoo.exceptions import UserError
-from odoo.tools import ustr, pycompat, formataddr, email_normalize, encapsulate_email, email_domain_extract, email_domain_normalize
-
+from odoo.tools import formataddr, email_normalize, encapsulate_email, email_domain_extract, email_domain_normalize, human_size
 
 _logger = logging.getLogger(__name__)
 _test_logger = logging.getLogger('odoo.tests')
@@ -99,7 +95,7 @@ def extract_rfc2822_addresses(text):
     """
     if not text:
         return []
-    candidates = address_pattern.findall(ustr(text))
+    candidates = address_pattern.findall(text)
     valid_addresses = []
     for c in candidates:
         try:
@@ -157,9 +153,18 @@ class IrMailServer(models.Model):
     smtp_debug = fields.Boolean(string='Debugging', help="If enabled, the full output of SMTP sessions will "
                                                          "be written to the server log at DEBUG level "
                                                          "(this is very verbose and may include confidential info!)")
+    max_email_size = fields.Float(string="Max Email Size")
     sequence = fields.Integer(string='Priority', default=10, help="When no specific mail server is requested for a mail, the highest priority one "
                                                                   "is used. Default priority is 10 (smaller number = higher priority)")
     active = fields.Boolean(default=True)
+
+    _sql_constraints = [
+        (
+            'certificate_requires_tls',
+            "CHECK(smtp_encryption != 'none' OR smtp_authentication != 'certificate')",
+            "Certificate-based authentication requires a TLS transport"
+        ),
+    ]
 
     @api.depends('smtp_authentication')
     def _compute_smtp_authentication_info(self):
@@ -217,11 +222,11 @@ class IrMailServer(models.Model):
                                         for line in usage_details_per_server[server])
         if is_multiple_server_usage:
             raise UserError(
-                _('You cannot archive these Outgoing Mail Servers (%s) because they are still used in the following case(s):\n%s',
-                  error_server_usage, error_usage_details))
+                _('You cannot archive these Outgoing Mail Servers (%(server_usage)s) because they are still used in the following case(s):\n%(usage_details)s',
+                  server_usage=error_server_usage, usage_details=error_usage_details))
         raise UserError(
-            _('You cannot archive this Outgoing Mail Server (%s) because it is still used in the following case(s):\n%s',
-              error_server_usage, error_usage_details))
+            _('You cannot archive this Outgoing Mail Server (%(server_usage)s) because it is still used in the following case(s):\n%(usage_details)s',
+              server_usage=error_server_usage, usage_details=error_usage_details))
 
     def _active_usages_compute(self):
         """Compute a dict server id to list of user-friendly outgoing mail servers usage of this record set.
@@ -231,6 +236,11 @@ class IrMailServer(models.Model):
         :return dict: { ir_mail_server.id: usage_str_list }.
         """
         return dict()
+
+    def _get_max_email_size(self):
+        if self.max_email_size:
+            return self.max_email_size
+        return float(self.env['ir.config_parameter'].sudo().get_param('base.default_max_email_size', '10'))
 
     def _get_test_email_from(self):
         self.ensure_one()
@@ -252,7 +262,16 @@ class IrMailServer(models.Model):
     def _get_test_email_to(self):
         return "noreply@odoo.com"
 
-    def test_smtp_connection(self):
+    def test_smtp_connection(self, autodetect_max_email_size=False):
+        """Test the connection and if autodetect_max_email_size, set auto-detected max email size.
+
+        :param bool autodetect_max_email_size: whether to autodetect the max email size
+        :return (dict): client action to notify the user of the result of the operation (connection test or
+        auto-detection successful depending on the autodetect_max_email_size parameter)
+
+        :raises UserError: if the connection fails and if autodetect_max_email_size and
+            the server doesn't support the auto-detection of email max size
+        """
         for server in self:
             smtp = False
             try:
@@ -274,6 +293,12 @@ class IrMailServer(models.Model):
                 (code, repl) = smtp.getreply()
                 if code != 354:
                     raise UserError(_('The server refused the test connection with error %(repl)s', repl=repl))  # noqa: TRY301
+                if autodetect_max_email_size:
+                    max_size = smtp.esmtp_features.get('size')
+                    if not max_size:
+                        raise UserError(_('The server "%(server_name)s" doesn\'t return the maximum email size.',
+                                          server_name=server.name))
+                    server.max_email_size = float(max_size) / (1024 ** 2)
             except (UnicodeError, idna.core.InvalidCodepoint) as e:
                 raise UserError(_("Invalid server name!\n %s", e)) from e
             except (gaierror, timeout) as e:
@@ -301,7 +326,12 @@ class IrMailServer(models.Model):
                     # ignored, just a consequence of the previous exception
                     pass
 
-        message = _("Connection Test Successful!")
+        if autodetect_max_email_size:
+            message = _(
+                'Email maximum size updated (%(details)s).',
+                details=', '.join(f'{server.name}: {human_size(server.max_email_size * 1024 ** 2)}' for server in self))
+        else:
+            message = _('Connection Test Successful!')
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -309,8 +339,13 @@ class IrMailServer(models.Model):
                 'message': message,
                 'type': 'success',
                 'sticky': False,
-            }
+                'next': {'type': 'ir.actions.act_window_close'},  # force a form reload
+            },
         }
+
+    def action_retrieve_max_email_size(self):
+        self.ensure_one()
+        return self.test_smtp_connection(autodetect_max_email_size=True)
 
     def connect(self, host=None, port=None, user=None, password=None, encryption=None,
                 smtp_from=None, ssl_certificate=None, ssl_private_key=None, smtp_debug=False, mail_server_id=None,
@@ -336,9 +371,8 @@ class IrMailServer(models.Model):
            longer raised.
         """
         # Do not actually connect while running in test mode
-        if self._is_test_mode():
+        if modules.module.current_test:
             return
-
         mail_server = smtp_encryption = None
         if mail_server_id:
             mail_server = self.sudo().browse(mail_server_id)
@@ -408,10 +442,11 @@ class IrMailServer(models.Model):
                     raise UserError(_('Could not load your certificate / private key. \n%s', str(e)))
 
         if not smtp_server:
-            raise UserError(
-                (_("Missing SMTP Server") + "\n" +
-                 _("Please define at least one SMTP server, "
-                   "or provide the SMTP parameters explicitly.")))
+            raise UserError(_(
+                "Missing SMTP Server\n"
+                "Please define at least one SMTP server, "
+                "or provide the SMTP parameters explicitly.",
+            ))
 
         if smtp_encryption == 'ssl':
             if 'SMTP_SSL' not in smtplib.__all__:
@@ -500,12 +535,11 @@ class IrMailServer(models.Model):
         headers = headers or {}         # need valid dict later
         email_cc = email_cc or []
         email_bcc = email_bcc or []
-        body = body or u''
 
         msg = EmailMessage(policy=email.policy.SMTP)
         if not message_id:
             if object_id:
-                message_id = tools.generate_tracking_message_id(object_id)
+                message_id = tools.mail.generate_tracking_message_id(object_id)
             else:
                 message_id = make_msgid()
         msg['Message-Id'] = message_id
@@ -522,16 +556,16 @@ class IrMailServer(models.Model):
             msg['Bcc'] = email_bcc
         msg['Date'] = datetime.datetime.utcnow()
         for key, value in headers.items():
-            msg[pycompat.to_text(ustr(key))] = value
+            msg[key] = value
 
-        email_body = ustr(body)
+        email_body = body or ''
         if subtype == 'html' and not body_alternative:
             msg['MIME-Version'] = '1.0'
             msg.add_alternative(tools.html2plaintext(email_body), subtype='plain', charset='utf-8')
             msg.add_alternative(email_body, subtype=subtype, charset='utf-8')
         elif body_alternative:
             msg['MIME-Version'] = '1.0'
-            msg.add_alternative(ustr(body_alternative), subtype=subtype_alternative, charset='utf-8')
+            msg.add_alternative(body_alternative, subtype=subtype_alternative, charset='utf-8')
             msg.add_alternative(email_body, subtype=subtype, charset='utf-8')
         else:
             msg.set_content(email_body, subtype=subtype, charset='utf-8')
@@ -692,27 +726,14 @@ class IrMailServer(models.Model):
         smtp_from, smtp_to_list, message = self._prepare_email_message(message, smtp)
 
         # Do not actually send emails in testing mode!
-        if self._is_test_mode():
-            _test_logger.info("skip sending email in test mode")
+        if modules.module.current_test:
+            _test_logger.debug("skip sending email in test mode")
             return message['Message-Id']
 
         try:
             message_id = message['Message-Id']
 
-            if sys.version_info < (3, 7, 4):
-                # header folding code is buggy and adds redundant carriage
-                # returns, it got fixed in 3.7.4 thanks to bpo-34424
-                message_str = message.as_string()
-                message_str = re.sub('\r+(?!\n)', '', message_str)
-
-                mail_options = []
-                if any((not is_ascii(addr) for addr in smtp_to_list + [smtp_from])):
-                    # non ascii email found, require SMTPUTF8 extension,
-                    # the relay may reject it
-                    mail_options.append("SMTPUTF8")
-                smtp.sendmail(smtp_from, smtp_to_list, message_str, mail_options=mail_options)
-            else:
-                smtp.send_message(message, smtp_from, smtp_to_list)
+            smtp.send_message(message, smtp_from, smtp_to_list)
 
             # do not quit() a pre-established smtp_session
             if not smtp_session:
@@ -720,8 +741,12 @@ class IrMailServer(models.Model):
         except smtplib.SMTPServerDisconnected:
             raise
         except Exception as e:
-            params = (ustr(smtp_server), e.__class__.__name__, ustr(e))
-            msg = _("Mail delivery failed via SMTP server '%s'.\n%s: %s", *params)
+            msg = _(
+                "Mail delivery failed via SMTP server '%(server)s'.\n%(exception_name)s: %(message)s",
+                server=smtp_server,
+                exception_name=e.__class__.__name__,
+                message=e,
+            )
             _logger.info(msg)
             raise MailDeliveryException(_("Mail Delivery Failed"), msg)
         return message_id
@@ -831,11 +856,3 @@ class IrMailServer(models.Model):
         else:
             self.smtp_port = 25
         return result
-
-    def _is_test_mode(self):
-        """Return True if we are running the tests, so we do not send real emails.
-
-        Can be overridden in tests after mocking the SMTP lib to test in depth the
-        outgoing mail server.
-        """
-        return getattr(threading.current_thread(), 'testing', False) or self.env.registry.in_test_mode()

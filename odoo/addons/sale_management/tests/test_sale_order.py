@@ -17,6 +17,7 @@ class TestSaleOrder(SaleManagementCommon):
         # some variables to ease asserts in tests
         cls.pub_product_price = 100.0
         cls.pl_product_price = 80.0
+        cls._enable_discounts()
         cls.tpl_discount = 10.0
         cls.pl_discount = (cls.pub_product_price - cls.pl_product_price) * 100 / cls.pub_product_price
         cls.merged_discount = 100.0 - (100.0 - cls.pl_discount) * (100.0 - cls.tpl_discount) / 100.0
@@ -32,6 +33,7 @@ class TestSaleOrder(SaleManagementCommon):
             {
                 'name': 'Product 1',
                 'lst_price': cls.pub_product_price,
+                'description_sale': "This is a product description"
             }, {
                 'name': 'Optional product',
                 'lst_price': cls.pub_option_price,
@@ -70,6 +72,22 @@ class TestSaleOrder(SaleManagementCommon):
                 'fixed_price': cls.pl_option_price,
             }),
         ]
+        percentage_pricelist_rule_values = [
+            Command.create({
+                'name': 'Product 1 premium price',
+                'applied_on': '1_product',
+                'product_tmpl_id': cls.product_1.product_tmpl_id.id,
+                'compute_price': 'percentage',
+                'percent_price': cls.pl_discount,
+            }),
+            Command.create({
+                'name': 'Optional product premium price',
+                'applied_on': '1_product',
+                'product_tmpl_id': cls.optional_product.product_tmpl_id.id,
+                'compute_price': 'percentage',
+                'percent_price': cls.pl_option_discount,
+            }),
+        ]
 
         (
             cls.discount_included_price_list,
@@ -77,12 +95,10 @@ class TestSaleOrder(SaleManagementCommon):
         ) = cls.env['product.pricelist'].create([
             {
                 'name': 'Discount included Pricelist',
-                'discount_policy': 'with_discount',
                 'item_ids': pricelist_rule_values,
             }, {
                 'name': 'Discount excluded Pricelist',
-                'discount_policy': 'without_discount',
-                'item_ids': pricelist_rule_values,
+                'item_ids': percentage_pricelist_rule_values,
             }
         ])
 
@@ -336,3 +352,47 @@ class TestSaleOrder(SaleManagementCommon):
         # after changing the quantity of the product, the price unit should not be recomputed
         sale_order_with_option.order_line.product_uom_qty = 10
         self.assertEqual(sale_order_with_option.sale_order_option_ids.price_unit, 10)
+
+    def test_product_description_no_template_description(self):
+        """
+        Test case for when the product has a description, but the quotation template line does not.
+        The final sale order line should use the product's description.
+        """
+        quotation_template_no_description = self.empty_order_template
+        quotation_template_no_description.sale_order_template_line_ids = [
+            Command.create({
+                'product_id': self.product_1.id,
+                'name': False,
+            }),
+        ]
+        sale_order = self.empty_order
+        sale_order.sale_order_template_id = quotation_template_no_description
+        sale_order._onchange_sale_order_template_id()
+        self.assertEqual(
+            sale_order.order_line[0].name,
+            f"{self.product_1.name}\n{self.product_1.description_sale}",
+            "Sale order line should use product's description when no quotation template \
+            description is set."
+        )
+
+    def test_product_description_with_template_description(self):
+        """
+        Test case for when both the product and the quotation template line have descriptions.
+        The final sale order line should use the template's description.
+        """
+        quotation_template_with_description = self.empty_order_template
+        quotation_template_with_description.sale_order_template_line_ids = [
+            Command.create({
+                'product_id': self.product_1.id,
+                'name': "This is a template description",
+            }),
+        ]
+        sale_order = self.empty_order
+        sale_order.sale_order_template_id = quotation_template_with_description
+        sale_order._onchange_sale_order_template_id()
+        self.assertEqual(
+            sale_order.order_line[0].name,
+            quotation_template_with_description.sale_order_template_line_ids[0].name,
+            "The sale order line should use the quotation template's description when both \
+            product and the quotation template descriptions are set."
+        )

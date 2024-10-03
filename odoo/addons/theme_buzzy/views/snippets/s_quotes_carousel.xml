@@ -4,22 +4,12 @@
 <template id="s_quotes_carousel" inherit_id="website.s_quotes_carousel">
     <!-- Carousel -->
     <xpath expr="//div[hasclass('s_quotes_carousel')]" position="attributes">
-        <attribute name="class" add="s_carousel_rounded o_cc5" remove="s_carousel_default o_cc2" separator=" "/>
+        <attribute name="class" add="s_carousel_rounded o_cc5" remove="s_carousel_boxed o_cc2 carousel-dark" separator=" "/>
         <attribute name="data-oe-shape-data">{"shape":"web_editor/Rainy/10","flip":[]}</attribute>
     </xpath>
     <!-- Shape -->
-    <xpath expr="//ol[hasclass('carousel-indicators')]" position="before">
+    <xpath expr="//div[hasclass('carousel-inner')]" position="before">
         <div class="o_we_shape o_web_editor_Rainy_10"/>
-    </xpath>
-    <!-- Icons quote -->
-    <xpath expr="//i" position="attributes">
-        <attribute name="class" add="bg-o-color-1" remove="bg-o-color-2" separator=" "/>
-    </xpath>
-    <xpath expr="(//i)[2]" position="attributes">
-        <attribute name="class" add="bg-o-color-1" remove="bg-o-color-2" separator=" "/>
-    </xpath>
-    <xpath expr="(//i)[3]" position="attributes">
-        <attribute name="class" add="bg-o-color-1" remove="bg-o-color-2" separator=" "/>
     </xpath>
     <!-- Carousel items - Remove background image -->
     <xpath expr="//div[hasclass('carousel-item')]" position="attributes">
@@ -30,6 +20,16 @@
     </xpath>
     <xpath expr="(//div[hasclass('carousel-item')])[3]" position="attributes">
         <attribute name="style"/>
+    </xpath>
+    <!-- Authors -->
+    <xpath expr="(//div[hasclass('s_blockquote_author')])[1]//span//span" position="attributes">
+        <attribute name="class" add="text-o-color-2" remove="text-muted" separator=" "/>
+    </xpath>
+    <xpath expr="(//div[hasclass('s_blockquote_author')])[2]//span//span" position="attributes">
+        <attribute name="class" add="text-o-color-2" remove="text-muted" separator=" "/>
+    </xpath>
+    <xpath expr="(//div[hasclass('s_blockquote_author')])[3]//span//span" position="attributes">
+        <attribute name="class" add="text-o-color-2" remove="text-muted" separator=" "/>
     </xpath>
 </template>
 

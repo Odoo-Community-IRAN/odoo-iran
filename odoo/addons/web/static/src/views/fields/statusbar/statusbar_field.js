@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { Component, onWillRender, useEffect, useExternalListener, useRef } from "@odoo/owl";
 import { browser } from "@web/core/browser/browser";
 import { useCommand } from "@web/core/commands/command_hook";
@@ -11,12 +9,13 @@ import { registry } from "@web/core/registry";
 import { groupBy } from "@web/core/utils/arrays";
 import { escape } from "@web/core/utils/strings";
 import { throttleForAnimation } from "@web/core/utils/timing";
+import { getFieldDomain } from "@web/model/relational_model/utils";
 import { useSpecialData } from "@web/views/fields/relational_utils";
 import { standardFieldProps } from "../standard_field_props";
 
 /**
  * @typedef {import("../standard_field_props").StandardFieldProps & {
- *  domain?: typeof Domain;
+ *  domain?: [Array, Function];
  *  foldField?: string;
  *  isDisabled?: boolean;
  *  visibleSelection?: string[];
@@ -53,7 +52,7 @@ export class StatusBarField extends Component {
     };
     static props = {
         ...standardFieldProps,
-        domain: { type: typeof Domain, optional: true },
+        domain: { type: [Array, Function], optional: true },
         foldField: { type: String, optional: true },
         isDisabled: { type: Boolean, optional: true },
         visibleSelection: { type: Array, element: String, optional: true },
@@ -100,11 +99,11 @@ export class StatusBarField extends Component {
                 if (foldField) {
                     fieldNames.push(foldField);
                 }
-                const value = props.record.data[fieldName];
-                let domain = props.domain;
+                const value = record.data[fieldName];
+                let domain = getFieldDomain(record, fieldName, props.domain);
                 if (domain.length && value) {
                     domain = Domain.or([[["id", "=", value[0]]], domain]).toList(
-                        props.record.evalContext
+                        record.evalContext
                     );
                 }
                 return orm.searchRead(relation, domain, fieldNames);
@@ -352,7 +351,7 @@ export const statusBarField = {
         visibleSelection: attrs.statusbar_visible?.trim().split(/\s*,\s*/g),
         withCommand: viewType === "form",
         foldField: options.fold_field,
-        domain: dynamicInfo.domain(),
+        domain: dynamicInfo.domain,
     }),
 };
 

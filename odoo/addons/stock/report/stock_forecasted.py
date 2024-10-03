@@ -8,7 +8,6 @@ from odoo import api, models
 from odoo.osv.expression import AND
 from odoo.tools import float_is_zero, format_date, float_round, float_compare
 
-
 class StockForecasted(models.AbstractModel):
     _name = 'stock.forecasted_product_product'
     _description = "Stock Replenishment Report"
@@ -34,7 +33,11 @@ class StockForecasted(models.AbstractModel):
         out_domain = move_domain + [
             '&',
             ('location_id', 'in', wh_location_ids),
+            '|',
             ('location_dest_id', 'not in', wh_location_ids),
+            '&',
+            ('location_final_id', '!=', False),
+            ('location_final_id', 'not in', wh_location_ids),
         ]
         in_domain = move_domain + [
             '&',
@@ -112,8 +115,8 @@ class StockForecasted(models.AbstractModel):
         assert product_template_ids or product_ids
         res = {}
 
-        if self.env.context.get('warehouse') and isinstance(self.env.context['warehouse'], int):
-            warehouse = self.env['stock.warehouse'].browse(self.env.context.get('warehouse'))
+        if self.env.context.get('warehouse_id') and isinstance(self.env.context['warehouse_id'], int):
+            warehouse = self.env['stock.warehouse'].browse(self.env.context.get('warehouse_id'))
         else:
             warehouse = self.env['stock.warehouse'].search([['active', '=', True]])[0]
 

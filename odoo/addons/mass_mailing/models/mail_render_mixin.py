@@ -8,9 +8,9 @@ class MailRenderMixin(models.AbstractModel):
     _inherit = "mail.render.mixin"
 
     @api.model
-    def _render_template_postprocess(self, rendered):
+    def _render_template_postprocess(self, model, rendered):
         # super will transform relative url to absolute
-        rendered = super(MailRenderMixin, self)._render_template_postprocess(rendered)
+        rendered = super()._render_template_postprocess(model, rendered)
 
         # apply shortener after
         if self.env.context.get('post_convert_links'):
@@ -18,6 +18,6 @@ class MailRenderMixin(models.AbstractModel):
                 rendered[res_id] = self._shorten_links(
                     html,
                     self.env.context['post_convert_links'],
-                    blacklist=['/unsubscribe_from_list', '/view']
+                    blacklist=['/unsubscribe_from_list', '/view', '/cards/']
                 )
         return rendered

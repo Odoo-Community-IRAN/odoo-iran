@@ -1,6 +1,7 @@
 /** @odoo-module **/
 
 import publicWidget from "@web/legacy/js/public/public_widget";
+import { rpc } from "@web/core/network/rpc";
 import { uniqueId } from "@web/core/utils/functions";
 import { renderToString } from "@web/core/utils/render";
 import { listenSizeChange, utils as uiUtils } from "@web/core/ui/ui_service";
@@ -35,8 +36,6 @@ const DynamicSnippet = publicWidget.Widget.extend({
         this.isDesplayedAsMobile = uiUtils.isSmall();
         this.unique_id = uniqueId("s_dynamic_snippet_");
         this.template_key = 'website.s_dynamic_snippet.grid';
-
-        this.rpc = this.bindService("rpc");
     },
     /**
      *
@@ -119,15 +118,18 @@ const DynamicSnippet = publicWidget.Widget.extend({
     async _fetchData() {
         if (this._isConfigComplete()) {
             const nodeData = this.el.dataset;
-            const filterFragments = await this.rpc(
+            const filterFragments = await rpc(
                 '/website/snippet/filters',
                 Object.assign({
-                    'filter_id': parseInt(nodeData.filterId),
-                    'template_key': nodeData.templateKey,
-                    'limit': parseInt(nodeData.numberOfRecords),
-                    'search_domain': this._getSearchDomain(),
-                    'with_sample': this.editableMode,
-                }, this._getRpcParameters())
+                        'filter_id': parseInt(nodeData.filterId),
+                        'template_key': nodeData.templateKey,
+                        'limit': parseInt(nodeData.numberOfRecords),
+                        'search_domain': this._getSearchDomain(),
+                        'with_sample': this.editableMode,
+                    },
+                    this._getRpcParameters(),
+                    JSON.parse(this.el.dataset?.customTemplateData || "{}")
+                )
             );
             this.data = filterFragments.map(markup);
         } else {
@@ -165,6 +167,7 @@ const DynamicSnippet = publicWidget.Widget.extend({
             data: this.data,
             unique_id: this.unique_id,
             extraClasses: dataset.extraClasses || '',
+            columnClasses: dataset.columnClasses || '',
         };
     },
     /**
@@ -173,10 +176,10 @@ const DynamicSnippet = publicWidget.Widget.extend({
      */
     _render: function () {
         if (this.data.length > 0 || this.editableMode) {
-            this.$el.removeClass('o_dynamic_empty');
+            this.$el.removeClass('o_dynamic_snippet_empty');
             this._prepareContent();
         } else {
-            this.$el.addClass('o_dynamic_empty');
+            this.$el.addClass('o_dynamic_snippet_empty');
             this.renderedContent = '';
         }
         this._renderContent();
@@ -194,6 +197,12 @@ const DynamicSnippet = publicWidget.Widget.extend({
         this.trigger_up('widgets_stop_request', {
             $target: $templateArea,
         });
+        const mainPageUrl = this._getMainPageUrl();
+        const allContentLink = this.el.querySelector(".s_dynamic_snippet_main_page_url");
+        if (allContentLink && mainPageUrl) {
+            allContentLink.href = mainPageUrl;
+            allContentLink.classList.remove("d-none");
+        }
         $templateArea.html(this.renderedContent);
         // TODO this is probably not the only public widget which creates DOM
         // which should be attached to another public widget. Maybe a generic
@@ -222,7 +231,15 @@ const DynamicSnippet = publicWidget.Widget.extend({
      * @private
      */
     _toggleVisibility: function (visible) {
-        this.$el.toggleClass('o_dynamic_empty', !visible);
+        this.$el.toggleClass('o_dynamic_snippet_empty', !visible);
+    },
+    /**
+     * Returns the main URL of the module related to the active filter.
+     *
+     * @private
+     */
+    _getMainPageUrl() {
+        return '';
     },
 
     //------------------------------------- -------------------------------------

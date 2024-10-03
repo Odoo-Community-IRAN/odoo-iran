@@ -17,7 +17,7 @@ class ResPartner(models.Model):
         """ Add validation of UY document types CI and NIE """
         ci_nie_types = self.filtered(
             lambda p: p.l10n_latam_identification_type_id.l10n_uy_dgi_code in ("1", "3")
-            and p.l10n_latam_identification_type_id.country_id.code == "UY" and p.vat)
+                      and p.l10n_latam_identification_type_id.country_id.code == "UY" and p.vat)
         for partner in ci_nie_types:
             if not partner._l10n_uy_ci_nie_is_valid():
                 raise ValidationError(self._l10n_uy_build_vat_error_message(partner))

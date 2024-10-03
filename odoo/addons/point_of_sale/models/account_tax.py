@@ -6,7 +6,8 @@ from odoo.tools import split_every
 
 
 class AccountTax(models.Model):
-    _inherit = 'account.tax'
+    _name = 'account.tax'
+    _inherit = ['account.tax', 'pos.load.mixin']
 
     def write(self, vals):
         forbidden_fields = {
@@ -49,3 +50,14 @@ class AccountTax(models.Model):
             used_taxes.update([tax[0] for tax in self.env.cr.fetchall()])
 
         return used_taxes
+
+    @api.model
+    def _load_pos_data_domain(self, data):
+        return self.env['account.tax']._check_company_domain(data['pos.config']['data'][0]['company_id'])
+
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        return [
+            'id', 'name', 'price_include', 'include_base_amount', 'is_base_affected', 'has_negative_factor',
+            'amount_type', 'children_tax_ids', 'amount', 'company_id', 'id', 'sequence', 'tax_group_id',
+        ]

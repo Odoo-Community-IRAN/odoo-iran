@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { htmlToTextContentInline } from "@mail/utils/common/format";
 
 import { browser } from "@web/core/browser/browser";
@@ -26,12 +24,13 @@ export class OutOfFocusService {
         this.audio = undefined;
         this.multiTab = services.multi_tab;
         this.notificationService = services.notification;
+        this.closeFuncs = [];
     }
 
     async notify(message, channel) {
         const modelsHandleByPush = ["mail.thread", "discuss.channel"];
         if (
-            modelsHandleByPush.includes(message.model) &&
+            modelsHandleByPush.includes(message.thread?.model) &&
             (await this.hasServiceWorkInstalledAndPushSubscriptionActive())
         ) {
             return;
@@ -112,7 +111,10 @@ export class OutOfFocusService {
      * @param {Object} options
      */
     async sendOdooNotification(message, options) {
-        this.notificationService.add(message, options);
+        this.closeFuncs.push(this.notificationService.add(message, options));
+        if (this.closeFuncs.length > 3) {
+            this.closeFuncs.shift()();
+        }
         this._playSound();
     }
 

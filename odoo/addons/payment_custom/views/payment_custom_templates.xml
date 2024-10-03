@@ -2,9 +2,15 @@
 <odoo>
 
     <template id="payment_custom.token_form" inherit_id="payment.token_form">
+        <xpath expr="//t[@t-set='hide_secured_by']" position="attributes">
+            <attribute name="t-value" separator=" " add="or provider_sudo.code == 'custom'"/>
+        </xpath>
     </template>
 
     <template id="payment_custom.payment_method_form" inherit_id="payment.method_form">
+        <xpath expr="//t[@t-set='hide_secured_by']" position="attributes">
+            <attribute name="t-value" separator=" " add="or provider_sudo.code == 'custom'"/>
+        </xpath>
     </template>
 
     <template id="redirect_form">
@@ -13,7 +19,7 @@
         </form>
     </template>
 
-    <template id="custom_transaction_status" inherit_id="payment.transaction_status">
+    <template id="custom_state_header" inherit_id="payment.state_header">
 
         <xpath expr="//div[@name='o_payment_status_alert']" position="before">
             <h1 t-if=" tx.provider_id.sudo().code == 'custom' and tx.state == 'pending'"
@@ -62,14 +68,13 @@
                  class="order-3 order-md-1 flex-grow-1"
             >
                 <div class="card flex-grow-1">
-                    <div class="card-body">
+                    <div id="o_payment_status_message_details" class="card-body">
                         <t>$0</t>
                         <t t-if="tx._get_communication()">
                             <hr class="w-100"/>
                             <strong class="mt-auto">Communication: </strong>
                             <span t-out="tx._get_communication()"/>
                         </t>
-                        <t t-if="tx.reference"/>  <!-- Remove in master -->
                     </div>
                 </div>
             </div>

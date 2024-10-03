@@ -8,7 +8,7 @@
         </p>
 
         <ul class="o-tooltip--technical" t-if="debug" role="tooltip">
-            <li data-item="field" t-if="field and field.label">
+            <li data-item="label" t-if="field and field.label">
                 <span class="o-tooltip--technical--title">Label:</span>
                 <t t-esc="field.label"/>
             </li>
@@ -24,6 +24,10 @@
                 <li t-if="field.type" data-item="type" >
                     <span class="o-tooltip--technical--title">Type:</span>
                     <t t-esc="field.type"/>
+                </li>
+                <li t-if="field.model_field" data-item="model_field">
+                    <span class="o-tooltip--technical--title">Model field:</span>
+                    <t t-esc="field.model_field"/>
                 </li>
                 <li t-if="field.widget" data-item="widget">
                     <span class="o-tooltip--technical--title">Widget:</span>

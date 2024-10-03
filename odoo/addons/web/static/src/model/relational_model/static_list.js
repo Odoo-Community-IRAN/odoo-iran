@@ -1,11 +1,9 @@
-/* @odoo-module */
-
 import { x2ManyCommands } from "@web/core/orm_service";
 import { intersection } from "@web/core/utils/arrays";
 import { pick } from "@web/core/utils/objects";
 import { completeActiveFields } from "@web/model/relational_model/utils";
 import { DataPoint } from "./datapoint";
-import { fromUnityToServerValues, getId, patchActiveFields } from "./utils";
+import { fromUnityToServerValues, getBasicEvalContext, getId, patchActiveFields } from "./utils";
 
 import { markRaw } from "@odoo/owl";
 
@@ -87,14 +85,9 @@ export class StaticList extends DataPoint {
     }
 
     get evalContext() {
-        const context = this.config.context;
-        return {
-            context,
-            uid: context.uid,
-            allowed_company_ids: context.allowed_company_ids,
-            current_company_id: this.config.currentCompanyId,
-            parent: this._parent.evalContext,
-        };
+        const evalContext = getBasicEvalContext(this.config);
+        evalContext.parent = this._parent.evalContext;
+        return evalContext;
     }
 
     get limit() {
@@ -148,34 +141,6 @@ export class StaticList extends DataPoint {
 
     canResequence() {
         return this.handleField && this.orderBy.length && this.orderBy[0].name === this.handleField;
-    }
-
-    /**
-     * TODO: We should probably delete this function.
-     * It is only used for the product configurator.
-     * It will take a list of contexts containing default
-     * values used to create the new records in the static list.
-     * It will then delete the old records from the static list
-     * and replace them with the new ones we have just created.
-     */
-    createAndReplace(contextRecords) {
-        return this.model.mutex.exec(async () => {
-            const proms = [];
-            for (const context of contextRecords) {
-                proms.push(
-                    this._createNewRecordDatapoint({
-                        context,
-                        manuallyAdded: true,
-                    })
-                );
-            }
-            this.records = await Promise.all(proms);
-            this._commands = this.records.map((record) => [
-                x2ManyCommands.CREATE,
-                record._virtualId,
-            ]);
-            this._currentIds = this.records.map((record) => record._virtualId);
-        });
     }
 
     delete(record) {

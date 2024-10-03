@@ -1,9 +1,8 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
 import { browser } from "@web/core/browser/browser";
 import { CheckBox } from "@web/core/checkbox/checkbox";
 import { Dialog } from "@web/core/dialog/dialog";
+import { rpc } from "@web/core/network/rpc";
 import { unique } from "@web/core/utils/arrays";
 import { useService } from "@web/core/utils/hooks";
 import { fuzzyLookup } from "@web/core/utils/search";
@@ -13,15 +12,33 @@ import { useDebounced } from "@web/core/utils/timing";
 import { Component, useRef, useState, onMounted, onWillStart, onWillUnmount } from "@odoo/owl";
 
 class DeleteExportListDialog extends Component {
+    static components = { Dialog };
+    static template = "web.DeleteExportListDialog";
+    static props = {
+        text: String,
+        close: Function,
+        delete: Function,
+    };
     async onDelete() {
         await this.props.delete();
         this.props.close();
     }
 }
-DeleteExportListDialog.components = { Dialog };
-DeleteExportListDialog.template = "web.DeleteExportListDialog";
 
 class ExportDataItem extends Component {
+    static template = "web.ExportDataItem";
+    static components = { ExportDataItem };
+    static props = {
+        exportList: { type: Object, optional: true },
+        field: { type: Object, optional: true },
+        filterSubfields: Function,
+        isDebug: Boolean,
+        isExpanded: Boolean,
+        isFieldExpandable: Function,
+        onAdd: Function,
+        loadFields: Function,
+    };
+
     setup() {
         this.state = useState({
             subfields: [],
@@ -62,25 +79,23 @@ class ExportDataItem extends Component {
         return this.props.exportList.find(({ id }) => id === current);
     }
 }
-ExportDataItem.template = "web.ExportDataItem";
-ExportDataItem.components = { ExportDataItem };
-ExportDataItem.props = {
-    exportList: { type: Object, optional: true },
-    field: { type: Object, optional: true },
-    filterSubfields: Function,
-    isDebug: Boolean,
-    isExpanded: Boolean,
-    isFieldExpandable: Function,
-    onAdd: Function,
-    loadFields: Function,
-};
 
 export class ExportDataDialog extends Component {
+    static template = "web.ExportDataDialog";
+    static components = { CheckBox, Dialog, ExportDataItem };
+    static props = {
+        close: { type: Function },
+        context: { type: Object, optional: true },
+        defaultExportList: { type: Array },
+        download: { type: Function },
+        getExportedFields: { type: Function },
+        root: { type: Object },
+    };
+
     setup() {
         this.dialog = useService("dialog");
         this.notification = useService("notification");
         this.orm = useService("orm");
-        this.rpc = useService("rpc");
         this.draggableRef = useRef("draggable");
         this.exportListRef = useRef("exportList");
         this.searchRef = useRef("search");
@@ -101,7 +116,6 @@ export class ExportDataDialog extends Component {
             disabled: false,
         });
 
-        this.title = _t("Export Data");
         this.newTemplateText = _t("New template");
         this.removeFieldText = _t("Remove field");
 
@@ -133,7 +147,7 @@ export class ExportDataDialog extends Component {
         });
 
         onWillStart(async () => {
-            this.availableFormats = await this.rpc("/web/export/formats");
+            this.availableFormats = await rpc("/web/export/formats");
             this.templates = await this.orm.searchRead(
                 "ir.exports",
                 [["resource", "=", this.props.root.resModel]],
@@ -231,16 +245,12 @@ export class ExportDataDialog extends Component {
         if (!value || value === "new_template") {
             return;
         }
-        const fields = await this.rpc("/web/export/namelist", {
+        const fields = await rpc("/web/export/namelist", {
             model: this.props.root.resModel,
             export_id: Number(value),
         });
-        this.state.exportList = fields.map(({ label, name }) => {
-            return {
-                string: label,
-                id: name,
-            };
-        });
+        // Don't safe the result in this.knownFields because, the result is only partial
+        this.state.exportList = fields;
     }
 
     async loadFields(id, preventLoad = false) {
@@ -411,13 +421,3 @@ export class ExportDataDialog extends Component {
         }
     }
 }
-ExportDataDialog.components = { CheckBox, Dialog, ExportDataItem };
-ExportDataDialog.props = {
-    close: { type: Function },
-    context: { type: Object, optional: true },
-    defaultExportList: { type: Array },
-    download: { type: Function },
-    getExportedFields: { type: Function },
-    root: { type: Object },
-};
-ExportDataDialog.template = "web.ExportDataDialog";

@@ -1,13 +1,10 @@
-/* @odoo-module */
-
 import { cleanTerm } from "@mail/utils/common/format";
 
 import { Component } from "@odoo/owl";
 
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
-import { url } from "@web/core/utils/urls";
-import { imageCacheKey } from "@web/views/fields/image/image_field";
+import { imageUrl } from "@web/core/utils/urls";
 import { ImStatus } from "@mail/core/common/im_status";
 
 const commandSetupRegistry = registry.category("command_setup");
@@ -16,6 +13,16 @@ const commandProviderRegistry = registry.category("command_provider");
 class DiscussCommand extends Component {
     static components = { ImStatus };
     static template = "mail.DiscussCommand";
+    static props = {
+        counter: { type: Number, optional: true },
+        executeCommand: Function,
+        imgUrl: String,
+        name: String,
+        persona: { type: Object, optional: true },
+        channel: { type: Object, optional: true },
+        searchValue: String,
+        slots: Object,
+    };
 }
 
 // -----------------------------------------------------------------------------
@@ -34,60 +41,63 @@ commandProviderRegistry.add("mail.partner", {
      * @param {import("@web/env").OdooEnv} env
      */
     async provide(env, options) {
-        const messaging = env.services["mail.messaging"];
-        const threadService = env.services["mail.thread"];
+        const store = env.services["mail.store"];
+        await store.channels.fetch();
         const suggestionService = env.services["mail.suggestion"];
         const commands = [];
-        const mentionedChannels = threadService.getNeedactionChannels();
+        const mentionedChannels = store.getNeedactionChannels();
         // We don't want to display the same channel twice in the command palette.
         const displayedPartnerIds = new Set();
         if (!options.searchValue) {
             mentionedChannels.slice(0, 3).map((channel) => {
-                if (channel.type === "chat") {
-                    displayedPartnerIds.add(channel.chatPartner.id);
+                if (channel.channel_type === "chat") {
+                    displayedPartnerIds.add(channel.correspondent.persona.id);
                 }
                 commands.push({
                     Component: DiscussCommand,
                     async action() {
-                        switch (channel.type) {
+                        switch (channel.channel_type) {
                             case "chat":
-                                threadService.openChat({ partnerId: channel.chatPartner.id });
+                                store.openChat({ partnerId: channel.correspondent.persona.id });
                                 break;
                             case "group":
-                                threadService.open(channel);
+                                channel.open();
                                 break;
                             case "channel": {
-                                await threadService.joinChannel(channel.id, channel.name);
-                                threadService.open(channel);
+                                await store.joinChannel(channel.id, channel.name);
+                                channel.open();
                             }
                         }
                     },
                     name: channel.displayName,
                     category: "discuss_mentioned",
                     props: {
-                        imgUrl: channel.imgUrl,
-                        persona: channel.type === "chat" ? channel.correspondent : undefined,
-                        counter: threadService.getCounter(channel),
+                        imgUrl: channel.avatarUrl,
+                        persona:
+                            channel.channel_type === "chat"
+                                ? channel.correspondent.persona
+                                : undefined,
+                        counter: channel.importantCounter,
                     },
                 });
             });
         }
-        const searchResults = await messaging.searchPartners(options.searchValue);
+        const searchResults = await store.searchPartners(options.searchValue);
         suggestionService
             .sortPartnerSuggestions(searchResults, options.searchValue)
             .filter((partner) => !displayedPartnerIds.has(partner.id))
             .map((partner) => {
-                const chat = threadService.searchChat(partner);
+                const chat = partner.searchChat();
                 commands.push({
                     Component: DiscussCommand,
                     action() {
-                        threadService.openChat({ partnerId: partner.id });
+                        store.openChat({ partnerId: partner.id });
                     },
                     name: partner.name,
                     props: {
-                        imgUrl: threadService.avatarUrl(partner),
+                        imgUrl: partner.avatarUrl,
                         persona: partner,
-                        counter: chat ? threadService.getCounter(chat) : undefined,
+                        counter: chat ? chat.importantCounter : undefined,
                     },
                 });
             });
@@ -112,29 +122,30 @@ commandProviderRegistry.add("discuss.channel", {
      * @param {import("@web/env").OdooEnv} env
      */
     async provide(env, options) {
-        const messaging = env.services["mail.messaging"];
-        const threadService = env.services["mail.thread"];
+        const store = env.services["mail.store"];
+        await store.channels.fetch();
         const commands = [];
-        const recentChannels = threadService.getRecentChannels();
+        const recentChannels = store.getRecentChannels();
         // We don't want to display the same thread twice in the command palette.
         const shownChannels = new Set();
         if (!options.searchValue) {
             recentChannels
-                .filter((channel) => ["channel", "group"].includes(channel.type))
+                .filter((channel) => ["channel", "group"].includes(channel.channel_type))
                 .slice(0, 3)
                 .map((channel) => {
                     shownChannels.add(channel.id);
                     commands.push({
                         Component: DiscussCommand,
                         async action() {
-                            await threadService.joinChannel(channel.id, channel.name);
-                            threadService.open(channel);
+                            await store.joinChannel(channel.id, channel.name);
+                            channel.open();
                         },
                         name: channel.displayName,
                         category: "discuss_recent",
                         props: {
-                            imgUrl: channel.imgUrl,
-                            counter: threadService.getCounter(channel),
+                            channel,
+                            imgUrl: channel.avatarUrl,
+                            counter: channel.importantCounter,
                         },
                     });
                 });
@@ -143,28 +154,37 @@ commandProviderRegistry.add("discuss.channel", {
             ["channel_type", "=", "channel"],
             ["name", "ilike", cleanTerm(options.searchValue)],
         ];
-        const channelsData = await messaging.orm.searchRead(
+        const channelsData = await env.services.orm.searchRead(
             "discuss.channel",
             domain,
-            ["channel_type", "name", "avatar_128"],
+            ["channel_type", "name", "avatar_cache_key", "parent_channel_id"],
             { limit: 10 }
         );
         channelsData
             .filter((data) => !shownChannels.has(data.id))
             .map((data) => {
+                const channel = store.Thread.insert({
+                    ...data,
+                    model: "discuss.channel",
+                    parent_channel_id: data.parent_channel_id
+                        ? {
+                              id: data.parent_channel_id[0],
+                              model: "discuss.channel",
+                              name: data.parent_channel_id[1],
+                          }
+                        : null,
+                });
                 commands.push({
                     Component: DiscussCommand,
                     async action() {
-                        const channel = await threadService.joinChannel(data.id, data.name);
-                        threadService.open(channel);
+                        const channel = await store.joinChannel(data.id, data.name);
+                        channel.open();
                     },
                     name: data.name,
                     props: {
-                        imgUrl: url("/web/image", {
-                            model: "discuss.channel",
-                            field: "avatar_128",
-                            id: data.id,
-                            unique: imageCacheKey(data.avatar_128),
+                        channel,
+                        imgUrl: imageUrl("discuss.channel", data.id, "avatar_128", {
+                            unique: data.avatar_cache_key,
                         }),
                     },
                 });
@@ -172,19 +192,19 @@ commandProviderRegistry.add("discuss.channel", {
         const groups = recentChannels.filter(
             (channel) =>
                 !shownChannels.has(channel.id) &&
-                channel.type === "group" &&
+                channel.channel_type === "group" &&
                 cleanTerm(channel.displayName).includes(cleanTerm(options.searchValue))
         );
         groups.map((channel) => {
             commands.push({
                 Component: DiscussCommand,
                 async action() {
-                    threadService.open(channel);
+                    channel.open();
                 },
                 name: channel.displayName,
                 props: {
-                    imgUrl: channel.imgUrl,
-                    counter: threadService.getCounter(channel),
+                    imgUrl: channel.avatarUrl,
+                    counter: channel.importantCounter,
                 },
             });
         });

@@ -1,7 +1,7 @@
 .o-form-buttonbox {
     // Compute the expected oe_stat_button's height according to the default btn size.
-    $-stat-button-inner-size: ($btn-padding-y * 2) + ($btn-font-size * $btn-line-height);
-    $-stat-button-height: $-stat-button-inner-size + o-to-rem($btn-border-width * 2);
+    $-stat-button-inner-size: calc(#{$btn-padding-y} * 2 + #{$btn-font-size} * #{$btn-line-height});
+    $-stat-button-height: calc(#{$-stat-button-inner-size} + #{$btn-border-width} * 2);
 
     $-stat-button-icon-size: 1.5em;
     $-stat-button-icon-margin-end: $btn-padding-x * 0.5;
@@ -67,7 +67,7 @@
 
             .o_stat_text {
                 @extend %-stat-button-text;
-                
+
                 .o_field_empty {
                     display: none;
                 }
@@ -103,24 +103,26 @@
         }
     }
 
-    > * + * {
+    &:not(.o-form-buttonbox-small) > * + * {
         margin-left: -$border-width;
     }
 
-    .oe_stat_button, 
-    .oe_stat_button > button {
-        border-radius: 0;
-    }
+    @include media-breakpoint-up(md) {
+        .oe_stat_button,
+        .oe_stat_button > button {
+            border-radius: 0;
+        }
 
-    > .oe_stat_button:first-child, 
-    > div:first-child > .oe_stat_button {
-        @include border-start-radius($border-radius);
-    }
+        > .oe_stat_button:first-child,
+        > div:first-child > .oe_stat_button {
+            @include border-start-radius($border-radius);
+        }
 
-    > button.oe_stat_button:last-child, 
-    > div:last-child > .oe_stat_button, 
-    > div.oe_stat_button:last-child > button {
-        @include border-end-radius($border-radius);
+        > button.oe_stat_button:last-child,
+        > div:last-child > .oe_stat_button,
+        > div.oe_stat_button:last-child > button {
+            @include border-end-radius($border-radius);
+        }
     }
 
     // "More" button and dropdown
@@ -134,17 +136,6 @@
             &:after {
                 margin-left: 5px;
                 @include o-caret-down;
-            }
-        }
-
-        .o_dropdown_more {
-
-            .oe_stat_button {
-                height: auto;
-                width: 100%;
-                border: none;
-                padding-top: map-get($spacers, 2);
-                padding-bottom: map-get($spacers, 2);
             }
         }
     }
@@ -167,5 +158,45 @@
 
     .o_pie_value {
         @extend %-stat-button-value;
+    }
+}
+
+.o-form-buttonbox-small {
+    --button-box-gap: 1px;
+    --button-box-per-row: 2;
+    --button-box-border-color: #{map-get(map-get($o-btns-bs-outline-override, 'secondary'), 'border')};
+    --button-box-spacing: #{map-get($spacers, 3)};
+
+    display: grid;
+    grid-template-columns: repeat(var(--button-box-per-row), minmax(0, 1fr));
+    overflow: hidden;
+    gap: var(--button-box-gap);
+    width: calc(100vw - var(--button-box-spacing) * 2) !important;
+    left: var(--button-box-spacing) !important;
+    right: var(--button-box-spacing) !important;
+
+    > span .o_field_widget, .o_stat_info, .o_stat_value {
+        @include text-truncate;
+    }
+
+    .oe_stat_button,
+    .oe_stat_button > button {
+        border-color: transparent;
+        border-radius: 0;
+    }
+
+    > .o-dropdown-item {
+        outline: $btn-border-width solid var(--button-box-border-color);
+    }
+}
+
+.o_dropdown_more {
+
+    .oe_stat_button {
+        height: auto;
+        width: 100%;
+        border: none;
+        padding-top: map-get($spacers, 2);
+        padding-bottom: map-get($spacers, 2);
     }
 }

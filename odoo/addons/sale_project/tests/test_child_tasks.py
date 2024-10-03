@@ -229,11 +229,15 @@ class TestNestedTaskUpdate(TransactionCase):
             'child_ids': [
                 Command.create({
                     'name': 'Subtask 1',
+                    'display_in_project': True,
                     'project_id': self.project.id,
                 }),
                 Command.create({
                     'name': 'Subtask 2',
-                    'child_ids': [Command.create({'name': 'Subsubtask'})],
+                    'project_id': self.project.id,
+                    'child_ids': [
+                        Command.create({'name': 'Subsubtask', 'project_id': self.project.id})
+                    ],
                 }),
             ],
         })
@@ -264,7 +268,7 @@ class TestNestedTaskUpdate(TransactionCase):
         child = self.env['project.task'].create({'name': 'child task', 'parent_id': parent.id, 'project_id': project_tempalte.id})
         super_product = self.env['product.product'].create({
             'name': 'Super product',
-            'detailed_type': 'service',
+            'type': 'service',
             'service_tracking': 'project_only',
             'project_template_id': project_tempalte.id,
         })

@@ -4,7 +4,8 @@
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
-from odoo.tests.common import TransactionCase, new_test_user, Form
+from odoo.tests.common import TransactionCase, new_test_user
+from odoo.tests import Form
 from odoo import fields, Command
 from freezegun import freeze_time
 

@@ -3,16 +3,15 @@
 # 	* auth_totp
 # 
 # Translators:
-# Wil Odoo, 2023
-# Thi Huong Nguyen, 2024
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:55+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Thi Huong Nguyen, 2024\n"
+"POT-Creation-Date: 2024-09-25 08:40+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Vietnamese (https://app.transifex.com/odoo/teams/41243/vi/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -23,7 +22,6 @@ msgstr ""
 #. module: auth_totp
 #. odoo-python
 #: code:addons/auth_totp/controllers/home.py:0
-#, python-format
 msgid "%(browser)s on %(platform)s"
 msgstr "%(browser)s trên %(platform)s"
 
@@ -35,27 +33,8 @@ msgstr "Công cụ cài đặt 2 yếu tố"
 #. module: auth_totp
 #. odoo-python
 #: code:addons/auth_totp/wizard/auth_totp_wizard.py:0
-#, python-format
 msgid "2-Factor authentication is now enabled."
 msgstr "Xác thực 2 yếu tố đang bật."
-
-#. module: auth_totp
-#: model_terms:ir.ui.view,arch_db:auth_totp.view_totp_form
-msgid ""
-"<i title=\"Documentation\" class=\"fa fa-fw o_button_icon fa-info-circle\"/>\n"
-"                                    Learn More"
-msgstr ""
-"<i title=\"Documentation\" class=\"fa fa-fw o_button_icon fa-info-circle\"/>\n"
-"                                    Tìm hiểu thêm"
-
-#. module: auth_totp
-#: model_terms:ir.ui.view,arch_db:auth_totp.view_totp_field
-msgid ""
-"<i title=\"Documentation\" class=\"fa fa-fw o_button_icon fa-info-circle\"/>\n"
-"                            Learn More"
-msgstr ""
-"<i title=\"Documentation\" class=\"fa fa-fw o_button_icon fa-info-circle\"/>\n"
-"                            Tìm hiểu thêm"
 
 #. module: auth_totp
 #: model_terms:ir.ui.view,arch_db:auth_totp.view_totp_wizard
@@ -101,11 +80,6 @@ msgid ""
 msgstr ""
 "<span invisible=\"not totp_enabled\" class=\"text-muted\">Tài khoản của bạn "
 "được bảo vệ!</span>"
-
-#. module: auth_totp
-#: model_terms:ir.ui.view,arch_db:auth_totp.view_totp_form
-msgid "Account Security"
-msgstr "Bảo mật tài khoản"
 
 #. module: auth_totp
 #: model_terms:ir.ui.view,arch_db:auth_totp.view_totp_wizard
@@ -227,9 +201,9 @@ msgid "Enter your six-digit code below"
 msgstr "Nhập mã gồm 6 chữ số của bạn dưới đây"
 
 #. module: auth_totp
-#: model:ir.model,name:auth_totp.model_ir_http
-msgid "HTTP Routing"
-msgstr "Định tuyến HTTP"
+#: model:ir.model.fields,field_description:auth_totp.field_auth_totp_device__expiration_date
+msgid "Expiration Date"
+msgstr "Ngày hết hạn"
 
 #. module: auth_totp
 #: model:ir.model.fields,field_description:auth_totp.field_auth_totp_device__id
@@ -240,7 +214,6 @@ msgstr "ID"
 #. module: auth_totp
 #. odoo-python
 #: code:addons/auth_totp/controllers/home.py:0
-#, python-format
 msgid "Invalid authentication code format."
 msgstr "Định dạng mã xác thực không hợp lệ."
 
@@ -311,7 +284,6 @@ msgstr "Secret"
 #. module: auth_totp
 #. odoo-python
 #: code:addons/auth_totp/wizard/auth_totp_wizard.py:0
-#, python-format
 msgid "The verification code should only contain numbers"
 msgstr "Mã xác minh chỉ được chứa số"
 
@@ -339,7 +311,6 @@ msgstr "Thiết bị đáng tin cậy"
 #. module: auth_totp
 #. odoo-python
 #: code:addons/auth_totp/models/res_users.py:0
-#, python-format
 msgid "Two-Factor Authentication Activation"
 msgstr "Kích hoạt xác thực hai yếu tố"
 
@@ -351,18 +322,8 @@ msgid "Two-factor Authentication"
 msgstr "Xác thực hai yếu tố"
 
 #. module: auth_totp
-#: model_terms:ir.ui.view,arch_db:auth_totp.view_totp_form
-msgid ""
-"Two-factor Authentication (\"2FA\") is a system of double authentication.\n"
-"                                The first one is done with your password and the second one with a code you get from a dedicated mobile app.\n"
-"                                Popular ones include Authy, Google Authenticator or the Microsoft Authenticator."
-msgstr ""
-"Xác thực hai yếu tố (\"2FA\") là một hệ thống xác thực kép.\n"
-"                                Bước đầu tiên được thực hiện với mật khẩu của bạn và bước thứ hai với mã bạn nhận được từ một ứng dụng dành riêng cho thiết bị di động.\n"
-"                                Các ứng dụng phổ biến bao gồm Authy, Google Authenticator hoặc Microsoft Authenticator."
-
-#. module: auth_totp
 #: model_terms:ir.ui.view,arch_db:auth_totp.view_totp_field
+#: model_terms:ir.ui.view,arch_db:auth_totp.view_totp_form
 msgid ""
 "Two-factor Authentication (\"2FA\") is a system of double authentication.\n"
 "                        The first one is done with your password and the second one with a code you get from a dedicated mobile app.\n"
@@ -390,21 +351,18 @@ msgstr "Xác thực hai yếu tố đang bật"
 #. module: auth_totp
 #. odoo-python
 #: code:addons/auth_totp/models/res_users.py:0
-#, python-format
 msgid "Two-factor authentication already enabled"
 msgstr "Xác thực hai yếu tố đã bật"
 
 #. module: auth_totp
 #. odoo-python
 #: code:addons/auth_totp/models/res_users.py:0
-#, python-format
 msgid "Two-factor authentication can only be enabled for yourself"
 msgstr "Xác thực hai yếu tố chỉ được bật cho bạn"
 
 #. module: auth_totp
 #. odoo-python
 #: code:addons/auth_totp/models/res_users.py:0
-#, python-format
 msgid "Two-factor authentication disabled for the following user(s): %s"
 msgstr "Xác thực hai yếu tố đang tắt đối với (những) người dùng sau: %s"
 
@@ -430,7 +388,6 @@ msgstr "Mã xác minh"
 #. odoo-python
 #: code:addons/auth_totp/models/res_users.py:0
 #: code:addons/auth_totp/wizard/auth_totp_wizard.py:0
-#, python-format
 msgid "Verification failed, please double-check the 6-digit code"
 msgstr "Xác minh không thành công, vui lòng kiểm tra lại mã gồm 6 chữ số"
 

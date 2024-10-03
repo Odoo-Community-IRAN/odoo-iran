@@ -5,8 +5,9 @@ import { Component, onWillStart, useState } from "@odoo/owl";
 import { download } from "@web/core/network/download";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { useSetupAction } from "@web/search/action_hook";
 import { Layout } from "@web/search/layout";
-import { useSetupAction } from "@web/webclient/actions/action_hook";
+import { standardActionServiceProps } from "@web/webclient/actions/action_service";
 
 function processLine(line) {
     return { ...line, lines: [], isFolded: true };
@@ -33,11 +34,11 @@ function extractPrintData(lines) {
 export class TraceabilityReport extends Component {
     static template = "stock.TraceabilityReport";
     static components = { Layout };
+    static props = { ...standardActionServiceProps };
 
     setup() {
         this.actionService = useService("action");
         this.orm = useService("orm");
-        this.user = useService("user");
 
         onWillStart(this.onWillStart);
         useSetupAction({
@@ -58,10 +59,14 @@ export class TraceabilityReport extends Component {
         Object.assign(this.context, {
             active_id: active_id || this.props.action.params.active_id,
             auto_unfold: auto_unfold || false,
-            model: active_model || false,
+            model: active_model || this.props.action.context.params?.active_model || false,
             lot_name: lot_name || false,
             ttype: ttype || false,
         });
+
+        if (this.context.model) {
+            this.props.updateActionState({ active_model: this.context.model });
+        }
 
         this.display = {
             controlPanel: {},

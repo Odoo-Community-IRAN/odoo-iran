@@ -9,8 +9,8 @@ from odoo.tests.common import tagged
 class TestPurchaseOrder(ValuationReconciliationTestCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref=None):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
 
         cls.dropship_picking_type = cls.env['stock.picking.type'].search([
             ('code', '=', 'dropship'),

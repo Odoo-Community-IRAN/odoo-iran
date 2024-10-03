@@ -51,7 +51,7 @@
         </t>
         <t t-if="hasattr(object, 'timesheet_count') and object.timesheet_count">
             <br /><br />
-            PS: you can review your timesheets <a t-att-href="'my/timesheets?search_in=invoice&amp;search=%s' % object.name">from the portal.</a>
+            PS: you can review your timesheets <a t-att-href="'/my/timesheets?search_in=invoice&amp;search=%s' % object.name">from the portal.</a>
         </t>
         <br /><br />
         Do not hesitate to contact us if you have any questions.
@@ -139,5 +139,22 @@
             <field name="lang">{{ object.partner_id.lang }}</field>
             <field name="auto_delete" eval="True"/>
         </record>
+        <!-- Invoice mail gateway failed -->
+        <template id="email_template_mail_gateway_failed">
+<p>
+    Hi,
+    <br/><br/>
+    Your email has been discarded. the e-mail address you have used only accepts new invoices:
+    <ul>
+        <li>For new invoices, please ensure a PDF or electronic invoice file is attached</li>
+        <li>To add information to a previously sent invoice, reply to your "sent" email</li>
+    </ul>
+    For any other question, write to <t t-esc="company_email"/>.
+    <br/>
+    --
+    <br/>
+    <t t-esc="company_name"/>
+</p>
+        </template>
     </data>
 </odoo>

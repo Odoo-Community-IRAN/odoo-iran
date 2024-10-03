@@ -1,16 +1,17 @@
-/** @odoo-module **/
-
-import { deleteConfirmationMessage, ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
+import {
+    deleteConfirmationMessage,
+    ConfirmationDialog,
+} from "@web/core/confirmation_dialog/confirmation_dialog";
 import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
 import { CogMenu } from "@web/search/cog_menu/cog_menu";
 import { evaluateBooleanExpr } from "@web/core/py_js/py";
+import { useSetupAction } from "@web/search/action_hook";
 import { Layout } from "@web/search/layout";
 import { usePager } from "@web/search/pager_hook";
 import { SearchBar } from "@web/search/search_bar/search_bar";
 import { useSearchBarToggler } from "@web/search/search_bar/search_bar_toggler";
 import { session } from "@web/session";
-import { useSetupView } from "@web/views/view_hook";
 import { useModelWithSampleData } from "@web/model/model";
 import { standardViewProps } from "@web/views/standard_view_props";
 import { MultiRecordViewButton } from "@web/views/view_button/multi_record_view_button";
@@ -26,6 +27,32 @@ const QUICK_CREATE_FIELD_TYPES = ["char", "boolean", "many2one", "selection", "m
 // -----------------------------------------------------------------------------
 
 export class KanbanController extends Component {
+    static template = `web.KanbanView`;
+    static components = { Layout, KanbanRenderer, MultiRecordViewButton, SearchBar, CogMenu };
+    static props = {
+        ...standardViewProps,
+        defaultGroupBy: {
+            validate: (dgb) => !dgb || typeof dgb === "string",
+            optional: true,
+        },
+        editable: { type: Boolean, optional: true },
+        forceGlobalClick: { type: Boolean, optional: true },
+        onSelectionChanged: { type: Function, optional: true },
+        showButtons: { type: Boolean, optional: true },
+        Compiler: { type: Function, optional: true }, // optional in stable for backward compatibility
+        Model: Function,
+        Renderer: Function,
+        buttonTemplate: String,
+        archInfo: Object,
+    };
+
+    static defaultProps = {
+        createRecord: () => {},
+        forceGlobalClick: false,
+        selectRecord: () => {},
+        showButtons: true,
+    };
+
     setup() {
         this.actionService = useService("action");
         this.dialog = useService("dialog");
@@ -113,17 +140,13 @@ export class KanbanController extends Component {
         });
 
         this.rootRef = useRef("root");
-        useViewButtons(this.model, this.rootRef, {
+        useViewButtons(this.rootRef, {
             beforeExecuteAction: this.beforeExecuteActionButton.bind(this),
             afterExecuteAction: this.afterExecuteActionButton.bind(this),
+            reload: () => this.model.load(),
         });
-        useSetupView({
+        useSetupAction({
             rootRef: this.rootRef,
-            getGlobalState: () => {
-                return {
-                    resIds: this.model.root.records.map((rec) => rec.resId), // WOWL: ask LPE why?
-                };
-            },
             getLocalState: () => {
                 return {
                     activeBars: this.progressBarState?.activeBars,
@@ -139,9 +162,12 @@ export class KanbanController extends Component {
                     offset: offset,
                     limit: limit,
                     total: count,
-                    onUpdate: async ({ offset, limit }) => {
+                    onUpdate: async ({ offset, limit }, hasNavigated) => {
                         await this.model.root.load({ offset, limit });
                         await this.onUpdatedPager();
+                        if (hasNavigated) {
+                            this.onPageChangeScroll();
+                        }
                     },
                     updateTotal: hasLimitedCount ? () => root.fetchCount() : undefined,
                 };
@@ -153,6 +179,20 @@ export class KanbanController extends Component {
     get modelParams() {
         const { resModel, archInfo, limit, defaultGroupBy } = this.props;
         const { activeFields, fields } = extractFieldsFromArchInfo(archInfo, this.props.fields);
+
+        const cardColorField = archInfo.cardColorField;
+        if (cardColorField) {
+            addFieldDependencies(activeFields, fields, [{ name: cardColorField, type: "integer" }]);
+        }
+
+        // Remove fields aggregator unused to avoid asking them for no reason
+        const aggregateFieldNames = this.progressBarAggregateFields.map((field) => field.name);
+        for (const [key, value] of Object.entries(activeFields)) {
+            if (!aggregateFieldNames.includes(key)) {
+                value.aggregator = null;
+            }
+        }
+
         addFieldDependencies(activeFields, fields, this.progressBarAggregateFields);
         const modelConfig = this.props.state?.modelState?.config || {
             resModel,
@@ -281,6 +321,16 @@ export class KanbanController extends Component {
         }
     }
 
+    onPageChangeScroll() {
+        if (this.rootRef && this.rootRef.el) {
+            if (this.env.isSmall) {
+                this.rootRef.el.scrollTop = 0;
+            } else {
+                this.rootRef.el.querySelector(".o_content").scrollTop = 0;
+            }
+        }
+    }
+
     async beforeExecuteActionButton(clickParams) {}
 
     async afterExecuteActionButton(clickParams) {}
@@ -295,29 +345,3 @@ export class KanbanController extends Component {
         return field && QUICK_CREATE_FIELD_TYPES.includes(field.type);
     }
 }
-
-KanbanController.template = `web.KanbanView`;
-KanbanController.components = { Layout, KanbanRenderer, MultiRecordViewButton, SearchBar, CogMenu };
-KanbanController.props = {
-    ...standardViewProps,
-    defaultGroupBy: {
-        validate: (dgb) => !dgb || typeof dgb === "string",
-        optional: true,
-    },
-    editable: { type: Boolean, optional: true },
-    forceGlobalClick: { type: Boolean, optional: true },
-    onSelectionChanged: { type: Function, optional: true },
-    showButtons: { type: Boolean, optional: true },
-    Compiler: { type: Function, optional: true }, // optional in stable for backward compatibility
-    Model: Function,
-    Renderer: Function,
-    buttonTemplate: String,
-    archInfo: Object,
-};
-
-KanbanController.defaultProps = {
-    createRecord: () => {},
-    forceGlobalClick: false,
-    selectRecord: () => {},
-    showButtons: true,
-};

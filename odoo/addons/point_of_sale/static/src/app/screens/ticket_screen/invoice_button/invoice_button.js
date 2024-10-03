@@ -1,27 +1,29 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
-import { ErrorPopup } from "@point_of_sale/app/errors/popups/error_popup";
-import { ConfirmPopup } from "@point_of_sale/app/utils/confirm_popup/confirm_popup";
+import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { usePos } from "@point_of_sale/app/store/pos_hook";
-import { Component, useRef } from "@odoo/owl";
+import { Component } from "@odoo/owl";
+import { ask, makeAwaitable } from "@point_of_sale/app/store/make_awaitable_dialog";
+import { PartnerList } from "../../partner_list/partner_list";
 
 export class InvoiceButton extends Component {
     static template = "point_of_sale.InvoiceButton";
+    static props = {
+        order: Object,
+        onInvoiceOrder: Function,
+    };
 
     setup() {
         this.pos = usePos();
-        this.invoiceButton = useRef("invoice-button");
-        this.popup = useService("popup");
-        this.orm = useService("orm");
-        this.report = useService("report");
+        this.dialog = useService("dialog");
+        this.invoiceService = useService("account_move");
+        this.lock = false;
     }
     get isAlreadyInvoiced() {
         if (!this.props.order) {
             return false;
         }
-        return Boolean(this.props.order.account_move);
+        return Boolean(this.props.order.raw.account_move);
     }
     get commandName() {
         if (!this.props.order) {
@@ -32,30 +34,27 @@ export class InvoiceButton extends Component {
     }
     async _downloadInvoice(orderId) {
         try {
-            const [orderWithInvoice] = await this.orm.read(
-                "pos.order",
-                [orderId],
-                ["account_move"],
-                { load: false }
-            );
-            if (orderWithInvoice?.account_move) {
-                await this.report.doAction("account.account_invoices", [
-                    orderWithInvoice.account_move,
-                ]);
+            const orderWithInvoice = await this.pos.data.read("pos.order", [orderId], [], {
+                load: false,
+            });
+            const order = orderWithInvoice[0];
+            const accountMoveId = order.raw.account_move;
+            if (accountMoveId) {
+                await this.invoiceService.downloadPdf(accountMoveId);
             }
         } catch (error) {
             if (error instanceof Error) {
                 throw error;
             } else {
                 // NOTE: error here is most probably undefined
-                this.popup.add(ErrorPopup, {
+                this.dialog.add(AlertDialog, {
                     title: _t("Network Error"),
                     body: _t("Unable to download invoice."),
                 });
             }
         }
     }
-    async onWillInvoiceOrder(order) {
+    async onWillInvoiceOrder(order, partner) {
         return true;
     }
     async _invoiceOrder() {
@@ -64,56 +63,56 @@ export class InvoiceButton extends Component {
             return;
         }
 
-        const orderId = order.backendId;
-
+        const orderId = order.id;
         // Part 0. If already invoiced, print the invoice.
         if (this.isAlreadyInvoiced) {
             await this._downloadInvoice(orderId);
+            this.props.onInvoiceOrder(orderId);
             return;
         }
 
         // Part 1: Handle missing partner.
         // Write to pos.order the selected partner.
-        const prevPartner = order.get_partner();
-        if (!prevPartner) {
-            const { confirmed: confirmedPopup } = await this.popup.add(ConfirmPopup, {
+        let partner = order.get_partner();
+        if (!partner) {
+            const _confirmed = await ask(this.dialog, {
                 title: _t("Need customer to invoice"),
                 body: _t("Do you want to open the customer list to select customer?"),
             });
-            if (!confirmedPopup) {
+            if (!_confirmed) {
+                return;
+            }
+            partner = await makeAwaitable(this.dialog, PartnerList);
+            if (!partner) {
                 return;
             }
 
-            const { confirmed: confirmedTempScreen, payload: newPartner } =
-                await this.pos.showTempScreen("PartnerListScreen");
-            if (!confirmedTempScreen) {
-                return;
-            }
-
-            await this.orm.write("pos.order", [orderId], { partner_id: newPartner.id });
-            order.set_partner(newPartner);
+            await this.pos.data.ormWrite("pos.order", [orderId], { partner_id: partner.id });
         }
 
-        const confirmed = await this.onWillInvoiceOrder(order);
+        const confirmed = await this.onWillInvoiceOrder(order, partner);
         if (!confirmed) {
-            order.set_partner(prevPartner);
             return;
         }
 
         // Part 2: Invoice the order.
         // FIXME POSREF timeout
-        await this.orm.silent.call("pos.order", "action_pos_order_invoice", [orderId]);
+        await this.pos.data.silentCall("pos.order", "action_pos_order_invoice", [orderId]);
 
         // Part 3: Download invoice.
         await this._downloadInvoice(orderId);
         this.props.onInvoiceOrder(orderId);
     }
     async click() {
+        if (this.lock) {
+            return;
+        }
+
+        this.lock = true;
         try {
-            this.invoiceButton.el.style.pointerEvents = "none";
             await this._invoiceOrder();
         } finally {
-            this.invoiceButton.el.style.pointerEvents = "auto";
+            this.lock = false;
         }
     }
 }

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from dateutil.relativedelta import relativedelta
@@ -6,6 +5,7 @@ from dateutil.relativedelta import relativedelta
 from odoo import api, fields, models
 from odoo.exceptions import AccessError
 from odoo.tools.translate import _
+from odoo.addons.mail.tools.discuss import Store
 
 
 class MailNotification(models.Model):
@@ -32,7 +32,7 @@ class MailNotification(models.Model):
         ('sent', 'Delivered'),
         ('bounce', 'Bounced'),
         ('exception', 'Exception'),
-        ('canceled', 'Canceled')
+        ('canceled', 'Cancelled')
         ], string='Status', default='ready', index=True)
     is_read = fields.Boolean('Is Read', index=True)
     read_date = fields.Datetime('Read Date', copy=False)
@@ -77,8 +77,7 @@ class MailNotification(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         messages = self.env['mail.message'].browse(vals['mail_message_id'] for vals in vals_list)
-        messages.check_access_rights('read')
-        messages.check_access_rule('read')
+        messages.check_access('read')
         for vals in vals_list:
             if vals.get('is_read'):
                 vals['read_date'] = fields.Datetime.now()
@@ -110,7 +109,9 @@ class MailNotification(models.Model):
         if self.failure_type != 'unknown':
             return dict(self._fields['failure_type'].selection).get(self.failure_type, _('No Error'))
         else:
-            return _("Unknown error") + ": %s" % (self.failure_reason or '')
+            if self.failure_reason:
+                return _("Unknown error: %(error)s", error=self.failure_reason)
+            return _("Unknown error")
 
     # ------------------------------------------------------------
     # DISCUSS
@@ -127,13 +128,13 @@ class MailNotification(models.Model):
 
         return self.filtered(_filter_unimportant_notifications)
 
-    def _notification_format(self):
+    def _to_store(self, store: Store, /):
         """Returns the current notifications in the format expected by the web
         client."""
-        return [{
-            'id': notif.id,
-            'notification_type': notif.notification_type,
-            'notification_status': notif.notification_status,
-            'failure_type': notif.failure_type,
-            'persona': {'id': notif.res_partner_id.id, 'displayName': notif.res_partner_id.display_name, 'type': "partner"} if notif.res_partner_id else False,
-        } for notif in self]
+        for notif in self:
+            data = notif._read_format(
+                ["failure_type", "notification_status", "notification_type"], load=False
+            )[0]
+            data["message"] = Store.one(notif.mail_message_id, only_id=True)
+            data["persona"] = Store.one(notif.res_partner_id, fields=["name"])
+            store.add(notif, data)

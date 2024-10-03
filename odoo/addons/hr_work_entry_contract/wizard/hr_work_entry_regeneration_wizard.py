@@ -17,7 +17,8 @@ class HrWorkEntryRegenerationWizard(models.TransientModel):
     date_from = fields.Date('From', required=True, default=lambda self: self.env.context.get('date_start'))
     date_to = fields.Date('To', required=True, compute='_compute_date_to', store=True,
             readonly=False, default=lambda self: self.env.context.get('date_end'))
-    employee_ids = fields.Many2many('hr.employee', string='Employees', required=True)
+    employee_ids = fields.Many2many('hr.employee', string='Employees',
+                                    domain=lambda self: [('company_id', 'in', self.env.companies.ids)], required=True)
     validated_work_entry_ids = fields.Many2many('hr.work.entry', string='Work Entries Within Interval',
                                    compute='_compute_validated_work_entry_ids')
     search_criteria_completed = fields.Boolean(compute='_compute_search_criteria_completed')
@@ -85,7 +86,7 @@ class HrWorkEntryRegenerationWizard(models.TransientModel):
     def _date_to_string(self, date):
         if not date:
             return ''
-        user_date_format = self.env['res.lang']._lang_get(self.env.user.lang).date_format
+        user_date_format = self.env['res.lang']._get_data(code=self.env.user.lang).date_format
         return date.strftime(user_date_format)
 
     def _work_entry_fields_to_nullify(self):

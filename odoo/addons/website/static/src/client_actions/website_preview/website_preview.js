@@ -5,17 +5,18 @@ import { browser } from '@web/core/browser/browser';
 import { registry } from '@web/core/registry';
 import { ResizablePanel } from '@web/core/resizable_panel/resizable_panel';
 import { useService, useBus } from '@web/core/utils/hooks';
+import { redirect } from "@web/core/utils/urls";
 import { ResourceEditor } from '../../components/resource_editor/resource_editor';
 import { WebsiteEditorComponent } from '../../components/editor/editor';
 import { WebsiteTranslator } from '../../components/translator/translator';
 import { unslugHtmlDataObject } from '../../services/website_service';
 import {OptimizeSEODialog} from '@website/components/dialog/seo';
 import { WebsiteDialog } from "@website/components/dialog/dialog";
-import { routeToUrl } from "@web/core/browser/router_service";
 import { getActiveHotkey } from "@web/core/hotkeys/hotkey_service";
 import wUtils from '@website/js/utils';
 import { renderToElement } from "@web/core/utils/render";
 import { SIZES, utils as uiUtils } from "@web/core/ui/ui_service";
+import { standardActionServiceProps } from "@web/webclient/actions/action_service";
 import {
     Component,
     onWillStart,
@@ -26,17 +27,27 @@ import {
     useState,
     useExternalListener,
 } from "@odoo/owl";
+import { getScrollingElement } from "@web/core/utils/scrolling";
 
-class BlockPreview extends Component {}
-BlockPreview.template = 'website.BlockPreview';
+class BlockPreview extends Component {
+    static template = "website.BlockPreview";
+    static props = {};
+}
 
 export class WebsitePreview extends Component {
+    static template = "website.WebsitePreview";
+    static components = {
+        WebsiteEditorComponent,
+        BlockPreview,
+        WebsiteTranslator,
+        ResourceEditor,
+        ResizablePanel,
+    };
+    static props = { ...standardActionServiceProps };
     setup() {
         this.websiteService = useService('website');
         this.dialogService = useService('dialog');
         this.title = useService('title');
-        this.user = useService('user');
-        this.router = useService('router');
         this.action = useService('action');
         this.orm = useService('orm');
 
@@ -84,7 +95,7 @@ export class WebsitePreview extends Component {
                     showSecondaryButton: false,
                 }, {
                     onClose: () => {
-                        window.location.href = `${encodeURI(this.websiteDomain)}/web#action=website.website_preview&path=${encodedPath}&website_id=${encodeURIComponent(this.websiteId)}`;
+                        redirect(`${encodeURI(this.websiteDomain)}/odoo/action-website.website_preview?path=${encodedPath}&website_id=${encodeURIComponent(this.websiteId)}`);
                     }
                 });
             } else {
@@ -155,10 +166,8 @@ export class WebsitePreview extends Component {
             const backendIconEl = document.querySelector("link[rel~='icon']");
             // Save initial backend values.
             const backendIconHref = backendIconEl.href;
-            const { zopenerp } = this.title.getParts();
             this.iframe.el.addEventListener('load', () => {
                 // Replace backend values with frontend's ones.
-                this.title.setParts({ zopenerp: null });
                 const frontendIconEl = this.iframe.el.contentDocument.querySelector("link[rel~='icon']");
                 if (frontendIconEl) {
                     backendIconEl.href = frontendIconEl.href;
@@ -166,49 +175,19 @@ export class WebsitePreview extends Component {
             }, { once: true });
             return () => {
                 // Restore backend initial values when leaving.
-                this.title.setParts({ zopenerp, action: null });
                 backendIconEl.href = backendIconHref;
             };
         }, () => []);
 
-        useEffect(() => {
-            let leftOnBackNavigation = false;
-            // When reaching a "regular" url of the webclient's router, an
-            // hashchange event should be dispatched to properly display the
-            // content of the previous URL before reaching the client action,
-            // which was lost after being replaced for the frontend's URL.
-            const handleBackNavigation = () => {
-                if (window.location.pathname === '/web') {
-                    window.dispatchEvent(new HashChangeEvent('hashchange', {
-                        newURL: window.location.href.toString()
-                    }));
-                    leftOnBackNavigation = true;
-                }
-            };
-            window.addEventListener('popstate', handleBackNavigation);
-            return () => {
-                window.removeEventListener('popstate', handleBackNavigation);
-                // When leaving the client action, its original url is pushed
-                // so that the router can replay the action on back navigation
-                // from other screens.
-                if (!leftOnBackNavigation) {
-                    history.pushState({}, null, this.backendUrl);
-                }
-            };
-        }, () => []);
-
         const toggleIsMobile = () => {
-            const wrapwrapEl = this.iframe.el.contentDocument.querySelector('#wrapwrap');
-            if (wrapwrapEl) {
-                wrapwrapEl.classList.toggle('o_is_mobile', this.websiteContext.isMobile);
-            }
+            this.iframe.el.contentDocument.documentElement
+                .classList.toggle('o_is_mobile', this.websiteContext.isMobile);
         };
-        // Toggle the 'o_is_mobile' class on the wrapwrap when 'isMobile'
-        // changes in the context. (e.g. Click on mobile preview buttons)
+        // Toggle the 'o_is_mobile' class when the context 'isMobile' changes
+        // (e.g. Click on mobile preview buttons).
         useEffect(toggleIsMobile, () => [this.websiteContext.isMobile]);
 
-        // Toggle the 'o_is_mobile' class on the wrapwrap according to
-        // 'isMobile' on iframe load.
+        // Toggle the 'o_is_mobile' class according to 'isMobile' on iframe load
         useEffect(() => {
             this.iframe.el.addEventListener('OdooFrameContentLoaded', toggleIsMobile);
             return () => this.iframe.el.removeEventListener('OdooFrameContentLoaded', toggleIsMobile);
@@ -251,7 +230,7 @@ export class WebsitePreview extends Component {
                 // ... otherwise, the path still needs to be normalized (as it
                 // would be if the given path was used as an href of a  <a/>
                 // element).
-                path = url.pathname + url.search + url.hash;
+                path = url.pathname + url.search;
             }
         } else {
             path = '/';
@@ -292,19 +271,21 @@ export class WebsitePreview extends Component {
 
     addWelcomeMessage() {
         if (this.websiteService.isRestrictedEditor) {
-            const $wrap = $(this.iframe.el.contentDocument.querySelector('#wrapwrap.homepage')).find('#wrap');
-            if ($wrap.length && $wrap.html().trim() === '') {
-                this.$welcomeMessage = $(renderToElement('website.homepage_editor_welcome_message'));
-                this.$welcomeMessage.addClass('o_homepage_editor_welcome_message');
-                this.$welcomeMessage.css('min-height', $wrap.parent('main').height() - ($wrap.outerHeight(true) - $wrap.height()));
-                $wrap.empty().append(this.$welcomeMessage);
+            const wrap = this.iframe.el.contentDocument.querySelector('#wrapwrap.homepage #wrap');
+            if (wrap && !wrap.innerHTML.trim()) {
+                this.welcomeMessage = renderToElement('website.homepage_editor_welcome_message');
+                this.welcomeMessage.classList.add('o_homepage_editor_welcome_message', 'h-100');
+                while (wrap.firstChild) {
+                    wrap.removeChild(wrap.lastChild);
+                }
+                wrap.append(this.welcomeMessage);
             }
         }
     }
 
     removeWelcomeMessage() {
-        if (this.$welcomeMessage) {
-            this.$welcomeMessage.detach();
+        if (this.welcomeMessage) {
+            this.welcomeMessage.remove();
         }
     }
 
@@ -317,11 +298,12 @@ export class WebsitePreview extends Component {
      * @private
      */
     _isTopWindowURL({ host, pathname }) {
-        const backendRoutes = ['/web', '/web/session/logout'];
+        const backendRoutes = ['/web', '/web/session/logout', '/odoo'];
         return host !== window.location.host
             || (pathname
                 && (backendRoutes.includes(pathname)
                     || pathname.startsWith('/@/')
+                    || pathname.startsWith('/odoo/')
                     || pathname.startsWith('/web/content/')
                     // This is defined here to avoid creating a
                     // website_documents module for just one patch.
@@ -329,7 +311,7 @@ export class WebsitePreview extends Component {
     }
 
     /**
-     * This replaces the browser url (/web#action=website...) with
+     * This replaces the browser url (/odoo/action-website...) with
      * the iframe's url (it is clearer for the user).
      */
     _replaceBrowserUrl() {
@@ -339,17 +321,11 @@ export class WebsitePreview extends Component {
             // loads "about:blank"), do not push that into the history
             // state as that could prevent the user from going back and could
             // trigger a traceback.
-            history.replaceState({}, document.title, '/web');
+            history.replaceState(history.state, document.title, '/odoo');
             return;
         }
-        // The original /web#action=... url is saved to be pushed on top of the
-        // history when leaving the component, so that the webclient can
-        // correctly find back and replay the client action.
-        if (!this.backendUrl) {
-            this.backendUrl = routeToUrl(this.router.current);
-        }
         const currentTitle = this.iframe.el.contentDocument.title;
-        history.replaceState({}, currentTitle, this.iframe.el.contentDocument.location.href);
+        history.replaceState(history.state, currentTitle, this.iframe.el.contentDocument.location.href);
         this.title.setParts({ action: currentTitle });
     }
 
@@ -402,7 +378,7 @@ export class WebsitePreview extends Component {
         }
         this.iframe.el.contentWindow.addEventListener('beforeunload', this._onPageUnload.bind(this));
         this._replaceBrowserUrl();
-        this.iframe.el.contentWindow.addEventListener('hashchange', this._replaceBrowserUrl.bind(this));
+        this.iframe.el.contentWindow.addEventListener('popstate', this._replaceBrowserUrl.bind(this));
         this.iframe.el.contentWindow.addEventListener('pagehide', this._onPageHide.bind(this));
 
         this.websiteService.pageDocument = this.iframe.el.contentDocument;
@@ -528,7 +504,7 @@ export class WebsitePreview extends Component {
         if (!this.websiteContext.edition && this.iframe.el.contentDocument.body && this.iframefallback.el) {
             this.iframefallback.el.contentDocument.body.replaceWith(this.iframe.el.contentDocument.body.cloneNode(true));
             this.iframefallback.el.classList.remove('d-none');
-            $().getScrollingElement(this.iframefallback.el.contentDocument)[0].scrollTop = $().getScrollingElement(this.iframe.el.contentDocument)[0].scrollTop;
+            getScrollingElement(this.iframefallback.el.contentDocument).scrollTop = getScrollingElement(this.iframe.el.contentDocument).scrollTop;
             this._cleanIframeFallback();
         }
     }
@@ -559,19 +535,9 @@ export class WebsitePreview extends Component {
         }
         ev.preventDefault();
         const path = this.websiteService.contentWindow.location;
-        const debugMode = this.env.debug ? `?debug=${this.env.debug}` : "";
-        browser.location.assign(
-            `/web${debugMode}#action=website.website_preview&path=${encodeURIComponent(path)}`
-        );
+        const debugMode = this.env.debug ? `&debug=${this.env.debug}` : "";
+        redirect(`/odoo/action-website.website_preview?path=${encodeURIComponent(path)}${debugMode}`);
     }
 }
-WebsitePreview.template = 'website.WebsitePreview';
-WebsitePreview.components = {
-    WebsiteEditorComponent,
-    BlockPreview,
-    WebsiteTranslator,
-    ResourceEditor,
-    ResizablePanel,
-};
 
 registry.category('actions').add('website_preview', WebsitePreview);

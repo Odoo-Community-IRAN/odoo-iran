@@ -4,35 +4,34 @@
 import odoo.tests
 
 from odoo import Command
+from odoo.addons.mail.tests.common import mail_new_test_user
 from odoo.addons.point_of_sale.tests.common import archive_products
+
 
 @odoo.tests.tagged("post_install", "-at_install")
 class SelfOrderCommonTest(odoo.tests.HttpCase):
     browser_size = "375x667"
     touch_enabled = True
+    allow_inherited_tests_method = True
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         archive_products(cls.env)
-        cls.pos_user = cls.env['res.users'].create({
-            'name': 'POS User',
-            'login': 'pos_user',
-            'password': 'pos_user',
-            'groups_id': [
-                (4, cls.env.ref('base.group_user').id),
-                (4, cls.env.ref('point_of_sale.group_pos_user').id),
-            ],
-        })
-        cls.pos_admin = cls.env['res.users'].create({
-            'name': 'POS Admin',
-            'login': 'pos_admin',
-            'password': 'pos_admin',
-            'groups_id': [
-                (4, cls.env.ref('base.group_user').id),
-                (4, cls.env.ref('point_of_sale.group_pos_manager').id),
-            ],
-        })
+        cls.pos_user = mail_new_test_user(
+            cls.env,
+            groups="base.group_user,point_of_sale.group_pos_user",
+            login="pos_user",
+            name="POS User",
+            tz="Europe/Brussels",
+        )
+        cls.pos_admin = mail_new_test_user(
+            cls.env,
+            groups="base.group_user,point_of_sale.group_pos_manager",
+            login="pos_admin",
+            name="POS Admin",
+            tz="Europe/Brussels",
+        )
 
         pos_categ_misc = cls.env['pos.category'].create({
             'name': 'Miscellaneous',
@@ -40,15 +39,16 @@ class SelfOrderCommonTest(odoo.tests.HttpCase):
 
         cls.cola = cls.env['product.product'].create({
             'name': 'Coca-Cola',
-            'type': 'product',
+            'is_storable': True,
             'list_price': 2.2,
             'taxes_id': False,
             'available_in_pos': True,
             'pos_categ_ids': [(4, pos_categ_misc.id)],
+            'default_code': '12345',
         })
         cls.fanta = cls.env['product.product'].create({
             'name': 'Fanta',
-            'type': 'product',
+            'is_storable': True,
             'list_price': 2.2,
             'taxes_id': False,
             'available_in_pos': True,
@@ -138,12 +138,29 @@ class SelfOrderCommonTest(odoo.tests.HttpCase):
 
     def setUp(self):
         super().setUp()
+        journal_obj = self.env['account.journal']
+        main_company = self.env.company
+        self.bank_journal = journal_obj.create({
+            'name': 'Bank Test',
+            'type': 'bank',
+            'company_id': main_company.id,
+            'code': 'BNK',
+            'sequence': 10,
+        })
+
+        self.bank_payment_method = self.env['pos.payment.method'].create({
+            'name': 'Bank',
+            'journal_id': self.bank_journal.id,
+        })
+
         self.pos_config = self.env["pos.config"].create(
             {
                 "name": "BarTest",
+                "self_ordering_default_user_id": self.pos_user.id,
                 "module_pos_restaurant": True,
                 "self_ordering_mode": "consultation",
                 "floor_ids": self.env["restaurant.floor"].search([]),
+                "payment_method_ids": [(4, self.bank_payment_method.id)],
             }
         )
 
@@ -163,7 +180,7 @@ class SelfOrderCommonTest(odoo.tests.HttpCase):
         })
 
         self.pos_table_1 = self.env['restaurant.table'].create({
-            'name': '1',
+            'table_number': 1,
             'floor_id': self.pos_main_floor.id,
             'seats': 4,
             'shape': 'square',

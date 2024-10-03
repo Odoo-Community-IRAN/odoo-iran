@@ -12,8 +12,7 @@ from markupsafe import Markup
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
-from odoo.tools import consteq, format_amount, ustr
-from odoo.tools.misc import hmac as hmac_tool
+from odoo.tools import format_amount
 
 from odoo.addons.payment import utils as payment_utils
 
@@ -105,15 +104,6 @@ class PaymentTransaction(models.Model):
     landing_route = fields.Char(
         string="Landing Route",
         help="The route the user is redirected to after the transaction")
-    callback_model_id = fields.Many2one(
-        string="Callback Document Model", comodel_name='ir.model', groups='base.group_system')
-    callback_res_id = fields.Integer(string="Callback Record ID", groups='base.group_system')
-    callback_method = fields.Char(string="Callback Method", groups='base.group_system')
-    # Hash for extra security on top of the callback fields' group in case a bug exposes a sudo.
-    callback_hash = fields.Char(string="Callback Hash", groups='base.group_system')
-    callback_is_done = fields.Boolean(
-        string="Callback Done", help="Whether the callback has already been executed",
-        groups="base.group_system", readonly=True)
 
     # Duplicated partner values allowing to keep a record of them, should they be later updated.
     partner_id = fields.Many2one(
@@ -195,13 +185,6 @@ class PaymentTransaction(models.Model):
             # Include provider-specific create values
             values.update(self._get_specific_create_values(provider.code, values))
 
-            # Generate the hash for the callback if one has be configured on the tx.
-            values['callback_hash'] = self._generate_callback_hash(
-                values.get('callback_model_id'),
-                values.get('callback_res_id'),
-                values.get('callback_method'),
-            )
-
         txs = super().create(values_list)
 
         # Monetary fields are rounded with the currency at creation time by the ORM. Sometimes, this
@@ -255,7 +238,7 @@ class PaymentTransaction(models.Model):
             action['res_id'] = refund_tx.id
             action['view_mode'] = 'form'
         else:
-            action['view_mode'] = 'tree,form'
+            action['view_mode'] = 'list,form'
             action['domain'] = [('source_transaction_id', '=', self.id)]
         return action
 
@@ -366,7 +349,7 @@ class PaymentTransaction(models.Model):
 
         # Compute the sequence number.
         reference = prefix  # The first reference of a sequence has no sequence number.
-        if self.sudo().search([('reference', '=', prefix)]):  # The reference already has a match
+        if self.sudo().search_count([('reference', '=', prefix)], limit=1):  # The reference already has a match
             # We now execute a second search on `payment.transaction` to fetch all the references
             # starting with the given prefix. The load of these two searches is mitigated by the
             # index on `reference`. Although not ideal, this solution allows for quickly knowing
@@ -413,25 +396,6 @@ class PaymentTransaction(models.Model):
         :rtype: str
         """
         return ''
-
-    @api.model
-    def _generate_callback_hash(self, callback_model_id, callback_res_id, callback_method):
-        """ Return the hash for the callback on the transaction.
-
-        :param int callback_model_id: The model on which the callback method is defined, as a
-                                      `res.model` id.
-        :param int callback_res_id: The record on which the callback method must be called, as an id
-                                    of the callback method's model.
-        :param str callback_method: The name of the callback method.
-        :return: The callback hash.
-        :rtype: str
-        """
-        if callback_model_id and callback_res_id and callback_method:
-            model_name = self.env['ir.model'].sudo().browse(callback_model_id).model
-            token = f'{model_name}|{callback_res_id}|{callback_method}'
-            callback_hash = hmac_tool(self.env(su=True), 'generate_callback_hash', token)
-            return callback_hash
-        return None
 
     def _get_processing_values(self):
         """ Return the values used to process the transaction.
@@ -666,7 +630,6 @@ class PaymentTransaction(models.Model):
         """
         tx = self._get_tx_from_notification_data(provider_code, notification_data)
         tx._process_notification_data(notification_data)
-        tx._execute_callback()
         return tx
 
     def _get_tx_from_notification_data(self, provider_code, notification_data):
@@ -841,6 +804,7 @@ class PaymentTransaction(models.Model):
             'state': target_state,
             'state_message': state_message,
             'last_state_change': fields.Datetime.now(),
+            'is_post_processed': False,  # Reset to allow post-processing again for other states.
         })
         return txs_to_process
 
@@ -866,108 +830,11 @@ class PaymentTransaction(models.Model):
                 # Call `_update_state` directly instead of `_set_authorized` to avoid looping.
                 child_tx.source_transaction_id._update_state(('authorized',), 'done', state_message)
 
-    def _execute_callback(self):
-        """ Execute the callbacks defined on the transactions.
-
-        Callbacks that have already been executed are silently ignored. For example, the callback is
-        called twice when a transaction is first authorized then confirmed.
-
-        Only successful callbacks are marked as done. This allows callbacks to reschedule
-        themselves, should the conditions be unmet in the present call.
-
-        :return: None
-        """
-        for tx in self.filtered(lambda t: not t.sudo().callback_is_done):
-            # Only use sudo to check, not to execute.
-            tx_sudo = tx.sudo()
-            model_sudo = tx_sudo.callback_model_id
-            res_id = tx_sudo.callback_res_id
-            method = tx_sudo.callback_method
-            callback_hash = tx_sudo.callback_hash
-            if not (model_sudo and res_id and method):
-                continue  # Skip transactions with unset (or not properly defined) callbacks.
-
-            valid_callback_hash = self._generate_callback_hash(model_sudo.id, res_id, method)
-            if not consteq(ustr(valid_callback_hash), callback_hash):
-                _logger.warning(
-                    "invalid callback signature for transaction with reference %s", tx.reference
-                )
-                continue  # Ignore tampered callbacks.
-
-            record = self.env[model_sudo.model].browse(res_id).exists()
-            if not record:
-                _logger.warning(
-                    "invalid callback record %(model)s.%(record_id)s for transaction with "
-                    "reference %(ref)s",
-                    {
-                        'model': model_sudo.model,
-                        'record_id': res_id,
-                        'ref': tx.reference,
-                    }
-                )
-                continue  # Ignore invalidated callbacks.
-
-            success = getattr(record, method)(tx)  # Execute the callback.
-            tx_sudo.callback_is_done = success or success is None  # Missing returns are successful.
-
     #=== BUSINESS METHODS - POST-PROCESSING ===#
 
-    def _get_post_processing_values(self):
-        """ Return a dict of values used to display the status of the transaction.
-
-        For a provider to handle transaction status display, it must override this method and
-        return a dict of values. Provider-specific values take precedence over those of the dict of
-        generic post-processing values.
-
-        The returned dict contains the following entries:
-
-        - `provider_code`: The code of the provider.
-        - `provider_name`: The name of the provider.
-        - `reference`: The reference of the transaction.
-        - `amount`: The rounded amount of the transaction.
-        - `currency_id`: The currency of the transaction, as a `res.currency` id.
-        - `state`: The transaction state: `draft`, `pending`, `authorized`, `done`, `cancel`, or
-          `error`.
-        - `state_message`: The information message about the state.
-        - `operation`: The operation of the transaction.
-        - `is_post_processed`: Whether the transaction has already been post-processed.
-        - `landing_route`: The route the user is redirected to after the transaction.
-        - Additional provider-specific entries.
-
-        Note: `self.ensure_one()`
-
-        :return: The dict of processing values.
-        :rtype: dict
-        """
-        self.ensure_one()
-
-        display_message = None
-        if self.state == 'pending':
-            display_message = self.provider_id.pending_msg
-        elif self.state == 'done':
-            display_message = self.provider_id.done_msg
-        elif self.state == 'cancel':
-            display_message = self.provider_id.cancel_msg
-        post_processing_values = {
-            'provider_code': self.provider_code,
-            'provider_name': self.provider_id.name,
-            'reference': self.reference,
-            'amount': self.amount,
-            'currency_id': self.currency_id.id,
-            'state': self.state,
-            'state_message': self.state_message,
-            'display_message': display_message,
-            'operation': self.operation,
-            'landing_route': self.landing_route,
-        }
-        _logger.debug(
-            "post-processing values of transaction with reference %s for provider with id %s:\n%s",
-            self.reference, self.provider_id.id, pprint.pformat(post_processing_values)
-        )  # DEBUG level because this can get spammy with transactions in non-final states
-        return post_processing_values
-
-    def _cron_finalize_post_processing(self):
-        """ Finalize the post-processing of recently done transactions not handled by the client.
+    def _cron_post_process(self):
+        """ Trigger the post-processing of the transactions that were not handled by the client in
+        the `poll_status` controller method.
 
         :return: None
         """
@@ -977,14 +844,12 @@ class PaymentTransaction(models.Model):
             # to 4 days because some providers (PayPal) need that much for the payment verification.
             retry_limit_date = datetime.now() - relativedelta.relativedelta(days=4)
             # Retrieve all transactions matching the criteria for post-processing
-            txs_to_post_process = self.search([
-                ('state', '=', 'done'),
-                ('is_post_processed', '=', False),
-                ('last_state_change', '>=', retry_limit_date),
-            ])
+            txs_to_post_process = self.search(
+                [('is_post_processed', '=', False), ('last_state_change', '>=', retry_limit_date)]
+            )
         for tx in txs_to_post_process:
             try:
-                tx._finalize_post_processing()
+                tx._post_process()
                 self.env.cr.commit()
             except psycopg2.OperationalError:
                 self.env.cr.rollback()  # Rollback and try later.
@@ -995,23 +860,17 @@ class PaymentTransaction(models.Model):
                 )
                 self.env.cr.rollback()
 
-    def _finalize_post_processing(self):
-        """ Trigger the final post-processing tasks and mark the transactions as post-processed.
+    def _post_process(self):
+        """ Post-process the transactions.
+
+        The generic post-processing only consists in flagging the transactions as post-processed.
+        For a module to add its own logic to the post-processing, it must overwrite this method and
+        apply its specific logic to the transactions, optionally after filtering them based on their
+        state.
 
         :return: None
         """
-        self.filtered(lambda tx: tx.operation != 'validation')._reconcile_after_done()
         self.is_post_processed = True
-
-    def _reconcile_after_done(self):
-        """ Perform compute-intensive operations on related documents.
-
-        For a provider to handle transaction post-processing, it must overwrite this method and
-        execute its compute-intensive operations on documents linked to confirmed transactions.
-
-        :return: None
-        """
-        return
 
     #=== BUSINESS METHODS - LOGGING ===#
 

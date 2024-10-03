@@ -10,6 +10,7 @@ from odoo.addons.web.controllers.home import ensure_db, Home, SIGN_UP_REQUEST_PA
 from odoo.addons.base_setup.controllers.main import BaseSetup
 from odoo.exceptions import UserError
 from odoo.http import request
+from markupsafe import Markup
 
 _logger = logging.getLogger(__name__)
 
@@ -61,11 +62,11 @@ class AuthSignupHome(Home):
             except UserError as e:
                 qcontext['error'] = e.args[0]
             except (SignupError, AssertionError) as e:
-                if request.env["res.users"].sudo().search([("login", "=", qcontext.get("login"))]):
+                if request.env["res.users"].sudo().search_count([("login", "=", qcontext.get("login"))], limit=1):
                     qcontext["error"] = _("Another user is already registered using this email address.")
                 else:
                     _logger.warning("%s", e)
-                    qcontext['error'] = _("Could not create a new account.") + "\n" + str(e)
+                    qcontext['error'] = _("Could not create a new account.") + Markup('<br/>') + str(e)
 
         elif 'signup_email' in qcontext:
             user = request.env['res.users'].sudo().search([('email', '=', qcontext.get('signup_email')), ('state', '!=', 'new')], limit=1)
@@ -134,7 +135,7 @@ class AuthSignupHome(Home):
         if qcontext.get('token'):
             try:
                 # retrieve the user info (name, login or email) corresponding to a signup token
-                token_infos = request.env['res.partner'].sudo().signup_retrieve_info(qcontext.get('token'))
+                token_infos = request.env['res.partner'].sudo()._signup_retrieve_info(qcontext.get('token'))
                 for k, v in token_infos.items():
                     qcontext.setdefault(k, v)
             except:
@@ -163,9 +164,8 @@ class AuthSignupHome(Home):
     def _signup_with_values(self, token, values):
         login, password = request.env['res.users'].sudo().signup(values, token)
         request.env.cr.commit()     # as authenticate will use its own cursor we need to commit the current transaction
-        pre_uid = request.session.authenticate(request.db, login, password)
-        if not pre_uid:
-            raise SignupError(_('Authentication Failed.'))
+        credential = {'login': login, 'password': password, 'type': 'password'}
+        request.session.authenticate(request.db, credential)
 
 class AuthBaseSetup(BaseSetup):
     @http.route()

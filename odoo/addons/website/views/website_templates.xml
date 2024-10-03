@@ -18,23 +18,13 @@
            role="menuitem">
             <span t-field="submenu.name"/>
         </a>
-        <div t-if="submenu.is_mega_menu and not is_mobile"
-             t-attf-class="dropdown-menu o_mega_menu #{submenu.mega_menu_classes}"
-             data-name="Mega Menu"
-             t-field="submenu.mega_menu_content"/>
-        <!--
-            TODO remove the next two if elements in master, this was made to not
-            have to change the "else" element in stable and prevent xpath fails
-            on the existing elements.
-            -> The first one render nothing (case submenu.is_mega_menu and is_mobile)
-            -> The second one is never considered (t-elif evaluated first)
-        -->
-        <t t-elif="submenu.is_mega_menu"/>
-        <div t-if="submenu.is_mega_menu" t-elif="False"
-             t-attf-class="dropdown-menu o_mega_menu #{submenu.mega_menu_classes}"
-             data-name="Mega Menu"
-             t-field="submenu.mega_menu_content"
-             role="menuitem"/>
+        <t t-if="submenu.is_mega_menu">
+            <div t-if="not is_mobile"
+                 t-attf-class="dropdown-menu o_mega_menu #{submenu.mega_menu_classes}"
+                 data-name="Mega Menu"
+                 t-field="submenu.mega_menu_content"
+                 role="menuitem"/>
+        </t>
         <ul t-else="" t-attf-class="dropdown-menu #{dropdown_menu_classes}" role="menu">
             <t t-foreach="submenu.child_id" t-as="submenu">
                 <t t-call="website.submenu">
@@ -49,8 +39,8 @@
 <template id="layout" name="Main layout" inherit_id="portal.frontend_layout">
     <xpath expr="//html" position="before">
         <t t-set="html_data" t-value="{
-            'lang': lang and lang.replace('_', '-'),
-            'data-website-id': website.id if website else None,
+            'lang': lang.replace('_', '-'),
+            'data-website-id': website.id,
             'data-edit_translations': '1' if edit_translations else None,
             'data-main-object': repr(main_object) if main_object else None,
             'data-seo-object': repr(seo_object) if seo_object else None,
@@ -66,6 +56,8 @@
             'data-translatable': '1' if translatable else None,
             'data-view-xmlid': xmlid,
             'data-viewid': viewid,
+            'data-default-lang-name': website.default_lang_id.name.split('/').pop() if translatable else None,
+            'data-lang-name': website.env['res.lang']._get_data(code=lang).name.split('/').pop() if translatable else None,
         })"/>
     </xpath>
 
@@ -90,7 +82,7 @@
             <t t-if="not additional_title and main_object and 'name' in main_object">
                 <t t-set="additional_title" t-value="main_object.name"/>
             </t>
-            <t t-set="default_title" t-translation="off"> <t t-if="additional_title"><t t-out="additional_title"/> | </t><t t-out="(website or res_company).name"/> </t>
+            <t t-set="default_title" t-translation="off"> <t t-if="additional_title"><t t-out="additional_title"/> | </t><t t-out="website.name"/> </t>
             <t t-set="seo_object" t-value="seo_object or main_object"/>
             <t t-if="seo_object and 'website_meta_title' in seo_object and seo_object.website_meta_title">
                 <t t-set="title" t-value="seo_object.website_meta_title"/>
@@ -138,18 +130,31 @@
                 </t>
             </t>
         </t>
-        <!-- `alternate`/`canonical` mainly useful to crawlers/bots/SEO tools, which test the website as public user -->
-        <t t-if="request and request.is_frontend_multilang and website and website.is_public_user()">
-            <t t-set="alternate_languages" t-value="website._get_alternate_languages(canonical_params=canonical_params)"/>
-            <t t-foreach="alternate_languages" t-as="lg">
-        <link rel="alternate" t-att-hreflang="lg['hreflang']" t-att-href="lg['href']"/>
+        <t t-set="canonical_domain" t-value="website.get_base_url()"/>
+        <!-- no hreflang on non-canonical pages or if no alternate language -->
+        <t t-if="request.is_frontend_multilang and website._is_canonical_url() and len(frontend_languages) &gt; 1">
+            <t t-foreach="frontend_languages.values()" t-as="lg">
+        <link rel="alternate" t-att-hreflang="lg.hreflang" t-att-href="url_localized(lang_code=lg.code, prefetch_langs=True, canonical_domain=canonical_domain)"/>
             </t>
+        <link rel="alternate" hreflang="x-default" t-att-href="url_localized(lang_code=website.env['res.lang']._get_data(id=website._get_cached('default_lang_id')).code, canonical_domain=canonical_domain)"/>
         </t>
-        <link t-if="request and website and website.is_public_user()" rel="canonical" t-att-href="website._get_canonical_url(canonical_params=canonical_params)"/>
+        <link rel="canonical" t-att-href="url_localized(lang_code=lang,canonical_domain=canonical_domain)"/>
         <!-- TODO: Once we have style in DB, add this preconnect only if a
         google font is actually used. Note that if no font is used, the
         preconnect is actually not connecting to the google servers. -->
         <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin=""/>
+    </xpath>
+
+    <xpath expr="//head/script" position="before">
+        <t t-if="website and website.cookies_bar and website.block_third_party_domains
+                 and not request.env['ir.http']._is_allowed_cookie('optional')
+                 and not editable and not translatable
+                 and not request.env.user.has_group('website.group_website_restricted_editor')">
+            <script src="/website/static/src/js/content/cookie_watcher.js"/>
+            <script>
+                watch3rdPartyScripts(<t t-out="json.dumps(website._get_blocked_third_party_domains_list())"/>);
+            </script>
+        </t>
     </xpath>
 
     <xpath expr="//header" position="attributes">
@@ -168,6 +173,14 @@
         <t t-set="cta_btn_text" t-value="False"/>
         <t t-set="cta_btn_href">/contactus</t>
         <t t-set="extra_items_toggle_aria_label">Extra items button</t>
+        <t t-set="primary_additional_colors" t-value="False"/>
+        <t t-set="secondary_additional_colors" t-value="False"/>
+        <t t-if="primary_additional_colors">
+            <t t-set="_additional_btn_color" t-valuef="btn btn-outline-primary"/>
+        </t>
+        <t t-if="secondary_additional_colors">
+            <t t-set="_additional_btn_color" t-valuef="btn btn-outline-secondary"/>
+        </t>
     </xpath>
 
     <xpath expr="//footer" position="attributes">
@@ -190,7 +203,7 @@
     </xpath>
 
     <xpath expr="//div[@id='wrapwrap']" position="after">
-        <t t-if="website and website.google_analytics_key and not editable">
+        <t t-if="website.google_analytics_key and not editable">
             <script id="tracking_code" t-attf-src="https://www.googletagmanager.com/gtag/js?id={{ website.google_analytics_key }}" async="async"/>
             <script id="tracking_code_config">
                 window.dataLayer = window.dataLayer || [];
@@ -223,7 +236,7 @@
                 </t>
             </script>
         </t>
-        <t t-if="website and website.plausible_shared_key and not editable">
+        <t t-if="website.plausible_shared_key and not editable">
             <script id="plausible_script" name="plausible" defer="defer" t-att-data-domain="website.plausible_site" t-att-src="website._get_plausible_script_url()"></script>
         </t>
     </xpath>
@@ -258,7 +271,7 @@
                 <div class="dropdown-menu o_frontend_to_backend_apps_menu" role="menu">
                     <a role="menuitem" class="dropdown-item" t-esc="menu['name']"
                        t-as="menu" t-foreach="env['ir.ui.menu'].with_context(force_action=True).load_menus_root()['children']"
-                       t-attf-href="/web#menu_id=#{menu['id']}&amp;action=#{menu['action'] and menu['action'].split(',')[1] or ''}"/>
+                       t-attf-href="/odoo/action-#{menu['action'] and menu['action'].split(',')[1] or ''}"/>
                 </div>
                 <a groups="website.group_website_restricted_editor" href="#" title="Edit this content" class="o_frontend_to_backend_edit_btn px-3 d-flex align-items-center justify-content-center text-decoration-none">
                     <img src="/website/static/description/icon.png" alt=""/>Editor
@@ -323,15 +336,14 @@
 </template>
 
 <template id="navbar" name="Navbar">
-    <t t-set="_navbar_expand_class" t-value="_navbar_expand_class is None and 'navbar-expand-lg' or ''"/>
+    <t t-set="_navbar_expand_class" t-value="_navbar_expand_class is None and 'navbar-expand-lg' or _navbar_expand_class"/>
     <nav data-name="Navbar" t-attf-aria-label="#{_navbar_name if _navbar_name else 'Main'}" t-attf-class="navbar #{_navbar_expand_class} navbar-light o_colored_level o_cc #{_navbar_classes} #{_extra_navbar_classes}">
         <t t-out="0"/>
     </nav>
 </template>
 
-<!-- TODO adapt in master: remove fixed id -->
 <template id="navbar_nav" name="Navbar Nav">
-    <ul id="top_menu" t-att-id="not is_mobile and 'top_menu'" t-attf-class="nav navbar-nav top_menu #{'' if _no_autohide_menu_mobile else 'o_menu_loading'} #{_nav_class}" role="menu">
+    <ul t-att-id="not is_mobile and 'top_menu'" t-attf-class="nav navbar-nav top_menu #{'' if _no_autohide_menu_mobile else 'o_menu_loading'} #{_nav_class}" role="menu">
         <t t-out="0"/>
     </ul>
 </template>
@@ -339,20 +351,19 @@
 <!-- Header templates -->
 
 <!-- "mobile" template -->
-<!-- TODO adapt in master: remove o_main_nav id -->
 <template id="template_header_mobile" name="Template Header Mobile">
     <t t-call="website.navbar">
-        <t t-set="_navbar_classes" t-valuef="o_header_mobile d-block d-lg-none shadow-sm px-0"/>
-        <t t-set="_navbar_expand_class" t-valuef="None"/>
+        <t t-set="_navbar_classes" t-valuef="o_header_mobile d-block d-lg-none shadow-sm"/>
+        <t t-set="_navbar_expand_class" t-valuef=""/>
         <t t-set="_navbar_name" t-valuef="Mobile"/>
 
-        <div id="o_main_nav" t-att-id="None" class="o_main_nav container flex-wrap justify-content-between">
+        <div class="o_main_nav container flex-wrap justify-content-between">
             <!-- Brand -->
             <t t-call="website.placeholder_header_brand"/>
             <ul class="o_header_mobile_buttons_wrap navbar-nav flex-row align-items-center gap-2 mb-0">
                 <li class="o_not_editable">
                     <button
-                        class="nav-link btn me-auto p-2 o_not_editable"
+                        class="nav-link btn me-auto p-2"
                         type="button"
                         data-bs-toggle="offcanvas"
                         data-bs-target="#top_menu_collapse_mobile"
@@ -402,26 +413,26 @@
                         </t>
                     </ul>
                     <ul class="navbar-nav gap-2 mt-3 w-100">
+                        <!-- Language Selector -->
+                        <t t-call="website.placeholder_header_language_selector">
+                            <t t-set="_btn_class" t-valuef="{{_additional_btn_color or 'nav-link'}} d-flex align-items-center w-100"/>
+                            <t t-set="_txt_class" t-valuef="me-auto small"/>
+                            <t t-set="_flag_class" t-valuef="me-2"/>
+                            <t t-set="_div_classes" t-valuef="dropup"/>
+                            <t t-set="_dropdown_menu_class" t-valuef="w-100"/>
+                        </t>
                         <!-- Sign In -->
                         <t t-call="portal.placeholder_user_sign_in">
-                            <t t-set="_link_class" t-valuef="btn btn-outline-secondary w-100"/>
+                            <t t-set="_link_class" t-valuef="{{_additional_btn_color or 'nav-link o_nav_link_btn'}} w-100 border text-center"/>
                         </t>
                         <!-- User Dropdown -->
                         <t t-call="portal.user_dropdown">
                             <t t-set="_icon" t-value="true"/>
                             <t t-set="_user_name" t-value="true"/>
                             <t t-set="_user_name_class" t-valuef="me-auto small"/>
-                            <t t-set="_link_class" t-valuef="btn-outline-secondary d-flex align-items-center border-0 px-2"/>
+                            <t t-set="_link_class" t-valuef="{{ _additional_btn_color or 'nav-link'}} d-flex align-items-center border-0"/>
                             <t t-set="_icon_class" t-valuef="me-2"/>
                             <t t-set="_item_class" t-valuef="dropdown dropup"/>
-                            <t t-set="_dropdown_menu_class" t-valuef="w-100"/>
-                        </t>
-                        <!-- Language Selector -->
-                        <t t-call="website.placeholder_header_language_selector">
-                            <t t-set="_btn_class" t-valuef="btn-outline-secondary d-flex align-items-center w-100 px-2"/>
-                            <t t-set="_txt_class" t-valuef="me-auto small"/>
-                            <t t-set="_flag_class" t-valuef="me-2"/>
-                            <t t-set="_div_classes" t-valuef="dropup"/>
                             <t t-set="_dropdown_menu_class" t-valuef="w-100"/>
                         </t>
                         <!-- Call To Action -->
@@ -507,20 +518,18 @@
                     <t t-call="website.placeholder_header_social_links"/>
                     <!-- Language Selector -->
                     <t t-call="website.placeholder_header_language_selector">
-                        <t t-set="_btn_class" t-valuef="btn-outline-secondary border-0"/>
-                        <t t-set="_txt_class" t-valuef="small"/>
+                        <t t-set="_btn_class" t-value="_additional_btn_color or 'nav-link'"/>
                         <t t-set="_dropdown_menu_class" t-valuef="dropdown-menu-end"/>
                     </t>
                     <!-- Sign In -->
                     <t t-call="portal.placeholder_user_sign_in">
-                        <t t-set="_link_class" t-valuef="btn btn-outline-secondary"/>
+                        <t t-set="_link_class" t-value="_additional_btn_color or 'o_nav_link_btn nav-link border px-3'"/>
                     </t>
                     <!-- User Dropdown -->
                     <t t-call="portal.user_dropdown">
                         <t t-set="_user_name" t-value="True"/>
                         <t t-set="_item_class" t-valuef="dropdown"/>
-                        <t t-set="_link_class" t-valuef="btn-outline-secondary border-0 fw-bold"/>
-                        <t t-set="_user_name_class" t-valuef="small"/>
+                        <t t-set="_link_class" t-valuef="{{_additional_btn_color or 'nav-link'}} border-0"/>
                         <t t-set="_dropdown_menu_class" t-valuef="dropdown-menu-end"/>
                     </t>
                     <!-- Call To Action -->
@@ -549,7 +558,7 @@
     <xpath expr="//header//nav" position="replace">
         <t t-call="website.navbar">
             <t t-set="_navbar_classes" t-valuef="d-none d-lg-block shadow-sm"/>
-            <t t-set="_navbar_expand_class" t-valuef="None"/>
+            <t t-set="_navbar_expand_class" t-valuef=""/>
 
             <div id="o_main_nav" class="o_main_nav container d-grid py-0 o_grid_header_3_cols">
                 <!-- Nav Toggler -->
@@ -563,7 +572,7 @@
                 <ul class="o_header_hamburger_right_col navbar-nav flex-row gap-2 align-items-center ms-auto">
                     <!-- Sign In -->
                     <t t-call="portal.placeholder_user_sign_in">
-                        <t t-set="_link_class" t-valuef="o_navlink_background_hover btn rounded-circle text-reset"/>
+                        <t t-set="_link_class" t-valuef="o_navlink_background_hover btn text-reset"/>
                     </t>
                     <!-- User Dropdown -->
                     <t t-call="portal.user_dropdown">
@@ -615,7 +624,7 @@
                         <ul class="navbar-nav gap-2 mt-3 w-100">
                             <!-- Language Selector -->
                             <t t-call="website.placeholder_header_language_selector">
-                                <t t-set="_btn_class" t-valuef="btn-outline-secondary d-flex align-items-center w-100"/>
+                                <t t-set="_btn_class" t-valuef="{{_additional_btn_color or 'nav-link'}} d-flex align-items-center w-100"/>
                                 <t t-set="_txt_class" t-valuef="me-auto small"/>
                                 <t t-set="_flag_class" t-valuef="me-2"/>
                                 <t t-set="_div_classes" t-valuef="dropup"/>
@@ -708,7 +717,7 @@
                     <t t-call="website.placeholder_header_search_box">
                         <t t-set="_input_classes" t-valuef="o_header_stretch_search_input border-0 rounded-0 bg-transparent text-reset"/>
                         <t t-set="_submit_classes" t-valuef="o_navlink_background_hover rounded-0 text-reset"/>
-                        <t t-set="_form_classes" t-valuef="h-100 z-index-0"/>
+                        <t t-set="_form_classes" t-valuef="h-100 z-0"/>
                         <t t-set="_classes" t-valuef="h-100 border-start o_border_contrast"/>
                     </t>
                     <!-- Social -->
@@ -718,7 +727,7 @@
                     <!-- Language Selector -->
                     <t t-call="website.placeholder_header_language_selector">
                         <t t-set="_div_classes" t-valuef="h-100 border-start o_border_contrast"/>
-                        <t t-set="_btn_class" t-valuef="o_navlink_background_hover h-100 rounded-0 text-reset"/>
+                        <t t-set="_btn_class" t-valuef="o_navlink_background_hover btn h-100 rounded-0 text-reset"/>
                         <t t-set="_txt_class" t-valuef="small"/>
                         <t t-set="_dropdown_menu_class" t-valuef="dropdown-menu-end"/>
                     </t>
@@ -731,7 +740,7 @@
                     <t t-call="portal.user_dropdown">
                         <t t-set="_icon" t-value="true"/>
                         <t t-set="_item_class" t-valuef="dropdown border-start o_border_contrast"/>
-                        <t t-set="_link_class" t-valuef="o_navlink_background_hover d-flex align-items-center h-100 rounded-0 text-reset"/>
+                        <t t-set="_link_class" t-valuef="o_navlink_background_hover btn d-flex align-items-center h-100 rounded-0 text-reset"/>
                         <t t-set="_dropdown_menu_class" t-valuef="dropdown-menu-end"/>
                     </t>
                     <!-- Call To Action -->
@@ -788,20 +797,18 @@
                     <ul class="navbar-nav align-items-center gap-1 flex-wrap justify-content-end ms-auto">
                         <!-- Sign In -->
                         <t t-call="portal.placeholder_user_sign_in">
-                            <t t-set="_link_class" t-valuef="o_navlink_background btn rounded-circle text-reset"/>
+                            <t t-set="_link_class" t-valuef="o_navlink_background btn border-0 text-reset"/>
                         </t>
                         <!-- User Dropdown -->
                         <t t-call="portal.user_dropdown">
                             <t t-set="_icon" t-value="true"/>
                             <t t-set="_item_class" t-valuef="dropdown"/>
-                            <t t-set="_icon_class" t-valuef="fa-stack"/>
-                            <t t-set="_link_class" t-valuef="o_navlink_background btn d-flex align-items-center rounded-pill py-1 text-reset"/>
+                            <t t-set="_link_class" t-valuef="o_navlink_background btn d-flex align-items-center border-0 text-reset"/>
                             <t t-set="_dropdown_menu_class" t-valuef="dropdown-menu-end"/>
                         </t>
                         <!-- Language Selector -->
                         <t t-call="website.placeholder_header_language_selector">
-                            <t t-set="_txt_class" t-valuef="small"/>
-                            <t t-set="_btn_class" t-valuef="o_navlink_background rounded-pill py-1 text-reset"/>
+                            <t t-set="_btn_class" t-valuef="o_navlink_background btn text-reset"/>
                             <t t-set="_flag_class" t-valuef="m-2"/>
                             <t t-set="_dropdown_menu_class" t-valuef="dropdown-menu-end"/>
                         </t>
@@ -842,7 +849,7 @@
                             <!-- Language Selector -->
                             <t t-call="website.placeholder_header_language_selector">
                                 <t t-set="_div_classes" t-valuef="h-100 border-end o_border_contrast"/>
-                                <t t-set="_btn_class" t-valuef="o_navlink_background_hover btn-sm d-flex align-items-center h-100 rounded-0 p-2 text-reset"/>
+                                <t t-set="_btn_class" t-valuef="o_navlink_background_hover btn btn-sm d-flex align-items-center h-100 rounded-0 p-2 text-reset"/>
                             </t>
                             <!-- Text element -->
                             <t t-call="website.placeholder_header_text_element">
@@ -863,7 +870,7 @@
                             <t t-call="portal.user_dropdown">
                                 <t t-set="_user_name" t-value="true"/>
                                 <t t-set="_item_class" t-valuef="dropdown border-start o_border_contrast"/>
-                                <t t-set="_link_class" t-valuef="o_navlink_background_hover btn-sm d-flex align-items-center h-100 rounded-0 p-2 text-reset"/>
+                                <t t-set="_link_class" t-valuef="o_navlink_background_hover btn btn-sm d-flex align-items-center h-100 rounded-0 p-2 text-reset"/>
                                 <t t-set="_dropdown_menu_class" t-valuef="dropdown-menu-end"/>
                             </t>
                         </ul>
@@ -941,7 +948,7 @@
             <t t-set="_navbar_classes" t-valuef="o_header_force_no_radius d-none d-lg-block p-0 shadow-sm"/>
 
             <div id="o_main_nav" class="o_main_nav">
-                <div aria-label="Top" class="container d-flex justify-content-between py-3">
+                <div aria-label="Top" class="container d-flex align-items-center justify-content-between py-3">
                     <!-- Brand -->
                     <t t-call="website.placeholder_header_brand">
                         <t t-set="_link_class" t-valuef="me-4"/>
@@ -985,7 +992,7 @@
                         </t>
                         <!-- Language Selector -->
                         <t t-call="website.placeholder_header_language_selector">
-                            <t t-set="_btn_class" t-valuef="rounded-circle text-reset o_navlink_background"/>
+                            <t t-set="_btn_class" t-valuef="btn rounded-circle text-reset o_navlink_background"/>
                             <t t-set="_txt_class" t-valuef="small"/>
                             <t t-set="_dropdown_menu_class" t-valuef="dropdown-menu-end"/>
                         </t>
@@ -1041,7 +1048,7 @@
                             <!-- Language Selector -->
                             <t t-call="website.placeholder_header_language_selector">
                                 <t t-set="_div_classes" t-valuef="d-flex align-items-center h-100"/>
-                                <t t-set="_btn_class" t-valuef="btn-sm btn-outline-secondary border-0"/>
+                                <t t-set="_btn_class" t-valuef="btn btn-sm btn-outline-secondary border-0"/>
                             </t>
                             <!-- Text element -->
                             <!-- Return empty placeholder if the element is not active to keep the right layout -->
@@ -1072,7 +1079,7 @@
                             </t>
                             <!-- Sign In -->
                             <t t-call="portal.placeholder_user_sign_in">
-                                <t t-set="_link_class" t-valuef="btn btn-outline-secondary"/>
+                                <t t-set="_link_class" t-valuef="{{_additional_btn_color or 'nav-link o_nav_link_btn'}} ms-2 border px-3"/>
                             </t>
                             <!-- User Dropdown -->
                             <t t-call="portal.user_dropdown">
@@ -1080,7 +1087,7 @@
                                 <t t-set="_icon" t-value="true"/>
                                 <t t-set="_icon_class" t-valuef="fa-stack"/>
                                 <t t-set="_item_class" t-valuef="dropdown"/>
-                                <t t-set="_link_class" t-valuef="d-flex align-items-center border-0 fw-bold text-reset o_navlink_background_hover"/>
+                                <t t-set="_link_class" t-valuef="btn d-flex align-items-center border-0 fw-bold text-reset o_navlink_background_hover"/>
                                 <t t-set="_icon_wrap_class" t-value="'position-relative me-2 p-2 rounded-circle border bg-o-color-3'"/>
                                 <t t-set="_dropdown_menu_class" t-valuef="dropdown-menu-end"/>
                             </t>
@@ -1091,7 +1098,7 @@
                     <div class="container d-flex justify-content-between">
                         <!-- Navbar -->
                         <t t-call="website.navbar_nav">
-                            <t t-set="_nav_class" t-valuef="me-4 py-1"/>
+                            <t t-set="_nav_class" t-valuef="align-items-center me-4 py-1"/>
 
                             <!-- Menu -->
                             <t t-foreach="website.menu_id.child_id" t-as="submenu">
@@ -1138,7 +1145,7 @@
 
             <div id="o_main_nav" class="o_main_nav">
                 <div aria-label="Top" t-if="is_view_active('website.header_text_element') or is_view_active('website.header_social_links') or is_view_active('website.header_search_box') or is_view_active('website.header_call_to_action')"
-                     class="o_header_sales_three_top o_header_hide_on_scroll position-relative border-bottom z-index-1 o_border_contrast">
+                     class="o_header_sales_three_top o_header_hide_on_scroll position-relative border-bottom z-1 o_border_contrast">
                     <div class="container d-flex justify-content-between gap-3 h-100">
                         <ul class="navbar-nav align-items-center gap-3 py-1">
                             <!-- Social -->
@@ -1155,7 +1162,7 @@
                             <t t-call="website.placeholder_header_search_box">
                                 <t t-set="_input_classes" t-valuef="border-0 border-start rounded-0"/>
                                 <t t-set="_submit_classes" t-valuef="rounded-0 bg-o-color-4"/>
-                                <t t-set="_form_classes" t-valuef="h-100 z-index-0"/>
+                                <t t-set="_form_classes" t-valuef="h-100 z-0"/>
                                 <t t-set="_classes" t-valuef="h-100"/>
                             </t>
                             <!-- Call To Action -->
@@ -1171,10 +1178,10 @@
                         <t t-set="_link_class" t-valuef="me-4"/>
                     </t>
                     <div class="ms-auto">
-                        <ul class="navbar-nav justify-content-end align-items-center gap-2 w-100 o_header_separator">
+                        <ul class="o_header_sales_three_small_links navbar-nav justify-content-end align-items-center gap-2 w-100 o_header_separator">
                             <!-- Language Selector -->
                             <t t-call="website.placeholder_header_language_selector">
-                                <t t-set="_btn_class" t-valuef="nav-link btn-sm d-flex align-items-center fw-bold text-uppercase o_nav-link_secondary"/>
+                                <t t-set="_btn_class" t-valuef="nav-link d-flex align-items-center fw-bold text-uppercase o_nav-link_secondary"/>
                                 <t t-set="_txt_class" t-valuef="ms-1"/>
                                 <t t-set="_dropdown_menu_class" t-valuef="dropdown-menu-end"/>
                                 <t t-set="_item_class" t-valuef="position-relative"/>
@@ -1182,13 +1189,13 @@
                             <!-- Sign In -->
                             <t t-call="portal.placeholder_user_sign_in">
                                 <t t-set="_item_class" t-valuef="position-relative"/>
-                                <t t-set="_link_class" t-valuef="nav-link btn-sm fw-bold text-uppercase o_nav-link_secondary"/>
+                                <t t-set="_link_class" t-valuef="nav-link fw-bold text-uppercase o_nav-link_secondary"/>
                             </t>
                             <!-- User Dropdown -->
                             <t t-call="portal.user_dropdown">
                                 <t t-set="_user_name" t-value="true"/>
                                 <t t-set="_item_class" t-valuef="dropdown"/>
-                                <t t-set="_link_class" t-valuef="nav-link btn-sm d-flex align-items-center fw-bold text-uppercase o_nav-link_secondary"/>
+                                <t t-set="_link_class" t-valuef="nav-link d-flex align-items-center fw-bold text-uppercase o_nav-link_secondary"/>
                                 <t t-set="_dropdown_menu_class" t-valuef="dropdown-menu-end"/>
                             </t>
                         </ul>
@@ -1217,9 +1224,15 @@
 
 <!-- "Sales four" template -->
 <template id="template_header_sales_four" inherit_id="website.layout" name="Template Header Sale 4" active="False">
+    <xpath expr="//t[@t-if='primary_additional_colors']" position="inside">
+        <t t-set="_additional_btn_color" t-valuef="text-primary"/>
+    </xpath>
+    <xpath expr="//t[@t-if='secondary_additional_colors']" position="inside">
+        <t t-set="_additional_btn_color" t-valuef="text-secondary"/>
+    </xpath>
     <xpath expr="//header//nav" position="replace">
         <t t-call="website.navbar">
-            <t t-set="_navbar_classes" t-valuef="o_header_sales_four_top o_header_force_no_radius d-none d-lg-block p-0 shadow-sm z-index-1"/>
+            <t t-set="_navbar_classes" t-valuef="o_header_sales_four_top o_header_force_no_radius d-none d-lg-block p-0 shadow-sm z-1"/>
 
             <div id="o_main_nav" class="o_main_nav">
                 <div aria-label="Top" class="container d-flex">
@@ -1249,8 +1262,8 @@
                         </t>
                         <!-- Sign In -->
                         <t t-call="portal.placeholder_user_sign_in">
-                            <t t-set="_item_class" t-valuef="position-relative"/>
-                            <t t-set="_link_class" t-valuef="btn btn-outline-secondary d-flex align-items-center h-100 border-0"/>
+                            <t t-set="_item_class" t-valuef="position-relative small"/>
+                            <t t-set="_link_class" t-valuef="{{_additional_btn_color or 'nav-link'}} d-flex align-items-center h-100 border-0 px-2 text-decoration-none"/>
                         </t>
                         <!-- User Dropdown -->
                         <t t-call="portal.user_dropdown">
@@ -1269,7 +1282,7 @@
                         </t>
                     </ul>
                 </div>
-                <div aria-label="Bottom" class="o_header_sales_four_bot o_header_hide_on_scroll z-index-0">
+                <div aria-label="Bottom" class="o_header_sales_four_bot o_header_hide_on_scroll z-0">
                     <div class="container">
                         <ul class="navbar-nav d-grid align-items-center py-2 o_grid_header_3_cols">
                             <!-- Search bar -->
@@ -1287,7 +1300,7 @@
                             </t>
                             </li>
                             <li class="d-flex align-items-center gap-3 ms-auto mb-0">
-                                <ul class="navbar-nav gap-2">
+                                <ul class="navbar-nav align-items-center gap-2">
                                     <!-- Call To Action -->
                                     <t t-call="website.placeholder_header_call_to_action"/>
                                 </ul>
@@ -1366,27 +1379,27 @@
                                 <t t-set="_div_class" t-valuef="mt-2 border-top pt-2 o_border_contrast"/>
                             </t>
                         </ul>
-                        <ul class="navbar-nav flex-column gap-2 mt-3 w-100">
+                        <ul class="navbar-nav gap-2 mt-3 w-100">
+                            <!-- Language Selector -->
+                            <t t-call="website.placeholder_header_language_selector">
+                                <t t-set="_btn_class" t-valuef="{{_additional_btn_color or 'nav-link'}} d-flex align-items-center w-100"/>
+                                <t t-set="_txt_class" t-valuef="me-auto small"/>
+                                <t t-set="_flag_class" t-valuef="me-2"/>
+                                <t t-set="_div_classes" t-valuef="dropup"/>
+                                <t t-set="_dropdown_menu_class" t-valuef="w-100"/>
+                            </t>
                             <!-- Sign In -->
                             <t t-call="portal.placeholder_user_sign_in">
-                                <t t-set="_link_class" t-valuef="btn btn-outline-secondary w-100"/>
+                                <t t-set="_link_class" t-valuef="{{_additional_btn_color or 'nav-link o_nav_link_btn'}} w-100 border text-center"/>
                             </t>
                             <!-- User Dropdown -->
                             <t t-call="portal.user_dropdown">
                                 <t t-set="_icon" t-value="true"/>
                                 <t t-set="_user_name" t-value="true"/>
                                 <t t-set="_user_name_class" t-valuef="me-auto small"/>
-                                <t t-set="_link_class" t-valuef="btn-outline-secondary d-flex align-items-center border-0 px-2"/>
+                                <t t-set="_link_class" t-valuef="{{ _additional_btn_color or 'nav-link'}} d-flex align-items-center border-0"/>
                                 <t t-set="_icon_class" t-valuef="me-2"/>
                                 <t t-set="_item_class" t-valuef="dropdown dropup"/>
-                                <t t-set="_dropdown_menu_class" t-valuef="w-100"/>
-                            </t>
-                            <!-- Language Selector -->
-                            <t t-call="website.placeholder_header_language_selector">
-                                <t t-set="_btn_class" t-valuef="btn-outline-secondary d-flex align-items-center w-100 px-2"/>
-                                <t t-set="_txt_class" t-valuef="me-auto small"/>
-                                <t t-set="_flag_class" t-valuef="me-2"/>
-                                <t t-set="_div_classes" t-valuef="dropup"/>
                                 <t t-set="_dropdown_menu_class" t-valuef="w-100"/>
                             </t>
                             <!-- Call To Action -->
@@ -1478,13 +1491,13 @@
                         <t t-call="website.placeholder_header_social_links"/>
                         <!-- Language Selector -->
                         <t t-call="website.placeholder_header_language_selector">
-                            <t t-set="_btn_class" t-valuef="btn-outline-secondary d-flex align-items-center gap-1 border-0 rounded-circle px-3"/>
+                            <t t-set="_btn_class" t-valuef="{{_additional_btn_color or 'nav-link'}} d-flex align-items-center gap-1 border-0 rounded-pill px-3"/>
                             <t t-set="_txt_class" t-valuef="small"/>
                             <t t-set="_dropdown_menu_class" t-valuef="dropdown-menu-end"/>
                         </t>
                         <!-- Sign In -->
                         <t t-call="portal.placeholder_user_sign_in">
-                            <t t-set="_link_class" t-valuef="btn btn-outline-secondary rounded-circle px-3"/>
+                            <t t-set="_link_class" t-valuef="{{_additional_btn_color or 'nav-link o_nav_link_btn'}} border px-3"/>
                         </t>
                         <!-- User Dropdown -->
                         <t t-call="portal.user_dropdown">
@@ -1492,7 +1505,7 @@
                             <t t-set="_user_name" t-value="false"/>
                             <t t-set="_user_name_class" t-valuef="me-auto small"/>
                             <t t-set="_item_class" t-valuef="dropdown"/>
-                            <t t-set="_link_class" t-valuef="btn-outline-secondary d-flex align-items-center border-0 rounded-circle px-3 fw-bold"/>
+                            <t t-set="_link_class" t-valuef="{{_additional_btn_color or 'nav-link'}} d-flex align-items-center border-0 rounded-pill px-3"/>
                             <t t-set="_dropdown_menu_class" t-valuef="dropdown-menu-end"/>
                         </t>
                         <!-- Call To Action -->
@@ -1516,6 +1529,18 @@
 <template id="template_header_boxed_align_right" inherit_id="website.template_header_boxed" active="False">
     <xpath expr="//t[@t-set='_nav_class']" position="replace">
         <t t-set="_nav_class" t-valuef="ms-auto"/>
+    </xpath>
+</template>
+
+<!-- Additional colors option -->
+<template id="template_header_additional_color_primary" inherit_id="website.layout" active="False">
+    <xpath expr="//t[@t-set='primary_additional_colors']" position="attributes">
+        <attribute name="t-value">True</attribute>
+    </xpath>
+</template>
+<template id="template_header_additional_color_secondary" inherit_id="website.layout" active="False">
+    <xpath expr="//t[@t-set='secondary_additional_colors']" position="attributes">
+        <attribute name="t-value">True</attribute>
     </xpath>
 </template>
 
@@ -1594,9 +1619,8 @@
     </xpath>
 </template>
 
-<!-- TODO adapt in master when fixed top_menu id removed -->
 <template id="header_navbar_pills_style" inherit_id="website.navbar_nav" name="Navbar Links Style" active="False">
-    <xpath expr="//ul[@id='top_menu']" position="attributes">
+    <xpath expr="//ul[contains(@t-attf-class, 'top_menu')]" position="attributes">
         <attribute name="t-attf-class" add="nav-pills" separator=" "/>
     </xpath>
 </template>
@@ -1662,7 +1686,7 @@
                                 <a href="/website/social/facebook" class="s_social_media_facebook" target="_blank" aria-label="Facebook">
                                     <i class="fa fa-facebook rounded-circle shadow-sm o_editable_media"/>
                                 </a>
-                                <a href="/website/social/twitter" class="s_social_media_twitter" target="_blank" aria-label="Twitter">
+                                <a href="/website/social/twitter" class="s_social_media_twitter" target="_blank" aria-label="X">
                                     <i class="fa fa-twitter rounded-circle shadow-sm o_editable_media"/>
                                 </a>
                                 <a href="/website/social/linkedin" class="s_social_media_linkedin" target="_blank" aria-label="LinkedIn">
@@ -1735,7 +1759,7 @@
                         <a href="/website/social/facebook" class="s_social_media_facebook" target="_blank" aria-label="Facebook">
                             <i class="fa fa-facebook rounded-circle rounded shadow-sm o_editable_media"/>
                         </a>
-                        <a href="/website/social/twitter" class="s_social_media_twitter" target="_blank" aria-label="Twitter">
+                        <a href="/website/social/twitter" class="s_social_media_twitter" target="_blank" aria-label="X">
                             <i class="fa fa-twitter rounded-circle rounded shadow-sm o_editable_media"/>
                         </a>
                         <a href="/website/social/linkedin" class="s_social_media_linkedin" target="_blank" aria-label="LinkedIn">
@@ -1796,7 +1820,7 @@
                             <h5>Follow us</h5>
                             <ul class="list-unstyled">
                                 <li class="py-1"><i class="fa fa-1x fa-fw fa-facebook-square me-2"/><a href="/website/social/facebook" target="_blank">Facebook</a></li>
-                                <li class="py-1"><i class="fa fa-1x fa-fw fa-twitter-square me-2"/><a href="/website/social/twitter" target="_blank">Twitter</a></li>
+                                <li class="py-1"><i class="fa fa-1x fa-fw fa-twitter-square me-2"/><a href="/website/social/twitter" target="_blank">X</a></li>
                                 <li class="py-1"><i class="fa fa-1x fa-fw fa-linkedin-square me-2"/><a href="/website/social/linkedin" target="_blank">Linkedin</a></li>
                                 <li class="py-1"><i class="fa fa-1x fa-fw fa-instagram me-2"/><a href="/website/social/instagram" target="_blank">Instagram</a></li>
                             </ul>
@@ -1904,7 +1928,7 @@
             <section class="s_text_block" data-snippet="s_text_block" data-name="Text">
                 <div class="container allow_columns">
                     <div class="s_hr pt16 pb16">
-                        <hr class="w-100 mx-auto" style="border-top-width: 1px; border-top-style: solid; border-color: var(--600);"/>
+                        <hr class="w-100 mx-auto" style="border-color: var(--600);"/>
                     </div>
                 </div>
             </section>
@@ -1943,14 +1967,14 @@
 <template id="template_footer_call_to_action" inherit_id="website.layout" name="Call-to-Action" active="False">
     <xpath expr="//div[@id='footer']" position="replace">
         <div id="footer" class="oe_structure oe_structure_solo" t-ignore="true" t-if="not no_footer">
-            <section class="s_call_to_action pt48">
+            <section class="s_call_to_action pt64 pb64">
                 <div class="container">
                     <div class="row">
-                        <div class="col-lg-9 pb24">
+                        <div class="col-lg-9">
                             <h3>50,000+ companies run Odoo to grow their businesses.</h3>
                             <p class="lead">Join us and make your company a better place.</p>
                         </div>
-                        <div class="col-lg-3 pb24">
+                        <div class="col-lg-3">
                             <a href="/contactus" class="btn btn-primary btn-lg btn-block">Start Button</a>
                         </div>
                     </div>
@@ -1959,7 +1983,7 @@
             <section class="s_text_block" data-snippet="s_text_block" data-name="Text">
                 <div class="container s_allow_columns">
                     <div class="s_hr pt16 pb16">
-                        <hr class="w-100 mx-auto" style="border-top-width: 1px; border-top-style: solid; border-color: var(--600);"/>
+                        <hr class="w-100 mx-auto" style="border-color: var(--600);"/>
                     </div>
                 </div>
             </section>
@@ -2020,7 +2044,7 @@
                                 <a href="/website/social/facebook" class="s_social_media_facebook" target="_blank" aria-label="Facebook">
                                     <i class="fa fa-1x fa-facebook rounded-circle shadow-sm o_editable_media"/>
                                 </a>
-                                <a href="/website/social/twitter" class="s_social_media_twitter" target="_blank" aria-label="Twitter">
+                                <a href="/website/social/twitter" class="s_social_media_twitter" target="_blank" aria-label="X">
                                     <i class="fa fa-1x fa-twitter rounded-circle shadow-sm o_editable_media"/>
                                 </a>
                                 <a href="/website/social/instagram" class="s_social_media_instagram" target="_blank" aria-label="Instagram">
@@ -2112,13 +2136,10 @@
 </template>
 
 <!-- Language selector templates -->
-<!-- TODO adapt in master so this template receives lang as parameter -->
 <template id="lang_flag" name="Language Flag">
-    <t t-set="lang" t-value="lg or active_lang"/>
-    <t t-set="lang_name" t-value="lang and lang[2].split('/').pop()"/>
     <img t-attf-class="o_lang_flag #{_flag_class}"
-         t-attf-src="#{flag_image_src}?height=25"
-         t-att-alt="lang_name"/>
+         t-attf-src="#{flag_image_url}?height=25"
+         t-att-alt="flag_lang_alt or ''"/>
 </template>
 
 <template id="language_selector" inherit_id="portal.language_selector">
@@ -2128,7 +2149,7 @@
     </xpath>
 
     <xpath expr="//t[@t-set='active_lang']" position="before">
-        <t t-if="lang not in (lg[0] for lg in languages)">
+        <t t-if="lang not in frontend_languages">
             <t t-set="lang" t-value="website.default_lang_id.code"/>
         </t>
     </xpath>
@@ -2136,12 +2157,13 @@
     <!-- Add the 'flags' possibility -->
     <xpath expr="//button[contains(@t-attf-class, 'dropdown-toggle')]/span" position="before">
         <t t-if="flags" t-call="website.lang_flag">
-            <t t-set="flag_image_src" t-value="active_lang[4]"/>
+            <t t-if="no_text and not codes" t-set="flag_lang_alt" t-value="active_lang.name.split('/').pop()"/>
+            <t t-set="flag_image_url" t-value="active_lang.flag_image_url"/>
         </t>
     </xpath>
     <xpath expr="//*[contains(@t-attf-class, 'js_change_lang')]/span" position="before">
         <t t-if="flags" t-call="website.lang_flag">
-            <t t-set="flag_image_src" t-value="lg[4]"/>
+            <t t-set="flag_image_url" t-value="lg.flag_image_url"/>
         </t>
     </xpath>
 </template>
@@ -2159,7 +2181,7 @@
     <xpath expr="//*[contains(@t-attf-class,'dropdown-item')]" position="attributes">
         <attribute name="t-attf-class" remove="dropdown-item" add="list-inline-item" separator=" "/>
     </xpath>
-    <xpath expr="//t[@t-foreach='languages']" position="inside">
+    <xpath expr="//t[@t-foreach='frontend_languages.values()']" position="inside">
         <t t-if="not lg_last and not no_text">
             <span class="list-inline-item">|</span>
         </t>
@@ -2285,13 +2307,13 @@
 <!-- Util template -->
 <template id="publish_management">
     <div groups="website.group_website_restricted_editor" t-ignore="true" class="float-end css_editable_mode_hidden" t-att-style="style or None">
-        <div t-attf-class="btn-group #{btn_class} js_publish_management #{object.website_published and 'css_published' or 'css_unpublished'}" t-att-data-id="object.id" t-att-data-object="object._name" t-att-data-description="env['ir.model']._get(object._name).display_name" t-att-data-controller="publish_controller">
+        <div t-attf-class="btn-group #{btn_class} js_publish_management #{object.website_published and 'css_published' or 'css_unpublished'}" t-att-data-id="object.id" t-att-data-object="object._name" t-att-data-description="env['ir.model']._get(object._name).display_name">
             <button class="btn btn-danger js_publish_btn">Unpublished</button>
             <button class="btn btn-success js_publish_btn">Published</button>
             <button type="button" t-attf-class="btn btn-default dropdown-toggle dropdown-toggle-split" t-att-id="'dopprod-%s' % object.id" data-bs-toggle="dropdown"/>
             <div class="dropdown-menu" role="menu" t-att-aria-labelledby="'dopprod-%s' % object.id">
                 <t t-out="0"/>
-                <a role="menuitem" t-attf-href="/web#view_type=form&amp;model=#{object._name}&amp;id=#{object.id}&amp;action=#{action}&amp;menu_id=#{menu or object.env['ir.model.data']._xmlid_to_res_id('website.menu_website_configuration')}"
+                <a role="menuitem" t-attf-href="/odoo/action-#{action}/#{object.id}?menu_id=#{menu or object.env['ir.model.data']._xmlid_to_res_id('website.menu_website_configuration')}"
                     title='Edit in backend' class="dropdown-item" t-if="publish_edit">Edit</a>
             </div>
         </div>
@@ -2481,6 +2503,10 @@
     <!--    see test_05_reset_specific_view_controller_broken_request                                          -->
     <!-- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! -->
     <xpath expr="//script[last()]" position="before">
+        <script type="text/javascript" src="/web/static/lib/bootstrap/js/dist/util/component-functions.js"/>
+        <script type="text/javascript" src="/web/static/lib/bootstrap/js/dist/util/backdrop.js"/>
+        <script type="text/javascript" src="/web/static/lib/bootstrap/js/dist/util/focustrap.js"/>
+        <script type="text/javascript" src="/web/static/lib/bootstrap/js/dist/util/scrollbar.js"/>
         <script type="text/javascript" src="/web/static/lib/bootstrap/js/dist/modal.js"/>
     </xpath>
     <xpath expr="//style" position="after">
@@ -2623,8 +2649,8 @@ Sitemap: <t t-esc="url_root"/>sitemap.xml
 <template id="website_search_box" name="Website Searchbox">
     <div t-attf-class="input-group #{_classes}" role="search" t-nocache="The searchbox should not cache previous searches.">
         <t t-set="search_placeholder">Search...</t>
-        <input type="search" name="search" t-att-class="'search-query form-control oe_search_box border-0 bg-light %s' % _input_classes" t-att-placeholder="placeholder if placeholder else search_placeholder" t-att-value="search"/>
-        <button type="submit" t-att-class="'btn oe_search_button %s' % (_submit_classes or 'btn-light')" aria-label="Search" title="Search">
+        <input type="search" name="search" t-att-class="'search-query form-control oe_search_box %s %s' % (_input_classes or '', '' if default_style else 'border-0 bg-light')" t-att-placeholder="placeholder if placeholder else search_placeholder" t-att-value="search"/>
+        <button type="submit" t-att-class="'btn oe_search_button %s' % (_submit_classes or ('btn-primary' if default_style else 'btn-light'))" aria-label="Search" title="Search">
             <i class="oi oi-search"/>
             <span t-if="search" class="oe_search_found">
                 <small>(<t t-out="search_count or 0"/> found)</small>
@@ -2762,7 +2788,7 @@ Sitemap: <t t-esc="url_root"/>sitemap.xml
         <attribute name="t-attf-class" remove="s_searchbar_input" separator=" "/>
     </xpath>
     <xpath expr="//div[@role='search']" position="replace">
-        <form t-attf-class="o_searchbar_form o_wait_lazy_js s_searchbar_input #{_form_classes}" t-att-action="action" method="get" t-attf-data-snippet="s_searchbar_input">
+        <form t-attf-class="o_searchbar_form s_searchbar_input #{_form_classes}" t-att-action="action" method="get" t-attf-data-snippet="s_searchbar_input">
             <t>$0</t>
             <input name="order" type="hidden" class="o_search_order_by" t-att-value="order_by if order_by else 'name asc'"/>
             <t t-out="0"/>
@@ -2846,10 +2872,10 @@ Sitemap: <t t-esc="url_root"/>sitemap.xml
         </div>
         <div class="o_wizard_circle_progress progress d-md-none position-relative rounded-circle ms-3 bg-transparent"
                 t-attf-style="--rightProgress:{{'180' if _steps_in_deg >= 180 else _steps_in_deg}}deg; --leftProgress:{{_steps_in_deg-180 if _steps_in_deg >= 180 else 0}}deg;">
-            <span class="o_wizard_circle_progress_left position-absolute start-0 top-0 z-index-1 overflow-hidden w-50 h-100 ">
+            <span class="o_wizard_circle_progress_left position-absolute start-0 top-0 z-1 overflow-hidden w-50 h-100 ">
                 <span class="progress-bar position-absolute start-100 top-0 w-100 h-100 border border-5 border-start-0 border-primary bg-transparent"/>
             </span>
-            <span class="o_wizard_circle_progress_right position-absolute top-0 end-0 z-index-1 overflow-hidden w-50 h-100">
+            <span class="o_wizard_circle_progress_right position-absolute top-0 end-0 z-1 overflow-hidden w-50 h-100">
                 <span class="progress-bar position-absolute top-0 end-100 w-100 h-100 border border-5 border-end-0 border-primary bg-transparent"/>
             </span>
             <p class="mx-auto fw-bold">
@@ -2879,7 +2905,7 @@ Sitemap: <t t-esc="url_root"/>sitemap.xml
                     <a href="/website/social/facebook" class="s_social_media_facebook o_nav-link_secondary nav-link m-0 p-0 text-decoration-none" target="_blank" aria-label="Facebook">
                         <i class="fa fa-facebook fa-stack p-1 o_editable_media"/>
                     </a>
-                    <a href="/website/social/twitter" class="s_social_media_twitter o_nav-link_secondary nav-link m-0 p-0 text-decoration-none" target="_blank" aria-label="Twitter">
+                    <a href="/website/social/twitter" class="s_social_media_twitter o_nav-link_secondary nav-link m-0 p-0 text-decoration-none" target="_blank" aria-label="X">
                         <i class="fa fa-twitter fa-stack p-1 o_editable_media"/>
                     </a>
                     <a href="/website/social/linkedin" class="s_social_media_linkedin o_nav-link_secondary nav-link m-0 p-0 text-decoration-none" target="_blank" aria-label="LinkedIn">

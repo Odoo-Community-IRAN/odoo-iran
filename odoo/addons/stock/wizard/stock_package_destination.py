@@ -30,4 +30,4 @@ class ChooseDestinationLocation(models.TransientModel):
     def action_done(self):
         # set the same location on each move line and pass again in action_put_in_pack
         self.move_line_ids.location_dest_id = self.location_dest_id
-        return self.picking_id.action_put_in_pack()
+        return self.move_line_ids.action_put_in_pack()

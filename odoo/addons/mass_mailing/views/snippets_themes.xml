@@ -1,108 +1,78 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+
+<template id="email_designer_themes" groups="base.group_user">
+    <t t-set="company_id" t-value="res_company"/>
+    <div data-name="basic"
+            title="Plain Text"
+            data-nowrap="1"
+            data-img="/mass_mailing/static/src/img/theme_imgs/basic_thumb"
+            data-images-info='{"logo": {"format": "png"}}'>
+        <t t-call="mass_mailing.theme_basic_template"/>
+    </div>
+    <div data-name="empty"
+            title="Start From Scratch"
+            data-img="/mass_mailing/static/src/img/theme_imgs/empty_thumb"
+            data-images-info='{"logo": {"format": "png"}}'
+            data-hide-from-mobile="true">
+        <t t-call="mass_mailing.theme_empty_template"/>
+    </div>
+    <div data-name="default"
+            title="Welcome Message"
+            data-img="/mass_mailing/static/src/img/theme_imgs/default_thumb"
+            data-images-info='{"logo": {"format": "png"}, "header_logo": {"format": "png"}}'>
+        <t t-call="mass_mailing.theme_default_template"/>
+    </div>
+</template>
+
 <!-- Snippets & Themes Menu -->
 <template id="email_designer_snippets" inherit_id="web_editor.snippets" primary="True" groups="base.group_user">
-    <xpath expr="//div[hasclass('o_we_website_top_actions')]" position="inside">
-        <div class="email_designer_top_actions">
-            <button class="o_codeview_btn btn btn-primary">
-                <i class="fa fa-code"></i>
-            </button>
-            <button class="o_mobile_preview_btn btn btn-primary">
-                <i class="fa fa-lg fa-mobile"/>
-            </button>
-            <button class="o_fullscreen_btn btn btn-primary">
-                <img class="img-fluid" src="/web_editor/font_to_img/61541/rgb(255,255,255)/16" alt="Fullscreen"/>
-            </button>
-        </div>
-    </xpath>
-    <xpath expr="//div[@id='snippets_menu']" position="inside">
-        <button type="button" tabindex="3" class="o_we_customize_design_btn text-uppercase" accesskey="2">
-            <span>Design</span>
-        </button>
-    </xpath>
     <xpath expr="//t[@id='default_snippets']" position="replace">
         <t id="default_snippets">
             <t t-set="company_id" t-value="res_company"/>
-            <div id="email_designer_themes" class="d-none">
-                <div data-name="basic"
-                     title="Plain Text"
-                     data-nowrap="1"
-                     data-img="/mass_mailing/static/src/img/theme_imgs/basic_thumb"
-                     data-images-info='{"logo": {"format": "png"}}'>
-                    <t t-call="mass_mailing.theme_basic_template"/>
-                </div>
-                <div data-name="empty"
-                     title="Start From Scratch"
-                     data-img="/mass_mailing/static/src/img/theme_imgs/empty_thumb"
-                     data-images-info='{"logo": {"format": "png"}}'
-                     data-hide-from-mobile="true">
-                    <t t-call="mass_mailing.theme_empty_template"/>
-                </div>
-                <div data-name="default"
-                     title="Welcome Message"
-                     data-img="/mass_mailing/static/src/img/theme_imgs/default_thumb"
-                     data-images-info='{"logo": {"format": "png"}, "header_logo": {"format": "png"}}'>
-                    <t t-call="mass_mailing.theme_default_template"/>
-                </div>
-            </div>
-            <div id="email_designer_default_headers" class="o_panel">
-                <div class="o_panel_header">Headers</div>
-                <div class="o_panel_body" id="email_designer_header_elements">
-                    <t t-snippet="mass_mailing.s_mail_block_header_social" string="Left Logo" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/block_header_social.png"/>
-                    <t t-snippet="mass_mailing.s_mail_block_header_text_social" string="Left Text" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/block_header_text_social.png"/>
-                    <t t-snippet="mass_mailing.s_mail_block_header_logo" string="Centered Logo" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/block_header_logo.png"/>
-                    <t t-snippet="mass_mailing.s_cover" string="Cover" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_cover.svg"/>
-                    <t t-snippet="mass_mailing.s_mail_block_header_view" string="View Online" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/block_header_browser.png"/>
-                </div>
-            </div>
-            <div id="email_designer_default_body" class="o_panel">
-                <div class="o_panel_header">Body</div>
-                <div class="o_panel_body" id="email_designer_body_elements">
-                    <t t-snippet="mass_mailing.s_title" string="Title" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_title.svg"/>
-                    <t t-snippet="mass_mailing.s_text_block" string="Text" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_text_block.svg"/>
-                    <t t-snippet="mass_mailing.s_comparisons" string="Comparisons" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_comparisons.svg"/>
-                    <t t-snippet="mass_mailing.s_color_blocks_2" string="Big Boxes" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_color_blocks_2.svg"/>
-                    <t t-snippet="mass_mailing.s_three_columns" string="Columns" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_three_columns.svg"/>
-                    <t t-snippet="mass_mailing.s_image_text" string="Image - Text" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_image_text.svg"/>
-                    <t t-snippet="mass_mailing.s_text_image" string="Text - Image" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_text_image.svg"/>
-                    <t t-snippet="mass_mailing.s_picture" string="Picture" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_picture.svg"/>
-                    <t t-snippet="mass_mailing.s_features" string="Features" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_features.svg"/>
-                    <t t-snippet="mass_mailing.s_numbers" string="Numbers" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_numbers.svg"/>
-                    <t t-snippet="mass_mailing.s_masonry_block" string="Masonry" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_masonry_block.svg"/>
-                    <t t-snippet="mass_mailing.s_media_list" string="Media List" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_media_list.svg"/>
-                    <t t-snippet="mass_mailing.s_showcase" string="Showcase" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_showcase.svg"/>
-                </div>
-            </div>
-            <div id="email_designer_default_extra" class="o_panel">
-                <div class="o_panel_header">Marketing Content</div>
-                <div class="o_panel_body" id="email_designer_marketing_elements">
-                    <t t-snippet="mass_mailing.s_company_team" string="Team" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_company_team.svg"/>
-                    <t t-snippet="mass_mailing.s_call_to_action" string="Call to Action" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_call_to_action.svg"/>
-                    <t t-snippet="mass_mailing.s_references" string="References" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_references.svg"/>
-                    <t t-snippet="mass_mailing.s_coupon_code" string="Promo Code" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/block_discount2.png"/>
-                    <t t-snippet="mass_mailing.s_mail_block_discount1" string="Discount Offer" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/block_discount1.png"/>
-                    <t t-snippet="mass_mailing.s_event" string="Event" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_event.svg"/>
-                    <t t-snippet="mass_mailing.s_product_list" string="Items" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_product_list.svg"/>
-                    <t t-snippet="mass_mailing.s_features_grid" string="Features Grid" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_features_grid.svg"/>
-                </div>
-            </div>
-            <div id="email_designer_default_inner" class="o_panel">
-                <div class="o_panel_header">Inner Content</div>
-                <div class="o_panel_body" id="email_designer_inner_elements">
-                    <t t-snippet="mass_mailing.s_alert" string="Alert" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_alert.svg"/>
-                    <t t-snippet="mass_mailing.s_rating" string="Rating" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_rating.svg"/>
-                    <t t-snippet="mass_mailing.s_blockquote" string="Blockquote" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_blockquote.svg"/>
-                    <t t-snippet="mass_mailing.s_hr" string="Separator" t-thumbnail="/web_editor/static/src/img/snippets_thumbs/s_hr.svg"/>
-                    <t t-snippet="mass_mailing.s_text_highlight" string="Text Highlight" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_text_highlight.svg"/>
-                </div>
-            </div>
-            <div id="email_designer_default_footer" class="o_panel">
-                <div class="o_panel_header">Footers</div>
-                <div class="o_panel_body" id="email_designer_footer_elements">
-                    <t t-snippet="mass_mailing.s_mail_block_footer_social" string="Footer Center" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/block_footer_social.png"/>
-                    <t t-snippet="mass_mailing.s_mail_block_footer_social_left" string="Footer Left" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/block_footer_social_left.png"/>
-                </div>
-            </div>
+            <snippets id="email_designer_header_elements" string="Headers">
+                <t t-snippet="mass_mailing.s_mail_block_header_social" string="Left Logo" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/block_header_social.png"/>
+                <t t-snippet="mass_mailing.s_mail_block_header_text_social" string="Left Text" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/block_header_text_social.png"/>
+                <t t-snippet="mass_mailing.s_mail_block_header_logo" string="Centered Logo" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/block_header_logo.png"/>
+                <t t-snippet="mass_mailing.s_cover" string="Cover" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_cover.svg"/>
+                <t t-snippet="mass_mailing.s_mail_block_header_view" string="View Online" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/block_header_browser.png"/>
+            </snippets>
+            <snippets id="email_designer_body_elements" string="Body">
+                <t t-snippet="mass_mailing.s_title" string="Title" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_title.svg"/>
+                <t t-snippet="mass_mailing.s_text_block" string="Text" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_text_block.svg"/>
+                <t t-snippet="mass_mailing.s_comparisons" string="Comparisons" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_comparisons.svg"/>
+                <t t-snippet="mass_mailing.s_color_blocks_2" string="Big Boxes" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_color_blocks_2.svg"/>
+                <t t-snippet="mass_mailing.s_three_columns" string="Columns" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_three_columns.svg"/>
+                <t t-snippet="mass_mailing.s_image_text" string="Image - Text" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_image_text.svg"/>
+                <t t-snippet="mass_mailing.s_text_image" string="Text - Image" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_text_image.svg"/>
+                <t t-snippet="mass_mailing.s_picture" string="Picture" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_picture.svg"/>
+                <t t-snippet="mass_mailing.s_features" string="Features" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_features.svg"/>
+                <t t-snippet="mass_mailing.s_numbers" string="Numbers" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_numbers.svg"/>
+                <t t-snippet="mass_mailing.s_masonry_block" string="Masonry" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_masonry_block.svg"/>
+                <t t-snippet="mass_mailing.s_media_list" string="Media List" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_media_list.svg"/>
+                <t t-snippet="mass_mailing.s_showcase" string="Showcase" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_showcase.svg"/>
+            </snippets>
+            <snippets id="email_designer_marketing_elements" string="Marketing Content">
+                <t t-snippet="mass_mailing.s_company_team" string="Team" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_company_team.svg"/>
+                <t t-snippet="mass_mailing.s_call_to_action" string="Call to Action" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_call_to_action.svg"/>
+                <t t-snippet="mass_mailing.s_references" string="References" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_references.svg"/>
+                <t t-snippet="mass_mailing.s_coupon_code" string="Promo Code" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/block_discount2.png"/>
+                <t t-snippet="mass_mailing.s_mail_block_discount1" string="Discount Offer" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/block_discount1.png"/>
+                <t t-snippet="mass_mailing.s_event" string="Event" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_event.svg"/>
+                <t t-snippet="mass_mailing.s_product_list" string="Items" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_product_list.svg"/>
+                <t t-snippet="mass_mailing.s_features_grid" string="Features Grid" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_features_grid.svg"/>
+            </snippets>
+            <snippets id="email_designer_inner_elements" string="Inner Content">
+                <t t-snippet="mass_mailing.s_alert" string="Alert" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_alert.svg"/>
+                <t t-snippet="mass_mailing.s_rating" string="Rating" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_rating.svg"/>
+                <t t-snippet="mass_mailing.s_blockquote" string="Blockquote" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_blockquote.svg"/>
+                <t t-snippet="mass_mailing.s_hr" string="Separator" t-thumbnail="/web_editor/static/src/img/snippets_thumbs/s_hr.svg"/>
+                <t t-snippet="mass_mailing.s_text_highlight" string="Text Highlight" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/s_text_highlight.svg"/>
+            </snippets>
+            <snippets id="email_designer_footer_elements" string="Footers">
+                <t t-snippet="mass_mailing.s_mail_block_footer_social" string="Footer Center" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/block_footer_social.png"/>
+                <t t-snippet="mass_mailing.s_mail_block_footer_social_left" string="Footer Left" t-thumbnail="/mass_mailing/static/src/img/snippets_thumbs/block_footer_social_left.png"/>
+            </snippets>
         </t>
     </xpath>
     <xpath expr="//div[@id='snippet_options']/t" position="attributes">
@@ -245,7 +215,7 @@
     <a t-att-href="social_links.get('social_linkedin')" style="margin-left:10px" aria-label="LinkedIn" title="LinkedIn">
         <span class="fa fa-linkedin"></span>
     </a>&amp;nbsp;&amp;nbsp;
-    <a t-att-href="social_links.get('social_twitter')" style="margin-left:10px" aria-label="Twitter" title="Twitter">
+    <a t-att-href="social_links.get('social_twitter')" style="margin-left:10px" aria-label="X" title="X">
         <span class="fa fa-twitter"></span>
     </a>&amp;nbsp;&amp;nbsp;
     <a t-att-href="social_links.get('social_instagram')" style="margin-left:10px" aria-label="Instagram" title="Instagram">
@@ -319,7 +289,7 @@
     <!-- from it. -->
     <xpath expr="//div[hasclass('o_we_image_options')]" position="replace">
         <div data-selector="span.fa, i.fa, img">
-            <we-select string="Alignment" data-state-to-first-class="true">
+            <we-select id="o_we_image_alignment_option" string="Alignment" data-state-to-first-class="true">
                 <we-button data-select-class="float-start" title="Align Left">Left</we-button>
                 <we-button data-select-class="" title="Align Center">Center</we-button>
                 <we-button data-select-class="float-end" title="Align Right">Right</we-button>
@@ -335,11 +305,11 @@
             data-unit="px" data-extra-class="rounded"
             t-att-data-variable="radius_variable"/>
 
-            <we-row string="Padding ⭤">
+            <we-row string="Padding &#x2194;">
                 <we-input data-select-style="" data-unit="px" data-css-property="padding-left"/>
                 <we-input data-select-style="" data-unit="px" data-css-property="padding-right"/>
             </we-row>
-            <we-row string="Padding ↕">
+            <we-row string="Padding &#x2195;">
                 <we-input data-select-style="" data-unit="px" data-css-property="padding-top"/>
                 <we-input data-select-style="" data-unit="px" data-css-property="padding-bottom"/>
             </we-row>
@@ -453,12 +423,12 @@
 
     <div data-js="sizing_y"
         data-selector=".o_mail_snippet_general, .o_mail_snippet_general .row > div"
-        data-exclude=".o_mail_no_resize, .o_mail_no_options"/>
+        data-exclude=".o_mail_no_resize, .o_mail_no_options, .s_col_no_resize.row > div, .s_col_no_resize"/>
 
     <div data-js="sizing_x"
         data-selector=".row > div"
         data-drop-near=".row:not(.s_col_no_resize) > div"
-        data-exclude=".o_mail_no_resize, .o_mail_no_options"/>
+        data-exclude=".o_mail_no_resize, .o_mail_no_options, .s_col_no_resize.row > div, .s_col_no_resize"/>
 
     <div data-selector=".note-editable .oe_structure > div:not(:has(> .o_mail_snippet_general)),
         .note-editable .oe_structure > div.o_mail_snippet_general,
@@ -479,8 +449,9 @@
             data-color-prefix="bg-"/>
     </div>
     <!-- Allow customised padding-x on snippets -->
-    <div data-selector="[class*='col-lg-'], .s_discount2, .s_text_block, .s_media_list, .s_picture, .s_rating">
-        <we-row string="Padding ⭤">
+    <div data-selector="[class*='col-lg-'], .s_discount2, .s_text_block, .s_media_list, .s_picture, .s_rating"
+        data-exclude=".s_col_no_resize.row > div, .s_col_no_resize">
+        <we-row string="Padding &#x2194;">
             <we-input data-select-style="" data-unit="px" data-css-property="padding-left"/>
             <we-input data-select-style="" data-unit="px" data-css-property="padding-right"/>
         </we-row>
@@ -521,7 +492,7 @@
     </div>
 
     <!--  Vertical Alignment -->
-    <div id="row_valign_snippet_option" data-selector=".s_text_image, .s_image_text, .s_three_columns, s_mail_block_event" data-target=".row">
+    <div data-js="vAlignment" id="row_valign_snippet_option" data-selector=".s_text_image, .s_image_text, .s_three_columns, s_mail_block_event" data-target=".row">
         <we-button-group string="Vert. Alignment" title="Vertical Alignment">
             <we-button title="Align Top"
                        data-select-class="align-items-start"
@@ -552,8 +523,14 @@
                         data-img="/mass_mailing/static/src/img/snippets_options/content_width_full.svg"
                         title="Full"/>
         </we-button-group>
-        <we-colorpicker string="Background Color"
+        <we-colorpicker string="Mailing Background"
                         data-apply-to=".o_layout, > div:not(.o_layout)"
+                        data-select-style="true"
+                        data-no-transparency="true"
+                        data-css-property="background-color"
+                        data-color-prefix="bg-"/>
+        <we-colorpicker string="Content Background"
+                        data-apply-to=".o_mail_wrapper_td > div"
                         data-select-style="true"
                         data-no-transparency="true"
                         data-css-property="background-color"

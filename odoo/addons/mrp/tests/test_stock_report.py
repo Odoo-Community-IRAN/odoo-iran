@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo import Command
-from odoo.tests.common import Form
+from odoo.tests import Form
 from odoo.addons.stock.tests.test_report import TestReportsCommon
+from odoo import Command
 
 
 class TestMrpStockReports(TestReportsCommon):
@@ -18,15 +18,15 @@ class TestMrpStockReports(TestReportsCommon):
         })
         product_chococake = self.env['product.product'].create({
             'name': 'Choco Cake',
-            'type': 'product',
+            'is_storable': True,
         })
         product_double_chococake = self.env['product.product'].create({
             'name': 'Double Choco Cake',
-            'type': 'product',
+            'is_storable': True,
         })
         byproduct = self.env['product.product'].create({
             'name': 'by-product',
-            'type': 'product',
+            'is_storable': True,
         })
 
         # Creates two BOM: one creating a regular slime, one using regular slimes.
@@ -115,7 +115,7 @@ class TestMrpStockReports(TestReportsCommon):
         # Configures a product.
         product_apple_pie = self.env['product.product'].create({
             'name': 'Apple Pie',
-            'type': 'product',
+            'is_storable': True,
         })
         product_apple = self.env['product.product'].create({
             'name': 'Apple',
@@ -177,7 +177,7 @@ class TestMrpStockReports(TestReportsCommon):
         """
         product_banana = self.env['product.product'].create({
             'name': 'Banana',
-            'type': 'product',
+            'is_storable': True,
         })
         product_chocolate = self.env['product.product'].create({
             'name': 'Chocolate',
@@ -217,7 +217,7 @@ class TestMrpStockReports(TestReportsCommon):
 
         compo01, compo02 = self.env['product.product'].create([{
             'name': n,
-            'type': 'product',
+            'is_storable': True,
             'uom_id': self.env.ref('uom.product_uom_meter').id,
             'uom_po_id': self.env.ref('uom.product_uom_meter').id,
         } for n in ['Compo 01', 'Compo 02']])
@@ -338,7 +338,7 @@ class TestMrpStockReports(TestReportsCommon):
         })
         product_chococake = self.env['product.product'].create({
             'name': 'Choco Cake',
-            'type': 'product',
+            'is_storable': True,
         })
         self.env['mrp.bom'].create({
             'product_id': product_chococake.id,
@@ -362,6 +362,31 @@ class TestMrpStockReports(TestReportsCommon):
 
         overview_values = self.env['report.mrp.report_mo_overview'].get_report_values(mo.id)
         self.assertEqual(overview_values['data']['id'], mo.id, "computing overview value should work")
+
+    def test_overview_with_component_also_as_byproduct(self):
+        """ Check that opening he overview of an MO for which the BoM contains an element as both component and byproduct
+        does not cause an infinite recursion.
+        """
+        bom = self.env['mrp.bom'].create({
+            'product_tmpl_id': self.product.product_tmpl_id.id,
+            'product_qty': 1.0,
+            'bom_line_ids': [
+                Command.create({'product_id': self.product1.id, 'product_qty': 1.0}),
+                ],
+            'byproduct_ids': [
+                Command.create({'product_id': self.product1.id, 'product_qty': 1.0})
+                ]
+        })
+
+        mo = self.env['mrp.production'].create({
+            'product_id': self.product.id,
+            'bom_id': bom.id,
+            'product_qty': 1,
+        })
+
+        mo.action_confirm()
+        overview_values = self.env['report.mrp.report_mo_overview'].get_report_values(mo.id)
+        self.assertEqual(overview_values['data']['id'], mo.id, "Unexpected disparity between overview and MO data")
 
     def test_multi_step_component_forecast_availability(self):
         """

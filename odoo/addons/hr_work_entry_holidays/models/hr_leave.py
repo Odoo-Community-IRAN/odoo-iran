@@ -25,56 +25,6 @@ class HrLeave(models.Model):
         vals['work_entry_type_id'] = self.holiday_status_id.work_entry_type_id.id
         return vals
 
-    def _get_overlapping_contracts(self, contract_states=None):
-        self.ensure_one()
-        if contract_states is None:
-            contract_states = [
-                '|',
-                ('state', 'not in', ['draft', 'cancel']),
-                '&',
-                ('state', '=', 'draft'),
-                ('kanban_state', '=', 'done')
-            ]
-        domain = AND([contract_states, [
-            ('employee_id', '=', self.employee_id.id),
-            ('date_start', '<=', self.date_to),
-            '|',
-                ('date_end', '>=', self.date_from),
-                ('date_end', '=', False),
-        ]])
-        return self.env['hr.contract'].sudo().search(domain)
-
-    @api.constrains('date_from', 'date_to')
-    def _check_contracts(self):
-        """
-            A leave cannot be set across multiple contracts.
-            Note: a leave can be across multiple contracts despite this constraint.
-            It happens if a leave is correctly created (not across multiple contracts) but
-            contracts are later modifed/created in the middle of the leave.
-        """
-        for holiday in self.filtered('employee_id'):
-            contracts = holiday._get_overlapping_contracts()
-            if len(contracts.resource_calendar_id) > 1:
-                state_labels = {e[0]: e[1] for e in contracts._fields['state']._description_selection(self.env)}
-                raise ValidationError(
-                    _("""A leave cannot be set across multiple contracts with different working schedules.
-
-Please create one time off for each contract.
-
-Time off:
-%s
-
-Contracts:
-%s""",
-                      holiday.display_name,
-                      '\n'.join(_(
-                          "Contract %s from %s to %s, status: %s",
-                          contract.name,
-                          format_date(self.env, contract.date_start),
-                          format_date(self.env, contract.date_start) if contract.date_end else _("undefined"),
-                          state_labels[contract.state]
-                      ) for contract in contracts)))
-
     def _cancel_work_entry_conflict(self):
         """
         Creates a leave work entry for each hr.leave in self.
@@ -158,8 +108,6 @@ Contracts:
 
     @api.model_create_multi
     def create(self, vals_list):
-        if any(vals.get('holiday_type', 'employee') == 'employee' and not vals.get('multi_employee', False) and not vals.get('employee_id', False) for vals in vals_list):
-            raise ValidationError(_("There is no employee set on the time off. Please make sure you're logged in the correct company."))
         employee_ids = {v['employee_id'] for v in vals_list if v.get('employee_id')}
         # We check a whole day before and after the interval of the earliest
         # request_date_from and latest request_date_end because date_{from,to}
@@ -173,11 +121,11 @@ Contracts:
         with self.env['hr.work.entry']._error_checking(start=start, stop=stop, employee_ids=employee_ids):
             return super().create(vals_list)
 
-    def action_confirm(self):
+    def action_reset_confirm(self):
         start = min(self.mapped('date_from'), default=False)
         stop = max(self.mapped('date_to'), default=False)
         with self.env['hr.work.entry']._error_checking(start=start, stop=stop, employee_ids=self.employee_id.ids):
-            return super().action_confirm()
+            return super().action_reset_confirm()
 
     def _get_leaves_on_public_holiday(self):
         return super()._get_leaves_on_public_holiday().filtered(

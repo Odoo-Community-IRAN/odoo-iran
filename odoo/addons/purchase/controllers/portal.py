@@ -22,11 +22,11 @@ class CustomerPortal(portal.CustomerPortal):
         if 'rfq_count' in counters:
             values['rfq_count'] = PurchaseOrder.search_count([
                 ('state', 'in', ['sent'])
-            ]) if PurchaseOrder.check_access_rights('read', raise_exception=False) else 0
+            ]) if PurchaseOrder.has_access('read') else 0
         if 'purchase_count' in counters:
             values['purchase_count'] = PurchaseOrder.search_count([
                 ('state', 'in', ['purchase', 'done', 'cancel'])
-            ]) if PurchaseOrder.check_access_rights('read', raise_exception=False) else 0
+            ]) if PurchaseOrder.has_access('read') else 0
         return values
 
     def _get_purchase_searchbar_sortings(self):
@@ -158,6 +158,8 @@ class CustomerPortal(portal.CustomerPortal):
             order_sudo.confirm_reminder_mail(kw.get('confirmed_date'))
         if confirm_type == 'reception':
             order_sudo._confirm_reception_mail()
+        if confirm_type == 'decline':
+            order_sudo._decline_reception_mail()
 
         values = self._purchase_order_get_page_view_values(order_sudo, access_token, **kw)
         update_date = kw.get('update')
@@ -196,3 +198,30 @@ class CustomerPortal(portal.CustomerPortal):
         if updated_dates:
             order_sudo._update_date_planned_for_lines(updated_dates)
         return Response(status=204)
+
+    @http.route(['/my/purchase/<int:order_id>/download_edi'], auth="public", website=True)
+    def portal_my_purchase_order_download_edi(self, order_id=None, access_token=None, **kw):
+        """An endpoint to download EDI file representation.
+        """
+        try:
+            order_sudo = self._document_check_access('purchase.order', order_id, access_token=access_token)
+        except (AccessError, MissingError):
+            return request.redirect('/my')
+
+        builders = order_sudo._get_edi_builders()
+
+        # This handles only one builder for now, more can be added in the future
+        if len(builders) != 1:
+            return request.redirect('/my')
+        builder = builders[0]
+
+        xml_content = builder._export_order(order_sudo)
+
+        download_name = builder._export_purchase_order_filename(order_sudo)
+
+        http_headers = [
+            ('Content-Type', 'text/xml'),
+            ('Content-Length', len(xml_content)),
+            ('Content-Disposition', f'attachment; filename={download_name}')
+        ]
+        return request.make_response(xml_content, headers=http_headers)

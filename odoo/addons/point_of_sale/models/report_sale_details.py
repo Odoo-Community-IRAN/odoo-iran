@@ -6,15 +6,54 @@ import pytz
 
 from odoo import api, fields, models, _
 from odoo.osv.expression import AND
+from odoo.tools import SQL
+
 
 class ReportSaleDetails(models.AbstractModel):
 
     _name = 'report.point_of_sale.report_saledetails'
     _description = 'Point of Sale Details'
 
+    def _get_date_start_and_date_stop(self, date_start, date_stop):
+        if date_start:
+            date_start = fields.Datetime.from_string(date_start)
+        else:
+            # start by default today 00:00:00
+            user_tz = pytz.timezone(self.env.context.get('tz') or self.env.user.tz or 'UTC')
+            today = user_tz.localize(fields.Datetime.from_string(fields.Date.context_today(self)))
+            date_start = today.astimezone(pytz.timezone('UTC')).replace(tzinfo=None)
+
+        if date_stop:
+            date_stop = fields.Datetime.from_string(date_stop)
+            # avoid a date_stop smaller than date_start
+            if (date_stop < date_start):
+                date_stop = date_start + timedelta(days=1, seconds=-1)
+        else:
+            # stop by default today 23:59:59
+            date_stop = date_start + timedelta(days=1, seconds=-1)
+
+        return date_start, date_stop
+
+    def _get_domain(self, date_start=False, date_stop=False, config_ids=False, session_ids=False):
+        domain = [('state', 'in', ['paid', 'invoiced', 'done'])]
+
+        if (session_ids):
+            domain = AND([domain, [('session_id', 'in', session_ids)]])
+        else:
+            date_start, date_stop = self._get_date_start_and_date_stop(date_start, date_stop)
+
+            domain = AND([domain,
+                [('date_order', '>=', fields.Datetime.to_string(date_start)),
+                ('date_order', '<=', fields.Datetime.to_string(date_stop))]
+            ])
+
+            if config_ids:
+                domain = AND([domain, [('config_id', 'in', config_ids)]])
+
+        return domain
 
     @api.model
-    def get_sale_details(self, date_start=False, date_stop=False, config_ids=False, session_ids=False):
+    def get_sale_details(self, date_start=False, date_stop=False, config_ids=False, session_ids=False, **kwargs):
         """ Serialise the orders of the requested time period, configs and sessions.
         :param date_start: The dateTime to start, default today 00:00:00.
         :type date_start: str.
@@ -26,35 +65,10 @@ class ReportSaleDetails(models.AbstractModel):
         :type session_ids: list of numbers.
         :returns: dict -- Serialised sales.
         """
-        domain = [('state', 'in', ['paid', 'invoiced', 'done'])]
-        if (session_ids):
-            domain = AND([domain, [('session_id', 'in', session_ids)]])
-        else:
-            if date_start:
-                date_start = fields.Datetime.from_string(date_start)
-            else:
-                # start by default today 00:00:00
-                user_tz = pytz.timezone(self.env.context.get('tz') or self.env.user.tz or 'UTC')
-                today = user_tz.localize(fields.Datetime.from_string(fields.Date.context_today(self)))
-                date_start = today.astimezone(pytz.timezone('UTC')).replace(tzinfo=None)
+        if (not session_ids):
+            date_start, date_stop = self._get_date_start_and_date_stop(date_start, date_stop)
 
-            if date_stop:
-                date_stop = fields.Datetime.from_string(date_stop)
-                # avoid a date_stop smaller than date_start
-                if (date_stop < date_start):
-                    date_stop = date_start + timedelta(days=1, seconds=-1)
-            else:
-                # stop by default today 23:59:59
-                date_stop = date_start + timedelta(days=1, seconds=-1)
-
-            domain = AND([domain,
-                [('date_order', '>=', fields.Datetime.to_string(date_start)),
-                ('date_order', '<=', fields.Datetime.to_string(date_stop))]
-            ])
-
-            if config_ids:
-                domain = AND([domain, [('config_id', 'in', config_ids)]])
-
+        domain = self._get_domain(date_start, date_stop, config_ids, session_ids, **kwargs)
         orders = self.env['pos.order'].search(domain)
 
         if config_ids:
@@ -91,15 +105,16 @@ class ReportSaleDetails(models.AbstractModel):
 
         payment_ids = self.env["pos.payment"].search([('pos_order_id', 'in', orders.ids)]).ids
         if payment_ids:
-            self.env.cr.execute("""
-                SELECT method.id as id, payment.session_id as session, COALESCE(method.name->>%s, method.name->>'en_US') as name, method.is_cash_count as cash,
+            method_name = self.env['pos.payment.method']._field_to_sql('method', 'name')
+            self.env.cr.execute(SQL("""
+                SELECT method.id as id, payment.session_id as session, %(method_name)s as name, method.is_cash_count as cash,
                      sum(amount) total, method.journal_id journal_id
                 FROM pos_payment AS payment,
                      pos_payment_method AS method
                 WHERE payment.payment_method_id = method.id
-                    AND payment.id IN %s
+                    AND payment.id IN %(payment_ids)s
                 GROUP BY method.name, method.is_cash_count, payment.session_id, method.id, journal_id
-            """, (self.env.lang, tuple(payment_ids),))
+            """, method_name=method_name, payment_ids=tuple(payment_ids)))
             payments = self.env.cr.dictfetchall()
         else:
             payments = []
@@ -189,7 +204,7 @@ class ReportSaleDetails(models.AbstractModel):
                         payment['cash_moves'] = cash_in_out_list
                         payment['count'] = True
             if not is_cash_method:
-                cash_name = _('Cash') + ' ' + str(session.name)
+                cash_name = _('Cash %(session_name)s', session_name=session.name)
                 previous_session = self.env['pos.session'].search([('id', '<', session.id), ('state', '=', 'closed'), ('config_id', '=', session.config_id.id)], limit=1)
                 final_count = previous_session.cash_register_balance_end_real + session.cash_real_transaction
                 cash_difference = session.cash_register_balance_end_real - final_count
@@ -324,16 +339,13 @@ class ReportSaleDetails(models.AbstractModel):
             'invoiceTotal': invoiceTotal,
         }
 
-    def _get_product_total_amount(self, line):
-        return line.currency_id.round(line.price_unit * line.qty * (100 - line.discount) / 100.0)
-
     def _get_products_and_taxes_dict(self, line, products, taxes, currency):
         key2 = (line.product_id, line.price_unit, line.discount)
         key1 = line.product_id.product_tmpl_id.pos_categ_ids[0].name if len(line.product_id.product_tmpl_id.pos_categ_ids) else _('Not Categorized')
         products.setdefault(key1, {})
         products[key1].setdefault(key2, [0.0, 0.0, 0.0])
         products[key1][key2][0] += line.qty
-        products[key1][key2][1] += self._get_product_total_amount(line)
+        products[key1][key2][1] += line.currency_id.round(line.price_unit * line.qty * (100 - line.discount) / 100.0)
         products[key1][key2][2] += line.price_subtotal
 
         if line.tax_ids_after_fiscal_position:
@@ -365,10 +377,16 @@ class ReportSaleDetails(models.AbstractModel):
             category_dict['qty'] = qty_cat
         # IMPROVEMENT: It would be better if the `products` are grouped by pos.order.line.id.
         unique_products = list({tuple(sorted(product.items())): product for category in categories for product in category['products']}.values())
-        all_qty = sum(product['quantity'] for product in unique_products)
-        all_total = sum(product['base_amount'] for product in unique_products)
+        all_qty = sum([product['quantity'] for product in unique_products])
+        all_total = sum([product['base_amount'] for product in unique_products])
 
         return categories, {'total': all_total, 'qty': all_qty}
+
+    def _prepare_get_sale_details_args_kwargs(self, data):
+        configs = self.env['pos.config'].browse(data['config_ids'])
+        args = (data['date_start'], data['date_stop'], configs.ids, data['session_ids'])
+        kwargs = {}
+        return args, kwargs
 
     @api.model
     def _get_report_values(self, docids, data=None):
@@ -379,10 +397,10 @@ class ReportSaleDetails(models.AbstractModel):
             'session_ids': data.get('session_ids') or (docids if not data.get('config_ids') and not data.get('date_start') and not data.get('date_stop') else None),
             'config_ids': data.get('config_ids'),
             'date_start': data.get('date_start'),
-            'date_stop': data.get('date_stop')
+            'date_stop': data.get('date_stop'),
         })
-        configs = self.env['pos.config'].browse(data['config_ids'])
-        data.update(self.get_sale_details(data['date_start'], data['date_stop'], configs.ids, data['session_ids']))
+        args, kwargs = self._prepare_get_sale_details_args_kwargs(data)
+        data.update(self.get_sale_details(*args, **kwargs))
         return data
 
     def _get_taxes_info(self, taxes):

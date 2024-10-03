@@ -1,7 +1,6 @@
-/* @odoo-module */
-
 import { CallContextMenu } from "@mail/discuss/call/common/call_context_menu";
 import { CallParticipantVideo } from "@mail/discuss/call/common/call_participant_video";
+import { CONNECTION_TYPES } from "@mail/discuss/call/common/rtc_service";
 import { useHover } from "@mail/utils/common/hooks";
 import { isEventHandled, markEventHandled } from "@web/core/utils/misc";
 import { browser } from "@web/core/browser/browser";
@@ -14,11 +13,11 @@ import {
     useState,
     useExternalListener,
 } from "@odoo/owl";
-
 import { usePopover } from "@web/core/popover/popover_hook";
 import { useService } from "@web/core/utils/hooks";
+import { rpc } from "@web/core/network/rpc";
 
-const HIDDEN_CONNECTION_STATES = new Set(["connected", "completed"]);
+const HIDDEN_CONNECTION_STATES = new Set([undefined, "connected", "completed"]);
 
 export class CallParticipantCard extends Component {
     static props = ["className", "cardData", "thread", "minimized?", "inset?"];
@@ -26,15 +25,14 @@ export class CallParticipantCard extends Component {
     static template = "discuss.CallParticipantCard";
 
     setup() {
+        super.setup();
         this.contextMenuAnchorRef = useRef("contextMenuAnchor");
         this.root = useRef("root");
         this.popover = usePopover(CallContextMenu);
-        this.rpc = useService("rpc");
         this.rtc = useState(useService("discuss.rtc"));
         this.store = useState(useService("mail.store"));
         this.ui = useState(useService("ui"));
         this.rootHover = useHover("root");
-        this.threadService = useService("mail.thread");
         this.state = useState({ drag: false, dragPos: undefined });
         onMounted(() => {
             if (!this.rtcSession) {
@@ -59,10 +57,10 @@ export class CallParticipantCard extends Component {
         if (!this.rtcSession) {
             return false;
         }
-        if (this.env.debug) {
-            return true;
-        }
-        return !this.rtcSession?.eq(this.rtc.state.selfSession);
+        return (
+            !this.rtcSession.eq(this.rtc.selfSession) ||
+            (this.env.debug && this.rtc.state.connectionType === CONNECTION_TYPES.SERVER)
+        );
     }
 
     get rtcSession() {
@@ -79,9 +77,7 @@ export class CallParticipantCard extends Component {
 
     get showConnectionState() {
         return Boolean(
-            this.isOfActiveCall &&
-                this.rtcSession?.peerConnection &&
-                !HIDDEN_CONNECTION_STATES.has(this.rtcSession.connectionState)
+            this.isOfActiveCall && !HIDDEN_CONNECTION_STATES.has(this.rtcSession.connectionState)
         );
     }
 
@@ -109,7 +105,7 @@ export class CallParticipantCard extends Component {
     }
 
     get isTalking() {
-        return Boolean(this.rtcSession && this.rtcSession.isTalking && !this.rtcSession.isMute);
+        return Boolean(this.rtcSession && this.rtcSession.isActuallyTalking);
     }
 
     get hasRaisingHand() {
@@ -144,11 +140,10 @@ export class CallParticipantCard extends Component {
             }
             return;
         }
-        const channelData = await this.rpc("/mail/rtc/channel/cancel_call_invitation", {
+        await rpc("/mail/rtc/channel/cancel_call_invitation", {
             channel_id: this.props.thread.id,
             member_ids: [this.channelMember.id],
         });
-        this.props.thread.invitedMembers = channelData.invitedMembers;
     }
 
     async onClickReplay() {

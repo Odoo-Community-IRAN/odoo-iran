@@ -116,12 +116,26 @@ class IrModel(models.Model):
             model_class._inherit = parents + ['mail.activity.mixin']
         return model_class
 
-    def _get_model_definitions(self, model_names_to_fetch):
-        fields_by_model_names = super()._get_model_definitions(model_names_to_fetch)
-        for model_name, field_by_fname in fields_by_model_names.items():
+    def _get_definitions(self, model_names):
+        model_definitions = super()._get_definitions(model_names)
+        for model_name, model_definition in model_definitions.items():
             model = self.env[model_name]
             tracked_field_names = model._track_get_fields() if 'mail.thread' in model._inherit else []
-            for fname, field in field_by_fname.items():
+            for fname in tracked_field_names:
+                if fname in model_definition["fields"]:
+                    model_definition["fields"][fname]["tracking"] = True
+            if isinstance(self.env[model_name], self.env.registry['mail.activity.mixin']):
+                model_definition["has_activities"] = True
+        return model_definitions
+
+    def _get_model_definitions(self, model_names_to_fetch):
+        model_definitions = super()._get_model_definitions(model_names_to_fetch)
+        for model_name, model_definition in model_definitions.items():
+            model = self.env[model_name]
+            tracked_field_names = model._track_get_fields() if 'mail.thread' in model._inherit else []
+            for fname, field in model_definition["fields"].items():
                 if fname in tracked_field_names:
                     field['tracking'] = True
-        return fields_by_model_names
+            if isinstance(self.env[model_name], self.env.registry['mail.activity.mixin']):
+                model_definition["has_activities"] = True
+        return model_definitions

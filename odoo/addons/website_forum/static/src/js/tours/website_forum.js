@@ -1,68 +1,103 @@
 /** @odoo-module **/
 
-    import { _t } from "@web/core/l10n/translation";
-    import wTourUtils from "@website/js/tours/tour_utils";
+import { _t } from "@web/core/l10n/translation";
+import {
+    registerBackendAndFrontendTour,
+} from '@website/js/tours/tour_utils';
 
-    wTourUtils.registerBackendAndFrontendTour("question", {
-        url: '/forum/1',
-    }, () => [{
-        trigger: ".o_wforum_ask_btn",
-        position: "left",
-        content: _t("Create a new post in this forum by clicking on the button."),
-    }, {
-        trigger: "input[name=post_name]",
-        position: "top",
-        content: _t("Give your post title."),
-    }, {
-        trigger: ".note-editable p",
-        extra_trigger: "input[name=post_name]:not(:propValue(\"\"))",
-        content: _t("Put your question here."),
-        position: "bottom",
-        run: "text",
-    }, {
-        trigger: ".select2-choices",
-        extra_trigger: ".note-editable p:not(:containsExact(\"<br>\"))",
-        content: _t("Insert tags related to your question."),
-        position: "top",
-        run: function (actions) {
-            actions.auto("input[id=s2id_autogen2]");
-        },
-    }, {
-        trigger: "button:contains(\"Post\")",
-        extra_trigger: "input[id=s2id_autogen2]:not(:propValue(\"Tags\"))",
-        content: _t("Click to post your question."),
-        position: "bottom",
-    }, {
-        extra_trigger: 'div.modal.modal_shown',
-        trigger: ".modal-header button.btn-close",
-        auto: true,
-    },
-    {
-        trigger: "a:contains(\"Answer\").collapsed",
-        content: _t("Click to answer."),
-        position: "bottom",
-    },
-    {
-        trigger: ".note-editable p",
-        content: _t("Put your answer here."),
-        position: "bottom",
-        run: "text",
-    }, {
-        trigger: "button:contains(\"Post Answer\")",
-        extra_trigger: ".note-editable p:not(:containsExact(\"<br>\"))",
-        content: _t("Click to post your answer."),
-        position: "bottom",
-    }, {
-        extra_trigger: 'div.modal.modal_shown',
-        trigger: ".modal-header button.btn-close",
-        auto: true,
-    }, {
-        trigger: ".o_wforum_validate_toggler[data-karma]:first",
-        content: _t("Click here to accept this answer."),
-        position: "right",
-    }, {
-        content: "Check edit button is there",
-        trigger: "a:contains('Edit your answer')",
-        auto: true,
-        isCheck: true,
-    }]);
+registerBackendAndFrontendTour("question", {
+    url: '/forum/1',
+}, () => [{
+    trigger: ".o_wforum_ask_btn",
+    tooltipPosition: "left",
+    content: _t("Create a new post in this forum by clicking on the button."),
+    run: "click",
+}, {
+    trigger: "input[name=post_name]",
+    tooltipPosition: "top",
+    content: _t("Give your post title."),
+    run: "edit Test",
+},
+{
+    isActive: ["auto"],
+    trigger: `input[name=post_name]:not(:empty)`,
+},
+{
+    trigger: ".note-editable p",
+    content: _t("Put your question here."),
+    tooltipPosition: "bottom",
+    run: "editor Test",
+},
+{
+    isActive: ["auto"],
+    trigger: `.note-editable p:not(:contains(/^<br>$/))`,
+},
+{
+    trigger: ".o_select_menu_toggler",
+    content: _t("Insert tags related to your question."),
+    tooltipPosition: "top",
+    run: "click",
+}, 
+{
+    trigger: ".o_select_menu_sticky",
+    run: "edit Test",
+},
+{
+    isActive: ["auto"],
+    trigger: `.o_popover input.o_select_menu_sticky:not(:contains(Please enter 2 or more characters))`,
+},
+{
+    content: "Select found select menu item",
+    trigger: ".o_popover.o_select_menu_menu .o_select_menu_item span:contains('Test')",
+    run: 'click',
+},
+{
+    content: "Close search bar",
+    trigger: "body",
+    run: 'click',
+},
+{
+    trigger: "button:contains(/^Post/)",
+    content: _t("Click to post your question."),
+    tooltipPosition: "bottom",
+    run: "click",
+}, {
+    isActive: ["auto"],
+    trigger: ".modal .modal-header button.btn-close",
+    run: "click",
+},
+{
+    trigger: "a:contains(\"Reply\").collapsed",
+    content: _t("Click to reply."),
+    tooltipPosition: "bottom",
+    run: "click",
+},
+{
+    trigger: ".note-editable p",
+    content: _t("Put your answer here."),
+    tooltipPosition: "bottom",
+    run: "editor Test",
+},
+{
+    isActive: ["auto"],
+    trigger: `.note-editable p:not(:contains(/^<br>$/))`,
+},
+{
+    trigger: "button:contains(\"Post Answer\")",
+    content: _t("Click to post your answer."),
+    tooltipPosition: "bottom",
+    run: "click",
+}, {
+    isActive: ["auto"],
+    trigger: ".modal .modal-header button.btn-close",
+    run: "click",
+}, {
+    trigger: ".o_wforum_validate_toggler[data-karma]:first",
+    content: _t("Click here to accept this answer."),
+    tooltipPosition: "right",
+    run: "click",
+}, {
+    isActive: ["auto"],
+    content: "Check edit button is there",
+    trigger: "a:contains('Edit your answer')",
+}]);

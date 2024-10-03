@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo import api, fields, models, SUPERUSER_ID, _
+from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 
 
@@ -25,10 +25,9 @@ class ResConfigSettings(models.TransientModel):
         help="Add and customize route operations to process product moves in your warehouse(s): e.g. unload > quality control > stock for incoming products, pick > pack > ship for outgoing products. \n You can also set putaway strategies on warehouse locations in order to send incoming products into specific child locations straight away (e.g. specific bins, racks).")
     group_warning_stock = fields.Boolean("Warnings for Stock", implied_group='stock.group_warning_stock')
     group_stock_sign_delivery = fields.Boolean("Signature", implied_group='stock.group_stock_sign_delivery')
-    module_stock_picking_batch = fields.Boolean("Batch Transfers")
-    group_stock_picking_wave = fields.Boolean('Wave Transfers', implied_group='stock.group_stock_picking_wave',
-        help="Group your move operations in wave transfer to process them together")
+    module_stock_picking_batch = fields.Boolean("Batch, Wave & Cluster Transfers")
     module_stock_barcode = fields.Boolean("Barcode Scanner")
+    module_stock_barcode_barcodelookup = fields.Boolean("Stock Barcode Database")
     stock_move_email_validation = fields.Boolean(related='company_id.stock_move_email_validation', readonly=False)
     module_stock_sms = fields.Boolean("SMS Confirmation")
     module_delivery = fields.Boolean("Delivery Methods")
@@ -40,22 +39,24 @@ class ResConfigSettings(models.TransientModel):
     module_delivery_easypost = fields.Boolean("Easypost Connector")
     module_delivery_sendcloud = fields.Boolean("Sendcloud Connector")
     module_delivery_shiprocket = fields.Boolean("Shiprocket Connector")
+    module_delivery_starshipit = fields.Boolean("Starshipit Connector")
     module_quality_control = fields.Boolean("Quality")
     module_quality_control_worksheet = fields.Boolean("Quality Worksheet")
     group_stock_multi_locations = fields.Boolean('Storage Locations', implied_group='stock.group_stock_multi_locations',
         help="Store products in specific locations of your warehouse (e.g. bins, racks) and to track inventory accordingly.")
-    group_stock_storage_categories = fields.Boolean(
-        'Storage Categories', implied_group='stock.group_stock_storage_categories')
     annual_inventory_month = fields.Selection(related='company_id.annual_inventory_month', readonly=False)
     annual_inventory_day = fields.Integer(related='company_id.annual_inventory_day', readonly=False)
     group_stock_reception_report = fields.Boolean("Reception Report", implied_group='stock.group_reception_report')
     module_stock_dropshipping = fields.Boolean("Dropshipping")
+    barcode_separator = fields.Char(
+        "Separator", config_parameter='stock.barcode_separator',
+        help="Character(s) used to separate data contained within an aggregate barcode (i.e. a barcode containing multiple barcode encodings)")
+    module_stock_fleet = fields.Boolean("Dispatch Management System")
 
     @api.onchange('group_stock_multi_locations')
     def _onchange_group_stock_multi_locations(self):
         if not self.group_stock_multi_locations:
             self.group_stock_adv_location = False
-            self.group_stock_storage_categories = False
 
     @api.onchange('group_stock_production_lot')
     def _onchange_group_stock_production_lot(self):
@@ -76,26 +77,10 @@ class ResConfigSettings(models.TransientModel):
         if not self.group_stock_multi_locations and location_grp in base_user_implied_ids and warehouse_grp in base_user_implied_ids:
             raise UserError(_("You can't deactivate the multi-location if you have more than once warehouse by company"))
 
-        # Deactivate putaway rules with storage category when not in storage category
-        # group. Otherwise, active them.
-        storage_cate_grp = self.env.ref('stock.group_stock_storage_categories')
-        PutawayRule = self.env['stock.putaway.rule']
-        if self.group_stock_storage_categories and storage_cate_grp not in base_user_implied_ids:
-            putaway_rules = PutawayRule.search([
-                ('active', '=', False),
-                ('storage_category_id', '!=', False)
-            ])
-            if putaway_rules:
-                putaway_rules.active = True
-        elif not self.group_stock_storage_categories and storage_cate_grp in base_user_implied_ids:
-            putaway_rules = PutawayRule.search([('storage_category_id', '!=', False)])
-            if putaway_rules:
-                putaway_rules.active = False
-
         previous_group = self.default_get(['group_stock_multi_locations', 'group_stock_production_lot', 'group_stock_tracking_lot'])
         super().set_values()
 
-        if not self.user_has_groups('stock.group_stock_manager'):
+        if not self.env.user.has_group('stock.group_stock_manager'):
             return
 
         # If we just enabled multiple locations with this settings change, we can deactivate

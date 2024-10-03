@@ -27,17 +27,30 @@ class LoyaltyGenerateWizard(models.TransientModel):
     points_name = fields.Char(related='program_id.portal_point_name', readonly=True)
     valid_until = fields.Date()
     will_send_mail = fields.Boolean(compute='_compute_will_send_mail')
+    confirmation_message = fields.Char(compute='_compute_confirmation_message')
+    description = fields.Text(string="Description")
 
     def _get_partners(self):
         self.ensure_one()
         if self.mode != 'selected':
             return self.env['res.partner']
-        domain = []
+        domains = []
         if self.customer_ids:
-            domain = [('id', 'in', self.customer_ids.ids)]
+            domains.append([('id', 'in', self.customer_ids.ids)])
         if self.customer_tag_ids:
-            domain = expression.OR([domain, [('category_id', 'in', self.customer_tag_ids.ids)]])
-        return self.env['res.partner'].search(domain)
+            domains.append([('category_id', 'in', self.customer_tag_ids.ids)])
+        return self.env['res.partner'].search(expression.OR(domains) if domains else [])
+
+    @api.depends('program_type', 'points_granted', 'coupon_qty')
+    def _compute_confirmation_message(self):
+        self.confirmation_message = False
+        for wizard in self:
+            program_desc = dict(wizard._fields['program_type']._description_selection(wizard.env))
+            wizard.confirmation_message = _("You're about to generate %(program_type)s with a value of %(value)s for %(customer_number)i customers",
+                program_type=program_desc[wizard.program_type],
+                value=wizard.points_granted,
+                customer_number=wizard.coupon_qty,
+            )
 
     @api.depends('customer_ids', 'customer_tag_ids', 'mode')
     def _compute_coupon_qty(self):
@@ -71,5 +84,12 @@ class LoyaltyGenerateWizard(models.TransientModel):
             customers = wizard._get_partners() or range(wizard.coupon_qty)
             for partner in customers:
                 coupon_create_vals.append(wizard._get_coupon_values(partner))
-        self.env['loyalty.card'].create(coupon_create_vals)
+        coupons = self.env['loyalty.card'].create(coupon_create_vals)
+        self.env['loyalty.history'].create([
+            {
+                'description': self.description or _("Gift For Customer"),
+                'card_id': coupon.id,
+                'issued': self.points_granted,
+            } for coupon in coupons
+        ])
         return True

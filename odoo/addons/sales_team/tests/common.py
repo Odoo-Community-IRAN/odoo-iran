@@ -3,16 +3,15 @@
 
 from odoo.tests import TransactionCase
 
+from odoo.addons.base.tests.common import BaseCommon
 from odoo.addons.mail.tests.common import mail_new_test_user
-from odoo.addons.base.tests.common import DISABLED_MAIL_CONTEXT
 
-class SalesTeamCommon(TransactionCase):
+
+class SalesTeamCommon(BaseCommon):
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-
-        cls.env = cls.env['base'].with_context(**DISABLED_MAIL_CONTEXT).env
 
         cls.group_sale_salesman = cls.env.ref('sales_team.group_sale_salesman')
         cls.group_sale_manager = cls.env.ref('sales_team.group_sale_manager')

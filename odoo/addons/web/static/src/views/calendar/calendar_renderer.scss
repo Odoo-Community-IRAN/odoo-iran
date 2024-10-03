@@ -3,22 +3,34 @@
     --o-cw-border-color: #{$border-color};
 
     background-color: $o-view-background-color;
-    grid-area: cal;
 
     @include media-breakpoint-down(lg) {
         border-top: 1px solid var(--o-cw-border-color);
+    }
+
+    // Simulate the old UI (FC v4)
+    // the resizer on the bottom of the event styled with a = icon when hovered
+    .fc-timegrid-event .fc-event-resizer {
+        color: #fff;
+        text-align: center;
+        font-family: monospace;
+    }
+    .fc-timegrid-event:hover .fc-event-resizer:after {
+        content: "=";
+        display: inline-block;
+        vertical-align: top;
+        line-height: 0;
     }
 
     .fc-event {
         // `web/lib/fullcalendar/core/main.css` gives events with links and draggable events a hand mouse pointer,
         // but doesn't take into account that events have popovers.
         cursor: pointer;
-        color: $body-color;
-        background-color: $o-view-background-color;
-        transition: right .3s, left .3s;
+        --fc-event-text-color: $body-color;
+        --fc-event-bg-color: #{$o-view-background-color};
         overflow: hidden;
 
-        @include media-breakpoint-down (md) {
+        @include media-breakpoint-down(md) {
             line-height: 1.2;
         }
 
@@ -30,7 +42,7 @@
             }
         }
 
-        &.fc-mirror, &.fc-dragging {
+        &.fc-event-mirror, &.fc-dragging {
             --o-bg-opacity: .25;
             border-color: rgba($o-action, .5);
 
@@ -39,11 +51,11 @@
             }
         }
 
-        &.fc-mirror {
+        &.fc-event-mirror {
             background-color: rgba($o-action, var(--o-bg-opacity));
         }
 
-        &.o_past_event::after{
+        &.o_past_event::after {
             content: '';
             @include o-position-absolute(0, 0, 0, 0);
             display: block;
@@ -57,12 +69,17 @@
         }
 
         .fc-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
             transition: $transition-base;
         }
 
-        .fc-content {
+        .fc-event-main {
             > .o_event_title {
-                @include media-breakpoint-down(lg){
+                @include media-breakpoint-down(lg) {
                     text-overflow: unset;
                     white-space: break-spaces;
 
@@ -102,25 +119,22 @@
         }
     }
 
-    .o_calendar_widget {
-        > .fc-view-container {
-            height: 100%;
-        }
+    // Reset all link (A tag) the normal color (to override Bootstrap rule)
+    // And also override WebEditor rules
+    div.fc a {
+        color: inherit;
+    }
 
-        .fc-row .fc-widget-header {
-            padding-top: map-get($spacers, 2);
+    .o_calendar_widget {
+        // Remove background today color
+        .fc-day-today:not(.o_calendar_disabled) {
+            --fc-today-bg-color: none;
         }
 
         // ===  Adapt calendar table borders and general layout ===
         // ========================================================
-
-        th, td {
-            border-color: var(--o-cw-border-color);
-        }
-
-        .fc-time-grid .fc-slats .fc-minor td {
-            border-top-color: var(--o-cw-border-color);
-        }
+        --fc-page-bg-color: #{$o-view-background-color};
+        --fc-border-color: var(--o-cw-border-color);
 
         .fc-body > tr > .fc-widget-content {
             border-top: 0;
@@ -136,35 +150,23 @@
             background: map-get($grays, "400");
         }
 
-        .fc-head-container {
-            position: sticky;
-            top: 0;
-            z-index: $zindex-modal;
-            border-top: 0;
-            background-color: $o-view-background-color;
-
-            .fc-week-number {
-                text-align: center;
-                font-size: $o-font-size-base-smaller;
-
-                > span {
-                    display: none;
-                    padding:  map-get($spacers,1);
-                    border-radius: $border-radius;
-                    background-color: rgba($gray-200, .5);
+        .fc-scrollgrid-section-header {
+            .fc-timegrid-axis-frame.fc-scrollgrid-shrink-frame.fc-timegrid-axis-frame-liquid {
+                > a.fc-timegrid-axis-cushion.fc-scrollgrid-shrink-cushion.fc-scrollgrid-sync-inner {
+                    color: transparent;
                 }
             }
         }
 
         .fc-more-popover {
-            .fc-header {
+            .fc-popover-header {
                 padding-left: 1rem;
-                .fc-title {
+                .fc-popover-title {
                     font-weight: bold;
                 }
             }
 
-            .fc-body {
+            .fc-popover-body {
                 max-height: 500px;
                 overflow: auto;
             }
@@ -179,11 +181,10 @@
 
         // ====== Day only
         .fc-timeGridDay-view {
-            .fc-day-header {
+            .fc-col-header-cell {
                 text-align: left;
-                border: 0;
 
-                > span {
+                a {
                     gap: map-get($spacers, 1);
                     margin-left: map-get($spacers, 1);
                     margin-bottom: map-get($spacers, 1);
@@ -197,10 +198,10 @@
         // ====== Week only
 
         .fc-timeGridWeek-view {
-            .fc-day-header {
+            .fc-col-header-cell {
                 text-align: center;
 
-                > span{
+                a {
                     flex-direction: column;
                 }
 
@@ -212,31 +213,23 @@
                     }
                 }
             }
-
-            .fc-time-grid {
-                .fc-event-container {
-                    margin: 1px;
-                }
-            }
         }
 
         // ====== Both Day and Week agenda
         .fc-timeGridDay-view,
         .fc-timeGridWeek-view {
-            .fc-head-container {
-                border-bottom: 1px solid var(--o-cw-border-color);
-            }
-            .fc-day-header {
-                > span {
+            .fc-col-header-cell {
+                a {
                     display: flex;
                     align-items: center;
                 }
 
-                &.fc-today {
+                &.fc-day-today {
                     --o-cw-color: #{color-contrast($o-cw-color-today-accent)};
                     --o-cw-bg: #{$o-cw-color-today-accent};
 
                     .o_cw_day_number {
+                        z-index: 0;
                         position:relative;
                         color: var(--o-cw-color);
 
@@ -255,27 +248,25 @@
                 }
             }
 
-            .fc-time-grid .fc-slats .fc-minor td {
+            // Remove dotted borders (half-hours)
+            .fc-timegrid-slot-minor {
                 border-top-style: none;
             }
 
-            // Remove dotted borders (half-hours)
-
-
             // Align labels and timelines
-            .fc-axis{
+            .fc-timegrid-slot {
                 font-size: .6rem;
 
                 @include media-breakpoint-up(md) {
                     font-size: .75rem;
                 }
 
-                &.fc-time {
-                    border-top-color: transparent;
+                &.fc-timegrid-slot-label {
+                    border-width: 0;
 
-                    span {
-                        max-width: 7ch;
-                        margin-top: -22px;
+                    // Center the time label (vertical align to the center of the line)
+                    .fc-timegrid-slot-label-cushion {
+                        margin-top: -18px;
                         position: relative;
                         display: block;
                     }
@@ -283,45 +274,42 @@
             }
 
             // Add a small gap on top to show the first time label (0:00)
-            .fc-scroller .fc-time-grid > .fc-slats,
-            .fc-scroller .fc-time-grid > .fc-bg {
+            .fc-scroller.fc-scroller-liquid-absolute {
                 padding-top: 15px;
             }
 
             // Row containing "all day" events
-            div.fc-day-grid {
-                background-color: $o-view-background-color;
-                box-shadow: 0 6px 12px -6px rgba(0, 0, 0, 0.16);
+            .fc-timegrid-divider.fc-cell-shaded {
+                position: relative;
+                padding: 0;
 
-                + hr.fc-widget-header {
-                    padding: 1px 0 0;
-                    background: map-get($grays, "300");
-                }
-
-                .fc-day-grid-event {
-
-                    @include media-breakpoint-down(md){
-                        margin: 1px;
-
-                        .fc-content {
-                            max-height: 1.2em;
-                        }
+                @include media-only(screen) {
+                    &:after {
+                        @include o-position-absolute($border-width, 0, -15px, 0);
+                        background: linear-gradient(0deg, rgba($o-shadow-color, 0), rgba($o-shadow-color, 0.16));
+                        pointer-events: none;
+                        content: "";
                     }
                 }
+            }
 
-                .fc-content-skeleton tr:not(:first-child) .fc-h-event {
-                    margin-top: 3px;
+            @include media-breakpoint-down(md) {
+                .fc-daygrid-day .fc-daygrid-event {
+                    margin: 1px;
+
+                    .fc-event-main {
+                        max-height: 1.2em;
+                        white-space: nowrap;
+                        overflow: hidden;
+                    }
                 }
             }
+
 
             // Create a 'pseudo-border' for the first row. The actual border
             // is hidden because of border-collapse settings.
-            .fc-slats tr:first-child td.fc-widget-content:last-child {
+            .fc-scrollgrid-section-liquid tr:first-child .fc-timegrid-slot.fc-timegrid-slot-lane:last-child {
                 box-shadow: inset 0 1px 0 var(--o-cw-border-color);
-            }
-
-            .fc-day.fc-widget-content.fc-today:not(.o_calendar_disabled) {
-                background: $o-view-background-color;
             }
 
             .fc-event {
@@ -332,14 +320,7 @@
                     box-shadow: 0 0 0 1px $o-view-background-color;
                 }
 
-                &.o_cw_custom_highlight:not(.fc-dragging) {
-                    z-index: $zindex-modal !important;
-                    right: 0px !important;
-                    left: 0px !important;
-                    margin-right: 0 !important;
-                }
-
-                .fc-content {
+                .fc-event-main {
                     margin: map-get($spacers, 1);
 
                     @include media-breakpoint-up(md) {
@@ -349,16 +330,40 @@
                 }
             }
 
+            .fc-timegrid-event-harness-inset{
+                transition: right .3s, left .3s;
+
+                &:has(.fc-event.o_cw_custom_highlight:not(.fc-dragging)) {
+                    z-index: $zindex-modal !important;
+                    right: 0 !important;
+                    left: 0 !important;
+                    margin-right: 0 !important;
+                }
+            }
+
+            // Avoid pointer event on the "Now Indicator" (red line)
+            .fc-timegrid-now-indicator-line {
+                pointer-events: none;
+            }
+        }
+
+        // ====== Week only
+        .fc-timeGridWeek-view {
             // Reset position to keep the "nowIndicator" line visible
-            .fc-content-col {
-                position: initial;
+            @for $i from 1 through 7 {
+                .fc-timegrid-col:not(.fc-timegrid-axis):nth-child(#{$i + 1}) .fc-timegrid-now-indicator-container {
+                    $left: ($i - 1) * -100;
+                    $right: (7 - $i) * -100;
+                    left: #{$left + '%'};
+                    right: #{$right + '%'};
+                }
             }
         }
 
         // ====== Both Week and Month agenda
 
         .fc-timeGridWeek-view, .fc-dayGridMonth-view {
-            .fc-day-header > span{
+            .fc-col-header-cell a {
                 text-transform: uppercase;
                 font-size: $o-font-size-base-smaller;
             }
@@ -367,20 +372,31 @@
         // ====== Both Month and Months in Year agenda
 
         .fc-dayGridMonth-view {
-            .fc-content-skeleton {
-                --o-cw-circle-padding: calc(#{map-get($spacers, 1 )} / 2);
-                --o-cw-color: var(--body-color);
+            .o-fc-week-header {
+                color: transparent;
+            }
 
-                height: 100%;
-                padding-bottom: 0;
+            .o-fc-week, .o-fc-week-header {
+                line-height: $line-height-sm;
+                font-size: $o-font-size-base-smaller;
+                opacity: .5;
+                @include media-breakpoint-down(md) {
+                    width: 3ch;
+                }
+            }
 
-                .fc-week-number {
+            .fc-col-header-cell, .o-fc-week-header {
+                border-bottom: 0;
+            }
+
+            .fc-daygrid-body tr {
+                .fc-daygrid-week-number {
                     line-height: $line-height-sm;
                     font-size: $o-font-size-base-smaller;
                     opacity: .8;
 
                     @include media-breakpoint-down(lg) {
-                        > span {
+                        > a {
                             font-size: .5rem;
                         }
                     }
@@ -389,52 +405,49 @@
                         padding: map-get($spacers, 1);
                     }
                 }
+                .fc-day {
+                    .fc-daygrid-day-top {
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
 
-                .fc-day-top {
-                    text-align: center;
-
-                    &.fc-other-month {
-                        opacity: 0.8;
-
-                        &:not(.fc-today) .fc-day-number {
-                            color: map-get($grays, "500");
+                        .fc-daygrid-day-number {
+                            color: var(--o-cw-color);
                         }
                     }
-
-                    .fc-day-number {
-                        position: relative;
-                        float: none !important;
-                        color: var(--o-cw-color);
-
-
-                        &:before {
-                            content:"";
-                            z-index: -1;
-                            @include o_position-absolute($top: calc(#{var(--o-circle-padding)} * -1), $left: 50%);
-                            transform: translateX(-50%);
-                            display: none;
-                            aspect-ratio: 1/1;
-                            height: 100%;
-                            border-radius: 100%;
-                            background: var(--o-cw-bg, none);
-                            padding: var(--o-circle-padding);
-                        }
-                    }
-
-                    .fc-week-number {
+                    .fc-daygrid-week-number {
                         // only in Month view
-                        @include o-position-absolute($top: 0, $left: 0);
                         @include media-breakpoint-down(lg) {
                             background-color: $gray-100;
                         }
                     }
 
-                    &.fc-today {
+                    &.fc-day-other .fc-daygrid-day-top {
+                        opacity: 0.8;
+
+                        &:not(.fc-day-today) .fc-daygrid-day-number {
+                            --o-cw-color: #{map-get($grays, "500")};
+                        }
+                    }
+
+                    .fc-daygrid-day-number:before {
+                        content: "";
+                        z-index: -1;
+                        display: none;
+                        @include o_position-absolute($top: 0%, $left: 50%);
+                        transform: translateX(-50%);
+                        aspect-ratio: 1/1;
+                        height: 100%;
+                        border-radius: 100%;
+                        background: var(--o-cw-bg, none);
+                        padding: var(--o-circle-padding);
+                    }
+
+                    &.fc-day-today {
                         --o-cw-color: #{color-contrast($o-cw-color-today-accent)};
                         --o-cw-bg: #{$o-cw-color-today-accent};
-                        padding-top: map-get($spacers, 1)/2;
 
-                        .fc-day-number:before {
+                        .fc-daygrid-day-number:before {
                             display: block;
                         }
                     }
@@ -445,24 +458,23 @@
                 border-left: none;
             }
 
-            .fc-bg .fc-today:not(.o_calendar_disabled) {
+            .fc-bg .fc-day-today:not(.o_calendar_disabled) {
                 background: none;
             }
 
             .fc-more-cell {
-                > div,
-                .fc-more {
-                    text-align: center;
+                text-align: center;
+
+                .fc-more-link {
+                    color: $link-color;
+                    cursor: pointer;
                 }
             }
 
             .fc-event {
                 padding: 0 map-get($spacers, 1);
-                @include media-breakpoint-up(lg) {
-                    margin: 0 3px 2px;
-                }
 
-                .fc-content {
+                .fc-event-main:not(.o_homework_single):not(.o_homework_multi) {
                     display: flex;
                     justify-content: start;
                     flex-direction: row;
@@ -473,8 +485,10 @@
 
         // ====== Year only
         .fc-dayGridYear-view {
-            > table {
-                height: 100%;
+            --fc-neutral-bg-color: none;
+            flex-direction: row;
+            .fc-scroller {
+                overflow: hidden !important; // FC set its own rules inline
             }
 
             table,
@@ -485,25 +499,28 @@
             }
 
             &.fc-readonly-year-view {
-                .fc-day-top:not(.fc-has-event) {
-                    cursor: default !important;
+                .fc-daygrid-day-top:not(.fc-has-event) {
+                    &, a {
+                        cursor: default !important;
+                    }
                 }
             }
 
             &:not(.fc-readonly-year-view) {
-                .fc-day-top {
-                    &.fc-today {
+                .fc-daygrid-body tr .fc-day {
+                    &.fc-day-today {
                         padding-top: 0;
                     }
+                    .fc-daygrid-day-top {
+                        &:hover > .fc-daygrid-day-number {
+                            $-bg: mix($o-view-background-color, $o-action, 75%);
 
-                    &:hover > .fc-day-number {
-                        $-bg: mix($o-view-background-color, $o-action, 75%);
+                            --o-cw-color: #{color-contrast($-bg)};
+                            --o-cw-bg: #{$-bg};
 
-                        --o-cw-color: #{color-contrast($-bg)};
-                        --o-cw-bg: #{$-bg};
-
-                        &:before {
-                            display: block;
+                            &:before {
+                                display: block;
+                            }
                         }
                     }
                 }
@@ -550,18 +567,18 @@
                         }
                     }
 
-                    .fc-week.fc-row {
-                        display: flex;
-                        align-items: center;
-                        min-height: 2rem;
+                    .fc-daygrid-body tr {
+                        .fc-daygrid-day-frame {
+                            min-height: 2rem;
+                        }
 
-                        .fc-week-number {
-                            padding: 0;
+                        .o-fc-week {
+                            height: 100%;
+                            vertical-align: middle;
+                        }
 
-                            > span {
-                                padding: 0;
-                                vertical-align: middle;
-                            }
+                        .fc-daygrid-day-events {
+                            display: none;
                         }
                     }
 
@@ -569,7 +586,7 @@
                         background-color: unset;
                     }
 
-                    .fc-day-top {
+                    .fc-daygrid-day-top {
                         text-align: center;
                         cursor: pointer;
                     }
@@ -589,7 +606,7 @@
                     margin: 0 0 1px 5px;
                     border-width: 0 0 0 3px;
 
-                    .fc-content {
+                    .fc-event-main {
                         padding-right: 6px;
                         padding-left: 0;
                     }
@@ -598,12 +615,16 @@
                 &.fc-not-end {
                     margin: 0 5px 1px 0;
 
-                    .fc-content {
+                    .fc-event-main {
                         padding-left: 6px;
                         padding-right: 0;
                     }
                 }
             }
+        }
+        // To avoid some overlapping we set the FullCalendar More popover to a lower value
+        .fc-more-popover {
+            z-index: $zindex-modal-backdrop - 1;
         }
     }
 }
@@ -623,16 +644,20 @@
     $color: nth($o-colors-complete, $i);
     $color-subtle: mix($o-white, $color, 55%);
 
-    .o_calendar_renderer .fc-view {
+    .o_calendar_renderer {
         .o_calendar_color_#{$i - 1} {
+            --fc-event-bg-color: #{$color-subtle};
             --o-event-bg: #{$color};
             --o-event-bg--subtle-rgb: #{to-rgb($color-subtle)};
 
-            &.fc-bgevent, &:not(.o_event_dot) .fc-bg {
-                background-color: $color-subtle;
+            &.fc-bg-event {
+                --fc-bg-event-color: #{$color-subtle};
             }
 
-            &.o_event_hatched:not(.o_event_dot):not(.fc-day-grid-event):not(.fc-time-grid-event), &.o_event_hatched .fc-bg, &.o_attendee_status_tentative:not(.o_event_dot) .fc-bg {
+            &.o_event_hatched:has(.fc-bg), &.o_attendee_status_tentative:has(.fc-bg) {
+                --fc-event-bg-color: #{$o-view-background-color};
+            }
+            &.o_event_hatched:not(.o_event_dot):not(.fc-daygrid-event):not(.fc-timegrid-event), &.o_event_hatched .fc-bg, &.o_attendee_status_tentative:not(.o_event_dot) .fc-bg {
                 background: repeating-linear-gradient(
                     45deg,
                     RGBA(to-rgb($color), .3),
@@ -650,8 +675,8 @@
             }
 
             &.fc-event:not(.o_event_dot):not(.fc-dragging) {
-                color: color-contrast($color-subtle);
-                border-color: tint-color($color, 50%);
+                --fc-event-text-color: #{color-contrast($color-subtle)};
+                --fc-event-border-color: #{tint-color($color, 50%)};
             }
 
             &.o_event_dot {

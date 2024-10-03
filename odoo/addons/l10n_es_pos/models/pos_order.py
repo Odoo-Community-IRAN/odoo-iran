@@ -14,15 +14,11 @@ class PosOrder(models.Model):
             else:
                 order.l10n_es_simplified_invoice_number = False
 
-    @api.model
-    def _order_fields(self, ui_order):
-        res = super(PosOrder, self)._order_fields(ui_order)
-        if ui_order.get("is_l10n_es_simplified_invoice"):
-            res.update({"is_l10n_es_simplified_invoice": ui_order["is_l10n_es_simplified_invoice"]})
-        return res
-
     def _prepare_invoice_vals(self):
         res = super()._prepare_invoice_vals()
         if self.config_id.is_spanish and self.is_l10n_es_simplified_invoice:
             res["journal_id"] = self.config_id.l10n_es_simplified_invoice_journal_id.id
         return res
+
+    def get_invoice_name(self):
+        return self.account_move.name

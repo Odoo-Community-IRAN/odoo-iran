@@ -1,6 +1,3 @@
-/* @odoo-module */
-
-import { Record } from "@mail/core/common/record";
 import { reactive } from "@odoo/owl";
 
 import { _t } from "@web/core/l10n/translation";
@@ -17,16 +14,7 @@ export class DiscussCoreCommon {
         this.notificationService = services.notification;
         this.orm = services.orm;
         this.presence = services.presence;
-        this.rpc = services.rpc;
-        this.messageService = services["mail.message"];
-        this.messagingService = services["mail.messaging"];
         this.store = services["mail.store"];
-        this.threadService = services["mail.thread"];
-    }
-
-    /** @returns {import("models").Thread} */
-    insertInitChannel(data) {
-        return this.createChannelThread(data);
     }
 
     setup() {
@@ -39,151 +27,72 @@ export class DiscussCoreCommon {
                 }),
             { once: true }
         );
-        this.messagingService.isReady.then((data) => {
-            Record.MAKE_UPDATE(() => {
-                for (const channelData of data.channels) {
-                    this.insertInitChannel(channelData);
-                }
-            });
-            this.busService.subscribe("discuss.channel/joined", (payload) => {
-                const { channel, invited_by_user_id: invitedByUserId } = payload;
-                const thread = this.store.Thread.insert({
-                    ...channel,
-                    model: "discuss.channel",
-                    type: channel.channel_type,
-                });
-                if (invitedByUserId && invitedByUserId !== this.store.user?.user?.id) {
-                    this.notificationService.add(
-                        _t("You have been invited to #%s", thread.displayName),
-                        { type: "info" }
-                    );
-                }
-            });
-            this.busService.subscribe("discuss.channel/last_interest_dt_changed", (payload) => {
-                this.store.Thread.insert({ model: "discuss.channel", ...payload });
-            });
-            this.busService.subscribe("discuss.channel/leave", (payload) => {
-                const thread = this.store.Thread.insert({
-                    ...payload,
-                    model: "discuss.channel",
-                });
+        this.busService.subscribe("discuss.channel/leave", (payload) => {
+            const { Thread } = this.store.insert(payload);
+            const [thread] = Thread;
+            if (thread.notifyOnLeave) {
                 this.notificationService.add(_t("You unsubscribed from %s.", thread.displayName), {
                     type: "info",
                 });
-                thread.delete();
+            }
+        });
+        this.busService.subscribe("discuss.channel/delete", (payload, metadata) => {
+            const thread = this.store.Thread.insert({
+                id: payload.id,
+                model: "discuss.channel",
             });
-            this.busService.subscribe("discuss.channel/delete", (payload) => {
-                const thread = this.store.Thread.insert({
-                    id: payload.id,
-                    model: "discuss.channel",
-                });
-                const filteredStarredMessages = [];
-                let starredCounter = 0;
-                for (const msg of this.store.discuss.starred.messages) {
-                    if (!msg.originThread?.eq(thread)) {
-                        filteredStarredMessages.push(msg);
-                    } else {
-                        starredCounter++;
-                    }
-                }
-                this.store.discuss.starred.messages = filteredStarredMessages;
-                this.store.discuss.starred.counter -= starredCounter;
-                this.store.discuss.inbox.messages = this.store.discuss.inbox.messages.filter(
-                    (msg) => !msg.originThread?.eq(thread)
+            this._handleNotificationChannelDelete(thread, metadata);
+        });
+        this.busService.subscribe("discuss.channel/new_message", (payload, metadata) =>
+            this._handleNotificationNewMessage(payload, metadata)
+        );
+        this.busService.subscribe("discuss.channel/transient_message", (payload) => {
+            const { body, thread } = payload;
+            const lastMessageId = this.store.getLastMessageId();
+            const message = this.store.Message.insert(
+                {
+                    author: this.store.odoobot,
+                    body,
+                    id: lastMessageId + 0.01,
+                    is_note: true,
+                    is_transient: true,
+                    thread,
+                },
+                { html: true }
+            );
+            message.thread.messages.push(message);
+            message.thread.transientMessages.push(message);
+        });
+        this.busService.subscribe("discuss.channel/unpin", (payload) => {
+            const thread = this.store.Thread.get({ model: "discuss.channel", id: payload.id });
+            if (thread) {
+                thread.is_pinned = false;
+                this.notificationService.add(
+                    _t("You unpinned your conversation with %s", thread.displayName),
+                    { type: "info" }
                 );
-                this.store.discuss.inbox.counter -= thread.message_needaction_counter;
-                this.store.discuss.history.messages = this.store.discuss.history.messages.filter(
-                    (msg) => !msg.originThread?.eq(thread)
-                );
-                this.threadService.closeChatWindow?.(thread);
-                if (thread.eq(this.store.discuss.thread)) {
-                    this.threadService.setDiscussThread(this.store.discuss.inbox);
-                }
-                thread.messages.splice(0, thread.messages.length);
-                thread.delete();
-            });
-            this.busService.addEventListener("notification", ({ detail: notifications }) => {
-                // Do not handle new message notification if the channel was just left. This issue
-                // occurs because the "discuss.channel/leave" and the "discuss.channel/new_message"
-                // notifications come from the bus as a batch.
-                const channelsLeft = new Set(
-                    notifications
-                        .filter(({ type }) => type === "discuss.channel/leave")
-                        .map(({ payload }) => payload.id)
-                );
-                for (const notif of notifications.filter(
-                    ({ payload, type }) =>
-                        type === "discuss.channel/new_message" && !channelsLeft.has(payload.id)
-                )) {
-                    this._handleNotificationNewMessage(notif);
-                }
-            });
-            this.busService.subscribe("discuss.channel/transient_message", (payload) => {
-                const channel = this.store.Thread.get({
-                    model: "discuss.channel",
-                    id: payload.res_id,
-                });
-                const { body, res_id, model } = payload;
-                const lastMessageId = this.messageService.getLastMessageId();
-                const message = this.store.Message.insert(
-                    {
-                        author: this.store.odoobot,
-                        body,
-                        id: lastMessageId + 0.01,
-                        is_note: true,
-                        is_transient: true,
-                        res_id,
-                        model,
-                    },
-                    { html: true }
-                );
-                channel.messages.push(message);
-                channel.transientMessages.push(message);
-            });
-            this.busService.subscribe("discuss.channel/unpin", (payload) => {
-                const thread = this.store.Thread.get({ model: "discuss.channel", id: payload.id });
-                if (thread) {
-                    thread.is_pinned = false;
-                    this.notificationService.add(
-                        _t("You unpinned your conversation with %s", thread.displayName),
-                        { type: "info" }
-                    );
-                }
-            });
-            this.busService.subscribe("discuss.channel.member/fetched", (payload) => {
-                const { channel_id, id, last_message_id, partner_id } = payload;
-                this.store.ChannelMember.insert({
-                    id,
-                    lastFetchedMessage: { id: last_message_id },
-                    persona: { type: "partner", id: partner_id },
-                    thread: { id: channel_id, model: "discuss.channel" },
-                });
-            });
-            this.env.bus.addEventListener("mail.message/delete", ({ detail: { message } }) => {
-                if (message.originThread) {
-                    if (message.id > message.originThread.seen_message_id) {
-                        message.originThread.message_unread_counter--;
-                    }
-                }
+            }
+        });
+        this.busService.subscribe("discuss.channel.member/fetched", (payload) => {
+            const { channel_id, id, last_message_id, partner_id } = payload;
+            this.store.ChannelMember.insert({
+                id,
+                fetched_message_id: { id: last_message_id },
+                persona: { type: "partner", id: partner_id },
+                thread: { id: channel_id, model: "discuss.channel" },
             });
         });
-    }
-
-    /**
-     * todo: merge this with store.Thread.insert() (?)
-     *
-     * @returns {Thread}
-     */
-    createChannelThread(serverData) {
-        const thread = this.store.Thread.insert({
-            ...serverData,
-            model: "discuss.channel",
-            type: serverData.channel_type,
-            isAdmin:
-                serverData.channel_type !== "group" &&
-                serverData.create_uid === this.store.user?.user?.id,
+        this.env.bus.addEventListener("mail.message/delete", ({ detail: { message, notifId } }) => {
+            if (message.thread) {
+                const { selfMember } = message.thread;
+                if (
+                    message.id > selfMember?.seen_message_id.id &&
+                    notifId > selfMember.message_unread_counter_bus_id
+                ) {
+                    selfMember.message_unread_counter--;
+                }
+            }
         });
-        return thread;
     }
 
     async createGroupChat({ default_display_mode, partners_to }) {
@@ -191,91 +100,105 @@ export class DiscussCoreCommon {
             default_display_mode,
             partners_to,
         });
-        const channel = this.createChannelThread(data);
-        this.threadService.open(channel);
+        const { Thread } = this.store.insert(data);
+        const [channel] = Thread;
+        channel.open();
         return channel;
     }
 
-    /**
-     * @param {[number]} partnerIds
-     * @param {boolean} inChatWindow
-     */
-    async startChat(partnerIds, inChatWindow) {
+    /** @param {[number]} partnerIds */
+    async startChat(partnerIds) {
         const partners_to = [...new Set([this.store.self.id, ...partnerIds])];
         if (partners_to.length === 1) {
-            const chat = await this.threadService.joinChat(partners_to[0]);
-            this.threadService.open(chat, inChatWindow);
+            const chat = await this.store.joinChat(partners_to[0], true);
+            this.store.ChatWindow?.get({ thread: undefined })?.close();
+            chat.open();
         } else if (partners_to.length === 2) {
             const correspondentId = partners_to.find(
                 (partnerId) => partnerId !== this.store.self.id
             );
-            const chat = await this.threadService.joinChat(correspondentId);
-            this.threadService.open(chat, inChatWindow);
+            const chat = await this.store.joinChat(correspondentId, true);
+            chat.open();
         } else {
             await this.createGroupChat({ partners_to });
         }
     }
 
-    async _handleNotificationNewMessage(notif) {
-        const { id, message: messageData } = notif.payload;
-        let channel = this.store.Thread.get({ model: "discuss.channel", id });
-        if (!channel || !channel.type) {
-            channel = await this.threadService.fetchChannel(id);
-            if (!channel) {
-                return;
-            }
+    /**
+     * @param {import("models").Thread} thread
+     * @param {{ notifId: number}} metadata
+     */
+    _handleNotificationChannelDelete(thread, metadata) {
+        thread.closeChatWindow();
+        thread.messages.splice(0, thread.messages.length);
+        thread.delete();
+    }
+
+    async _handleNotificationNewMessage(payload, { id: notifId }) {
+        const { data, id: channelId, temporary_id } = payload;
+        const channel = await this.store.Thread.getOrFetch({
+            model: "discuss.channel",
+            id: channelId,
+        });
+        if (!channel) {
+            return;
         }
-        this.store.Message.get(messageData.temporary_id)?.delete();
-        messageData.temporary_id = null;
-        const message = this.store.Message.insert(messageData, { html: true });
+        const { Message: messages = [] } = this.store.insert(data, { html: true });
+        const message = messages[0];
         if (message.notIn(channel.messages)) {
             if (!channel.loadNewer) {
-                channel.messages.push(message);
+                channel.addOrReplaceMessage(message, this.store.Message.get(temporary_id));
             } else if (channel.status === "loading") {
                 channel.pendingNewMessages.push(message);
             }
-            if (message.isSelfAuthored) {
-                channel.seen_message_id = message.id;
+            if (message.isSelfAuthored && channel.selfMember) {
+                channel.selfMember.seen_message_id = message;
             } else {
-                if (notif.id > channel.message_unread_counter_bus_id) {
-                    channel.message_unread_counter++;
+                if (!channel.isDisplayed && channel.selfMember) {
+                    channel.selfMember.syncUnread = true;
+                    channel.scrollUnread = true;
+                }
+                if (notifId > channel.selfMember?.message_unread_counter_bus_id) {
+                    channel.selfMember.message_unread_counter++;
                 }
             }
         }
         if (
-            !channel.chatPartner?.eq(this.store.odoobot) &&
-            channel.type !== "channel" &&
-            this.store.user
+            !channel.isCorrespondentOdooBot &&
+            channel.channel_type !== "channel" &&
+            this.store.self.type === "partner"
         ) {
             // disabled on non-channel threads and
             // on "channel" channels for performance reasons
-            this.threadService.markAsFetched(channel);
+            channel.markAsFetched();
         }
         if (
             !channel.loadNewer &&
             !message.isSelfAuthored &&
             channel.composer.isFocused &&
-            !this.store.guest &&
+            this.store.self.type === "partner" &&
             channel.newestPersistentMessage?.eq(channel.newestMessage)
         ) {
-            this.threadService.markAsRead(channel);
+            channel.markAsRead();
         }
         this.env.bus.trigger("discuss.channel/new_message", { channel, message });
+        const authorMember = channel.channelMembers.find(({ persona }) =>
+            persona?.eq(message.author)
+        );
+        if (authorMember) {
+            authorMember.seen_message_id = message;
+        }
     }
 }
 
 export const discussCoreCommon = {
     dependencies: [
         "bus_service",
-        "mail.message",
-        "mail.messaging",
         "mail.out_of_focus",
         "mail.store",
-        "mail.thread",
         "notification",
         "orm",
         "presence",
-        "rpc",
     ],
     /**
      * @param {import("@web/env").OdooEnv} env

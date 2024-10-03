@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { Component } from "@odoo/owl";
 import { AutoComplete } from "@web/core/autocomplete/autocomplete";
 import { _t } from "@web/core/l10n/translation";
@@ -94,6 +92,7 @@ export class RecordAutocomplete extends Component {
         this.addDialog(SelectCreateDialog, {
             title: _t("Search: %s", fieldString),
             dynamicFilters,
+            domain: this.getDomain(),
             resModel,
             noCreate: true,
             multiSelect,

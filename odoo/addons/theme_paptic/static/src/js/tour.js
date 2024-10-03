@@ -1,43 +1,54 @@
 /** @odoo-module */
 
-import wTourUtils from '@website/js/tours/tour_utils';
+import * as wTourUtils from '@website/js/tours/tour_utils';
 
 const snippets = [
     {
         id: 's_cover',
         name: 'Cover',
-    },
-    {
-        id: 's_image_text',
-        name: 'Image - Text',
+        groupName: "Intro",
     },
     {
         id: 's_references',
         name: 'References',
+        groupName: "People",
     },
     {
-        id: 's_three_columns',
-        name: 'Columns',
+        id: 's_image_text',
+        name: 'Image - Text',
+        groupName: "Content",
     },
     {
-        id: 's_comparisons',
-        name: 'Comparisons',
+        id: 's_text_image',
+        name: 'Text - Image',
+        groupName: "Content",
     },
     {
-        id: 's_call_to_action',
-        name: 'Call to Action',
+        id: 's_masonry_block',
+        name: 'Masonry',
+        groupName: "Images",
+    },
+    {
+        id: 's_faq_list',
+        name: 'FAQ List',
+        groupName: "Text",
+    },
+    {
+        id: 's_cta_box',
+        name: 'CTA Box',
+        groupName: "Content",
     },
 ];
 
 
 wTourUtils.registerThemeHomepageTour("paptic_tour", () => [
-    wTourUtils.assertCssVariable('--color-palettes-name', '"paptic-1"'),
-    wTourUtils.dragNDrop(snippets[0], 'top'),
-    wTourUtils.clickOnText(snippets[0], 'h1', 'top'),
+    wTourUtils.assertCssVariable('--color-palettes-name', '"base-2"'),
+    ...wTourUtils.insertSnippet(snippets[0], 'top'),
+    ...wTourUtils.clickOnText(snippets[0], 'h1', 'top'),
     wTourUtils.goBackToBlocks(),
-    wTourUtils.dragNDrop(snippets[1], 'top'),
-    wTourUtils.dragNDrop(snippets[2], 'top'),
-    wTourUtils.dragNDrop(snippets[3], 'top'),
-    wTourUtils.dragNDrop(snippets[4], 'top'),
-    wTourUtils.dragNDrop(snippets[5], 'top'),
+    ...wTourUtils.insertSnippet(snippets[1], 'top'),
+    ...wTourUtils.insertSnippet(snippets[2], 'top'),
+    ...wTourUtils.insertSnippet(snippets[3], 'top'),
+    ...wTourUtils.insertSnippet(snippets[4], 'top'),
+    ...wTourUtils.insertSnippet(snippets[5], 'top'),
 ]);

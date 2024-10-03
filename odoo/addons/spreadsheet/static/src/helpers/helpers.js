@@ -1,4 +1,5 @@
 /** @odoo-module */
+// @ts-check
 
 /**
  * Get the intersection of two arrays
@@ -11,25 +12,6 @@
  */
 export function intersect(a, b) {
     return a.filter((x) => b.includes(x));
-}
-
-/**
- * Given an object of form {"1": {...}, "2": {...}, ...} get the maximum ID used
- * in this object
- * If the object has no keys, return 0
- *
- * @param {Object} o an object for which the keys are an ID
- *
- * @returns {number}
- */
-export function getMaxObjectId(o) {
-    const keys = Object.keys(o);
-    if (!keys.length) {
-        return 0;
-    }
-    const nums = keys.map((id) => parseInt(id, 10));
-    const max = Math.max(...nums);
-    return max;
 }
 
 /**
@@ -51,6 +33,9 @@ export function sum(array) {
     return array.reduce((acc, n) => acc + n, 0);
 }
 
+/**
+ * @param {string} word
+ */
 function camelToSnakeKey(word) {
     const result = word.replace(/(.){1}([A-Z])/g, "$1 $2");
     return result.split(" ").join("_").toLowerCase();
@@ -90,6 +75,9 @@ export function isEmpty(item) {
     return false;
 }
 
+/**
+ * @param {import("@odoo/o-spreadsheet").Cell} cell
+ */
 export function containsReferences(cell) {
     if (!cell.isFormula) {
         return false;

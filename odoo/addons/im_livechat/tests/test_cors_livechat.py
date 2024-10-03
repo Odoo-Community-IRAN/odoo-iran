@@ -26,7 +26,7 @@ class TestCorsLivechat(HttpCase):
 
     def test_ignore_user_cookie(self):
         self.authenticate("admin", "admin")
-        channel_info = self.make_jsonrpc_request(
+        data = self.make_jsonrpc_request(
             "/im_livechat/cors/get_session",
             {
                 "anonymous_name": "Visitor",
@@ -34,14 +34,14 @@ class TestCorsLivechat(HttpCase):
                 "persisted": True,
             },
         )
-        channel = self.env["discuss.channel"].browse(channel_info["id"])
+        channel = self.env["discuss.channel"].browse(data["discuss.channel"][0]["id"])
         self.assertEqual(channel.channel_member_ids[0].partner_id, self.operator.partner_id)
         self.assertFalse(channel.channel_member_ids[1].partner_id)
         self.assertTrue(channel.channel_member_ids[1].guest_id)
 
     def test_ignore_guest_cookie(self):
         guest = self.env["mail.guest"].create({"name": "Visitor"})
-        channel_info = self.make_jsonrpc_request(
+        data = self.make_jsonrpc_request(
             "/im_livechat/cors/get_session",
             {
                 "anonymous_name": "Visitor",
@@ -50,12 +50,12 @@ class TestCorsLivechat(HttpCase):
             },
             headers={"Cookie": f"{guest._cookie_name}={guest.id}{guest._cookie_separator}{guest.access_token};"},
         )
-        channel = self.env["discuss.channel"].browse(channel_info["id"])
+        channel = self.env["discuss.channel"].browse(data["discuss.channel"][0]["id"])
         channel_guest = channel.channel_member_ids.filtered(lambda member: member.guest_id).guest_id
         self.assertNotEqual(channel_guest, guest)
 
     def test_access_routes_with_valid_guest_token(self):
-        channel_info = self.make_jsonrpc_request(
+        data = self.make_jsonrpc_request(
             "/im_livechat/cors/get_session",
             {
                 "anonymous_name": "Visitor",
@@ -67,13 +67,13 @@ class TestCorsLivechat(HttpCase):
         self.make_jsonrpc_request(
             "/im_livechat/cors/channel/messages",
             {
-                "guest_token": channel_info["guest_token"],
-                "channel_id": channel_info["id"],
+                "guest_token": data["Store"]["guest_token"],
+                "channel_id": data["discuss.channel"][0]["id"],
             },
         )
 
     def test_access_denied_for_wrong_channel(self):
-        channel_info = self.make_jsonrpc_request(
+        data = self.make_jsonrpc_request(
             "/im_livechat/cors/get_session",
             {
                 "anonymous_name": "Visitor",
@@ -88,6 +88,6 @@ class TestCorsLivechat(HttpCase):
                 "/im_livechat/cors/channel/messages",
                 {
                     "guest_token": guest.access_token,
-                    "channel_id": channel_info["id"],
+                    "channel_id": data["discuss.channel"][0]["id"],
                 },
             )

@@ -6,18 +6,19 @@ from odoo import fields, models
 class ResCompany(models.Model):
     _inherit = "res.company"
 
-    expense_product_id = fields.Many2one(
-        "product.product",
-        string="Default Expense Category",
-        check_company=True,
-        domain="[('can_be_expensed', '=', True)]",
-    )
     expense_journal_id = fields.Many2one(
         "account.journal",
         string="Default Expense Journal",
         check_company=True,
         domain="[('type', '=', 'purchase')]",
         help="The company's default journal used when an employee expense is created.",
+    )
+    expense_outstanding_account_id = fields.Many2one(
+        "account.account",
+        string="Outstanding Account",
+        check_company=True,
+        domain="[('account_type', '=', 'asset_current'), ('reconcile', '=', True)]",
+        help="The account used to record the outstanding amount of the employee expenses.",
     )
     company_expense_allowed_payment_method_line_ids = fields.Many2many(
         "account.payment.method.line",

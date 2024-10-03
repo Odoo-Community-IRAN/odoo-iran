@@ -1,7 +1,6 @@
-/** @odoo-module */
-
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
+import { exprToBoolean } from "@web/core/utils/strings";
 import { combineModifiers } from "@web/model/relational_model/utils";
 
 export const X2M_TYPES = ["one2many", "many2many"];
@@ -20,8 +19,10 @@ export const BUTTON_CLICK_PARAMS = [
     "name",
     "type",
     "args",
+    "block-ui", // Blocks UI with a spinner until the action is done
     "context",
     "close",
+    "cancel-label",
     "confirm",
     "confirm-title",
     "confirm-label",
@@ -35,19 +36,6 @@ export const BUTTON_CLICK_PARAMS = [
     // This should be refactor someday
     "noSaveDialog",
 ];
-
-/**
- * Parse the arch to check if is true or false
- * If the string is empty, 0, False or false it's considered as false
- * The rest is considered as true
- *
- * @param {string} str
- * @param {boolean} [trueIfEmpty=false]
- * @returns {boolean}
- */
-export function archParseBoolean(str, trueIfEmpty = false) {
-    return str ? !/^false|0$/i.test(str) : trueIfEmpty;
-}
 
 /**
  * @param {string?} type
@@ -86,12 +74,17 @@ export function computeViewClassName(viewType, rootNode, additionalClassList = [
  * @param {string[]} activeMeasures
  * @returns {Object}
  */
-export const computeReportMeasures = (fields, fieldAttrs, activeMeasures) => {
+export const computeReportMeasures = (
+    fields,
+    fieldAttrs,
+    activeMeasures,
+    { sumAggregatorOnly = false } = {}
+) => {
     const measures = {
         __count: { name: "__count", string: _t("Count"), type: "integer" },
     };
     for (const [fieldName, field] of Object.entries(fields)) {
-        if (fieldName === "id" || !field.store) {
+        if (fieldName === "id") {
             continue;
         }
         const { isInvisible } = fieldAttrs[fieldName] || {};
@@ -100,7 +93,8 @@ export const computeReportMeasures = (fields, fieldAttrs, activeMeasures) => {
         }
         if (
             ["integer", "float", "monetary"].includes(field.type) &&
-            field.group_operator !== undefined
+            ((sumAggregatorOnly && field.aggregator === "sum") ||
+                (!sumAggregatorOnly && field.aggregator))
         ) {
             measures[fieldName] = field;
         }
@@ -136,21 +130,20 @@ export const computeReportMeasures = (fields, fieldAttrs, activeMeasures) => {
 };
 
 /**
- * @param {String} fieldName
- * @param {Object} rawAttrs
  * @param {Record} record
+ * @param {String} fieldName
+ * @param {Object} [fieldInfo]
  * @returns {String}
  */
-export function getFormattedValue(record, fieldName, attrs) {
+export function getFormattedValue(record, fieldName, fieldInfo = null) {
     const field = record.fields[fieldName];
     const formatter = registry.category("formatters").get(field.type, (val) => val);
-    const formatOptions = {
-        escape: false,
-        data: record.data,
-        isPassword: "password" in attrs,
-        digits: attrs.digits ? JSON.parse(attrs.digits) : field.digits,
-        field: record.fields[fieldName],
-    };
+    const formatOptions = {};
+    if (fieldInfo && formatter.extractOptions) {
+        Object.assign(formatOptions, formatter.extractOptions(fieldInfo));
+    }
+    formatOptions.data = record.data;
+    formatOptions.field = field;
     return record.data[fieldName] !== undefined
         ? formatter(record.data[fieldName], formatOptions)
         : "";
@@ -163,12 +156,12 @@ export function getFormattedValue(record, fieldName, attrs) {
 export function getActiveActions(rootNode) {
     const activeActions = {
         type: "view",
-        edit: archParseBoolean(rootNode.getAttribute("edit"), true),
-        create: archParseBoolean(rootNode.getAttribute("create"), true),
-        delete: archParseBoolean(rootNode.getAttribute("delete"), true),
+        edit: exprToBoolean(rootNode.getAttribute("edit"), true),
+        create: exprToBoolean(rootNode.getAttribute("create"), true),
+        delete: exprToBoolean(rootNode.getAttribute("delete"), true),
     };
     activeActions.duplicate =
-        activeActions.create && archParseBoolean(rootNode.getAttribute("duplicate"), true);
+        activeActions.create && exprToBoolean(rootNode.getAttribute("duplicate"), true);
     return activeActions;
 }
 
@@ -220,13 +213,16 @@ export function isNull(value) {
 
 export function processButton(node) {
     const withDefault = {
-        close: (val) => archParseBoolean(val, false),
+        close: (val) => exprToBoolean(val, false),
         context: (val) => val || "{}",
     };
     const clickParams = {};
+    const attrs = {};
     for (const { name, value } of node.attributes) {
         if (BUTTON_CLICK_PARAMS.includes(name)) {
             clickParams[name] = withDefault[name] ? withDefault[name](value) : value;
+        } else if (name === "data-hotkey") {
+            attrs[name] = value;
         }
     }
     return {
@@ -246,6 +242,7 @@ export function processButton(node) {
         ),
         readonly: node.getAttribute("readonly"),
         required: node.getAttribute("required"),
+        attrs,
     };
 }
 

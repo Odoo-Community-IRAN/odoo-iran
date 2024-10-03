@@ -12,8 +12,9 @@ from odoo.tools import file_open
 class TestAccountEdiUblCii(AccountTestInvoicingCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref=None):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.company_data_2 = cls.setup_other_company()
 
         cls.uom_units = cls.env.ref('uom.product_uom_unit')
         cls.uom_dozens = cls.env.ref('uom.product_uom_dozen')
@@ -63,7 +64,7 @@ class TestAccountEdiUblCii(AccountTestInvoicingCommon):
         company.phone = '+33499999999'
         company.zip = '78440'
 
-        company.partner_id.ubl_cii_format = 'facturx'
+        company.partner_id.with_company(company).invoice_edi_format = 'facturx'
         company.partner_id.bank_ids = [Command.create({
             'acc_number': '999999',
             'partner_id': company.partner_id.id,
@@ -79,15 +80,11 @@ class TestAccountEdiUblCii(AccountTestInvoicingCommon):
         })
         invoice.action_post()
 
-        template = self.env.ref('account.email_template_edi_invoice', raise_if_not_found=False)
-        print_wiz = self.env['account.move.send'].create({
-            'move_ids': invoice.ids,
-            'mail_template_id': template.id
+        print_wiz = self.env['account.move.send.wizard'].create({
+            'move_id': invoice.id,
+            'sending_methods': ['manual'],
         })
-        print_wiz.checkbox_download = False
-        print_wiz.checkbox_send_mail = False
-        print_wiz.checkbox_send_by_post = False
-        print_wiz.checkbox_ubl_cii_xml = True
+        self.assertEqual(print_wiz.invoice_edi_format, 'facturx')
         print_wiz.action_send_and_print()
 
         facturx_attachment = invoice.ubl_cii_xml_id
@@ -99,7 +96,6 @@ class TestAccountEdiUblCii(AccountTestInvoicingCommon):
 
         facturx_attachment.raw = etree.tostring(xml_tree)
         new_invoice = invoice.journal_id._create_document_from_attachment(facturx_attachment.ids)
-
         self.assertRecordValues(new_invoice.invoice_line_ids, line_vals)
 
     def test_import_tax_prediction(self):

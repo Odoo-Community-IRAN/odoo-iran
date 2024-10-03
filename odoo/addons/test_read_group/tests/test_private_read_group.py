@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 from odoo import fields
-from odoo.tests import common
+from odoo.tests import common, new_test_user
 from odoo import Command
 
-
 class TestPrivateReadGroup(common.TransactionCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.base_user = new_test_user(cls.env, login='Base User', groups='base.group_user')
 
     def test_simple_private_read_group(self):
         Model = self.env['test_read_group.aggregate']
@@ -351,7 +355,7 @@ class TestPrivateReadGroup(common.TransactionCase):
         with self.assertRaises(ValueError):
             Model._read_group([], aggregates=['label:sum(value)'])
 
-        with self.assertWarns(Warning):
+        with self.assertRaises(ValueError):
             Model._read_group([], aggregates=['order_id.create_date:min'])
 
         # Test malformed having clause
@@ -451,6 +455,56 @@ class TestPrivateReadGroup(common.TransactionCase):
             (False, 1),
             (fields.Date.to_date('2023-01-01'), 1),
             (fields.Date.to_date('2022-01-01'), 6),
+        ])
+
+        # order param not in the aggregate
+        result = Model._read_group([], ['date:year'], [], order="__count, date:year")
+        self.assertEqual(result, [
+            (fields.Date.to_date('2023-01-01'),),
+            (False,),
+            (fields.Date.to_date('2022-01-01'),),
+        ])
+
+    def test_groupby_date_part_number(self):
+        """ Test grouping by date part number (ex. month_number gives 1 for January) """
+        Model = self.env['test_read_group.fill_temporal']
+        Model.create({})  # Falsy date
+        Model.create({'date': '2022-01-29'})  # W4, M1, Q1
+        Model.create({'date': '2022-01-29'})  # W4, M1, Q1
+        Model.create({'date': '2022-01-30'})  # W4, M1, Q1
+        Model.create({'date': '2022-01-31'})  # W5, M1, Q1
+        Model.create({'date': '2022-02-01'})  # W5, M2, Q1
+        Model.create({'date': '2022-05-29'})  # W21, M5, Q2
+        Model.create({'date': '2023-01-29'})  # W4, M1, Q1
+
+        result = Model._read_group([], ['date:iso_week_number'], ['__count'])
+        self.assertEqual(result, [
+            (4, 4),  # week 4 has 4 records
+            (5, 2),  # week 5 has 2 records
+            (21, 1),  # week 21 has 1 record
+            (False, 1),
+        ])
+
+        result = Model._read_group([], ['date:month_number'], ['__count'])
+        self.assertEqual(result, [
+            (1, 5),  # month 1 has 5 records
+            (2, 1),  # month 2 has 1 record
+            (5, 1),  # month 5 has 1 record
+            (False, 1),
+        ])
+
+        result = Model._read_group([], ['date:quarter_number'], ['__count'])
+        self.assertEqual(result, [
+            (1, 6),  # quarter 1 has 6 records
+            (2, 1),  # quarter 2 has 1 record
+            (False, 1),
+        ])
+
+        result = Model._read_group([], ['date:quarter_number'], ['__count'], order="date:quarter_number DESC")
+        self.assertEqual(result, [
+            (False, 1),
+            (2, 1),
+            (1, 6),
         ])
 
     def test_groupby_datetime(self):
@@ -693,6 +747,12 @@ class TestPrivateReadGroup(common.TransactionCase):
             ],
         )
 
+    def test_float_aggregate(self):
+        records = self.env['test_read_group.aggregate'].create({'numeric_value': 42.42})
+        [[result]] = records._read_group([('id', 'in', records.ids)], [], ['numeric_value:array_agg'])
+        self.assertIsInstance(result, list)
+        self.assertIsInstance(result[0], float)
+
     def test_order_by_many2one_id(self):
         # ordering by a many2one ordered itself by id does not use useless join
         expected_query = '''
@@ -709,3 +769,246 @@ class TestPrivateReadGroup(common.TransactionCase):
             self.env["test_read_group.order.line"].read_group(
                 [], ["order_id"], "order_id", orderby="order_id DESC"
             )
+
+    def test_related(self):
+        RelatedBar = self.env['test_read_group.related_bar']
+        RelatedFoo = self.env['test_read_group.related_foo']
+        RelatedBase = self.env['test_read_group.related_base']
+
+        bars = RelatedBar.create([
+            {'name': 'bar_a'},
+            {'name': False},
+        ])
+
+        foos = RelatedFoo.create([
+            {'name': 'foo_a_bar_a', 'bar_id': bars[0].id},
+            {'name': 'foo_b_bar_false', 'bar_id': bars[1].id},
+            {'name': False, 'bar_id': bars[0].id},
+            {'name': False},
+        ])
+
+        RelatedBase.create([
+            {'name': 'base_foo_a_1', 'foo_id': foos[0].id},
+            {'name': 'base_foo_a_2', 'foo_id': foos[0].id},
+            {'name': 'base_foo_b_bar_false', 'foo_id': foos[1].id},
+            {'name': 'base_false_foo_bar_a', 'foo_id': foos[2].id},
+            {'name': 'base_false_foo', 'foo_id': foos[3].id},
+        ])
+
+        # env.su => false
+        RelatedBase = RelatedBase.with_user(self.base_user)
+
+        field_info = RelatedBase.fields_get(
+            ['foo_id_name', 'foo_id_name_sudo', 'foo_id_bar_id_name', 'foo_id_bar_name', 'foo_id_bar_name_sudo'],
+            ['groupable', 'aggregator'],
+        )
+        self.assertFalse(field_info['foo_id_name']['groupable'])
+        self.assertNotIn('aggregator', field_info['foo_id_name'])
+
+        self.assertTrue(field_info['foo_id_name_sudo']['groupable'])
+        self.assertNotIn('aggregator', field_info['foo_id_name_sudo'])
+
+        self.assertTrue(field_info['foo_id_bar_id_name']['groupable'])
+        self.assertEqual(field_info['foo_id_bar_id_name']['aggregator'], 'count_distinct')
+
+        self.assertTrue(field_info['foo_id_bar_name']['groupable'])
+        self.assertEqual(field_info['foo_id_bar_name']['aggregator'], 'count_distinct')
+
+        self.assertTrue(field_info['foo_id_bar_name_sudo']['groupable'])
+        self.assertEqual(field_info['foo_id_bar_name_sudo']['aggregator'], 'count_distinct')
+
+        RelatedBase._read_group([], ['foo_id_name_sudo'], ['__count'])
+        with self.assertQueries(["""
+            SELECT "test_read_group_related_base__foo_id"."name",
+                    COUNT(*)
+            FROM "test_read_group_related_base"
+            LEFT JOIN "test_read_group_related_foo" AS "test_read_group_related_base__foo_id"
+                ON ("test_read_group_related_base"."foo_id" = "test_read_group_related_base__foo_id"."id")
+            GROUP BY "test_read_group_related_base__foo_id"."name"
+            ORDER BY "test_read_group_related_base__foo_id"."name" ASC
+        """]):
+            self.assertEqual(
+                RelatedBase._read_group([], ['foo_id_name_sudo'], ['__count']),
+                [('foo_a_bar_a', 2), ('foo_b_bar_false', 1), (False, 2)],
+            )
+
+        # Same query generated by grouping foo_id_bar_id_name/foo_id_bar_name/foo_id_bar_name_sudo
+        foo_bar_name_query = """
+            SELECT "test_read_group_related_base__foo_id__bar_id"."name",
+                    COUNT(*)
+            FROM "test_read_group_related_base"
+            LEFT JOIN "test_read_group_related_foo" AS "test_read_group_related_base__foo_id"
+                ON ("test_read_group_related_base"."foo_id" = "test_read_group_related_base__foo_id"."id")
+            LEFT JOIN "test_read_group_related_bar" AS "test_read_group_related_base__foo_id__bar_id"
+                ON ("test_read_group_related_base__foo_id"."bar_id" = "test_read_group_related_base__foo_id__bar_id"."id")
+            GROUP BY "test_read_group_related_base__foo_id__bar_id"."name"
+            ORDER BY "test_read_group_related_base__foo_id__bar_id"."name" ASC
+        """
+
+        with self.assertQueries([foo_bar_name_query] * 3):
+            self.assertEqual(
+                RelatedBase._read_group([], ['foo_id_bar_id_name'], ['__count']),
+                [('bar_a', 3), (False, 2)],
+            )
+            RelatedBase._read_group([], ['foo_id_bar_name'], ['__count'])
+            RelatedBase._read_group([], ['foo_id_bar_name_sudo'], ['__count'])
+
+        with self.assertQueries(["""
+            SELECT COUNT(DISTINCT "test_read_group_related_base__foo_id__bar_id"."name")
+            FROM "test_read_group_related_base"
+            LEFT JOIN "test_read_group_related_foo" AS "test_read_group_related_base__foo_id"
+                ON ("test_read_group_related_base"."foo_id" = "test_read_group_related_base__foo_id"."id")
+            LEFT JOIN "test_read_group_related_bar" AS "test_read_group_related_base__foo_id__bar_id"
+                ON ("test_read_group_related_base__foo_id"."bar_id" = "test_read_group_related_base__foo_id__bar_id"."id")
+        """]):
+            self.assertEqual(
+                RelatedBase._read_group([], aggregates=['foo_id_bar_id_name:count_distinct']),
+                [(1,)],
+            )
+
+        # Cannot groupby on foo_names_sudo because it traverse One2many
+        with self.assertRaises(ValueError):
+            RelatedBar._read_group([], ['foo_names_sudo'])
+
+    def test_inherited(self):
+        RelatedBase = self.env['test_read_group.related_base']
+        RelatedInherits = self.env['test_read_group.related_inherits']
+
+        bases = RelatedBase.create([
+            {'name': 'a', 'value': 1},
+            {'name': 'a', 'value': 2},
+            {'name': 'b', 'value': 3},
+            {'name': False, 'value': 4},
+        ])
+        RelatedInherits.create([
+            {'base_id': bases[0].id},
+            {'base_id': bases[0].id},
+            {'base_id': bases[1].id},
+            {'base_id': bases[2].id},
+            {'base_id': bases[3].id},
+        ])
+
+        # env.su => false
+        RelatedInherits = RelatedInherits.with_user(self.base_user)
+
+        field_info = RelatedInherits.fields_get(
+            ['name', 'foo_id_name', 'foo_id_name_sudo', 'value'],
+            ['groupable', 'aggregator'],
+        )
+        self.assertTrue(field_info['name']['groupable'])
+        self.assertFalse(field_info['foo_id_name']['groupable'])
+        self.assertTrue(field_info['foo_id_name_sudo']['groupable'])
+        self.assertEqual(field_info['value']['aggregator'], 'sum')
+
+        # warmup
+        RelatedInherits._read_group([], ['name'], ['__count'])
+        with self.assertQueries(["""
+            SELECT "test_read_group_related_inherits__base_id"."name",
+                    COUNT(*)
+            FROM "test_read_group_related_inherits"
+            LEFT JOIN "test_read_group_related_base" AS "test_read_group_related_inherits__base_id"
+                ON ("test_read_group_related_inherits"."base_id" = "test_read_group_related_inherits__base_id"."id")
+            GROUP BY "test_read_group_related_inherits__base_id"."name"
+            ORDER BY "test_read_group_related_inherits__base_id"."name" ASC
+        """]):
+            self.assertEqual(
+                RelatedInherits._read_group([], ['name'], ['__count']),
+                [('a', 3), ('b', 1), (False, 1)],
+            )
+
+        with self.assertQueries(["""
+            SELECT "test_read_group_related_inherits__base_id"."name",
+                    SUM("test_read_group_related_inherits__base_id"."value")
+            FROM "test_read_group_related_inherits"
+            LEFT JOIN "test_read_group_related_base" AS "test_read_group_related_inherits__base_id"
+                ON ("test_read_group_related_inherits"."base_id" = "test_read_group_related_inherits__base_id"."id")
+            GROUP BY "test_read_group_related_inherits__base_id"."name"
+            ORDER BY "test_read_group_related_inherits__base_id"."name" ASC
+        """]):
+            self.assertEqual(
+                RelatedInherits._read_group([], ['name'], ['value:sum']),
+                [('a', 1 + 1 + 2), ('b', 3), (False, 4)],
+            )
+
+        with self.assertQueries(["""
+            SELECT "test_read_group_related_inherits__base_id__foo_id"."name",
+                    COUNT(*)
+            FROM "test_read_group_related_inherits" 
+            LEFT JOIN "test_read_group_related_base" AS "test_read_group_related_inherits__base_id"
+                ON ("test_read_group_related_inherits"."base_id" = "test_read_group_related_inherits__base_id"."id")
+            LEFT JOIN "test_read_group_related_foo" AS "test_read_group_related_inherits__base_id__foo_id"
+                ON ("test_read_group_related_inherits__base_id"."foo_id" = "test_read_group_related_inherits__base_id__foo_id"."id")
+            GROUP BY "test_read_group_related_inherits__base_id__foo_id"."name"
+            ORDER BY "test_read_group_related_inherits__base_id__foo_id"."name" ASC
+        """]):
+            self.assertEqual(
+                RelatedInherits._read_group([], ['foo_id_name_sudo'], ['__count']),
+                [(False, 5)],
+            )
+
+        # Cannot groupby because foo_id_name is related_sudo=False
+        with self.assertRaises(ValueError):
+            RelatedInherits._read_group([], ['foo_id_name'])
+
+    def test_related_many2many_groupby(self):
+        RelatedFoo = self.env['test_read_group.related_foo'].with_user(self.base_user)
+
+        # warmup
+        RelatedFoo._read_group([], ['bar_base_ids'], ['__count'])
+        with self.assertQueries(["""
+            SELECT "test_read_group_related_foo__bar_id__base_ids"."test_read_group_related_base_id",
+                    COUNT(*)
+            FROM "test_read_group_related_foo"
+            LEFT JOIN "test_read_group_related_bar" AS "test_read_group_related_foo__bar_id"
+                ON ("test_read_group_related_foo"."bar_id" = "test_read_group_related_foo__bar_id"."id")
+            LEFT JOIN "test_read_group_related_bar_test_read_group_related_base_rel" AS "test_read_group_related_foo__bar_id__base_ids"
+                ON ("test_read_group_related_foo__bar_id"."id" = "test_read_group_related_foo__bar_id__base_ids"."test_read_group_related_bar_id")
+            GROUP BY "test_read_group_related_foo__bar_id__base_ids"."test_read_group_related_base_id"
+            ORDER BY "test_read_group_related_foo__bar_id__base_ids"."test_read_group_related_base_id" ASC
+        """]):
+            RelatedFoo._read_group([], ['bar_base_ids'], ['__count'])
+
+        field_info = RelatedFoo.fields_get(['bar_base_ids'], ['groupable'])
+        self.assertTrue(field_info['bar_base_ids']['groupable'])
+
+        # With ir.rule on the comodel of the many2many
+        related_base_model = self.env['ir.model']._get('test_read_group.related_base')
+        self.env['ir.rule'].create({
+            'name': "Only The Lone Wanderer allowed",
+            'model_id': related_base_model.id,
+            'domain_force': str([('id', '=', 161)]),
+        })
+
+        # warmup
+        RelatedFoo._read_group([], ['bar_base_ids'], ['__count'])
+        # The related_sudo=True should not bypass ir_rule of the comodel
+        with self.assertQueries(["""
+            SELECT "test_read_group_related_foo__bar_id__base_ids"."test_read_group_related_base_id", COUNT(*)
+            FROM "test_read_group_related_foo"
+            LEFT JOIN "test_read_group_related_bar" AS "test_read_group_related_foo__bar_id"
+                ON ("test_read_group_related_foo"."bar_id" = "test_read_group_related_foo__bar_id"."id")
+            LEFT JOIN "test_read_group_related_bar_test_read_group_related_base_rel" AS "test_read_group_related_foo__bar_id__base_ids"
+                ON ("test_read_group_related_foo__bar_id"."id" = "test_read_group_related_foo__bar_id__base_ids"."test_read_group_related_bar_id"
+                    AND "test_read_group_related_foo__bar_id__base_ids"."test_read_group_related_base_id" IN (
+                        SELECT "test_read_group_related_base"."id" FROM "test_read_group_related_base" WHERE ("test_read_group_related_base"."id" = %s)
+                    )
+                )
+            GROUP BY "test_read_group_related_foo__bar_id__base_ids"."test_read_group_related_base_id"
+            ORDER BY "test_read_group_related_foo__bar_id__base_ids"."test_read_group_related_base_id" ASC
+        """]):
+            RelatedFoo._read_group([], ['bar_base_ids'], ['__count'])
+
+    def test_many2many_aggregate(self):
+        """ many2many fields are not aggregable """
+        Model = self.env['test_read_group.task']
+
+        # it works with another field
+        Model._read_group([], [], ['name:array_agg'])
+
+        with self.assertRaises(ValueError):
+            Model._read_group([], [], ['user_ids:array_agg'])
+
+    def test_many2many_compute_not_groupable(self):
+        Model = self.env['test_read_group.related_bar']
+        field_info = Model.fields_get(['computed_base_ids'], ['groupable'])
+        self.assertFalse(field_info['computed_base_ids']['groupable'])

@@ -1,6 +1,4 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
-
 from odoo import fields, models, _
 
 
@@ -14,7 +12,7 @@ class Partner(models.Model):
 
     def _compute_employees_count(self):
         for partner in self:
-            partner.employees_count = len(partner.employee_ids.filtered(lambda e: e.company_id in self.env.companies))
+            partner.employees_count = len(partner.sudo().employee_ids.filtered(lambda e: e.company_id in self.env.companies))
 
     def action_open_employees(self):
         self.ensure_one()
@@ -31,7 +29,7 @@ class Partner(models.Model):
             'name': _('Employee'),
             'type': 'ir.actions.act_window',
             'res_model': 'hr.employee',
-            'res_id': self.employee_ids.id,
+            'res_id': self.employee_ids.filtered(lambda e: e.company_id in self.env.companies).id,
             'view_mode': 'form',
         }
 

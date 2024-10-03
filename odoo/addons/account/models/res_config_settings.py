@@ -2,7 +2,6 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo import _, api, fields, models
-
 from odoo.addons.account.models.company import PEPPOL_LIST
 
 
@@ -49,6 +48,14 @@ class ResConfigSettings(models.TransientModel):
         readonly=False,
         check_company=True,
     )
+    account_price_include = fields.Selection(
+        string='Default Sales Price Include',
+        related='company_id.account_price_include',
+        readonly=False,
+        required=True,
+        help="Default on whether the sales price used on the product and invoices with this Company includes its taxes."
+    )
+
     tax_calculation_rounding_method = fields.Selection(
         related='company_id.tax_calculation_rounding_method', string='Tax calculation rounding method', readonly=False)
     account_journal_suspense_account_id = fields.Many2one(
@@ -61,27 +68,6 @@ class ResConfigSettings(models.TransientModel):
         help='Bank Transactions are posted immediately after import or synchronization. '
              'Their counterparty is the bank suspense account.\n'
              'Reconciliation replaces the latter by the definitive account(s).')
-    account_journal_payment_debit_account_id = fields.Many2one(
-        comodel_name='account.account',
-        string='Outstanding Receipts',
-        readonly=False,
-        check_company=True,
-        related='company_id.account_journal_payment_debit_account_id',
-        domain="[('deprecated', '=', False), ('account_type', '=', 'asset_current')]",
-        help='Incoming payments are posted on an Outstanding Receipts Account. '
-             'In the bank reconciliation widget, they appear as blue lines.\n'
-             'Bank transactions are then reconciled on the Outstanding Receipts Accounts rather than the Receivable '
-             'Account.')
-    account_journal_payment_credit_account_id = fields.Many2one(
-        comodel_name='account.account',
-        string='Outstanding Payments',
-        readonly=False,
-        check_company=True,
-        related='company_id.account_journal_payment_credit_account_id',
-        domain="[('deprecated', '=', False), ('account_type', '=', 'asset_current')]",
-        help='Outgoing Payments are posted on an Outstanding Payments Account. '
-             'In the bank reconciliation widget, they appear as blue lines.\n'
-             'Bank transactions are then reconciled on the Outstanding Payments Account rather the Payable Account.')
     transfer_account_id = fields.Many2one('account.account', string="Internal Transfer",
         related='company_id.transfer_account_id', readonly=False,
         check_company=True,
@@ -105,7 +91,7 @@ class ResConfigSettings(models.TransientModel):
     module_account_batch_payment = fields.Boolean(string='Use batch payments',
         help='This allows you grouping payments into a single batch and eases the reconciliation process.\n'
              '-This installs the account_batch_payment module.')
-    module_account_sepa = fields.Boolean(string='SEPA Credit Transfer (SCT)')
+    module_account_iso20022 = fields.Boolean(string='SEPA Credit Transfer / ISO20022')
     module_account_sepa_direct_debit = fields.Boolean(string='Use SEPA Direct Debit')
     module_account_bank_statement_import_qif = fields.Boolean("Import .qif files")
     module_account_bank_statement_import_ofx = fields.Boolean("Import in .ofx format")
@@ -115,9 +101,9 @@ class ResConfigSettings(models.TransientModel):
     module_account_intrastat = fields.Boolean(string='Intrastat')
     module_product_margin = fields.Boolean(string="Allow Product Margin")
     module_l10n_eu_oss = fields.Boolean(string="EU Intra-community Distance Selling")
-    module_account_taxcloud = fields.Boolean(string="Account TaxCloud")
-    module_account_avatax = fields.Boolean(string="Account Avatax")
-    module_account_invoice_extract = fields.Boolean(string="Document Digitization")
+    module_account_extract = fields.Boolean(string="Document Digitization")
+    module_account_invoice_extract = fields.Boolean("Invoice Digitization", compute='_compute_module_account_invoice_extract', readonly=False, store=True)
+    module_account_bank_statement_extract = fields.Boolean("Bank Statement Digitization", compute='_compute_module_account_bank_statement_extract', readonly=False, store=True)
     module_snailmail_account = fields.Boolean(string="Snailmail")
     module_account_peppol = fields.Boolean(string='PEPPOL Invoicing')
     tax_exigibility = fields.Boolean(string='Cash Basis', related='company_id.tax_exigibility', readonly=False)
@@ -138,8 +124,6 @@ class ResConfigSettings(models.TransientModel):
     account_fiscal_country_id = fields.Many2one(string="Fiscal Country Code", related="company_id.account_fiscal_country_id", readonly=False, store=False)
 
     qr_code = fields.Boolean(string='Display SEPA QR-code', related='company_id.qr_code', readonly=False)
-    invoice_is_download = fields.Boolean(string='Download', related='company_id.invoice_is_download', readonly=False)
-    invoice_is_email = fields.Boolean(string='Send Email', related='company_id.invoice_is_email', readonly=False)
     incoterm_id = fields.Many2one('account.incoterms', string='Default incoterm', related='company_id.incoterm_id', help='International Commercial Terms are a series of predefined commercial terms used in international transactions.', readonly=False)
     invoice_terms = fields.Html(related='company_id.invoice_terms', string="Terms & Conditions", readonly=False)
     invoice_terms_html = fields.Html(related='company_id.invoice_terms_html', string="Terms & Conditions as a Web page",
@@ -150,6 +134,11 @@ class ResConfigSettings(models.TransientModel):
         string="Total amount of invoice in letters",
         related='company_id.display_invoice_amount_total_words',
         readonly=False
+    )
+    display_invoice_tax_company_currency = fields.Boolean(
+        string="Taxes in company currency",
+        related='company_id.display_invoice_tax_company_currency',
+        readonly=False,
     )
     preview_ready = fields.Boolean(string="Display preview button", compute='_compute_terms_preview')
 
@@ -178,7 +167,7 @@ class ResConfigSettings(models.TransientModel):
 
     account_journal_early_pay_discount_loss_account_id = fields.Many2one(
         comodel_name='account.account',
-        string='Cash Discount Loss',
+        string='Early Discount Loss',
         help='Account for the difference amount after the expense discount has been granted',
         readonly=False,
         related='company_id.account_journal_early_pay_discount_loss_account_id',
@@ -187,7 +176,7 @@ class ResConfigSettings(models.TransientModel):
     )
     account_journal_early_pay_discount_gain_account_id = fields.Many2one(
         comodel_name='account.account',
-        string='Cash Discount Gain',
+        string='Early Discount Gain',
         help='Account for the difference amount after the income discount has been granted',
         readonly=False,
         check_company=True,
@@ -217,6 +206,12 @@ class ResConfigSettings(models.TransientModel):
         compute='_compute_is_account_peppol_eligible',
     ) # technical field used for showing the Peppol settings conditionally
 
+    # Audit trail
+    check_account_audit_trail = fields.Boolean(string='Audit Trail', related='company_id.check_account_audit_trail', readonly=False)
+
+    # Autopost of bills
+    autopost_bills = fields.Boolean(related='company_id.autopost_bills', readonly=False)
+
     @api.depends('country_code')
     def _compute_is_account_peppol_eligible(self):
         # we want to show Peppol settings only to customers that are eligible for Peppol,
@@ -236,22 +231,33 @@ class ResConfigSettings(models.TransientModel):
 
     @api.depends('company_id')
     def _compute_account_default_credit_limit(self):
-        for setting in self:
-            setting.account_default_credit_limit = self.env['ir.property']._get('credit_limit', 'res.partner')
+        ResPartner = self.env['res.partner']
+        company_limit = ResPartner._fields['credit_limit'].get_company_dependent_fallback(ResPartner)
+        self.account_default_credit_limit = company_limit
 
     def _inverse_account_default_credit_limit(self):
         for setting in self:
-            self.env['ir.property']._set_default(
-                'credit_limit',
+            self.env['ir.default'].set(
                 'res.partner',
+                'credit_limit',
                 setting.account_default_credit_limit,
-                setting.company_id.id
+                company_id=setting.company_id.id
             )
 
     @api.depends('company_id')
     def _compute_has_chart_of_accounts(self):
         self.has_chart_of_accounts = bool(self.company_id.chart_template)
         self.has_accounting_entries = self.company_id.root_id._existing_accounting()
+
+    @api.depends('module_account_extract')
+    def _compute_module_account_invoice_extract(self):
+        for config in self:
+            config.module_account_invoice_extract = config.module_account_extract and self.env['ir.module.module']._get('account_invoice_extract').state == 'installed'
+
+    @api.depends('module_account_extract')
+    def _compute_module_account_bank_statement_extract(self):
+        for config in self:
+            config.module_account_bank_statement_extract = config.module_account_extract and self.env['ir.module.module']._get('account_invoice_extract').state == 'installed'
 
     @api.onchange('group_analytic_accounting')
     def onchange_analytic_accounting(self):

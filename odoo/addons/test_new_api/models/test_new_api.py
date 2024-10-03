@@ -4,12 +4,13 @@
 import datetime
 import logging
 
-from odoo.tools.float_utils import float_round
-_logger = logging.getLogger('precompute_setter')
-
-from odoo import models, fields, api, _, Command
+from odoo import Command, api, fields, models
 from odoo.exceptions import AccessError, ValidationError
+from odoo.tools import SQL
+from odoo.tools.float_utils import float_round
 from odoo.tools.translate import html_translate
+
+_logger = logging.getLogger('precompute_setter')
 
 
 class Category(models.Model):
@@ -22,11 +23,15 @@ class Category(models.Model):
     name = fields.Char(required=True)
     color = fields.Integer('Color Index')
     parent = fields.Many2one('test_new_api.category', ondelete='cascade')
-    parent_path = fields.Char(index=True, unaccent=False)
+    parent_path = fields.Char(index=True)
     depth = fields.Integer(compute="_compute_depth")
     root_categ = fields.Many2one(_name, compute='_compute_root_categ')
-    display_name = fields.Char(compute='_compute_display_name', recursive=True,
-                               inverse='_inverse_display_name')
+    display_name = fields.Char(
+        compute='_compute_display_name',
+        inverse='_inverse_display_name',
+        search='_search_display_name',
+        recursive=True,
+    )
     dummy = fields.Char(store=False)
     discussions = fields.Many2many('test_new_api.discussion', 'test_new_api_discussion_category',
                                    'category', 'discussion')
@@ -167,7 +172,7 @@ class Message(models.Model):
     def _check_author(self):
         for message in self.with_context(active_test=False):
             if message.discussion and message.author not in message.discussion.sudo().participants:
-                raise ValidationError(_("Author must be among the discussion participants."))
+                raise ValidationError(self.env._("Author must be among the discussion participants."))
 
     @api.depends('author.name', 'discussion.name')
     def _compute_name(self):
@@ -306,7 +311,6 @@ class MultiTag(models.Model):
     _description = 'Test New API Multi Tag'
 
     name = fields.Char()
-    display_name = fields.Char(compute='_compute_display_name')
 
     @api.depends('name')
     @api.depends_context('special_tag')
@@ -352,6 +356,10 @@ class MixedModel(models.Model):
     _name = 'test_new_api.mixed'
     _description = 'Test New API Mixed'
 
+    foo = fields.Char()
+    text = fields.Text()
+    truth = fields.Boolean()
+    count = fields.Integer()
     number = fields.Float(digits=(10, 2), default=3.14)
     number2 = fields.Float(digits='New API Precision')
     date = fields.Date()
@@ -440,6 +448,43 @@ class Related(models.Model):
     message_name = fields.Text(related="message.body", related_sudo=False, string='Message Body')
     message_currency = fields.Many2one(related="message.author", string='Message Author')
 
+    foo_id = fields.Many2one('test_new_api.related_foo')
+
+    foo_name = fields.Char('foo_name', related='foo_id.name', related_sudo=False)
+    foo_name_sudo = fields.Char('foo_name_sudo', related='foo_id.name', related_sudo=True)
+
+    foo_bar_name = fields.Char('foo_bar_name', related='foo_id.bar_id.name', related_sudo=False)
+    foo_bar_name_sudo = fields.Char('foo_bar_name_sudo', related='foo_id.bar_id.name', related_sudo=True)
+
+    foo_id_bar_name = fields.Char('foo_id_bar_name', related='foo_id.bar_name', related_sudo=False)
+
+    foo_bar_id = fields.Many2one(string='foo_bar_id', related='foo_id.bar_id', related_sudo=False)
+    foo_bar_id_name = fields.Char('foo_bar_id_name', related='foo_bar_id.name', related_sudo=False)
+
+    foo_bar_sudo_id = fields.Many2one(string='foo_bar_sudo_id', related='foo_id.bar_id', related_sudo=True)
+    foo_bar_sudo_id_name = fields.Char('foo_bar_sudo_id_name', related='foo_bar_sudo_id.name', related_sudo=False)
+
+
+class RelatedFoo(models.Model):
+    _name = _description = 'test_new_api.related_foo'
+
+    name = fields.Char()
+    bar_id = fields.Many2one('test_new_api.related_bar')
+    bar_name = fields.Char('bar_name', related='bar_id.name', related_sudo=False)
+
+
+class RelatedBar(models.Model):
+    _name = _description = 'test_new_api.related_bar'
+
+    name = fields.Char()
+
+
+class RelatedInherits(models.Model):
+    _name = _description = 'test_new_api.related_inherits'
+    _inherits = {'test_new_api.related': 'base_id'}
+
+    base_id = fields.Many2one('test_new_api.related', required=True, ondelete='cascade')
+
 
 class ComputeReadonly(models.Model):
     _name = 'test_new_api.compute.readonly'
@@ -478,6 +523,17 @@ class ComputeInverse(models.Model):
         if self._context.get('log_constraint'):
             self._context.get('log', []).append('constraint')
 
+
+class ComputeSudo(models.Model):
+    _name = 'test_new_api.compute.sudo'
+    _description = 'Model with a compute_sudo field'
+
+    name_for_uid = fields.Char(compute='_compute_name_for_uid', compute_sudo=True)
+
+    @api.depends_context('uid')
+    def _compute_name_for_uid(self):
+        for record in self:
+            record.name_for_uid = self.env.user.name
 
 class MultiComputeInverse(models.Model):
     """ Model with the same inverse method for several fields. """
@@ -596,6 +652,7 @@ class CompanyDependent(models.Model):
     _description = 'Test New API Company'
 
     foo = fields.Char(company_dependent=True)
+    text = fields.Text(company_dependent=True)
     date = fields.Date(company_dependent=True)
     moment = fields.Datetime(company_dependent=True)
     tag_id = fields.Many2one('test_new_api.multi.tag', company_dependent=True)
@@ -604,6 +661,8 @@ class CompanyDependent(models.Model):
     phi = fields.Float(company_dependent=True, digits=(2, 5))
     html1 = fields.Html(company_dependent=True, sanitize=False)
     html2 = fields.Html(company_dependent=True, sanitize_attributes=True, strip_classes=True, strip_style=True)
+    company_id = fields.Many2one('res.company', company_dependent=True)  # child_of and parent_of is optimized
+    partner_id = fields.Many2one('res.partner', company_dependent=True)
 
 
 class CompanyDependentAttribute(models.Model):
@@ -796,9 +855,9 @@ class ComputeOnchange(models.Model):
             if record.foo:
                 record.tag_ids = Tag.search([('name', '=', record.foo)])
 
-    def copy(self, default=None):
-        default = dict(default or {}, foo="%s (copy)" % (self.foo or ""))
-        return super().copy(default)
+    def copy_data(self, default=None):
+        vals_list = super().copy_data(default=default)
+        return [dict(vals, foo=self.env._("%s (copy)", record.foo)) for record, vals in zip(self, vals_list)]
 
 
 class ComputeOnchangeLine(models.Model):
@@ -1166,6 +1225,15 @@ class ModelActiveField(models.Model):
                                        context={'active_test': False})
     active_children_ids = fields.One2many('test_new_api.model_active_field', 'parent_id',
                                           context={'active_test': True})
+    relatives_ids = fields.Many2many(
+        'test_new_api.model_active_field',
+        'model_active_field_relatives_rel', 'source_id', 'dest_id',
+    )
+    all_relatives_ids = fields.Many2many(
+        'test_new_api.model_active_field',
+        'model_active_field_relatives_rel', 'source_id', 'dest_id',
+        context={'active_test': False},
+    )
     parent_active = fields.Boolean(string='Active Parent', related='parent_id.active', store=True)
 
 
@@ -1481,6 +1549,80 @@ class Group(models.Model):
     user_ids = fields.Many2many('test_new_api.user')
 
 
+class ModelNoAccess(models.Model):
+    _name = 'test_new_api.model.no_access'
+    _description = "Testing Utilities attrs and groups: if never access rights"
+
+    ab = fields.Integer(default=1)
+    cd = fields.Integer(default=1, groups="base.group_portal")
+
+
+class ModelAllAccess(models.Model):
+    _name = 'test_new_api.model.all_access'
+    _description = "Testing Utilities attrs and groups: if free access rights"
+
+    ab = fields.Integer(default=1)
+    cd = fields.Integer(default=1, groups="base.group_portal")
+    ef = fields.Integer(default=1)
+
+    def action_full(self):
+        return
+
+
+class ModelSomeAccess(models.Model):
+    _name = 'test_new_api.model.some_access'
+    _description = 'Testing Utilities attrs and groups'
+
+    a = fields.Integer()
+    b = fields.Integer()
+    c = fields.Integer()
+    d = fields.Integer(default=1, groups="base.group_erp_manager")
+    e = fields.Integer(default=1, groups="base.group_erp_manager,base.group_multi_company")
+    f = fields.Integer(groups="base.group_erp_manager,base.group_portal")
+    g = fields.Integer(default=1, groups="base.group_erp_manager,base.group_multi_company,!base.group_portal")
+    h = fields.Integer(default=1, groups="base.group_erp_manager,!base.group_portal")
+    i = fields.Integer(default=1, groups="!base.group_portal")
+    j = fields.Integer(default=1, groups="base.group_portal")
+    k = fields.Integer(default=1, groups="base.group_public")
+    g_id = fields.Many2one("test_new_api.model.all_access", string="m2o g_id")
+
+
+class Model2SomeAccess(models.Model):
+    _name = 'test_new_api.model2.some_access'
+    _description = 'Testing Utilities attrs and groups sub'
+
+    g_id = fields.Many2one('test_new_api.model.some_access', domain='[("a", "=", g_d)]')
+    g_d = fields.Integer(related='g_id.d')
+
+
+class Model3SomeAccess(models.Model):
+    _name = 'test_new_api.model3.some_access'
+    _description = 'Testing Utilities attrs and groups sub sub'
+
+    xxx_id = fields.Many2one('test_new_api.model2.some_access')
+    xxx_sub_id = fields.Many2one(related='xxx_id.g_id')
+
+
+class ComputedModifier(models.Model):
+    _name = 'test_new_api.computed.modifier'
+    _description = 'Test onchange and compute for automatically added invisible fields'
+
+    foo = fields.Integer()
+    sub_foo = fields.Integer(compute='_compute_sub_foo')
+    bar = fields.Integer()
+    sub_bar = fields.Integer()
+    name = fields.Char()
+
+    @api.depends('foo')
+    def _compute_sub_foo(self):
+        for record in self:
+            record.sub_foo = record.foo
+
+    @api.onchange('bar')
+    def _onchange_moderator(self):
+        self.sub_bar = self.bar
+
+
 class ComputeEditable(models.Model):
     _name = _description = 'test_new_api.compute_editable'
 
@@ -1777,6 +1919,15 @@ class Prefetch(models.Model):
     hansel = fields.Integer('Hansel', prefetch="Hansel and Gretel")
     gretel = fields.Char('Gretel', prefetch="Hansel and Gretel")
 
+    line_ids = fields.One2many('test_new_api.prefetch.line', 'prefetch_id')
+
+
+class PrefetchLine(models.Model):
+    _name = _description = 'test_new_api.prefetch.line'
+
+    prefetch_id = fields.Many2one('test_new_api.prefetch')
+    harry = fields.Integer(related='prefetch_id.harry', store=True)
+
 
 class Modified(models.Model):
     _name = 'test_new_api.modified'
@@ -1870,6 +2021,13 @@ class EmptyChar(models.Model):
     name = fields.Char('Name')
 
 
+class EmptyInt(models.Model):
+    _name = 'test_new_api.empty_int'
+    _description = 'A model to test empty int'
+
+    number = fields.Integer('Number')
+
+
 class Team(models.Model):
     _name = 'test_new_api.team'
     _description = 'Odoo Team'
@@ -1932,6 +2090,73 @@ class AnyTag(models.Model):
     child_ids = fields.Many2many('test_new_api.any.child')
 
 
+class CustomView(models.Model):
+    _name = _description = "test_new_api.custom.view"
+    _auto = False
+    _depends = {
+        'test_new_api.any.tag': ['name'],
+        'test_new_api.any.child': ['quantity'],
+    }
+
+    sum_quantity = fields.Integer()
+    tag_id = fields.Many2one('test_new_api.any.tag')
+
+    def init(self):
+        query = """
+            CREATE or REPLACE VIEW test_new_api_custom_view AS (
+                SELECT tag.id AS id, SUM(child.quantity) AS sum_quantity, tag.id AS tag_id
+                FROM test_new_api_any_child AS child
+                JOIN test_new_api_any_child_test_new_api_any_tag_rel AS rel ON rel.test_new_api_any_child_id = child.id
+                JOIN test_new_api_any_tag AS tag ON tag.id = rel.test_new_api_any_tag_id
+                GROUP BY tag.id
+            )
+        """
+        self.env.cr.execute(query)
+
+class CustomTableQuery(models.Model):
+    _name = _description = "test_new_api.custom.table_query"
+    _auto = False
+    _depends = {
+        'test_new_api.any.tag': ['name'],
+        'test_new_api.any.child': ['quantity'],
+    }
+
+    sum_quantity = fields.Integer()
+    tag_id = fields.Many2one('test_new_api.any.tag')
+
+    @property
+    def _table_query(self):
+        return """
+            SELECT tag.id AS id, SUM(child.quantity) AS sum_quantity, tag.id AS tag_id
+            FROM test_new_api_any_child AS child
+            JOIN test_new_api_any_child_test_new_api_any_tag_rel AS rel ON rel.test_new_api_any_child_id = child.id
+            JOIN test_new_api_any_tag AS tag ON tag.id = rel.test_new_api_any_tag_id
+            GROUP BY tag.id
+        """
+
+class CustomTableQuerySQL(models.Model):
+    _name = _description = "test_new_api.custom.table_query_sql"
+    _auto = False
+    _depends = {
+        'test_new_api.any.tag': ['name'],
+        'test_new_api.any.child': ['quantity'],
+    }
+
+    sum_quantity = fields.Integer()
+    tag_id = fields.Many2one('test_new_api.any.tag')
+
+    @property
+    def _table_query(self):
+        return SQL(
+            """
+            SELECT tag.id AS id, SUM(child.quantity) AS sum_quantity, tag.id AS tag_id
+            FROM test_new_api_any_child AS child
+            JOIN test_new_api_any_child_test_new_api_any_tag_rel AS rel ON rel.test_new_api_any_child_id = child.id
+            JOIN test_new_api_any_tag AS tag ON tag.id = rel.test_new_api_any_tag_id
+            GROUP BY tag.id
+            """,
+        )
+
 class ModelAutovacuumed(models.Model):
     _name = _description = 'test_new_api.autovacuumed'
 
@@ -1940,3 +2165,27 @@ class ModelAutovacuumed(models.Model):
     @api.autovacuum
     def _gc(self):
         self.search([('expire_at', '<', datetime.datetime.now() - datetime.timedelta(days=1))]).unlink()
+
+
+class SharedComputeMethod(models.Model):
+    _name = _description = 'test_new_api.shared.compute'
+
+    name = fields.Char(compute='_compute_name', store=True, readonly=False)
+    start = fields.Integer(compute='_compute_start_end', store=True, readonly=False)
+    end = fields.Integer(compute='_compute_start_end', store=True, readonly=False)
+
+    @api.depends('start', 'end')
+    def _compute_name(self):
+        for record in self:
+            if record.start and record.end:
+                record.name = f"{record.start}->{record.end}"
+
+    @api.depends('name')
+    def _compute_start_end(self):
+        for record in self:
+            if record.name and '->' in record.name:
+                record.start, record.end = map(int, record.name.split('->'))
+            if not record.start:
+                record.start = 0
+            if not record.end:
+                record.end = 10

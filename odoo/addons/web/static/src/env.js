@@ -1,9 +1,9 @@
-/** @odoo-module **/
-
-import { registry } from "./core/registry";
-import { templates } from "./core/assets";
 import { App, EventBus } from "@odoo/owl";
+import { SERVICES_METADATA } from "@web/core/utils/hooks";
+import { registry } from "@web/core/registry";
+import { getTemplate } from "@web/core/templates";
 import { _t } from "@web/core/l10n/translation";
+import { session } from "@web/session";
 
 // -----------------------------------------------------------------------------
 // Types
@@ -44,7 +44,13 @@ export function makeEnv() {
 
 const serviceRegistry = registry.category("services");
 
-export const SERVICES_METADATA = {};
+serviceRegistry.addValidation({
+    start: Function,
+    dependencies: { type: Array, element: String, optional: true },
+    async: { type: [{ type: Array, element: String }, { value: true }], optional: true },
+    "*": true,
+});
+
 let startServicesPromise = null;
 
 /**
@@ -60,7 +66,7 @@ export async function startServices(env) {
     // start them regardless of the order they're added to the registry.
     await Promise.resolve();
 
-    const toStart = new Set();
+    const toStart = new Map();
     serviceRegistry.addEventListener("UPDATE", async (ev) => {
         // Wait for all synchronous code so that if new services that depend on
         // one another are added to the registry, they're all present before we
@@ -75,7 +81,7 @@ export async function startServices(env) {
         }
         if (toStart.size) {
             const namedService = Object.assign(Object.create(service), { name });
-            toStart.add(namedService);
+            toStart.set(name, namedService);
         } else {
             await _startServices(env, toStart);
         }
@@ -91,7 +97,7 @@ async function _startServices(env, toStart) {
     for (const [name, service] of serviceRegistry.getEntries()) {
         if (!(name in services)) {
             const namedService = Object.assign(Object.create(service), { name });
-            toStart.add(namedService);
+            toStart.set(name, namedService);
         }
     }
 
@@ -101,63 +107,50 @@ async function _startServices(env, toStart) {
         const proms = [];
         while ((service = findNext())) {
             const name = service.name;
-            toStart.delete(service);
+            toStart.delete(name);
             const entries = (service.dependencies || []).map((dep) => [dep, services[dep]]);
             const dependencies = Object.fromEntries(entries);
-            let value;
-            try {
-                value = service.start(env, dependencies);
-            } catch (e) {
-                value = e;
-                console.error(e);
+            if (name in services) {
+                continue;
             }
+            const value = service.start(env, dependencies);
             if ("async" in service) {
                 SERVICES_METADATA[name] = service.async;
             }
-            if (value instanceof Promise) {
-                proms.push(
-                    new Promise((resolve) => {
-                        value
-                            .then((val) => {
-                                services[name] = val || null;
-                            })
-                            .catch((error) => {
-                                services[name] = error;
-                                console.error("Can't load service '" + name + "' because:", error);
-                            })
-                            .finally(resolve);
-                    })
-                );
-            } else {
-                services[service.name] = value || null;
-            }
+            proms.push(
+                Promise.resolve(value).then((val) => {
+                    services[name] = val || null;
+                })
+            );
         }
         await Promise.all(proms);
         if (proms.length) {
             return start();
         }
     }
-    startServicesPromise = start();
+    startServicesPromise = start().finally(() => {
+        startServicesPromise = null;
+    });
     await startServicesPromise;
-    startServicesPromise = null;
     if (toStart.size) {
-        const names = [...toStart].map((s) => s.name);
         const missingDeps = new Set();
-        [...toStart].forEach((s) =>
-            s.dependencies.forEach((dep) => {
-                if (!(dep in services) && !names.includes(dep)) {
-                    missingDeps.add(dep);
+        for (const service of toStart.values()) {
+            for (const dependency of service.dependencies) {
+                if (!(dependency in services) && !toStart.has(dependency)) {
+                    missingDeps.add(dependency);
                 }
-            })
-        );
+            }
+        }
         const depNames = [...missingDeps].join(", ");
         throw new Error(
-            `Some services could not be started: ${names}. Missing dependencies: ${depNames}`
+            `Some services could not be started: ${[
+                ...toStart.keys(),
+            ]}. Missing dependencies: ${depNames}`
         );
     }
 
     function findNext() {
-        for (const s of toStart) {
+        for (const s of toStart.values()) {
             if (s.dependencies) {
                 if (s.dependencies.every((d) => d in services)) {
                     return s;
@@ -190,9 +183,9 @@ export async function mountComponent(component, target, appConfig = {}) {
     }
     const app = new App(component, {
         env,
-        templates,
-        dev: env.debug,
-        warnIfNoStaticProps: true,
+        getTemplate,
+        dev: env.debug || session.test_mode,
+        warnIfNoStaticProps: !session.test_mode,
         name: component.constructor.name,
         translatableAttributes: ["data-tooltip"],
         translateFn: _t,

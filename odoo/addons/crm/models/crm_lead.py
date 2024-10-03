@@ -4,20 +4,18 @@
 import logging
 import pytz
 import threading
-from ast import literal_eval
 from collections import OrderedDict, defaultdict
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from markupsafe import Markup
-from psycopg2 import sql
 
-from odoo import api, fields, models, tools, SUPERUSER_ID
+from odoo import api, fields, models, tools
 from odoo.addons.iap.tools import iap_tools
 from odoo.addons.mail.tools import mail_validation
 from odoo.addons.phone_validation.tools import phone_validation
 from odoo.exceptions import UserError, AccessError
 from odoo.osv import expression
 from odoo.tools.translate import _
-from odoo.tools import date_utils, email_split, is_html_empty, groupby, parse_contact_from_email
+from odoo.tools import date_utils, email_split, is_html_empty, groupby, parse_contact_from_email, SQL
 from odoo.tools.misc import get_lang
 
 from . import crm_stage
@@ -128,7 +126,7 @@ class Lead(models.Model):
     active = fields.Boolean('Active', default=True, tracking=True)
     type = fields.Selection([
         ('lead', 'Lead'), ('opportunity', 'Opportunity')], required=True, tracking=15, index=True,
-        default=lambda self: 'lead' if self.env['res.users'].has_group('crm.group_use_lead') else 'opportunity')
+        default=lambda self: 'lead' if self.env.user.has_group('crm.group_use_lead') else 'opportunity')
     # Pipeline management
     priority = fields.Selection(
         crm_stage.AVAILABLE_PRIORITIES, string='Priority', index=True,
@@ -138,19 +136,14 @@ class Lead(models.Model):
         compute='_compute_stage_id', readonly=False, store=True,
         copy=False, group_expand='_read_group_stage_ids', ondelete='restrict',
         domain="['|', ('team_id', '=', False), ('team_id', '=', team_id)]")
-    kanban_state = fields.Selection([
-        ('grey', 'No next activity planned'),
-        ('red', 'Next activity late'),
-        ('green', 'Next activity is planned')], string='Kanban State',
-        compute='_compute_kanban_state')
     tag_ids = fields.Many2many(
         'crm.tag', 'crm_tag_rel', 'lead_id', 'tag_id', string='Tags',
         help="Classify and analyze your lead/opportunity categories like: Training, Service")
     color = fields.Integer('Color Index', default=0)
     # Revenues
-    expected_revenue = fields.Monetary('Expected Revenue', currency_field='company_currency', tracking=True)
+    expected_revenue = fields.Monetary('Expected Revenue', currency_field='company_currency', tracking=True, default=0.0)
     prorated_revenue = fields.Monetary('Prorated Revenue', currency_field='company_currency', store=True, compute="_compute_prorated_revenue")
-    recurring_revenue = fields.Monetary('Recurring Revenues', currency_field='company_currency', tracking=True)
+    recurring_revenue = fields.Monetary('Recurring Revenues', currency_field='company_currency', tracking=True, default=0.0)
     recurring_plan = fields.Many2one('crm.recurring.plan', string="Recurring Plan")
     recurring_revenue_monthly = fields.Monetary('Expected MRR', currency_field='company_currency', store=True,
                                                 compute="_compute_recurring_revenue_monthly")
@@ -193,7 +186,6 @@ class Lead(models.Model):
         compute="_compute_email_domain_criterion",
         index='btree_not_null',  # used for exact match, void value do not matter
         store=True,
-        unaccent=False,  # normalized, exact matching
     )
     phone = fields.Char(
         'Phone', tracking=50,
@@ -226,7 +218,7 @@ class Lead(models.Model):
         compute='_compute_partner_address_values', readonly=False, store=True)
     # Probability (Opportunity only)
     probability = fields.Float(
-        'Probability', group_operator="avg", copy=False,
+        'Probability', aggregator="avg", copy=False,
         compute='_compute_probabilities', readonly=False, store=True)
     automated_probability = fields.Float('Automated Probability', compute='_compute_probabilities', readonly=True, store=True)
     is_automated_probability = fields.Boolean('Is automated probability?', compute="_compute_is_automated_probability")
@@ -252,19 +244,6 @@ class Lead(models.Model):
     _sql_constraints = [
         ('check_probability', 'check(probability >= 0 and probability <= 100)', 'The probability of closing the deal should be between 0% and 100%!')
     ]
-
-    @api.depends('activity_date_deadline')
-    def _compute_kanban_state(self):
-        today = date.today()
-        for lead in self:
-            kanban_state = 'grey'
-            if lead.activity_date_deadline:
-                lead_date = fields.Date.from_string(lead.activity_date_deadline)
-                if lead_date >= today:
-                    kanban_state = 'green'
-                else:
-                    kanban_state = 'red'
-            lead.kanban_state = kanban_state
 
     @api.depends('company_id')
     def _compute_user_company_ids(self):
@@ -430,7 +409,7 @@ class Lead(models.Model):
         lang_codes = [code for code in self.mapped('partner_id.lang') if code]
         if lang_codes:
             lang_id_by_code = dict(
-                (code, self.env['res.lang']._lang_get_id(code))
+                (code, self.env['res.lang']._get_data(code=code).id)
                 for code in lang_codes
             )
         else:
@@ -456,7 +435,7 @@ class Lead(models.Model):
 
     def _inverse_email_from(self):
         for lead in self:
-            if lead._get_partner_email_update():
+            if lead._get_partner_email_update(force_void=False):
                 lead.partner_id.email = lead.email_from
 
     @api.depends('email_normalized')
@@ -475,7 +454,7 @@ class Lead(models.Model):
 
     def _inverse_phone(self):
         for lead in self:
-            if lead._get_partner_phone_update():
+            if lead._get_partner_phone_update(force_void=False):
                 lead.partner_id.phone = lead.phone
 
     @api.depends('phone', 'country_id.code')
@@ -624,12 +603,12 @@ class Lead(models.Model):
     @api.depends('email_from', 'partner_id')
     def _compute_partner_email_update(self):
         for lead in self:
-            lead.partner_email_update = lead._get_partner_email_update()
+            lead.partner_email_update = lead._get_partner_email_update(force_void=False)
 
     @api.depends('phone', 'partner_id')
     def _compute_partner_phone_update(self):
         for lead in self:
-            lead.partner_phone_update = lead._get_partner_phone_update()
+            lead.partner_phone_update = lead._get_partner_phone_update(force_void=False)
 
     @api.depends_context('uid')
     @api.depends('partner_id', 'type')
@@ -645,7 +624,7 @@ class Lead(models.Model):
         When it's set however, we want to display it, mainly because there are a few automatic synchronizations between
         the lead and its partner (phone and email for examples), and this needs to be clear that modifying
         one of those fields will in turn modify the linked partner."""
-        is_debug_mode = self.user_has_groups('base.group_no_one')
+        is_debug_mode = self.env.user.has_group('base.group_no_one')
         for lead in self:
             lead.is_partner_visible = bool(lead.type == 'opportunity' or lead.partner_id or is_debug_mode)
 
@@ -670,7 +649,7 @@ class Lead(models.Model):
         # For other fields, get the info from the partner, but only if set
         values.update({f: partner[f] or self[f] for f in PARTNER_FIELDS_TO_SYNC if f != 'lang'})
         if partner.lang:
-            values['lang_id'] = self.env['res.lang']._lang_get_id(partner.lang)
+            values['lang_id'] = self.env['res.lang']._get_data(code=partner.lang).id
 
         # Fields with specific logic
         values.update(self._prepare_contact_name_from_partner(partner))
@@ -700,31 +679,39 @@ class Lead(models.Model):
             partner_name = partner.company_name
         return {'partner_name': partner_name or self.partner_name}
 
-    def _get_partner_email_update(self):
+    def _get_partner_email_update(self, force_void=True):
         """Calculate if we should write the email on the related partner. When
         the email of the lead / partner is an empty string, we force it to False
         to not propagate a False on an empty string.
 
         Done in a separate method so it can be used in both ribbon and inverse
         and compute of email update methods.
+
+        :param bool force_void: if False, skip when lead has a void email value.
+          This is used notably to avoid propagating void lead value to a valid
+          partner value.
         """
         self.ensure_one()
-        if self.partner_id and self.email_from != self.partner_id.email:
+        if self.partner_id and (force_void or self.email_from) and self.email_from != self.partner_id.email:
             lead_email_normalized = tools.email_normalize(self.email_from) or self.email_from or False
             partner_email_normalized = tools.email_normalize(self.partner_id.email) or self.partner_id.email or False
             return lead_email_normalized != partner_email_normalized
         return False
 
-    def _get_partner_phone_update(self):
+    def _get_partner_phone_update(self, force_void=True):
         """Calculate if we should write the phone on the related partner. When
         the phone of the lead / partner is an empty string, we force it to False
         to not propagate a False on an empty string.
 
         Done in a separate method so it can be used in both ribbon and inverse
         and compute of phone update methods.
+
+        :param bool force_void: if False, skip when lead has a void phone value.
+          This is used notably to avoid propagating void lead value to a valid
+          partner value.
         """
         self.ensure_one()
-        if self.partner_id and self.phone != self.partner_id.phone:
+        if self.partner_id and (force_void or self.phone) and self.phone != self.partner_id.phone:
             lead_phone_formatted = self._phone_format(fname='phone') or self.phone or False
             partner_phone_formatted = self.partner_id._phone_format(fname='phone') or self.partner_id.phone or False
             return lead_phone_formatted != partner_phone_formatted
@@ -919,23 +906,22 @@ class Lead(models.Model):
         leads_reach_lost._pls_increment_frequencies(to_state='lost')
         leads_leave_lost._pls_increment_frequencies(from_state='lost')
 
-    @api.returns('self', lambda value: value.id)
-    def copy(self, default=None):
-        self.ensure_one()
+    def copy_data(self, default=None):
         # set default value in context, if not already set (Put stage to 'new' stage)
-        context = dict(self._context)
-        context.setdefault('default_type', self.type)
-        context.setdefault('default_team_id', self.team_id.id)
         # Set date_open to today if it is an opp
-        default = default or {}
-        default['date_open'] = self.env.cr.now() if self.type == 'opportunity' else False
-        # Do not assign to an archived user
-        if not self.user_id.active:
-            default['user_id'] = False
+        default = dict(default or {})
         if not self.env.user.has_group('crm.group_use_recurring_revenues'):
             default['recurring_revenue'] = 0
             default['recurring_plan'] = False
-        return super(Lead, self.with_context(context)).copy(default=default)
+        vals_list = super().copy_data(default=default)
+        now = self.env.cr.now()
+        for lead, vals in zip(self, vals_list):
+            vals.setdefault('type', lead.type)
+            vals.setdefault('team_id', lead.team_id.id)
+            vals['date_open'] = now if lead.type == 'opportunity' else False
+            if not lead.user_id.active:
+                vals['user_id'] = False
+        return vals_list
 
     def unlink(self):
         """ Update meetings when removing opportunities, otherwise you have
@@ -952,7 +938,7 @@ class Lead(models.Model):
         return super(Lead, self).unlink()
 
     @api.model
-    def _read_group_stage_ids(self, stages, domain, order):
+    def _read_group_stage_ids(self, stages, domain):
         # retrieve team_id from the context and write the domain
         # - ('id', 'in', stages.ids): add columns that should be present
         # - OR ('fold', '=', False): add default columns that are not folded
@@ -964,7 +950,7 @@ class Lead(models.Model):
             search_domain = ['|', ('id', 'in', stages.ids), ('team_id', '=', False)]
 
         # perform search
-        stage_ids = stages._search(search_domain, order=order, access_rights_uid=SUPERUSER_ID)
+        stage_ids = stages.sudo()._search(search_domain, order=stages._order)
         return stages.browse(stage_ids)
 
     def _stage_find(self, team_id=False, domain=None, order='sequence, id', limit=1):
@@ -1247,16 +1233,8 @@ class Lead(models.Model):
 
     def action_snooze(self):
         self.ensure_one()
-        today = date.today()
         my_next_activity = self.activity_ids.filtered(lambda activity: activity.user_id == self.env.user)[:1]
-        if my_next_activity:
-            if my_next_activity.date_deadline < today:
-                date_deadline = today + timedelta(days=7)
-            else:
-                date_deadline = my_next_activity.date_deadline + timedelta(days=7)
-            my_next_activity.write({
-                'date_deadline': date_deadline
-            })
+        my_next_activity.action_snooze()
         return True
 
     # ------------------------------------------------------------
@@ -1403,7 +1381,7 @@ class Lead(models.Model):
 
         See ``merge_opportunity`` for more details. """
         if len(self.ids) <= 1:
-            raise UserError(_('Please select more than one element (lead or opportunity) from the list view.'))
+            raise UserError(_('Select at least two Leads/Opportunities from the list to merge them.'))
 
         if max_length and len(self.ids) > max_length and not self.env.is_superuser():
             raise UserError(_("To prevent data loss, Leads and Opportunities can only be merged by groups of %(max_length)s.", max_length=max_length))
@@ -1514,7 +1492,7 @@ class Lead(models.Model):
                     subject = _("From %(source_name)s: %(source_subject)s", source_name=opportunity.name, source_subject=message.subject)
                 else:
                     subject = _("From %(source_name)s", source_name=opportunity.name)
-                message.write({
+                message.sudo().write({
                     'res_id': self.id,
                     'subject': subject,
                 })
@@ -1897,7 +1875,6 @@ class Lead(models.Model):
             'name': partner_name,
             'user_id': self.env.context.get('default_user_id') or self.user_id.id,
             'comment': self.description,
-            'team_id': self.team_id.id,
             'parent_id': parent_id,
             'phone': self.phone,
             'mobile': self.mobile,
@@ -1924,6 +1901,12 @@ class Lead(models.Model):
 
     def _creation_subtype(self):
         return self.env.ref('crm.mt_lead_create')
+
+    def _creation_message(self):
+        self.ensure_one()
+        if self.team_id:
+            return _('A new lead has been created for the team "%(team_name)s".', team_name=self.team_id.display_name)
+        return _('A new lead has been created and is not assigned to any team.')
 
     def _track_subtype(self, init_values):
         self.ensure_one()
@@ -2004,17 +1987,16 @@ class Lead(models.Model):
         }
 
     def _message_get_suggested_recipients(self):
-        recipients = super(Lead, self)._message_get_suggested_recipients()
+        recipients = super()._message_get_suggested_recipients()
         try:
-            for lead in self:
-                # check if that language is correctly installed (and active) before using it
-                lang_code = lead.lang_code if lead.lang_code and self.env['res.lang']._lang_get(lead.lang_code) else None
-                if lead.partner_id:
-                    lead._message_add_suggested_recipient(
-                        recipients, partner=lead.partner_id, lang=lang_code, reason=_('Customer'))
-                elif lead.email_from:
-                    lead._message_add_suggested_recipient(
-                        recipients, email=lead.email_from, lang=lang_code, reason=_('Customer Email'))
+            # check if that language is correctly installed (and active) before using it
+            lang_code = self.env['res.lang']._get_data(code=self.lang_code).code or None
+            if self.partner_id:
+                self._message_add_suggested_recipient(
+                    recipients, partner=self.partner_id, lang=lang_code, reason=_('Customer'))
+            elif self.email_from:
+                self._message_add_suggested_recipient(
+                    recipients, email=self.email_from, lang=lang_code, reason=_('Customer Email'))
         except AccessError:  # no read access rights -> just ignore suggested recipients because this imply modifying followers
             pass
         return recipients
@@ -2075,7 +2057,7 @@ class Lead(models.Model):
             if partner_info.get('partner_id') or not email:
                 continue
             # reformat email if no name information
-            name_emails = tools.email_split_tuples(email)
+            name_emails = tools.mail.email_split_tuples(email)
             name_from_email = name_emails[0][0] if name_emails else False
             if name_from_email:
                 continue  # already containing name + email
@@ -2302,7 +2284,7 @@ class Lead(models.Model):
     def _rebuild_pls_frequency_table(self):
         # Clear the frequencies table (in sql to speed up the cron)
         try:
-            self.check_access_rights('unlink')
+            self.browse().check_access('unlink')
         except AccessError:
             raise UserError(_("You don't have the access needed to run this cron."))
         else:
@@ -2654,30 +2636,28 @@ class Lead(models.Model):
             pls_fields.remove('tag_ids')
 
         if domain:
-            # active_test = False as domain should take active into 'active' field it self
-            from_clause, where_clause, where_params = self.env['crm.lead'].with_context(active_test=False)._where_calc(domain).get_sql()
-            str_fields = ", ".join(["{}"] * len(pls_fields))
-            args = [sql.Identifier(field) for field in pls_fields]
-
             # Get leads values
             self.flush_model()
-            query = """SELECT id, probability, %s
-                        FROM %s
-                        WHERE %s order by team_id asc, id desc"""
-            query = sql.SQL(query % (str_fields, from_clause, where_clause)).format(*args)
-            self._cr.execute(query, where_params)
+            # active_test = False as domain should take active into 'active' field it self
+            query = self.env['crm.lead'].with_context(active_test=False)._where_calc(domain)
+            table = query.table
+            query.order = SQL("%(table)s.team_id asc, %(table)s.id desc", table=SQL.identifier(table))
+            sql_fields = [SQL.identifier(field) for field in pls_fields]
+            self._cr.execute(query.select(
+                SQL("id"),
+                SQL("probability"),
+                *sql_fields,
+            ))
             lead_results = self._cr.dictfetchall()
 
             if use_tags:
                 # Get tags values
-                query = """SELECT crm_lead.id as lead_id, t.id as tag_id
-                            FROM %s
-                            LEFT JOIN crm_tag_rel rel ON crm_lead.id = rel.lead_id
-                            LEFT JOIN crm_tag t ON rel.tag_id = t.id
-                            WHERE %s order by crm_lead.team_id asc, crm_lead.id"""
-                args.append(sql.Identifier('tag_id'))
-                query = sql.SQL(query % (from_clause, where_clause)).format(*args)
-                self._cr.execute(query, where_params)
+                tag_rel_alias = query.left_join(table, 'id', 'crm_tag_rel', 'lead_id', 'crm_tag_rel')
+                tag_alias = query.left_join(tag_rel_alias, 'tag_id', 'crm_tag', 'id', 'crm_tag')
+                self._cr.execute(query.select(
+                    SQL("%s AS lead_id", SQL.identifier(table, "id")),
+                    SQL("%s AS tag_id", SQL.identifier(tag_alias, "id")),
+                ))
                 tag_results = self._cr.dictfetchall()
             else:
                 tag_results = []

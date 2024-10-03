@@ -1,6 +1,6 @@
-/** @odoo-module **/
-
 import { session } from "@web/session";
+import { jsToPyLocale } from "@web/core/l10n/utils";
+import { user } from "@web/core/user";
 import { browser } from "../browser/browser";
 import { registry } from "../registry";
 import { strftimeToLuxonFormat } from "./dates";
@@ -23,11 +23,10 @@ const NUMBERING_SYSTEMS = [
 ];
 
 export const localizationService = {
-    dependencies: ["user"],
-    start: async (env, { user }) => {
+    start: async () => {
         const cacheHashes = session.cache_hashes || {};
         const translationsHash = cacheHashes.translations || new Date().getTime().toString();
-        const lang = user.lang || document.documentElement.getAttribute("lang")?.replace(/-/g, "_");
+        const lang = jsToPyLocale(user.lang || document.documentElement.getAttribute("lang"));
         const translationURL = session.translationURL || "/web/webclient/translations";
         let url = `${translationURL}/${translationsHash}`;
         if (lang) {
@@ -58,11 +57,7 @@ export const localizationService = {
         translatedTerms[translationLoaded] = true;
         translationIsReady.resolve(true);
 
-        // Setup lang inside luxon. The locale codes received from the server contain "_",
-        // whereas the Intl codes use "-" (Unicode BCP 47). There's only one exception, which
-        // is locale "sr@latin", for which we manually fallback to the "sr-Latn-RS" locale.
-        const language = lang || browser.navigator.language;
-        const locale = language === "sr@latin" ? "sr-Latn-RS" : language.replace(/_/g, "-");
+        const locale = user.lang || browser.navigator.language;
         Settings.defaultLocale = locale;
         for (const [re, numberingSystem] of NUMBERING_SYSTEMS) {
             if (re.test(locale)) {
@@ -73,12 +68,14 @@ export const localizationService = {
 
         const dateFormat = strftimeToLuxonFormat(userLocalization.date_format);
         const timeFormat = strftimeToLuxonFormat(userLocalization.time_format);
+        const shortTimeFormat = strftimeToLuxonFormat(userLocalization.short_time_format);
         const dateTimeFormat = `${dateFormat} ${timeFormat}`;
         const grouping = JSON.parse(userLocalization.grouping);
 
         Object.assign(localization, {
             dateFormat,
             timeFormat,
+            shortTimeFormat,
             dateTimeFormat,
             decimalPoint: userLocalization.decimal_point,
             direction: userLocalization.direction,
@@ -86,7 +83,7 @@ export const localizationService = {
             multiLang,
             thousandsSep: userLocalization.thousands_sep,
             weekStart: userLocalization.week_start,
-            code: language,
+            code: jsToPyLocale(locale),
         });
         return localization;
     },

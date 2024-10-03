@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { Component, onMounted, onWillUnmount, useState } from "@odoo/owl";
 
 import { browser } from "@web/core/browser/browser";
@@ -18,12 +16,14 @@ export class CallContextMenu extends Component {
     rtcConnectionTypes = CONNECTION_TYPES;
 
     setup() {
-        this.userSettings = useState(useService("mail.user_settings"));
+        super.setup();
+        this.store = useState(useService("mail.store"));
         this.rtc = useState(useService("discuss.rtc"));
         this.state = useState({
             downloadStats: {},
             uploadStats: {},
             producerStats: {},
+            peerStats: {},
         });
         onMounted(() => {
             if (!this.env.debug) {
@@ -36,14 +36,14 @@ export class CallContextMenu extends Component {
     }
 
     get isSelf() {
-        return this.rtc.state.selfSession?.eq(this.props.rtcSession);
+        return this.rtc.selfSession?.eq(this.props.rtcSession);
     }
 
     get inboundConnectionTypeText() {
         const candidateType =
             this.rtc.state.connectionType === CONNECTION_TYPES.SERVER
                 ? this.state.downloadStats.remoteCandidateType
-                : this.props.rtcSession.remoteCandidateType;
+                : this.state.peerStats.remoteCandidateType;
         return this.formatProtocol(candidateType);
     }
 
@@ -51,12 +51,12 @@ export class CallContextMenu extends Component {
         const candidateType =
             this.rtc.state.connectionType === CONNECTION_TYPES.SERVER
                 ? this.state.uploadStats.localCandidateType
-                : this.props.rtcSession.localCandidateType;
+                : this.state.peerStats.localCandidateType;
         return this.formatProtocol(candidateType);
     }
 
     get volume() {
-        return this.userSettings.getVolume(this.props.rtcSession);
+        return this.store.settings.getVolume(this.props.rtcSession);
     }
 
     /**
@@ -74,7 +74,7 @@ export class CallContextMenu extends Component {
     }
 
     async updateStats() {
-        if (this.rtc.state.selfSession?.eq(this.props.rtcSession)) {
+        if (this.rtc.selfSession?.eq(this.props.rtcSession)) {
             if (this.rtc.sfuClient) {
                 const { uploadStats, downloadStats, ...producerStats } =
                     await this.rtc.sfuClient.getStats();
@@ -131,12 +131,14 @@ export class CallContextMenu extends Component {
             }
             return;
         }
-        await this.props.rtcSession.updateStats();
+        this.state.peerStats = await this.rtc.p2pService.getFormattedStats(
+            this.props.rtcSession.id
+        );
     }
 
     onChangeVolume(ev) {
         const volume = Number(ev.target.value);
-        this.userSettings.saveVolumeSetting({
+        this.store.settings.saveVolumeSetting({
             guestId: this.props.rtcSession?.guestId,
             partnerId: this.props.rtcSession?.partnerId,
             volume,

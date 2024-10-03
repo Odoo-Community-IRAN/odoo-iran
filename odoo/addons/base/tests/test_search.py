@@ -218,9 +218,16 @@ class test_search(TransactionCase):
         kw = dict(groups_id=[Command.set([self.ref('base.group_system'),
                                      self.ref('base.group_partner_manager')])])
 
-        u1 = Users.create(dict(name='Q', login='m', **kw)).id
+        # When creating with the superuser, the ordering by 'create_uid' will
+        # compare user logins with the superuser's login "__system__", which
+        # may give different results, because "_" may come before or after
+        # letters, depending on the database's locale.  In order to avoid this
+        # issue, use a user with a login that doesn't include "_".
+        u0 = Users.create(dict(name='A system', login='a', **kw)).id
+
+        u1 = Users.with_user(u0).create(dict(name='Q', login='m', **kw)).id
         u2 = Users.with_user(u1).create(dict(name='B', login='f', **kw)).id
-        u3 = Users.create(dict(name='C', login='c', **kw)).id
+        u3 = Users.with_user(u0).create(dict(name='C', login='c', **kw)).id
         u4 = Users.with_user(u2).create(dict(name='D', login='z', **kw)).id
 
         expected_ids = [u2, u4, u3, u1]
@@ -232,6 +239,8 @@ class test_search(TransactionCase):
         # test that a custom field x_active filters like active
         # we take the model res.country as a test model as it is included in base and does
         # not have an active field
+        self.addCleanup(self.registry.reset_changes) # reset the registry to avoid polluting other tests
+
         model_country = self.env['res.country']
         self.assertNotIn('active', model_country._fields)  # just in case someone adds the active field in the model
         self.env['ir.model.fields'].create({
@@ -279,8 +288,19 @@ class test_search(TransactionCase):
         self.assertEqual(len(partners) + count_partner_before, Partner.search_count([]))
         self.assertEqual(3, Partner.search_count([], limit=3))
 
-    def test_22_large_domain(self):
-        """ Ensure search and its unerlying SQL mechanism is able to handle large domains"""
-        N = 9500
-        domain = ['|'] * (N - 1) + [('login', '=', 'admin')] * N
-        self.env['res.users'].search(domain)
+    def test_22_like_folding(self):
+        Model = self.env['res.country']
+
+        with self.assertQueries(["""
+            SELECT "res_country"."id"
+            FROM "res_country"
+            WHERE TRUE
+            ORDER BY "res_country"."name"->>%s
+        """, """
+            SELECT "res_country"."id"
+            FROM "res_country"
+            WHERE FALSE
+            ORDER BY "res_country"."name"->>%s
+        """]):
+            Model.search([('code', 'ilike', '')])
+            Model.search([('code', 'not ilike', '')])

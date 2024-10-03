@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { SESSION_STATE } from "@im_livechat/embed/common/livechat_service";
 
 import { threadActionsRegistry } from "@mail/core/common/thread_actions";
@@ -18,15 +16,16 @@ threadActionsRegistry.add("restart", {
     name: _t("Restart Conversation"),
     open(component) {
         component.chatbotService.restart();
-        component.chatWindowService.show(component.props.chatWindow);
+        component.props.chatWindow.open();
     },
     sequence: 99,
+    sequenceQuick: 15,
 });
 
 const callSettingsAction = threadActionsRegistry.get("settings");
 patch(callSettingsAction, {
     condition(component) {
-        if (component.thread?.type !== "livechat") {
+        if (component.thread?.channel_type !== "livechat") {
             return super.condition(...arguments);
         }
         return (

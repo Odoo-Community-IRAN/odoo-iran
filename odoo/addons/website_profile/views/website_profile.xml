@@ -156,7 +156,7 @@
                                 <div class="mb-3 col-12">
                                     <label class="mb-1 text-primary" for="description"><span class="fw-bold">Biography</span></label>
                                     <textarea name="description" id="description" style="min-height: 120px"
-                                        class="form-control o_wysiwyg_loader" placeholder="Write a few words about yourself..."><t t-out="user.partner_id.website_description"/></textarea>
+                                        class="form-control o_wysiwyg_loader" placeholder="Write a few words about yourself..." t-att-content="user.partner_id.website_description"><t t-out="user.partner_id.website_description"/></textarea>
                                 </div>
                                 <div class="col">
                                     <button type="submit" class="btn btn-primary o_wprofile_submit_btn">Update</button>
@@ -318,7 +318,8 @@
             <div class="row">
                 <div class="mb-1 col-12">
                     <textarea name="description" id="description" style="min-height: 120px"
-                        class="form-control o_wysiwyg_loader" placeholder="Write a few words about yourself...">
+                        class="form-control o_wysiwyg_loader" placeholder="Write a few words about yourself..."
+                        t-att-content="user.partner_id.website_description">
                         <t t-out="user.partner_id.website_description"/>
                     </textarea>
                 </div>
@@ -604,10 +605,10 @@
                     <img class="position-absolute" t-attf-src="/website_profile/static/src/img/rank_#{user_index + 1}.svg" alt="User rank" style="bottom: 0; right: -10px"/>
                 </div>
                 <h3 class="mt-2 mb-0" t-esc="user['name']"></h3>
-                <span class="badge text-bg-danger fw-normal px-2" t-if="not user['website_published']">Unpublished</span>
+                <span class="badge text-bg-danger fw-normal" t-if="not user['website_published']">Unpublished</span>
                 <strong class="text-muted" t-esc="user['rank']"/>
                 <div class="h3 my-2" t-if="user['karma_gain']">
-                    <span t-attf-class="badge rounded-pill px-3 py-2 #{ 'text-bg-success' if user['karma_gain'] > 0 else 'text-bg-warning'}">
+                    <span t-attf-class="badge #{ 'text-bg-success' if user['karma_gain'] > 0 else 'text-bg-warning'}">
                         <t t-if="user['karma_gain'] > 0">+ </t><t t-esc="user['karma_gain']"/> XP
                     </span>
                 </div>
@@ -632,7 +633,7 @@
         </td>
         <td class="align-middle text-nowrap">
             <t t-if="user['karma_gain']">
-                <span t-attf-class="badge rounded-pill d-inline #{ 'text-bg-success' if user['karma_gain'] > 0 else 'text-bg-warning'}">
+                <span t-attf-class="badge d-inline #{ 'text-bg-success' if user['karma_gain'] > 0 else 'text-bg-warning'}">
                     <t t-if="user['karma_gain'] > 0">+ </t><t t-esc="user['karma_gain']"/> XP
                 </span>
                 <span class="text-muted ps-2 pe-3">
@@ -643,7 +644,7 @@
             </t>
         </td>
         <td class="align-middle fw-bold text-end text-nowrap">
-            <span t-if="not user['website_published']" class="badge text-bg-danger fw-normal px-2 py-1 m-1">Unpublished</span>
+            <span t-if="not user['website_published']" class="badge text-bg-danger fw-normal m-1">Unpublished</span>
         </td>
         <td class="align-middle fw-bold text-end text-nowrap">
             <b t-esc="user['karma']"/> <span class="text-muted small fw-bold">XP</span>

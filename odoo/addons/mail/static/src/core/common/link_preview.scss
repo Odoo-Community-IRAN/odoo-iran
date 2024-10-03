@@ -12,11 +12,6 @@
     -webkit-line-clamp: 2;
 }
 
-.o-mail-LinkPreviewCard-hasMultineLines {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-}
-
 .o-mail-LinkPreviewCard-imageLinkWrap {
     border-right: 1px solid $card-border-color;
 }
@@ -62,11 +57,13 @@
     }
 }
 
-.o-mail-LinkPreview-aside {
-    display: none;
-}
-.o-mail-LinkPreviewCard:hover, .o-mail-LinkPreviewImage:hover, .o-mail-LinkPreviewVideo:hover {
+@media (hover: hover) {
     .o-mail-LinkPreview-aside {
-        display: block;
+        display: none;
+    }
+    .o-mail-LinkPreviewCard:hover, .o-mail-LinkPreviewImage:hover, .o-mail-LinkPreviewVideo:hover {
+        .o-mail-LinkPreview-aside {
+            display: block;
+        }
     }
 }

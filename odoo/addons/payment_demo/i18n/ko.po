@@ -3,17 +3,16 @@
 # 	* payment_demo
 # 
 # Translators:
-# Sarah Park, 2023
-# Wil Odoo, 2024
 # Daye Jeong, 2024
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-08-13 10:28+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Daye Jeong, 2024\n"
+"POT-Creation-Date: 2024-09-26 08:56+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Korean (https://app.transifex.com/odoo/teams/41243/ko/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -31,8 +30,8 @@ msgid ""
 "                    <option value=\"pending\" title=\"Payment processing\">\n"
 "                        Pending\n"
 "                    </option>\n"
-"                    <option value=\"cancel\" title=\"Payment canceled by customer\">\n"
-"                        Canceled\n"
+"                    <option value=\"cancel\" title=\"Payment cancelled by customer\">\n"
+"                        Cancelled\n"
 "                    </option>\n"
 "                    <option value=\"error\" title=\"Processing error\">\n"
 "                        Error\n"
@@ -46,7 +45,7 @@ msgstr ""
 "                        <option value=\"pending\" title=\"Payment processing\">\n"
 "                            대기 중\n"
 "                        </option>\n"
-"                        <option value=\"cancel\" title=\"Payment canceled by customer\">\n"
+"                        <option value=\"cancel\" title=\"Payment cancelled by customer\">\n"
 "                            취소됨\n"
 "                        </option>\n"
 "                        <option value=\"error\" title=\"Processing error\">\n"
@@ -152,6 +151,7 @@ msgstr "확인됨"
 
 #. module: payment_demo
 #: model:ir.model.fields.selection,name:payment_demo.selection__payment_provider__code__demo
+#: model:payment.method,name:payment_demo.payment_method_demo
 msgid "Demo"
 msgstr "데모"
 
@@ -163,7 +163,6 @@ msgstr "데모용 간편 결제"
 #. module: payment_demo
 #. odoo-python
 #: code:addons/payment_demo/models/payment_provider.py:0
-#, python-format
 msgid "Demo providers should never be enabled."
 msgstr "데모 공급업체는 활성화해서는 안됩니다."
 
@@ -175,14 +174,12 @@ msgstr "오류"
 #. module: payment_demo
 #. odoo-javascript
 #: code:addons/payment_demo/static/src/js/express_checkout_form.js:0
-#, python-format
 msgid "No delivery method is available."
 msgstr "배송 방법을 선택할 수 없습니다."
 
 #. module: payment_demo
 #. odoo-python
 #: code:addons/payment_demo/models/payment_transaction.py:0
-#, python-format
 msgid "No transaction found matching reference %s."
 msgstr "%s 참조와 일치하는 거래 항목이 없습니다."
 
@@ -214,7 +211,6 @@ msgstr "지불 거래"
 #. module: payment_demo
 #. odoo-javascript
 #: code:addons/payment_demo/static/src/js/payment_demo_mixin.js:0
-#, python-format
 msgid "Payment processing failed"
 msgstr "결제 프로세스 실패"
 
@@ -227,8 +223,8 @@ msgstr "이 결제 수단으로 결제한 내역은 <b>성공</b>적으로 처�
 #: model_terms:ir.ui.view,arch_db:payment_demo.token_inline_form
 msgid ""
 "Payments made with this payment method will be automatically "
-"<b>canceled</b>."
-msgstr "이 결제 수단으로 결제한 내역은 자동으로 <b>취소</b> 처리 됩니다."
+"<b>cancelled</b>."
+msgstr "해당 결제 방법으로 결제한 경우 자동으로 <b>취소</b> 됩니다."
 
 #. module: payment_demo
 #: model_terms:ir.ui.view,arch_db:payment_demo.token_inline_form
@@ -275,7 +271,6 @@ msgstr "이 결제대행업체의 기술 코드입니다."
 #. module: payment_demo
 #. odoo-python
 #: code:addons/payment_demo/models/payment_transaction.py:0
-#, python-format
 msgid "The transaction is not linked to a token."
 msgstr "거래가 토큰에 연결되어 있지 않습니다."
 
@@ -287,7 +282,6 @@ msgstr "게시 안 함"
 #. module: payment_demo
 #. odoo-javascript
 #: code:addons/payment_demo/static/src/js/express_checkout_form.js:0
-#, python-format
 msgid "Validation Error"
 msgstr "유효성 검사 오류"
 
@@ -299,6 +293,5 @@ msgstr "XXXX XXXX XXXX XXXX"
 #. module: payment_demo
 #. odoo-python
 #: code:addons/payment_demo/models/payment_transaction.py:0
-#, python-format
 msgid "You selected the following demo payment status: %s"
 msgstr "다음 데모 결제 상태를 선택했습니다: %s"

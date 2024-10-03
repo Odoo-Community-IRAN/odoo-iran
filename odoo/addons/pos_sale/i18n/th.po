@@ -3,16 +3,15 @@
 # 	* pos_sale
 # 
 # Translators:
-# Wil Odoo, 2023
-# Rasareeyar Lappiam, 2024
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:55+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Rasareeyar Lappiam, 2024\n"
+"POT-Creation-Date: 2024-09-25 08:39+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Thai (https://app.transifex.com/odoo/teams/41243/th/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -22,15 +21,7 @@ msgstr ""
 
 #. module: pos_sale
 #. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_row/sale_order_row.xml:0
-#, python-format
-msgid "(left:"
-msgstr "(ซ้าย:"
-
-#. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/overrides/components/product_screen/product_screen.xml:0
-#, python-format
+#: code:addons/pos_sale/static/src/overrides/components/orderline/orderline.xml:0
 msgid "(tax incl.)"
 msgstr "(รวมภาษี)"
 
@@ -41,38 +32,31 @@ msgstr "<span style=\"margin: 0px 5px;\">:</span>"
 
 #. module: pos_sale
 #. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#, python-format
+#: code:addons/pos_sale/static/src/overrides/models/pos_store.js:0
 msgid "A new order has been created."
 msgstr "มีการสร้างคำสั่งซื้อใหม่แล้ว"
 
 #. module: pos_sale
+#: model:ir.model.fields,field_description:pos_sale.field_sale_order__amount_unpaid
+msgid "Amount To Pay In POS"
+msgstr ""
+
+#. module: pos_sale
+#: model:ir.model.fields,help:pos_sale.field_sale_order__amount_unpaid
+msgid "Amount left to pay in POS to avoid double payment or double invoicing."
+msgstr ""
+
+#. module: pos_sale
 #. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#, python-format
+#: code:addons/pos_sale/static/src/overrides/models/pos_store.js:0
 msgid "Apply a down payment (fixed amount)"
 msgstr "ใช้เงินดาวน์ (จำนวนเงินคงที่)"
 
 #. module: pos_sale
 #. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#, python-format
+#: code:addons/pos_sale/static/src/overrides/models/pos_store.js:0
 msgid "Apply a down payment (percentage)"
 msgstr "วางเงินดาวน์ (เปอร์เซ็นต์)"
-
-#. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_control_panel/sale_order_management_control_panel.xml:0
-#, python-format
-msgid "Back"
-msgstr "กลับ"
-
-#. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_row/sale_order_row.js:0
-#, python-format
-msgid "Cancelled"
-msgstr "ยกเลิก"
 
 #. module: pos_sale
 #: model:ir.model,name:pos_sale.model_res_config_settings
@@ -85,45 +69,24 @@ msgid "Currency Rate"
 msgstr "อัตราแลกเปลี่ยน"
 
 #. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_list/sale_order_list.xml:0
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_row/sale_order_row.xml:0
-#, python-format
-msgid "Customer"
-msgstr "ลูกค้า"
-
-#. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#, python-format
-msgid "Customer loading error"
-msgstr "เกิดข้อผิดพลาดในการโหลดลูกค้า"
-
-#. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_list/sale_order_list.xml:0
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_row/sale_order_row.xml:0
-#, python-format
-msgid "Date"
-msgstr "วันที่"
-
-#. module: pos_sale
 #: model_terms:ir.ui.view,arch_db:pos_sale.message_body
 msgid "Delivered from"
 msgstr "จัดส่งจาก"
 
 #. module: pos_sale
+#: model:ir.model.fields,field_description:pos_sale.field_pos_order_line__qty_delivered
+msgid "Delivery Quantity"
+msgstr "ปริมาณการจัดส่ง"
+
+#. module: pos_sale
 #. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#, python-format
+#: code:addons/pos_sale/static/src/overrides/models/pos_store.js:0
 msgid "Do you want to load the SN/Lots linked to the Sales Order?"
 msgstr "คุณต้องการโหลด SN/ล็อต ที่เชื่อมโยงกับคำสั่งขายหรือไม่?"
 
 #. module: pos_sale
 #. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#, python-format
+#: code:addons/pos_sale/static/src/overrides/models/pos_store.js:0
 msgid "Down Payment"
 msgstr "เงินดาวน์"
 
@@ -145,31 +108,29 @@ msgid "Down Payment Product"
 msgstr "เงินดาวน์สินค้า"
 
 #. module: pos_sale
+#. odoo-python
+#: code:addons/pos_sale/models/pos_order.py:0
+msgid ""
+"Down payment (ref: %(order_reference)s on \n"
+" %(date)s)"
+msgstr ""
+"เงินดาวน์ (อ้างอิง: %(order_reference)s เมื่อวันที่\n"
+"%(date)s)"
+
+#. module: pos_sale
 #. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#, python-format
+#: code:addons/pos_sale/static/src/overrides/models/pos_store.js:0
 msgid "Due balance: %s"
 msgstr "ยอดเงินคงเหลือ: %s"
 
 #. module: pos_sale
 #. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_control_panel/sale_order_management_control_panel.xml:0
-#, python-format
-msgid "E.g. customer: Steward, date: 2020-05-09"
-msgstr "เช่น ลูกค้า: Steward วันที่: 2020-05-09"
-
-#. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#, python-format
+#: code:addons/pos_sale/static/src/overrides/models/pos_store.js:0
 msgid "Error amount too high"
 msgstr "จำนวนข้อผิดพลาดสูงเกินไป"
 
 #. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/overrides/components/receipt_screen/order_receipt/order_receipt.xml:0
 #: model_terms:ir.ui.view,arch_db:pos_sale.report_invoice_document
-#, python-format
 msgid "From"
 msgstr "จาก"
 
@@ -180,8 +141,7 @@ msgstr "ออกใบแจ้งหนี้แล้ว"
 
 #. module: pos_sale
 #. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#, python-format
+#: code:addons/pos_sale/static/src/overrides/models/pos_store.js:0
 msgid ""
 "It seems that you didn't configure a down payment product in your point of "
 "sale. You can go to your point of sale configuration to choose one."
@@ -192,7 +152,6 @@ msgstr ""
 #. module: pos_sale
 #. odoo-python
 #: code:addons/pos_sale/models/sale_order.py:0
-#, python-format
 msgid "Linked POS Orders"
 msgstr "เชื่อมต่อคำสั่งซื้อ POS "
 
@@ -204,37 +163,12 @@ msgstr "เชื่อมต่อคำสั่งขาย"
 #. module: pos_sale
 #. odoo-python
 #: code:addons/pos_sale/models/pos_order.py:0
-#, python-format
 msgid "Linked Sale Orders"
 msgstr "เชื่อมต่อคำสั่งขาย"
 
 #. module: pos_sale
 #. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_row/sale_order_row.js:0
-#, python-format
-msgid "Locked"
-msgstr "ล็อก"
-
-#. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_control_panel/sale_order_management_control_panel.xml:0
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_control_panel/sale_order_management_control_panel.xml:0
-#, python-format
-msgid "Next Order List"
-msgstr "รายการคำสั่งซื้อถัดไป"
-
-#. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#, python-format
-msgid "No"
-msgstr "ไม่"
-
-#. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#, python-format
+#: code:addons/pos_sale/static/src/overrides/models/pos_store.js:0
 msgid "No down payment product"
 msgstr "สินค้าไม่มีเงินดาวน์"
 
@@ -250,11 +184,14 @@ msgstr "เปิดเซสชั่น"
 
 #. module: pos_sale
 #. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_list/sale_order_list.xml:0
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_row/sale_order_row.xml:0
-#, python-format
+#: code:addons/pos_sale/static/src/overrides/components/product_info_popup/product_info_popup.xml:0
+msgid "Optional Products:"
+msgstr "สินค้าทางเลือก:"
+
+#. module: pos_sale
+#: model:ir.model.fields,field_description:pos_sale.field_sale_report__order_reference
 msgid "Order"
-msgstr "คำสั่งซื้อ"
+msgstr "คำสั่ง"
 
 #. module: pos_sale
 #: model:ir.model.fields,field_description:pos_sale.field_sale_order__pos_order_line_ids
@@ -303,58 +240,30 @@ msgid "Pos Order Count"
 msgstr "จำนวนคำสั่งซื้อ Pos"
 
 #. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_control_panel/sale_order_management_control_panel.xml:0
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_control_panel/sale_order_management_control_panel.xml:0
-#, python-format
-msgid "Previous Order List"
-msgstr "รายการคำสั่งซื้อก่อนหน้า"
+#: model:ir.model.fields.selection,name:pos_sale.selection__sale_report__state__done
+msgid "Posted"
+msgstr "โพสต์"
+
+#. module: pos_sale
+#: model:ir.model,name:pos_sale.model_product_product
+msgid "Product Variant"
+msgstr "ตัวเลือกสินค้า"
 
 #. module: pos_sale
 #. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#, python-format
-msgid "Products not available in POS"
-msgstr "สินค้าไม่มีใน POS"
-
-#. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_row/sale_order_row.js:0
-#, python-format
-msgid "Quotation"
-msgstr "ใบเสนอราคา"
-
-#. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_row/sale_order_row.js:0
-#, python-format
-msgid "Quotation Sent"
-msgstr "ส่งใบเสนอราคาแล้ว"
-
-#. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/set_sale_order_button/set_sale_order_button.xml:0
-#, python-format
+#: code:addons/pos_sale/static/src/overrides/components/control_buttons/control_buttons.xml:0
 msgid "Quotation/Order"
 msgstr "ใบเสนอราคา/คำสั่งซื้อ"
 
 #. module: pos_sale
-#: model:ir.model.fields,field_description:pos_sale.field_sale_report__order_reference
-msgid "Related Order"
-msgstr "คำสั่งซื้อที่เกี่ยวข้อง"
-
-#. module: pos_sale
 #. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#, python-format
+#: code:addons/pos_sale/static/src/overrides/models/pos_store.js:0
 msgid "SN/Lots Loading"
 msgstr "กำลังโหลด SN/ล็อต"
 
 #. module: pos_sale
 #. odoo-javascript
-#: code:addons/pos_sale/static/src/overrides/components/product_screen/product_screen.xml:0
-#: code:addons/pos_sale/static/src/overrides/components/product_screen/product_screen.xml:0
-#, python-format
+#: code:addons/pos_sale/static/src/overrides/components/orderline/orderline.xml:0
 msgid "SO"
 msgstr "SO"
 
@@ -374,10 +283,7 @@ msgid "Sales Analysis Report"
 msgstr "รายงานวิเคราะห์การขาย"
 
 #. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_row/sale_order_row.js:0
 #: model:ir.model,name:pos_sale.model_sale_order
-#, python-format
 msgid "Sales Order"
 msgstr "คำสั่งขาย"
 
@@ -406,20 +312,6 @@ msgid "Sales are reported to the following sales team"
 msgstr "มีการรายงานยอดขายไปยังทีมขายต่อไปนี้"
 
 #. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_row/sale_order_row.xml:0
-#, python-format
-msgid "Salesman"
-msgstr "พนักงานขาย"
-
-#. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_list/sale_order_list.xml:0
-#, python-format
-msgid "Salesperson"
-msgstr "พนักงานขาย"
-
-#. module: pos_sale
 #: model_terms:ir.ui.view,arch_db:pos_sale.crm_team_view_kanban_dashboard
 msgid "Session Running"
 msgstr "เซสชั่นที่กำลังทำงาน"
@@ -436,27 +328,15 @@ msgstr "เซสชั่นที่กำลังทำงาน"
 
 #. module: pos_sale
 #. odoo-javascript
-#: code:addons/pos_sale/static/src/app/set_sale_order_button/set_sale_order_button.xml:0
-#: code:addons/pos_sale/static/src/app/set_sale_order_button/set_sale_order_button.xml:0
-#, python-format
+#: code:addons/pos_sale/static/src/overrides/components/control_buttons/control_buttons.xml:0
 msgid "Set Sale Order"
 msgstr "ตั้งค่าคำสั่งขาย"
 
 #. module: pos_sale
 #. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#, python-format
+#: code:addons/pos_sale/static/src/overrides/models/pos_store.js:0
 msgid "Settle the order"
 msgstr "ชำระคำสั่งซื้อ"
-
-#. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#, python-format
-msgid ""
-"Some of the products in your Sale Order are not available in POS, do you "
-"want to import them?"
-msgstr "สินค้าบางรายการในคำสั่งขายของคุณไม่มีใน POS คุณต้องการนำเข้าหรือไม่?"
 
 #. module: pos_sale
 #: model:ir.model.fields,field_description:pos_sale.field_pos_order_line__sale_order_line_id
@@ -464,22 +344,9 @@ msgid "Source Sale Order Line"
 msgstr "แหล่งที่มาของรายการคำสั่งขาย"
 
 #. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_list/sale_order_list.xml:0
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_row/sale_order_row.xml:0
-#, python-format
-msgid "State"
-msgstr "รัฐ"
-
-#. module: pos_sale
 #: model:ir.model.fields,field_description:pos_sale.field_sale_report__state
 msgid "Status"
 msgstr "สถานะ"
-
-#. module: pos_sale
-#: model:ir.model.fields,help:pos_sale.field_sale_order__amount_unpaid
-msgid "The amount due from the sale order."
-msgstr "จำนวนเงินที่ครบกำหนดชำระจากใบสั่งขาย"
 
 #. module: pos_sale
 #: model:ir.model.fields,help:pos_sale.field_pos_order__currency_rate
@@ -487,13 +354,6 @@ msgid ""
 "The rate of the currency to the currency of rate applicable at the date of "
 "the order"
 msgstr "อัตราของสกุลเงินต่ออีกสกุลเงินของอัตราที่ใช้ในวันที่สั่งซื้อ"
-
-#. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#, python-format
-msgid "There was a problem in loading the %s customer."
-msgstr "เกิดปัญหาในการโหลดลูกค้า %s"
 
 #. module: pos_sale
 #: model:ir.model.fields,help:pos_sale.field_pos_config__crm_team_id
@@ -514,14 +374,6 @@ msgid "This product will be used as down payment on a sale order."
 msgstr "สินค้านี้จะใช้เป็นเงินดาวน์สำหรับคำสั่งขาย"
 
 #. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_list/sale_order_list.xml:0
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_row/sale_order_row.xml:0
-#, python-format
-msgid "Total"
-msgstr "รวม"
-
-#. module: pos_sale
 #: model:ir.model,name:pos_sale.model_stock_picking
 msgid "Transfer"
 msgstr "โอน"
@@ -529,48 +381,35 @@ msgstr "โอน"
 #. module: pos_sale
 #: model_terms:ir.ui.view,arch_db:pos_sale.view_pos_order_form_inherit_pos_sale
 msgid ""
-"Transfered<br/>\n"
+"Transferred<br/>\n"
 "                                from Sale"
 msgstr ""
-"โอน<br/>\n"
-"                                จากการขาย"
 
 #. module: pos_sale
 #: model_terms:ir.ui.view,arch_db:pos_sale.view_order_form_inherit_pos_sale
 msgid ""
-"Transfered<br/>\n"
+"Transferred<br/>\n"
 "                                to POS"
 msgstr ""
-"โอน<br/>\n"
-"                                ไปที่ POS"
-
-#. module: pos_sale
-#: model:ir.model.fields,field_description:pos_sale.field_sale_order__amount_unpaid
-msgid "Unpaid Amount"
-msgstr "จำนวนเงินที่ยังไม่ได้ชำระ"
 
 #. module: pos_sale
 #. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#, python-format
+#: code:addons/pos_sale/static/src/overrides/models/pos_store.js:0
 msgid "What do you want to do?"
 msgstr "คุณอยากทำอะไร?"
 
 #. module: pos_sale
 #. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#, python-format
-msgid "Yes"
-msgstr "ใช่"
-
-#. module: pos_sale
-#. odoo-javascript
-#: code:addons/pos_sale/static/src/app/order_management_screen/sale_order_management_screen/sale_order_management_screen.js:0
-#, python-format
+#: code:addons/pos_sale/static/src/overrides/models/pos_store.js:0
 msgid ""
 "You have tried to charge a down payment of %s but only %s remains to be "
 "paid, %s will be applied to the purchase order line."
 msgstr ""
 "คุณได้พยายามเรียกเก็บเงินดาวน์ %s แต่ยังคงต้องชำระเพียง %s เท่านั้น %s "
 "จะถูกนำไปใช้กับรายการใบสั่งซื้อ"
+
+#. module: pos_sale
+#. odoo-javascript
+#: code:addons/pos_sale/static/src/overrides/components/product_info_popup/product_info_popup.xml:0
+msgid "from"
+msgstr "จาก"

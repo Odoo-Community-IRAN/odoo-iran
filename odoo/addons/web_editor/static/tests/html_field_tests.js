@@ -27,49 +27,6 @@ async function iframeReady(iframe) {
     await nextTick(); // ensure document is loaded
 }
 
-
-const pasteImage = async (editor, base64ImageData) => {
-    // Create image file.
-    const binaryImageData = atob(base64ImageData);
-    const uint8Array = new Uint8Array(binaryImageData.length);
-    for (let i = 0; i < binaryImageData.length; i++) {
-        uint8Array[i] = binaryImageData.charCodeAt(i);
-    }
-    const file = new File([uint8Array], "test_image.png", { type: 'image/png' });
-
-    // Create a promise to get the created img elements
-    const pasteImagePromise = makeDeferred();
-    const observer = new MutationObserver(mutations => {
-        mutations
-            .filter(mutation => mutation.type === 'childList')
-            .forEach(mutation => {
-                mutation.addedNodes.forEach(node => {
-                    if (node instanceof HTMLElement) {
-                        pasteImagePromise.resolve(node);
-                    }
-                });
-            });
-    });
-    observer.observe(editor.editable, { subtree: true, childList: true });
-
-    // Simulate paste.
-    editor._onPaste({
-        preventDefault() { },
-        clipboardData: {
-            getData() { },
-            items: [{
-                kind: 'file',
-                type: 'image/png',
-                getAsFile: () => file,
-            }],
-        },
-    });
-
-    const img = await pasteImagePromise;
-    observer.disconnect();
-    return img;
-}
-
 QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
     let serverData;
     let target;
@@ -128,7 +85,7 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
             serverData,
             arch: `
                 <form>
-                    <field name="txt" widget="html"/>
+                    <field name="txt" widget="html_legacy"/>
                 </form>`,
         });
         await wysiwygPromise;
@@ -163,7 +120,7 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
             arch: `
                 <form>
                     <field name="m2o" />
-                    <field name="txt" widget="html"/>
+                    <field name="txt" widget="html_legacy"/>
                 </form>`,
         });
 
@@ -182,7 +139,7 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
         range.setStart(target.querySelector(".insideoftfield"), 0);
         sel.addRange(range);
         await nextTick();
-        assert.strictEqual(sel.anchorNode, target.querySelector(".o_field_html p"));
+        assert.strictEqual(sel.anchorNode, target.querySelector(".o_field_html_legacy p"));
         sel.removeAllRanges();
 
         range = new Range();
@@ -225,7 +182,7 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
             serverData,
             arch: `
                 <form>
-                    <field name="txt" widget="html" options="{'style-inline' : true}"/>
+                    <field name="txt" widget="html_legacy" options="{'style-inline' : true}"/>
                 </form>`,
         });
         await wysiwygPromise;
@@ -266,7 +223,7 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
             serverData,
             arch: `
                 <form>
-                    <field name="txt" widget="html"/>
+                    <field name="txt" widget="html_legacy"/>
                 </form>`,
         });
         await wysiwygPromise;
@@ -290,7 +247,6 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
         await editable.dispatchEvent(new KeyboardEvent('keydown', {key: 'z', ctrlKey: true, bubbles: true, cancelable: true}));
         assert.strictEqual(editable.innerHTML, `<p>first</p>`);
     });
-
 
     QUnit.module('Sandboxed Preview');
 
@@ -323,11 +279,11 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
             serverData,
             arch: `
                 <form>
-                    <field name="txt" widget="html"/>
+                    <field name="txt" widget="html_legacy"/>
                 </form>`,
         });
 
-        assert.containsOnce(target, '.o_field_html[name="txt"] iframe[sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"]');
+        assert.containsOnce(target, '.o_field_html_legacy[name="txt"] iframe[sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"]');
     });
 
     QUnit.test("readonly sandboxed preview", async (assert) => {
@@ -358,11 +314,11 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
             serverData,
             arch: `
                 <form string="Partner">
-                    <field name="txt" widget="html" readonly="1" options="{'sandboxedPreview': true}"/>
+                    <field name="txt" widget="html_legacy" readonly="1" options="{'sandboxedPreview': true}"/>
                 </form>`,
         });
 
-        const readonlyIframe = target.querySelector('.o_field_html[name="txt"] iframe[sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"]');
+        const readonlyIframe = target.querySelector('.o_field_html_legacy[name="txt"] iframe[sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"]');
         assert.ok(readonlyIframe);
         await iframeReady(readonlyIframe);
         assert.strictEqual(readonlyIframe.contentDocument.body.innerText, 'Hello');
@@ -415,7 +371,7 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
                     <sheet>
                         <notebook>
                                 <page string="Body" name="body">
-                                    <field name="txt" widget="html" options="{'sandboxedPreview': true}"/>
+                                    <field name="txt" widget="html_legacy" options="{'sandboxedPreview': true}"/>
                                 </page>
                         </notebook>
                     </sheet>
@@ -429,7 +385,7 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
         });
 
         // check original displayed content
-        let iframe = target.querySelector('.o_field_html[name="txt"] iframe[sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"]');
+        let iframe = target.querySelector('.o_field_html_legacy[name="txt"] iframe[sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"]');
         assert.ok(iframe, 'Should use a sanboxed iframe');
         await iframeReady(iframe);
         assert.strictEqual(iframe.contentDocument.body.textContent.trim(), 'Hello');
@@ -442,12 +398,12 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
         await click(target, '#codeview-btn-group > button');
         await togglePromises[togglePromiseId];
         togglePromiseId++;
-        assert.containsOnce(target, '.o_field_html[name="txt"] textarea');
-        await editInput(target, '.o_field_html[name="txt"] textarea', htmlDocumentTextTemplate('Hi', 'blue'));
+        assert.containsOnce(target, '.o_field_html_legacy[name="txt"] textarea');
+        await editInput(target, '.o_field_html_legacy[name="txt"] textarea', htmlDocumentTextTemplate('Hi', 'blue'));
         await click(target, '#codeview-btn-group > button');
         await togglePromises[togglePromiseId];
         // check dispayed content after edit
-        iframe = target.querySelector('.o_field_html[name="txt"] iframe[sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"]');
+        iframe = target.querySelector('.o_field_html_legacy[name="txt"] iframe[sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"]');
         await iframeReady(iframe);
         assert.strictEqual(iframe.contentDocument.body.textContent.trim(), 'Hi');
         assert.strictEqual(iframe.contentDocument.head.querySelector('style').textContent.trim().replace(/\s/g, ''),
@@ -478,12 +434,12 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
             serverData,
             arch: `
                 <form>
-                    <field name="txt" widget="html"/>
+                    <field name="txt" widget="html_legacy"/>
                 </form>`,
         });
 
-        assert.containsN(target, '.o_field_html[name="txt"] iframe[sandbox]', 0);
-        assert.containsN(target, '.o_field_html[name="txt"] textarea', 0);
+        assert.containsN(target, '.o_field_html_legacy[name="txt"] iframe[sandbox]', 0);
+        assert.containsN(target, '.o_field_html_legacy[name="txt"] textarea', 0);
     });
 
     QUnit.test("sandboxed preview option applies even for simple text", async (assert) => {
@@ -500,11 +456,11 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
             serverData,
             arch: `
                 <form>
-                    <field name="txt" widget="html" options="{'sandboxedPreview': true}"/>
+                    <field name="txt" widget="html_legacy" options="{'sandboxedPreview': true}"/>
                 </form>`,
         });
 
-        assert.containsOnce(target, '.o_field_html[name="txt"] iframe[sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"]');
+        assert.containsOnce(target, '.o_field_html_legacy[name="txt"] iframe[sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"]');
     });
 
     QUnit.module('Readonly mode');
@@ -527,7 +483,7 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
             serverData,
             arch: `
                 <form>
-                    <field name="txt" widget="html" readonly="1"/>
+                    <field name="txt" widget="html_legacy" readonly="1"/>
                 </form>`,
         });
 
@@ -656,7 +612,7 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
             serverData,
             arch: `
                 <form>
-                    <field name="txt" widget="html"/>
+                    <field name="txt" widget="html_legacy"/>
                 </form>`,
             mockRPC: mockRPC,
         });
@@ -725,6 +681,49 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
             }
         };
 
+        const pasteImage = async (editor) => {
+            // Create image file.
+            const base64ImageData = "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX///+/v7+jQ3Y5AAAADklEQVQI12P4AIX8EAgALgAD/aNpbtEAAAAASUVORK5CYII"
+            const binaryImageData = atob(base64ImageData);
+            const uint8Array = new Uint8Array(binaryImageData.length);
+            for (let i = 0; i < binaryImageData.length; i++) {
+                uint8Array[i] = binaryImageData.charCodeAt(i);
+            }
+            const file = new File([uint8Array], "test_image.png", { type: 'image/png' });
+
+            // Create a promise to get the created img elements
+            const pasteImagePromise = makeDeferred();
+            const observer = new MutationObserver(mutations => {
+                mutations
+                    .filter(mutation => mutation.type === 'childList')
+                    .forEach(mutation => {
+                        mutation.addedNodes.forEach(node => {
+                            if (node instanceof HTMLElement) {
+                                pasteImagePromise.resolve(node);
+                            }
+                        });
+                    });
+            });
+            observer.observe(editor.editable, { subtree: true, childList: true });
+
+            // Simulate paste.
+            editor._onPaste({
+                preventDefault() {},
+                clipboardData: {
+                    getData() {},
+                    items: [{
+                        kind: 'file',
+                        type: 'image/png',
+                        getAsFile: () => file,
+                    }],
+                },
+            });
+
+            const img = await pasteImagePromise;
+            observer.disconnect();
+            return img;
+        }
+
         await makeView({
             type: "form",
             resId: 1,
@@ -732,7 +731,7 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
             serverData,
             arch: `
                 <form>
-                    <field name="txt" widget="html"/>
+                    <field name="txt" widget="html_legacy"/>
                 </form>`,
             mockRPC: mockRPC,
         });
@@ -744,7 +743,7 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
         Wysiwyg.setRange(paragraph);
 
         // Paste image.
-        const img = await pasteImage(editor, "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX///+/v7+jQ3Y5AAAADklEQVQI12P4AIX8EAgALgAD/aNpbtEAAAAASUVORK5CYII");
+        const img = await pasteImage(editor);
         // Test environment replaces 'src' by 'data-src'.
         assert.ok(/^data:image\/png;base64,/.test(img.dataset['src']));
         assert.ok(img.classList.contains('o_b64_image_to_save'));
@@ -755,72 +754,6 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
         await htmlField.commitChanges();
         assert.equal(img.dataset['src'], '/test_image_url.png?access_token=1234');
         assert.ok(!img.classList.contains('o_b64_image_to_save'));
-    });
-
-    QUnit.test("Pasted/dropped images are saved and content not transfered to next record", async (assert) => {
-        serverData.models.partner.records = [
-            { id: 1, txt: "<p class='image_target'>first</p>" },
-            { id: 2, txt: "<p>second</p>" },
-        ];
-
-        // Patch to get a promise to get the htmlField component instance when
-        // the wysiwyg is instancied.
-        const htmlFieldPromise = makeDeferred();
-        patchWithCleanup(HtmlField.prototype, {
-            async startWysiwyg() {
-                await super.startWysiwyg(...arguments);
-                await nextTick();
-                htmlFieldPromise.resolve(this);
-            }
-        });
-
-        const mockRPC = async function (route, args) {
-            if (route === '/web_editor/attachment/add_data') {
-                return {
-                    image_src: '/test_image_url.png',
-                    access_token: '1234',
-                    public: false,
-                }
-            }
-            if (route.includes("web_save")){
-                // reading next record
-                return [{ id: 2, txt: "<p>second</p>" }];
-            }
-        };
-
-        await makeView({
-            type: "form",
-            resId: 1,
-            resIds: [1, 2],
-            resModel: "partner",
-            serverData,
-            arch: `
-                <form>
-                    <field name="txt" widget="html"/>
-                </form>`,
-            mockRPC: mockRPC,
-        });
-        // Let the htmlField be mounted and recover the Component instance.
-        const htmlField = await htmlFieldPromise;
-        const editor = htmlField.wysiwyg.odooEditor;
-
-        const paragraph = editor.editable.querySelector(".image_target");
-        Wysiwyg.setRange(paragraph);
-
-        // Paste image.
-        const img = await pasteImage(editor, "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX///+/v7+jQ3Y5AAAADklEQVQI12P4AIX8EAgALgAD/aNpbtEAAAAASUVORK5CYII");
-        // Restore 'src' attribute so that SavePendingImages can do its job.
-        img.src = img.dataset['src'];
-
-        const blurEvent = new Event('blur', {
-            bubbles: true,
-            cancelable: true
-        });
-        target.querySelector(".odoo-editor-editable").dispatchEvent(blurEvent);
-
-        await click(target.querySelector(".o_pager_next"));
-        await nextTick();
-        assert.containsOnce(target, ".odoo-editor-editable p:contains('second')");
     });
 
     QUnit.module('Odoo fields synchronisation');
@@ -872,7 +805,7 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
             serverData,
             arch: `
                 <form>
-                    <field name="txt" widget="html"/>
+                    <field name="txt" widget="html_legacy"/>
                 </form>`,
         });
 
@@ -935,7 +868,7 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
             serverData,
             arch: `
                 <form>
-                    <field name="txt" widget="html"/>
+                    <field name="txt" widget="html_legacy"/>
                 </form>`,
         });
 
@@ -998,7 +931,7 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
             serverData,
             arch: `
                 <form>
-                    <field name="txt" widget="html"/>
+                    <field name="txt" widget="html_legacy"/>
                 </form>`,
         });
 
@@ -1041,7 +974,7 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
             serverData,
             arch: `
                 <form>
-                    <field name="txt" widget="html" options="{'allowCommandVideo': true}"/>
+                    <field name="txt" widget="html_legacy" options="{'allowCommandVideo': true}"/>
                 </form>`,
             mockRPC: mockRPC,
         });
@@ -1086,7 +1019,7 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
             serverData,
             arch: `
                 <form>
-                    <field name="txt" widget="html"/>
+                    <field name="txt" widget="html_legacy"/>
                 </form>`,
         });
 
@@ -1160,7 +1093,7 @@ QUnit.module("WebEditor.HtmlField", ({ beforeEach }) => {
             serverData,
             arch: `
                 <form>
-                    <field name="txt" widget="html"/>
+                    <field name="txt" widget="html_legacy"/>
                 </form>`,
         });
         await wysiwygPromise;
@@ -1262,7 +1195,7 @@ export const uploadTestModule = QUnit.module(
                 "mail.compose.message,false,search": "<search></search>",
                 "mail.compose.message,false,form": `
                     <form>
-                        <field name="body" type="html"/>
+                        <field name="body" type="html" widget="html_legacy"/>
                         <field name="attachment_ids" widget="many2many_binary"/>
                     </form>`,
             };
@@ -1302,7 +1235,7 @@ export const uploadTestModule = QUnit.module(
             await doAction(webClient, 1);
             //trigger wysiwyg mediadialog
             const fixture = getFixture();
-            const formField = fixture.querySelector('.o_field_html[name="body"]');
+            const formField = fixture.querySelector('.o_field_html_legacy[name="body"]');
             const textInput = formField.querySelector(".note-editable p");
             textInput.innerText = "test";
             const pText = $(textInput).contents()[0];

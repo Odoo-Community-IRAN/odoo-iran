@@ -14,10 +14,11 @@ class MrpUnbuild(models.Model):
     _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'id desc'
 
-    name = fields.Char('Reference', copy=False, readonly=True, default=lambda x: _('New'))
+    name = fields.Char('Reference', copy=False, readonly=True, default=lambda s: s.env._('New'))
     product_id = fields.Many2one(
         'product.product', 'Product', check_company=True,
-        domain="[('type', 'in', ['product', 'consu'])]",
+        domain="[('type', '=', 'consu')]",
+        compute='_compute_product_id', store=True, precompute=True, readonly=False,
         required=True)
     company_id = fields.Many2one(
         'res.company', 'Company',
@@ -25,6 +26,7 @@ class MrpUnbuild(models.Model):
         required=True, index=True)
     product_qty = fields.Float(
         'Quantity', default=1.0,
+        compute='_compute_product_qty', store=True, precompute=True, readonly=False,
         required=True)
     product_uom_id = fields.Many2one(
         'uom.uom', 'Unit of Measure',
@@ -43,6 +45,7 @@ class MrpUnbuild(models.Model):
             ('company_id', '=', company_id),
             ('company_id', '=', False)
         ]""",
+        compute='_compute_bom_id', store=True,
         check_company=True)
     mo_id = fields.Many2one(
         'mrp.production', 'Manufacturing Order',
@@ -51,8 +54,9 @@ class MrpUnbuild(models.Model):
     mo_bom_id = fields.Many2one('mrp.bom', 'Bill of Material used on the Production Order', related='mo_id.bom_id')
     lot_id = fields.Many2one(
         'stock.lot', 'Lot/Serial Number',
+        compute='_compute_lot_id', store=True,
         domain="[('product_id', '=', product_id)]", check_company=True)
-    has_tracking=fields.Selection(related='product_id.tracking', readonly=True)
+    has_tracking = fields.Selection(related='product_id.tracking', readonly=True)
     location_id = fields.Many2one(
         'stock.location', 'Source Location',
         domain="[('usage','=','internal')]",
@@ -97,24 +101,36 @@ class MrpUnbuild(models.Model):
                 if order.location_dest_id.company_id != order.company_id:
                     order.location_dest_id = warehouse.lot_stock_id
 
-    @api.onchange('mo_id')
-    def _onchange_mo_id(self):
-        if self.mo_id:
-            self.product_id = self.mo_id.product_id.id
-            self.bom_id = self.mo_id.bom_id
-            self.product_uom_id = self.mo_id.product_uom_id
-            self.lot_id = self.mo_id.lot_producing_id
-            if self.has_tracking == 'serial':
-                self.product_qty = 1
+    @api.depends('mo_id', 'product_id', 'company_id')
+    def _compute_bom_id(self):
+        for order in self:
+            if order.mo_id:
+                order.bom_id = order.mo_id.bom_id
             else:
-                self.product_qty = self.mo_id.qty_produced
+                order.bom_id = self.env['mrp.bom']._bom_find(
+                    order.product_id, company_id=order.company_id.id
+                )[order.product_id]
 
+    @api.depends('mo_id')
+    def _compute_lot_id(self):
+        for order in self:
+            if order.mo_id:
+                order.lot_id = order.mo_id.lot_producing_id
 
-    @api.onchange('product_id')
-    def _onchange_product_id(self):
-        if self.product_id:
-            self.bom_id = self.env['mrp.bom']._bom_find(self.product_id, company_id=self.company_id.id)[self.product_id]
-            self.product_uom_id = self.mo_id.product_id == self.product_id and self.mo_id.product_uom_id.id or self.product_id.uom_id.id
+    @api.depends('mo_id')
+    def _compute_product_id(self):
+        for order in self:
+            if order.mo_id and order.mo_id.product_id:
+                order.product_id = order.mo_id.product_id
+
+    @api.depends('mo_id')
+    def _compute_product_qty(self):
+        for order in self:
+            if order.mo_id:
+                if order.has_tracking == 'serial':
+                    order.product_qty = 1
+                else:
+                    order.product_qty = order.mo_id.qty_produced
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -183,23 +199,24 @@ class MrpUnbuild(models.Model):
         # TODO: Will fail if user do more than one unbuild with lot on the same MO. Need to check what other unbuild has aready took
         qty_already_used = defaultdict(float)
         for move in produce_moves | consume_moves:
-            if move.has_tracking != 'none':
-                original_move = move in produce_moves and self.mo_id.move_raw_ids or self.mo_id.move_finished_ids
-                original_move = original_move.filtered(lambda m: m.product_id == move.product_id)
-                needed_quantity = move.product_uom_qty
-                moves_lines = original_move.mapped('move_line_ids')
-                if move in produce_moves and self.lot_id:
-                    moves_lines = moves_lines.filtered(lambda ml: self.lot_id in ml.produce_line_ids.lot_id)  # FIXME sle: double check with arm
-                for move_line in moves_lines:
-                    # Iterate over all move_lines until we unbuilded the correct quantity.
-                    taken_quantity = min(needed_quantity, move_line.quantity - qty_already_used[move_line])
-                    if taken_quantity:
-                        move_line_vals = self._prepare_move_line_vals(move, move_line, taken_quantity)
-                        self.env['stock.move.line'].create(move_line_vals)
-                        needed_quantity -= taken_quantity
-                        qty_already_used[move_line] += taken_quantity
-            else:
+            original_move = move in produce_moves and self.mo_id.move_raw_ids or self.mo_id.move_finished_ids
+            original_move = original_move.filtered(lambda m: m.product_id == move.product_id)
+            if not original_move:
                 move.quantity = float_round(move.product_uom_qty, precision_rounding=move.product_uom.rounding)
+                continue
+            needed_quantity = move.product_uom_qty
+            moves_lines = original_move.mapped('move_line_ids')
+            if move in produce_moves and self.lot_id:
+                moves_lines = moves_lines.filtered(lambda ml: self.lot_id in ml.produce_line_ids.lot_id)  # FIXME sle: double check with arm
+            for move_line in moves_lines:
+                # Iterate over all move_lines until we unbuilded the correct quantity.
+                taken_quantity = min(needed_quantity, move_line.quantity - qty_already_used[move_line])
+                taken_quantity = float_round(taken_quantity, precision_rounding=move.product_uom.rounding)
+                if taken_quantity:
+                    move_line_vals = self._prepare_move_line_vals(move, move_line, taken_quantity)
+                    self.env["stock.move.line"].create(move_line_vals)
+                    needed_quantity -= taken_quantity
+                    qty_already_used[move_line] += taken_quantity
 
         (finished_moves | consume_moves | produce_moves).picked = True
         finished_moves._action_done()
@@ -298,7 +315,7 @@ class MrpUnbuild(models.Model):
             return self.action_unbuild()
         else:
             return {
-                'name': self.product_id.display_name + _(': Insufficient Quantity To Unbuild'),
+                'name': _('%(product)s: Insufficient Quantity To Unbuild', product=self.product_id.display_name),
                 'view_mode': 'form',
                 'res_model': 'stock.warn.insufficient.qty.unbuild',
                 'view_id': self.env.ref('mrp.stock_warn_insufficient_qty_unbuild_form_view').id,

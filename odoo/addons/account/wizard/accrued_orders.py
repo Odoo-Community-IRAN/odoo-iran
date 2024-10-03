@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 from dateutil.relativedelta import relativedelta
 import json
@@ -149,9 +148,6 @@ class AccruedExpenseRevenue(models.TransientModel):
                 order_line = order.order_line[0]
                 account = self._get_computed_account(order, order_line.product_id, is_purchase)
                 distribution = order_line.analytic_distribution if order_line.analytic_distribution else {}
-                if not is_purchase and order.analytic_account_id:
-                    analytic_account_id = str(order.analytic_account_id.id)
-                    distribution[analytic_account_id] = distribution.get(analytic_account_id, 0) + 100.0
                 values = _get_aml_vals(order, self.amount, 0, account.id, label=_('Manual entry'), analytic_distribution=distribution)
                 move_lines.append(Command.create(values))
             else:
@@ -167,7 +163,9 @@ class AccruedExpenseRevenue(models.TransientModel):
                     o.order_line.with_context(accrual_entry_date=self.date)._compute_untaxed_amount_invoiced()
                     o.order_line.with_context(accrual_entry_date=self.date)._compute_qty_to_invoice()
                 lines = o.order_line.filtered(
-                    lambda l: l.display_type not in ['line_section', 'line_note'] and
+                    # We only want lines that are not sections or notes and include all lines
+                    # for purchase orders but exclude downpayment lines for sales orders.
+                    lambda l: l.display_type not in ['line_section', 'line_note'] and (is_purchase or not l.is_downpayment) and
                     fields.Float.compare(
                         l.qty_to_invoice,
                         0,
@@ -190,17 +188,28 @@ class AccruedExpenseRevenue(models.TransientModel):
                         amount_currency = order_line.currency_id.round(price_subtotal)
                         amount = order.currency_id._convert(amount_currency, self.company_id.currency_id, self.company_id)
                         fnames = ['qty_to_invoice', 'qty_received', 'qty_invoiced', 'invoice_lines']
-                        label = _('%s - %s; %s Billed, %s Received at %s each', order.name, _ellipsis(order_line.name, 20), order_line.qty_invoiced, order_line.qty_received, formatLang(self.env, order_line.price_unit, currency_obj=order.currency_id))
+                        label = _(
+                            '%(order)s - %(order_line)s; %(quantity_billed)s Billed, %(quantity_received)s Received at %(unit_price)s each',
+                            order=order.name,
+                            order_line=_ellipsis(order_line.name, 20),
+                            quantity_billed=order_line.qty_invoiced,
+                            quantity_received=order_line.qty_received,
+                            unit_price=formatLang(self.env, order_line.price_unit, currency_obj=order.currency_id),
+                        )
                     else:
                         account = self._get_computed_account(order, order_line.product_id, is_purchase)
                         amount_currency = order_line.untaxed_amount_to_invoice
                         amount = order.currency_id._convert(amount_currency, self.company_id.currency_id, self.company_id)
                         fnames = ['qty_to_invoice', 'untaxed_amount_to_invoice', 'qty_invoiced', 'qty_delivered', 'invoice_lines']
-                        label = _('%s - %s; %s Invoiced, %s Delivered at %s each', order.name, _ellipsis(order_line.name, 20), order_line.qty_invoiced, order_line.qty_delivered, formatLang(self.env, order_line.price_unit, currency_obj=order.currency_id))
+                        label = _(
+                            '%(order)s - %(order_line)s; %(quantity_invoiced)s Invoiced, %(quantity_delivered)s Delivered at %(unit_price)s each',
+                            order=order.name,
+                            order_line=_ellipsis(order_line.name, 20),
+                            quantity_invoiced=order_line.qty_invoiced,
+                            quantity_delivered=order_line.qty_delivered,
+                            unit_price=formatLang(self.env, order_line.price_unit, currency_obj=order.currency_id),
+                        )
                     distribution = order_line.analytic_distribution if order_line.analytic_distribution else {}
-                    if not is_purchase and order.analytic_account_id:
-                        analytic_account_id = str(order.analytic_account_id.id)
-                        distribution[analytic_account_id] = distribution.get(analytic_account_id, 0) + 100.0
                     values = _get_aml_vals(order, amount, amount_currency, account.id, label=label, analytic_distribution=distribution)
                     move_lines.append(Command.create(values))
                     total_balance += amount
@@ -213,9 +222,6 @@ class AccruedExpenseRevenue(models.TransientModel):
             total = sum(order.amount_total for order in orders)
             for line in orders.order_line:
                 ratio = line.price_total / total
-                if not is_purchase and line.order_id.analytic_account_id:
-                    account_id = str(line.order_id.analytic_account_id.id)
-                    analytic_distribution.update({account_id: analytic_distribution.get(account_id, 0) +100.0*ratio})
                 if not line.analytic_distribution:
                     continue
                 for account_id, distribution in line.analytic_distribution.items():
@@ -225,7 +231,7 @@ class AccruedExpenseRevenue(models.TransientModel):
 
         move_type = _('Expense') if is_purchase else _('Revenue')
         move_vals = {
-            'ref': _('Accrued %s entry as of %s', move_type, format_date(self.env, self.date)),
+            'ref': _('Accrued %(entry_type)s entry as of %(date)s', entry_type=move_type, date=format_date(self.env, self.date)),
             'journal_id': self.journal_id.id,
             'date': self.date,
             'line_ids': move_lines,
@@ -259,6 +265,6 @@ class AccruedExpenseRevenue(models.TransientModel):
             'name': _('Accrual Moves'),
             'type': 'ir.actions.act_window',
             'res_model': 'account.move',
-            'view_mode': 'tree,form',
+            'view_mode': 'list,form',
             'domain': [('id', 'in', (move.id, reverse_move.id))],
         }

@@ -86,7 +86,7 @@
                 <br/>
 
                 <strong>Customer:</strong>
-                <span t-field="o.partner_id.name"/>
+                <span t-out="o.partner_id.commercial_partner_id.name or o.partner_id.name"/>
                 <br/>
 
                 <t t-if="o.partner_id.vat and o.partner_id.l10n_latam_identification_type_id">
@@ -146,7 +146,7 @@
             <div name="no_shipping"/>
         </xpath>
 
-        <xpath expr="//h2" position="replace"/>
+        <xpath expr="//t[@t-set='layout_document_title']" position="replace"/>
 
         <t t-set="current_subtotal" t-value="current_subtotal + line.price_subtotal" position="before">
             <t t-set="line_amounts" t-value="line._l10n_cl_get_line_amounts()"/>
@@ -162,7 +162,7 @@
             <attribute name="t-options">{"widget": "float", "precision": 2}</attribute>
         </xpath>
 
-        <th name="th_discount" t-attf-class="text-end {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}" position="after">
+        <th name="th_priceunit" t-attf-class="text-end text-nowrap {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}" position="after">
             <th name="th_discount_currency" t-if="display_discount" t-attf-class="text-end {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
                 <span>Disc.</span>
             </th>
@@ -210,10 +210,6 @@
             </div>
         </xpath>
 
-        <!-- Disable the recap of tax totals in company currency at the bottom right of the invoice
-        to prevent duplicate info since it's already present in our custom tax totals-->
-        <xpath expr="//div[@id='right-elements']/t[@t-call='account.document_tax_totals_company_currency_template']" position="replace"/>
-
         <xpath expr="//span[@t-field='line.name']" position="replace">
             <t t-set="all_taxes" t-value="'all_taxes'"/>
             <t t-if="'second_currency' in line_amounts" t-set="line_second_currency_round" t-value="line_amounts['second_currency']['round_currency']"/>
@@ -236,7 +232,7 @@
     </template>
 
     <template id="tax_totals_widget" inherit_id="account.document_tax_totals" primary="True">
-        <t t-foreach="tax_totals.get('subtotals')" t-as="subtotal" position="replace">
+        <t t-foreach="tax_totals['subtotals']" t-as="subtotal" position="replace">
             <t t-set="subtotal_amounts" t-value="o._l10n_cl_get_amounts()"/>
             <t t-set="withholdings" t-value="o._l10n_cl_get_withholdings()"/>
             <t t-if="subtotal_amounts['subtotal_amount_taxable'] != 0.0">
@@ -261,8 +257,8 @@
                     <td class="text-end" t-out="wh['tax_amount']" t-options="{'widget': 'monetary', 'display_currency': subtotal_amounts['main_currency']}"/></tr>
             </t>
         </t>
-        <tr class="border-black o_total" position="replace">
-            <tr class="border-black o_total">
+        <tr class="o_total" position="replace">
+            <tr class="o_total">
                 <td><strong>Total</strong></td>
                 <td class="text-end">
                     <span t-out="subtotal_amounts['total_amount']" t-options="{'widget': 'monetary', 'display_currency': subtotal_amounts['main_currency']}"/>

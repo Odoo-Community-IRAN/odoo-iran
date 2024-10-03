@@ -28,7 +28,7 @@ class MailBlackList(models.Model):
         for value in values:
             email = tools.email_normalize(value.get('email'))
             if not email:
-                raise UserError(_('Invalid email address %r', value['email']))
+                raise UserError(_('Invalid email address “%s”', value['email']))
             if email in all_emails:
                 continue
             all_emails.append(email)
@@ -54,7 +54,7 @@ class MailBlackList(models.Model):
             values['email'] = tools.email_normalize(values['email'])
         return super(MailBlackList, self).write(values)
 
-    def _search(self, domain, offset=0, limit=None, order=None, access_rights_uid=None):
+    def _search(self, domain, offset=0, limit=None, order=None):
         """ Override _search in order to grep search on email field and make it
         lower-case and sanitized """
         def normalize(arg):
@@ -65,7 +65,7 @@ class MailBlackList(models.Model):
             return arg
 
         domain = [normalize(item) for item in domain]
-        return super()._search(domain, offset, limit, order, access_rights_uid)
+        return super()._search(domain, offset, limit, order)
 
     def _add(self, email, message=None):
         normalized = tools.email_normalize(email)
@@ -101,11 +101,12 @@ class MailBlackList(models.Model):
 
     def mail_action_blacklist_remove(self):
         return {
-            'name': _('Are you sure you want to unblacklist this Email Address?'),
+            'name': _('Are you sure you want to unblacklist this email address?'),
             'type': 'ir.actions.act_window',
             'view_mode': 'form',
             'res_model': 'mail.blacklist.remove',
             'target': 'new',
+            'context': {'dialog_size': 'medium'},
         }
 
     def action_add(self):

@@ -6,7 +6,9 @@ import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_d
 import weUtils from "@web_editor/js/common/utils";
 import "@website/js/editor/snippets.options";
 import { unique } from "@web/core/utils/arrays";
+import { redirect } from "@web/core/utils/urls";
 import { _t } from "@web/core/l10n/translation";
+import { memoize } from "@web/core/utils/functions";
 import { renderToElement } from "@web/core/utils/render";
 import { formatDate, formatDateTime } from "@web/core/l10n/dates";
 import wUtils from '@website/js/utils';
@@ -38,6 +40,41 @@ function _getDomain(formEl, name, type, relation) {
     return field && field.domain;
 }
 
+const authorizedFieldsCache = {
+    data: {},
+    /**
+     * Returns the fields definitions for a form
+     *
+     * @param {HTMLElement} formEl
+     * @param {Object} orm
+     * @returns {Promise}
+     */
+    get(formEl, orm) {
+        // Combine model and fields into cache key.
+        const model = formEl.dataset.model_name;
+        const propertyOrigins = {};
+        const parts = [model];
+        for (const hiddenInputEl of [...formEl.querySelectorAll("input[type=hidden]")].sort(
+            (firstEl, secondEl) => firstEl.name.localeCompare(secondEl.name)
+        )) {
+            // Pushing using the name order to avoid being impacted by the
+            // order of hidden fields within the DOM.
+            parts.push(hiddenInputEl.name);
+            parts.push(hiddenInputEl.value);
+            propertyOrigins[hiddenInputEl.name] = hiddenInputEl.value;
+        }
+        const cacheKey = parts.join("/");
+        if (!(cacheKey in this.data)) {
+            this.data[cacheKey] = orm.call("ir.model", "get_authorized_fields", [
+                model,
+                propertyOrigins,
+            ]);
+        }
+        return this.data[cacheKey];
+    },
+};
+
+
 const FormEditor = options.Class.extend({
     init() {
         this._super(...arguments);
@@ -64,8 +101,18 @@ const FormEditor = options.Class.extend({
         if (field.records) {
             return field.records;
         }
-        // Set selection as records to avoid added conplexity
-        if (field.type === 'selection') {
+        if (field._property && field.type === "tags") {
+            // Convert tags to records to avoid added complexity.
+            // Tag ids need to escape "," to be able to recover their value on
+            // the server side if they contain ",".
+            field.records = field.tags.map(tag => ({
+                id: tag[0].replaceAll("\\", "\\/").replaceAll(",", "\\,"),
+                display_name: tag[1],
+            }));
+        } else if (field._property && field.comodel) {
+            field.records = await this.orm.searchRead(field.comodel, field.domain || [], ["display_name"]);
+        } else if (field.type === "selection") {
+            // Set selection as records to avoid added complexity.
             field.records = field.selection.map(el => ({
                 id: el[0],
                 display_name: el[1],
@@ -130,11 +177,7 @@ const FormEditor = options.Class.extend({
         return this.$target[0].dataset.mark;
     },
     /**
-     * Replace all `"` character by `&quot;`, all `'` character by `&apos;` and
-     * all "`" character by `&lsquo;`. This is needed in order to be able to
-     * perform querySelector of this type: `querySelector(`[name="${name}"]`)`.
-     * It also encodes the "\\" sequence to avoid having to escape it when doing
-     * a `querySelector`.
+     * Replace all `"` character by `&quot;`.
      *
      * @param {string} name
      * @returns {string}
@@ -151,12 +194,7 @@ const FormEditor = options.Class.extend({
         // names anyway; the idea was bad in the first place. We should probably
         // assign random field names (as we do for IDs) and send a mapping
         // with the labels, as values (TODO ?).
-        return name.replaceAll(/"/g, character => `&quot;`)
-            // TODO: in master only keep the conversion of the double quotation
-            // mark character as selectors are now escaped when doing a search.
-                   .replaceAll(/'/g, character => `&apos;`)
-                   .replaceAll(/`/g, character => `&lsquo;`)
-                   .replaceAll("\\", character => `&bsol;`);
+        return name.replaceAll(/"/g, character => `&quot;`);
     },
     /**
      * @private
@@ -200,7 +238,8 @@ const FormEditor = options.Class.extend({
             params.default_description = _t("Separate email addresses with a comma.");
         }
         const template = document.createElement('template');
-        template.content.append(renderToElement("website.form_field_" + field.type, params));
+        const renderType = field.type === "tags" ? "many2many" : field.type;
+        template.content.append(renderToElement("website.form_field_" + renderType, params));
         if (field.description && field.description !== true) {
             $(template.content.querySelector('.s_website_form_field_description')).replaceWith(field.description);
         }
@@ -394,14 +433,22 @@ options.registry.WebsiteFormEditor = FormEditor.extend({
         // e.g. User should not be enable to change existing job application form
         // to opportunity form in 'Apply job' page.
         this.modelCantChange = this.$target.attr('hide-change-model') !== undefined;
-
-        // Get list of website_form compatible models.
-        this.models = await this.orm.call("ir.model", "get_compatible_form_models");
+        this.models = await this._fetchModels();
 
         const targetModelName = this.$target[0].dataset.model_name || 'mail.mail';
         this.activeForm = this.models.find(m => m.model === targetModelName);
-        currentActionName = this.activeForm && this.activeForm.website_form_label;
+        currentActionName = this.activeForm && this.activeForm.website_form_label
 
+        this._makeSelectAction();
+        return _super(...arguments);
+    },
+
+    _fetchModels() {
+        // Get list of website_form compatible models.
+        return this.orm.call("ir.model", "get_compatible_form_models");
+    },
+
+    _makeSelectAction() {
         if (!this.modelCantChange) {
             // Create the Form Action select
             this.selectActionEl = document.createElement('we-select');
@@ -413,9 +460,8 @@ options.registry.WebsiteFormEditor = FormEditor.extend({
                 option.dataset.selectAction = el.id;
                 this.selectActionEl.append(option);
             });
+            return this.selectActionEl;
         }
-
-        return _super(...arguments);
     },
     /**
      * @override
@@ -529,11 +575,26 @@ options.registry.WebsiteFormEditor = FormEditor.extend({
      * ie: The Job you apply for if the form is on that job's page.
      */
     addActionField: function (previewMode, value, params) {
+        // Remove old property fields.
+        authorizedFieldsCache.get(this.$target[0], this.orm).then((fields) => {
+            for (const [fieldName, field] of Object.entries(fields)) {
+                if (field._property) {
+                    for (const inputEl of this.$target[0].querySelectorAll(`[name="${fieldName}"]`)) {
+                        inputEl.closest(".s_website_form_field").remove();
+                    }
+                }
+            }
+        });
         const fieldName = params.fieldName;
         if (params.isSelect === 'true') {
             value = parseInt(value);
         }
         this._addHiddenField(value, fieldName);
+        // Existing field editors need to be rebuilt with the correct list of
+        // available fields.
+        this.trigger_up('activate_snippet', {
+            $snippet: this.$target,
+        });
     },
     /**
      * Prompts the user to save changes before being redirected
@@ -878,7 +939,7 @@ options.registry.WebsiteFormEditor = FormEditor.extend({
      * @param {string} action
      */
     _redirectToAction: function (action) {
-        window.location.replace(`/web#action=${encodeURIComponent(action)}`);
+        redirect(`/odoo/action-${encodeURIComponent(action)}`);
     },
 
     //--------------------------------------------------------------------------
@@ -897,8 +958,6 @@ options.registry.WebsiteFormEditor = FormEditor.extend({
     },
 });
 
-const authorizedFieldsCache = {};
-
 options.registry.WebsiteFieldEditor = FieldEditor.extend({
     /**
      * @override
@@ -906,40 +965,14 @@ options.registry.WebsiteFieldEditor = FieldEditor.extend({
     init: function () {
         this._super.apply(this, arguments);
         this.rerender = true;
-    },
-    /**
-     * @override
-     */
-    willStart: async function () {
-        const _super = this._super.bind(this);
-        // Get the authorized existing fields for the form model
-        const model = this.formEl.dataset.model_name;
-        let getFields;
-        if (model in authorizedFieldsCache) {
-            getFields = authorizedFieldsCache[model];
-        } else {
-            getFields = this.orm.call("ir.model", "get_authorized_fields", [model]);
-            authorizedFieldsCache[model] = getFields;
-        }
-
-        this.existingFields = await getFields.then((fields) => {
-            this.fields = {};
-            for (const [fieldName, field] of Object.entries(fields)) {
-                field.name = fieldName;
-                const fieldDomain = _getDomain(this.formEl, field.name, field.type, field.relation);
-                field.domain = fieldDomain || field.domain || [];
-                this.fields[fieldName] = field;
-            }
-            // Create the buttons for the type we-select
-            return Object.keys(fields).map(key => {
-                const field = fields[key];
-                const button = document.createElement('we-button');
-                button.textContent = field.string;
-                button.dataset.existingField = field.name;
-                return button;
-            }).sort((a, b) => (a.textContent > b.textContent) ? 1 : (a.textContent < b.textContent) ? -1 : 0);
-        });
-        return _super(...arguments);
+        this._getVisibilityConditionCachedRecords = memoize(
+            (model, domain, fields, kwargs = {}) => {
+                return this.orm.searchRead(model, domain, fields, {
+                    ...kwargs,
+                    limit: 1000, // Safeguard to not crash DBs
+                });
+            },
+        );
     },
     /**
      * @override
@@ -953,16 +986,6 @@ options.registry.WebsiteFieldEditor = FieldEditor.extend({
             await this._replaceField(field);
         }
         return _super(...arguments);
-    },
-    /**
-     * @override
-     */
-    cleanForSave: function () {
-        this.$target[0].querySelectorAll('#editable_select').forEach(el => el.remove());
-        const select = this._getSelect();
-        if (select) {
-            select.style.display = '';
-        }
     },
     /**
      * @override
@@ -1051,6 +1074,16 @@ options.registry.WebsiteFieldEditor = FieldEditor.extend({
         this._setActiveProperties(field);
         await this._replaceField(field);
         this.rerender = true;
+    },
+    /**
+     * Set the the selction type of existing fields (radio or dropdown).
+     *
+     * @see this.selectClass for parameters
+     */
+    async existingFieldSelectType(previewMode, value, params) {
+        const field = this._getActiveField();
+        field.type = value;
+        await this._replaceField(field);
     },
     /**
      * Set the name of the field on the label
@@ -1230,6 +1263,7 @@ options.registry.WebsiteFieldEditor = FieldEditor.extend({
             case 'selectLabelPosition':
                 return this._getLabelPosition();
             case 'selectType':
+            case "existingFieldSelectType":
                 return this._getFieldType();
             case 'selectTextareaValue':
                 return this.$target[0].textContent;
@@ -1298,12 +1332,17 @@ options.registry.WebsiteFieldEditor = FieldEditor.extend({
                 return dependencyEl?.closest(".s_website_form_datetime");
             case 'hidden_condition_file_opt':
                 return dependencyEl && dependencyEl.type === 'file';
+            case "hidden_condition_record_opt":
+                return dependencyEl?.closest(".s_website_form_field")?.dataset.type === "record";
             case 'hidden_condition_opt':
                 return this.$target[0].classList.contains('s_website_form_field_hidden_if');
             case 'char_input_type_opt':
                 return !this.$target[0].classList.contains('s_website_form_custom') &&
                     ['char', 'email', 'tel', 'url'].includes(this.$target[0].dataset.type) &&
                     !this.$target[0].classList.contains('s_website_form_model_required');
+            case "existing_field_select_type_opt":
+                return !this._isFieldCustom() &&
+                        ["selection", "many2one"].includes(this.$target[0].dataset.type);
             case 'multi_check_display_opt':
                 return !!this._getMultipleInputs();
             case 'required_opt':
@@ -1384,10 +1423,32 @@ options.registry.WebsiteFieldEditor = FieldEditor.extend({
      * @override
      */
     _renderCustomXML: async function (uiFragment) {
+        // Get the authorized existing fields for the form model
+        // Do it on each render because of custom property fields which can
+        // change depending on the project selected.
+        this.existingFields = await authorizedFieldsCache.get(this.formEl, this.orm).then((fields) => {
+            this.fields = {};
+            for (const [fieldName, field] of Object.entries(fields)) {
+                field.name = fieldName;
+                const fieldDomain = _getDomain(this.formEl, field.name, field.type, field.relation);
+                field.domain = fieldDomain || field.domain || [];
+                this.fields[fieldName] = field;
+            }
+            // Create the buttons for the type we-select
+            return Object.keys(fields).map(key => {
+                const field = fields[key];
+                const button = document.createElement('we-button');
+                button.textContent = field.string;
+                button.dataset.existingField = field.name;
+                return button;
+            }).sort((a, b) => a.textContent.localeCompare(b.textContent, undefined, { numeric: true, sensitivity: "base" }));
+        });
         // Update available visibility dependencies
         const selectDependencyEl = uiFragment.querySelector('we-select[data-name="hidden_condition_opt"]');
         const existingDependencyNames = [];
-        for (const el of this.formEl.querySelectorAll('.s_website_form_field:not(.s_website_form_dnone)')) {
+        for (const el of this.formEl.querySelectorAll(
+            ".s_website_form_field:not(.s_website_form_dnone), .s_website_form_field[data-type]",
+        )) {
             const inputEl = el.querySelector('.s_website_form_input');
             if (el.querySelector('.s_website_form_label_content') && inputEl && inputEl.name
                     && inputEl.name !== this.$target[0].querySelector('.s_website_form_input').name
@@ -1403,9 +1464,21 @@ options.registry.WebsiteFieldEditor = FieldEditor.extend({
         const comparator = this.$target[0].dataset.visibilityComparator;
         const dependencyEl = this._getDependencyEl();
         if (dependencyEl) {
-            if ((['radio', 'checkbox'].includes(dependencyEl.type) || dependencyEl.nodeName === 'SELECT')) {
+            const containerEl = dependencyEl.closest(".s_website_form_field");
+            const fieldType = containerEl?.dataset.type;
+            if (
+                ["radio", "checkbox"].includes(dependencyEl.type) ||
+                dependencyEl.nodeName === "SELECT" ||
+                fieldType === "record"
+            ) {
                 // Update available visibility options
-                const selectOptEl = uiFragment.querySelectorAll('we-select[data-name="hidden_condition_no_text_opt"]')[1];
+                const selectOptName =
+                    fieldType === "record"
+                        ? "hidden_condition_record_opt"
+                        : "hidden_condition_no_text_opt";
+                const selectOptEl = uiFragment.querySelectorAll(
+                    `we-select[data-name="${selectOptName}"]`,
+                )[1];
                 const inputContainerEl = this.$target[0];
                 const dependencyEl = this._getDependencyEl();
                 if (dependencyEl.nodeName === 'SELECT') {
@@ -1417,6 +1490,24 @@ options.registry.WebsiteFieldEditor = FieldEditor.extend({
                     }
                     if (!inputContainerEl.dataset.visibilityCondition) {
                         inputContainerEl.dataset.visibilityCondition = dependencyEl.querySelector('option').value;
+                    }
+                } else if (fieldType === "record") {
+                    const model = containerEl.dataset.model;
+                    const idField = containerEl.dataset.idField || "id";
+                    const displayNameField = containerEl.dataset.displayNameField || "display_name";
+                    const records = await this._getVisibilityConditionCachedRecords(
+                        model,
+                        [],
+                        [idField, displayNameField],
+                    );
+                    for (const record of records) {
+                        const buttonEl = document.createElement("we-button");
+                        buttonEl.textContent = record[displayNameField];
+                        buttonEl.dataset.selectDataAttribute = record[idField];
+                        selectOptEl.append(buttonEl);
+                    }
+                    if (!inputContainerEl.dataset.visibilityCondition) {
+                        inputContainerEl.dataset.visibilityCondition = records[0]?.[idField];
                     }
                 } else { // DependecyEl is a radio or a checkbox
                     const dependencyContainerEl = dependencyEl.closest('.s_website_form_field');
@@ -1693,7 +1784,10 @@ options.registry.WebsiteFormFieldRequired = DisableOverlayButtonOption.extend({
         const fieldName = this.$target[0]
             .querySelector("input.s_website_form_input").getAttribute("name");
         const spanEl = document.createElement("span");
-        spanEl.innerText = _t("The field '%s' is mandatory for the action '%s'.", fieldName, currentActionName);
+        spanEl.innerText = _t("The field “%(field)s” is mandatory for the action “%(action)s”.", {
+            field: fieldName,
+            action: currentActionName,
+        });
         uiFragment.querySelector("we-alert").appendChild(spanEl);
     },
 });

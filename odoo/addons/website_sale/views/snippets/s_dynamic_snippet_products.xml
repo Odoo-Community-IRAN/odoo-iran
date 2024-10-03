@@ -3,6 +3,7 @@
     <template id="s_dynamic_snippet_products" name="Products">
         <t t-call="website.s_dynamic_snippet_template">
             <t t-set="snippet_name" t-value="'s_dynamic_snippet_products'"/>
+            <t t-call="website_sale.s_dynamic_snippet_products_preview_data"/>
         </t>
     </template>
     <template id="s_dynamic_snippet_products_options" inherit_id="website.snippet_options">
@@ -28,7 +29,11 @@
                     data-allow-delete="true"
                     data-fakem2m="true"
                     data-select-data-attribute=""/>
-                <we-input string="Product names" class="o_we_large" data-name="product_names_opt"
+                <we-checkbox string="Show variants"
+                    data-select-data-attribute="true"
+                    data-attribute-name="showVariants"
+                    data-no-preview="true"/>
+                <we-input string="Product Names" class="o_we_large" data-name="product_names_opt"
                     data-attribute-name="productNames" data-no-preview="true" data-select-data-attribute=""
                     placeholder="e.g. lamp,bin" title="Comma-separated list of parts of product names, barcodes or internal reference"/>
             </t>

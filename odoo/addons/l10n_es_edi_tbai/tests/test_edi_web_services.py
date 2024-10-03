@@ -13,8 +13,8 @@ from .common import TestEsEdiTbaiCommon
 class TestEdiTbaiWebServices(TestEsEdiTbaiCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref='es_full', edi_format_ref='l10n_es_edi_tbai.edi_es_tbai'):
-        super().setUpClass(chart_template_ref=chart_template_ref, edi_format_ref=edi_format_ref)
+    def setUpClass(cls):
+        super().setUpClass()
 
         # Invoice name are tracked by the web-services so this constant tries to get a new unique invoice name at each
         # execution.
@@ -55,7 +55,11 @@ class TestEdiTbaiWebServices(TestEsEdiTbaiCommon):
 
     def test_edi_gipuzkoa(self):
         self._set_tax_agency('gipuzkoa')
-        self.moves.action_process_edi_web_services(with_commit=False)
-        generated_files = self._process_documents_web_services(self.moves, {'es_tbai'})
-        self.assertTrue(generated_files)
-        self.assertRecordValues(self.out_invoice, [{'edi_state': 'sent'}])
+
+        self._get_invoice_send_wizard(self.out_invoice).action_send_and_print()
+        self.assertEqual(self.out_invoice.l10n_es_tbai_state, 'sent')
+        self.assertTrue(self.out_invoice.l10n_es_tbai_post_document_id.xml_attachment_id)
+
+        self.in_invoice.l10n_es_tbai_send_bill()
+        self.assertEqual(self.in_invoice.l10n_es_tbai_state, 'sent')
+        self.assertTrue(self.in_invoice.l10n_es_tbai_post_document_id.xml_attachment_id)

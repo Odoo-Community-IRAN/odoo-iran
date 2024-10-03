@@ -14,7 +14,7 @@ class MrpBom(models.Model):
     """ Defines bills of material for a product or a product template """
     _name = 'mrp.bom'
     _description = 'Bill of Material'
-    _inherit = ['mail.thread']
+    _inherit = ['mail.thread', 'product.catalog.mixin']
     _rec_name = 'product_tmpl_id'
     _rec_names_search = ['product_tmpl_id', 'code']
     _order = "sequence, id"
@@ -32,11 +32,11 @@ class MrpBom(models.Model):
     product_tmpl_id = fields.Many2one(
         'product.template', 'Product',
         check_company=True, index=True,
-        domain="[('type', 'in', ['product', 'consu'])]", required=True)
+        domain="[('type', '=', 'consu')]", required=True)
     product_id = fields.Many2one(
         'product.product', 'Product Variant',
         check_company=True, index=True,
-        domain="['&', ('product_tmpl_id', '=', product_tmpl_id), ('type', 'in', ['product', 'consu'])]",
+        domain="['&', ('product_tmpl_id', '=', product_tmpl_id), ('type', '=', 'consu')]",
         help="If a product variant is defined the BOM is available only for this product.")
     bom_line_ids = fields.One2many('mrp.bom.line', 'bom_id', 'BoM Lines', copy=True)
     byproduct_ids = fields.One2many('mrp.bom.byproduct', 'bom_id', 'By-products', copy=True)
@@ -102,7 +102,7 @@ class MrpBom(models.Model):
     )
     def _compute_possible_product_template_attribute_value_ids(self):
         for bom in self:
-            bom.possible_product_template_attribute_value_ids = bom.product_tmpl_id.valid_product_template_attribute_line_ids._without_no_variant_attributes().product_template_value_ids._only_active()
+            bom.possible_product_template_attribute_value_ids = bom.product_tmpl_id.valid_product_template_attribute_line_ids.product_template_value_ids._only_active()
 
     @api.onchange('product_id')
     def _onchange_product_id(self):
@@ -143,11 +143,11 @@ class MrpBom(models.Model):
                     _check_cycle(subcomponents, finished_products | component)
 
         boms_to_check = self
-        domain = []
-        for product in self.bom_line_ids.product_id:
-            domain = OR([domain, self._bom_find_domain(product)])
-        if domain:
-            boms_to_check |= self.env['mrp.bom'].search(domain)
+        if self.bom_line_ids.product_id:
+            boms_to_check |= self.search(OR([
+                self._bom_find_domain(product)
+                for product in self.bom_line_ids.product_id
+            ]))
 
         for bom in boms_to_check:
             if not bom.active:
@@ -191,7 +191,7 @@ class MrpBom(models.Model):
 
     @api.onchange('bom_line_ids', 'product_qty')
     def onchange_bom_structure(self):
-        if self.type == 'phantom' and self._origin and self.env['stock.move'].search([('bom_line_id', 'in', self._origin.bom_line_ids.ids)], limit=1):
+        if self.type == 'phantom' and self._origin and self.env['stock.move'].search_count([('bom_line_id', 'in', self._origin.bom_line_ids.ids)], limit=1):
             return {
                 'warning': {
                     'title': _('Warning'),
@@ -229,7 +229,7 @@ class MrpBom(models.Model):
                 domain.append(('id', '!=', self.id.origin))
             number_of_bom_of_this_product = self.env['mrp.bom'].search_count(domain)
             if number_of_bom_of_this_product:  # add a reference to the bom if there is already a bom for this product
-                self.code = _("%s (new) %s", self.product_tmpl_id.name, number_of_bom_of_this_product)
+                self.code = _("%(product_name)s (new) %(number_of_boms)s", product_name=self.product_tmpl_id.name, number_of_boms=number_of_bom_of_this_product)
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -253,23 +253,23 @@ class MrpBom(models.Model):
         return res
 
     def copy(self, default=None):
-        res = super().copy(default)
-        if self.operation_ids:
-            operations_mapping = {}
-            for original, copied in zip(self.operation_ids, res.operation_ids.sorted()):
-                operations_mapping[original] = copied
-            for bom_line in res.bom_line_ids:
-                if bom_line.operation_id:
-                    bom_line.operation_id = operations_mapping[bom_line.operation_id]
-            for operation in self.operation_ids:
-                if operation.blocked_by_operation_ids:
-                    copied_operation = operations_mapping[operation]
-                    dependencies = []
-                    for dependency in operation.blocked_by_operation_ids:
-                        dependencies.append(Command.link(operations_mapping[dependency].id))
-                    copied_operation.blocked_by_operation_ids = dependencies
-
-        return res
+        new_boms = super().copy(default)
+        for old_bom, new_bom in zip(self, new_boms):
+            if old_bom.operation_ids:
+                operations_mapping = {}
+                for original, copied in zip(old_bom.operation_ids, new_bom.operation_ids.sorted()):
+                    operations_mapping[original] = copied
+                for bom_line in new_bom.bom_line_ids:
+                    if bom_line.operation_id:
+                        bom_line.operation_id = operations_mapping[bom_line.operation_id]
+                for operation in old_bom.operation_ids:
+                    if operation.blocked_by_operation_ids:
+                        copied_operation = operations_mapping[operation]
+                        dependencies = []
+                        for dependency in operation.blocked_by_operation_ids:
+                            dependencies.append(Command.link(operations_mapping[dependency].id))
+                        copied_operation.blocked_by_operation_ids = dependencies
+        return new_boms
 
     @api.model
     def name_create(self, name):
@@ -317,7 +317,7 @@ class MrpBom(models.Model):
 
     @api.ondelete(at_uninstall=False)
     def _unlink_except_running_mo(self):
-        if self.env['mrp.production'].search([('bom_id', 'in', self.ids), ('state', 'not in', ['done', 'cancel'])], limit=1):
+        if self.env['mrp.production'].search_count([('bom_id', 'in', self.ids), ('state', 'not in', ['done', 'cancel'])], limit=1):
             raise UserError(_('You can not delete a Bill of Material with running manufacturing orders.\nPlease close or cancel it first.'))
 
     @api.model
@@ -363,7 +363,7 @@ class MrpBom(models.Model):
 
         return bom_by_product
 
-    def explode(self, product, quantity, picking_type=False):
+    def explode(self, product, quantity, picking_type=False, never_attribute_values=False):
         """
             Explodes the BoM and creates two lists with all the information you need: bom_done and line_done
             Quantity describes the number of times you need the BoM: so the quantity divided by the number created by the BoM
@@ -393,7 +393,7 @@ class MrpBom(models.Model):
             current_line, current_product, current_qty, parent_line = bom_lines[0]
             bom_lines = bom_lines[1:]
 
-            if current_line._skip_bom_line(current_product):
+            if current_line._skip_bom_line(current_product, never_attribute_values):
                 continue
 
             line_quantity = current_qty * current_line.product_qty
@@ -440,6 +440,79 @@ class MrpBom(models.Model):
             productions = self.env['mrp.production'].search(domain)
             if productions:
                 productions.is_outdated_bom = True
+
+    # -------------------------------------------------------------------------
+    # CATALOG
+    # -------------------------------------------------------------------------
+
+    def _default_order_line_values(self, child_field=False):
+        default_data = super()._default_order_line_values(child_field)
+        new_default_data = self[child_field]._get_product_catalog_lines_data(default=True)
+
+        return {**default_data, **new_default_data}
+
+    def _get_product_catalog_order_data(self, products, **kwargs):
+        product_catalog = super()._get_product_catalog_order_data(products, **kwargs)
+        for product in products:
+            product_catalog[product.id] |= self._get_product_price_and_data(product)
+        return product_catalog
+
+    def _get_product_price_and_data(self, product):
+        self.ensure_one()
+        return {'price': product.standard_price}
+
+    def _get_product_catalog_record_lines(self, product_ids, child_field=False, **kwargs):
+        if not child_field:
+            return {}
+        lines = self[child_field].filtered(lambda line: line.product_id.id in product_ids)
+        return lines.grouped('product_id')
+
+    def _update_order_line_info(self, product_id, quantity, child_field=False, **kwargs):
+        if not child_field:
+            return 0
+        entity = self[child_field].filtered(lambda line: line.product_id.id == product_id)
+        if entity:
+            if quantity != 0:
+                entity.product_qty = quantity
+            else:
+                entity.unlink()
+        elif quantity > 0:
+            command = Command.create({
+                'product_qty': quantity,
+                'product_id': product_id,
+            })
+            self.write({child_field: [command]})
+
+        return self.env['product.product'].browse(product_id).standard_price
+
+    # -------------------------------------------------------------------------
+    # DOCUMENT
+    # -------------------------------------------------------------------------
+
+    def _get_mail_thread_data_attachments(self):
+        res = super()._get_mail_thread_data_attachments()
+        return res | self._get_extra_attachments()
+
+    def _get_extra_attachments(self):
+        final_domain = []
+        bom_domain = [('attached_on_mrp', '=', 'bom')]
+        is_byproduct = self.env.user.has_group('mrp.group_mrp_byproducts')
+        for bom in self:
+            product_subdomain = ['|',
+                '&', ('res_model', '=', 'product.product'), ('res_id', '=', bom.product_id.id),
+                '&', ('res_model', '=', 'product.template'), ('res_id', '=', bom.product_tmpl_id.id)]
+            if is_byproduct:
+                product_domain = OR([product_subdomain, [
+                    '|',
+                    '&', ('res_model', '=', 'product.product'), ('res_id', 'in', bom.byproduct_ids.product_id.ids),
+                    '&', ('res_model', '=', 'product.template'), ('res_id', 'in', bom.byproduct_ids.product_id.product_tmpl_id.ids)]])
+            else:
+                product_domain = product_subdomain
+            prod_final_domain = AND([bom_domain, product_domain])
+            final_domain = OR([final_domain, prod_final_domain]) if final_domain else prod_final_domain
+
+        attachements = self.env['product.document'].search(final_domain).ir_attachment_id
+        return attachements
 
 
 class MrpBomLine(models.Model):
@@ -490,28 +563,16 @@ class MrpBomLine(models.Model):
     attachments_count = fields.Integer('Attachments Count', compute='_compute_attachments_count')
     tracking = fields.Selection(related='product_id.tracking')
     manual_consumption = fields.Boolean(
-        'Manual Consumption', default=False, compute='_compute_manual_consumption',
+        'Manual Consumption', default=False,
         readonly=False, store=True, copy=True,
         help="When activated, then the registration of consumption for that component is recorded manually exclusively.\n"
              "If not activated, and any of the components consumption is edited manually on the manufacturing order, Odoo assumes manual consumption also.")
-    manual_consumption_readonly = fields.Boolean(
-        'Manual Consumption Readonly', compute='_compute_manual_consumption_readonly')
 
     _sql_constraints = [
         ('bom_qty_zero', 'CHECK (product_qty>=0)', 'All product quantities must be greater or equal to 0.\n'
             'Lines with 0 quantities can be used as optional lines. \n'
             'You should install the mrp_byproduct module if you want to manage extra products on BoMs!'),
     ]
-
-    @api.depends('product_id', 'tracking', 'operation_id')
-    def _compute_manual_consumption(self):
-        for line in self:
-            line.manual_consumption = (line.tracking != 'none' or line.operation_id)
-
-    @api.depends('tracking', 'operation_id')
-    def _compute_manual_consumption_readonly(self):
-        for line in self:
-            line.manual_consumption_readonly = (line.tracking != 'none' or line.operation_id)
 
     @api.depends('product_id', 'bom_id')
     def _compute_child_bom_id(self):
@@ -526,10 +587,11 @@ class MrpBomLine(models.Model):
     @api.depends('product_id')
     def _compute_attachments_count(self):
         for line in self:
-            nbr_attach = self.env['mrp.document'].search_count([
+            nbr_attach = self.env['product.document'].search_count([
+                '&', '&', ('attached_on_mrp', '=', 'bom'), ('active', '=', 't'),
                 '|',
                 '&', ('res_model', '=', 'product.product'), ('res_id', '=', line.product_id.id),
-                '&', ('res_model', '=', 'product.template'), ('res_id', '=', line.product_id.product_tmpl_id.id)])
+                '&', ('res_model', '=', 'product.template'), ('res_id', '=', line.product_tmpl_id.id)])
             line.attachments_count = nbr_attach
 
     @api.depends('child_bom_id')
@@ -560,36 +622,102 @@ class MrpBomLine(models.Model):
                 values['product_uom_id'] = self.env['product.product'].browse(values['product_id']).uom_id.id
         return super(MrpBomLine, self).create(vals_list)
 
-    def _skip_bom_line(self, product):
-        """ Control if a BoM line should be produced, can be inherited to add
-        custom control.
+    def _skip_bom_line(self, product, never_attribute_values=False):
+        """ Control if a BoM line should be produced, can be inherited to add custom control.
+            cases:
+                - no_variant:
+                    1. attribute present on the line
+                        => need to be at least one attribute value matching between the one passed as args and the ones one the line
+                    2. attribute not present on the line
+                        => valid if the line has no attribute value selected for that attribute
+                - always and dynamic: match_all_variant_values()
         """
         self.ensure_one()
         if product._name == 'product.template':
             return False
-        return not product._match_all_variant_values(self.bom_product_template_attribute_value_ids)
+
+        # attributes create_variant 'always' and 'dynamic'
+        other_attribute_valid = product._match_all_variant_values(self.bom_product_template_attribute_value_ids.filtered(lambda a: a.attribute_id.create_variant != 'no_variant'))
+
+        # if there are no never attribute values on the bom line => always and dynamic
+
+        if not self.bom_product_template_attribute_value_ids.filtered(lambda a: a.attribute_id.create_variant == 'no_variant'):
+            return not other_attribute_valid
+
+        # or if there are never attribute on the line values but no value is passed => impossible to match
+        if not never_attribute_values:
+            return True
+
+        bom_values_by_attribute = self.bom_product_template_attribute_value_ids.filtered(
+                lambda a: a.attribute_id.create_variant == 'no_variant'
+            ).grouped('attribute_id')
+
+        never_values_by_attribute = never_attribute_values.grouped('attribute_id')
+
+        for a_id, a_values in bom_values_by_attribute.items():
+            if any(a.id in never_values_by_attribute[a_id].ids for a in a_values):
+                continue
+            return True
+        return not other_attribute_valid
 
     def action_see_attachments(self):
         domain = [
+            '&', ('attached_on_mrp', '=', 'bom'),
             '|',
             '&', ('res_model', '=', 'product.product'), ('res_id', '=', self.product_id.id),
             '&', ('res_model', '=', 'product.template'), ('res_id', '=', self.product_id.product_tmpl_id.id)]
-        attachment_view = self.env.ref('mrp.view_document_file_kanban_mrp')
+        attachments = self.env['product.document'].search(domain)
+        nbr_product_attach = len(attachments.filtered(lambda a: a.res_model == 'product.product'))
+        nbr_template_attach = len(attachments.filtered(lambda a: a.res_model == 'product.template'))
+        context = {'default_res_model': 'product.product',
+            'default_res_id': self.product_id.id,
+            'default_company_id': self.company_id.id,
+            'attached_on_bom': True,
+            'search_default_context_variant': not (nbr_product_attach == 0 and nbr_template_attach > 0) if self.env.user.has_group('product.group_product_variant') else False
+        }
+
         return {
             'name': _('Attachments'),
             'domain': domain,
-            'res_model': 'mrp.document',
+            'res_model': 'product.document',
             'type': 'ir.actions.act_window',
-            'view_id': attachment_view.id,
-            'views': [(attachment_view.id, 'kanban'), (False, 'form')],
-            'view_mode': 'kanban,tree,form',
+            'view_mode': 'kanban,list,form',
+            'target': 'current',
             'help': _('''<p class="o_view_nocontent_smiling_face">
                         Upload files to your product
                     </p><p>
                         Use this feature to store any files, like drawings or specifications.
                     </p>'''),
             'limit': 80,
-            'context': "{'default_res_model': '%s','default_res_id': %d, 'default_company_id': %s}" % ('product.product', self.product_id.id, self.company_id.id)
+            'context': context,
+            'search_view_id': self.env.ref('product.product_document_search').ids
+        }
+
+    # -------------------------------------------------------------------------
+    # CATALOG
+    # -------------------------------------------------------------------------
+
+    def action_add_from_catalog(self):
+        bom = self.env['mrp.bom'].browse(self.env.context.get('order_id'))
+        return bom.with_context(child_field='bom_line_ids').action_add_from_catalog()
+
+    def _get_product_catalog_lines_data(self, default=False, **kwargs):
+        if self and not default:
+            self.product_id.ensure_one()
+            return {
+                **self[0].bom_id._get_product_price_and_data(self[0].product_id),
+                'quantity': sum(
+                    self.mapped(
+                        lambda line: line.product_uom_id._compute_quantity(
+                            qty=line.product_qty,
+                            to_unit=line.product_uom_id,
+                        )
+                    )
+                ),
+                'readOnly': len(self) > 1,
+            }
+        return {
+            'quantity': 0,
         }
 
 
@@ -639,3 +767,30 @@ class MrpByProduct(models.Model):
         if product._name == 'product.template':
             return False
         return not product._match_all_variant_values(self.bom_product_template_attribute_value_ids)
+
+    # -------------------------------------------------------------------------
+    # CATALOG
+    # -------------------------------------------------------------------------
+
+    def action_add_from_catalog(self):
+        bom = self.env['mrp.bom'].browse(self.env.context.get('order_id'))
+        return bom.with_context(child_field='byproduct_ids').action_add_from_catalog()
+
+    def _get_product_catalog_lines_data(self, default=False, **kwargs):
+        if self and not default:
+            self.product_id.ensure_one()
+            return {
+                **self[0].bom_id._get_product_price_and_data(self[0].product_id),
+                'quantity': sum(
+                    self.mapped(
+                        lambda line: line.product_uom_id._compute_quantity(
+                            qty=line.product_qty,
+                            to_unit=line.product_uom_id,
+                        )
+                    )
+                ),
+                'readOnly': len(self) > 1
+            }
+        return {
+            'quantity': 0,
+        }

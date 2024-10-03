@@ -10,17 +10,22 @@
                     <sheet>
                         <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
                         <field name="active" invisible="1"/>
+                        <field name="floor_background_image" widget='image' class="oe_avatar" options='{"preview_image": "floor_background_image"}'/>
                         <group col="4">
                             <field name="name" />
                             <field name="pos_config_ids" widget="many2many_tags"/>
                             <field name="background_color" groups="base.group_no_one" />
                         </group>
                         <field name="table_ids">
-                            <tree string='Tables'>
-                                <field name="name" />
+                            <list string='Tables' editable="bottom">
+                                <field name="table_number" />
                                 <field name="seats" />
                                 <field name="shape" />
-                            </tree>
+                                <field name="height" optional="hide" />
+                                <field name="width" optional="hide" />
+                                <field name="color" widget="color" optional="hide" />
+                                <field name="active" optional="hide" />
+                            </list>
                         </field>
                     </sheet>
                 </form>
@@ -31,11 +36,11 @@
             <field name="name">Restaurant Floors</field>
             <field name="model">restaurant.floor</field>
             <field name="arch" type="xml">
-                <tree string="Restaurant Floors">
+                <list string="Restaurant Floors">
                     <field name="sequence" widget="handle" />
                     <field name="name" />
                     <field name="pos_config_ids" widget="many2many_tags"/>
-                </tree>
+                </list>
             </field>
         </record>
 
@@ -55,13 +60,11 @@
             <field name="model">restaurant.floor</field>
             <field name="arch" type="xml">
                 <kanban class="o_kanban_mobile">
-                    <field name="name"/>
-                    <field name="pos_config_ids" />
                     <templates>
-                        <t t-name="kanban-box">
-                            <div t-attf-class="oe_kanban_global_click">
-                                <div><strong>Floor Name: </strong><t t-esc="record.name.value"/></div>
-                                <div><strong>Point of Sales: </strong><t t-esc="record.pos_config_ids.value"/></div>
+                        <t t-name="card">
+                            <div><strong>Floor Name: </strong><field name="name"/></div>
+                            <div class="d-flex">
+                                <strong>Point of Sales:</strong><field name="pos_config_ids" class="ms-1"/>
                             </div>
                         </t>
                     </templates>
@@ -72,7 +75,7 @@
         <record id="action_restaurant_floor_form" model="ir.actions.act_window">
             <field name="name">Floor Plans</field>
             <field name="res_model">restaurant.floor</field>
-            <field name="view_mode">tree,kanban,form</field>
+            <field name="view_mode">list,kanban,form</field>
             <field name="help" type="html">
               <p class="o_view_nocontent_smiling_face">
                 Add a new restaurant floor
@@ -90,7 +93,7 @@
                 <form string="Restaurant Table">
                     <sheet>
                         <group col="2">
-                            <field name="name" />
+                            <field name="table_number" />
                             <field name="seats" />
                         </group>
                         <group col="4" string="Appearance" groups="base.group_no_one">

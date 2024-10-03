@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo import _, api, models, fields
-from odoo.tools import email_normalize, html2plaintext, is_html_empty, plaintext2html
+from odoo import api, models, fields
+from odoo.http import request
+from odoo.tools import email_normalize, get_lang, html2plaintext, is_html_empty, plaintext2html
 
 
 class ChatbotScript(models.Model):
@@ -52,7 +53,10 @@ class ChatbotScript(models.Model):
             else:
                 script.first_step_warning = False
 
-    @api.returns('self', lambda value: value.id)
+    def copy_data(self, default=None):
+        vals_list = super().copy_data(default=default)
+        return [dict(vals, title=self.env._("%s (copy)", script.title)) for script, vals in zip(self, vals_list)]
+
     def copy(self, default=None):
         """ Correctly copy the 'triggering_answer_ids' field from the original script_step_ids to the clone.
         This needs to be done in post-processing to make sure we get references to the newly created
@@ -60,35 +64,32 @@ class ChatbotScript(models.Model):
 
         This implementation assumes that the order of created steps and answers will be kept between
         the original and the clone, using 'zip()' to match the records between the two. """
-
         default = default or {}
-        default['title'] = self.title + _(' (copy)')
-
-        clone_chatbot_script = super().copy(default=default)
+        new_scripts = super().copy(default=default)
         if 'question_ids' in default:
-            return clone_chatbot_script
+            return new_scripts
 
-        original_steps = self.script_step_ids.sorted()
-        clone_steps = clone_chatbot_script.script_step_ids.sorted()
+        for old_script, new_script in zip(self, new_scripts):
+            original_steps = old_script.script_step_ids.sorted()
+            clone_steps = new_script.script_step_ids.sorted()
 
-        answers_map = {}
-        for clone_step, original_step in zip(clone_steps, original_steps):
-            for clone_answer, original_answer in zip(clone_step.answer_ids.sorted(), original_step.answer_ids.sorted()):
-                answers_map[original_answer] = clone_answer
+            answers_map = {}
+            for clone_step, original_step in zip(clone_steps, original_steps):
+                for clone_answer, original_answer in zip(clone_step.answer_ids.sorted(), original_step.answer_ids.sorted()):
+                    answers_map[original_answer] = clone_answer
 
-        for clone_step, original_step in zip(clone_steps, original_steps):
-            clone_step.write({
-                'triggering_answer_ids': [
-                    (4, answer.id)
-                    for answer in [
-                        answers_map[original_answer]
-                        for original_answer
-                        in original_step.triggering_answer_ids
+            for clone_step, original_step in zip(clone_steps, original_steps):
+                clone_step.write({
+                    'triggering_answer_ids': [
+                        (4, answer.id)
+                        for answer in [
+                            answers_map[original_answer]
+                            for original_answer
+                            in original_step.triggering_answer_ids
+                        ]
                     ]
-                ]
-            })
-
-        return clone_chatbot_script
+                })
+        return new_scripts
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -187,9 +188,9 @@ class ChatbotScript(models.Model):
         self.ensure_one()
 
         return {
-            'scriptId': self.id,
+            'id': self.id,
             'name': self.title,
-            'partnerId': self.operator_partner_id.id,
+            'partner': {'id': self.operator_partner_id.id, 'type': 'partner', 'name': self.operator_partner_id.name},
             'welcomeSteps': [
                 step._format_for_frontend()
                 for step in self._get_welcome_steps()
@@ -203,7 +204,7 @@ class ChatbotScript(models.Model):
         posted_message = False
         error_message = False
         if not email_normalized:
-            error_message = _(
+            error_message = self.env._(
                 "'%(input_email)s' does not look like a valid email. Can you please try again?",
                 input_email=email_address
             )
@@ -214,3 +215,7 @@ class ChatbotScript(models.Model):
             'posted_message': posted_message,
             'error_message': error_message,
         }
+
+    def _get_chatbot_language(self):
+        frontend_lang = request and request.cookies.get('frontend_lang')
+        return frontend_lang or self.env.user.lang or get_lang(self.env).code

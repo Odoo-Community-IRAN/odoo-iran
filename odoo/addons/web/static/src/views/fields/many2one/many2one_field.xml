@@ -28,7 +28,7 @@
                 <a
                     t-if="value"
                     t-attf-class="o_form_uri #{classFromDecoration}"
-                    t-att-href="value ? `#id=${value[0]}&amp;model=${relation}` : '#'"
+                    t-att-href="value ? `/odoo/${urlRelation}/${value[0]}` : '/'"
                     t-on-click.prevent="onClick"
                 >
                     <span t-esc="displayName" />
@@ -45,7 +45,7 @@
                 <t t-if="hasExternalButton">
                     <button
                         type="button"
-                        class="btn btn-link text-action oi o_external_button"
+                        class="btn btn-link text-action oi o_external_button px-1"
                         t-att-class="env.inDialog ? 'oi-launch' : 'oi-arrow-right'"
                         tabindex="-1"
                         draggable="false"

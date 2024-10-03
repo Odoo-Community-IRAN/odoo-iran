@@ -6,9 +6,9 @@
         <field name="name">calendar.event.type</field>
         <field name="model">calendar.event.type</field>
         <field name="arch" type="xml">
-            <tree string="Meeting Types" sample="1" editable="bottom">
+            <list string="Meeting Types" sample="1" editable="bottom">
                 <field name="name"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -20,15 +20,15 @@
 
     <!-- Calendar Alarm : -->
     <record id="view_calendar_alarm_tree" model="ir.ui.view">
-        <field name="name">calendar.alarm.tree</field>
+        <field name="name">calendar.alarm.list</field>
         <field name="model">calendar.alarm</field>
         <field name="arch" type="xml">
-            <tree string="Calendar Alarm" sample="1">
+            <list string="Calendar Alarm" sample="1">
                 <field name="name" column_invisible="True"/>
                 <field name="alarm_type"/>
                 <field name="duration"/>
                 <field name="interval"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -63,16 +63,16 @@
     <record id="action_calendar_alarm" model="ir.actions.act_window">
         <field name="name">Calendar Alarm</field>
         <field name="res_model">calendar.alarm</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
         <field name="view_id" ref="view_calendar_alarm_tree"/>
     </record>
 
     <!-- Calendar Events : Views and Actions  -->
     <record id="view_calendar_event_tree" model="ir.ui.view">
-        <field name="name">calendar.event.tree</field>
+        <field name="name">calendar.event.list</field>
         <field name="model">calendar.event</field>
         <field name="arch" type="xml">
-            <tree string="Meetings" sample="1" multi_edit="1">
+            <list string="Meetings" sample="1" multi_edit="1" js_class="calendar_list_view">
                 <header>
                     <button name="action_open_composer" type="object" context="{'default_composition_mode':'mass_mail'}"
                             string="Send Mail"/>
@@ -92,7 +92,7 @@
                 <field name="description" optional="hide" readonly="recurrency"/>
                 <field name="allday" column_invisible="True"/>
                 <field name="message_needaction" column_invisible="True"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -116,6 +116,8 @@
                     <field name="res_id" invisible="1" />
                     <field name="active" invisible="1"/>
                     <field name="user_can_edit" invisible="1"/>
+                    <field name="invalid_email_partner_ids" invisible="1"/> <!-- this field will be used in
+                        many2many_attendees widget -->
                     <div class="oe_title mb-3">
                         <div>
                             <label for="name"/>
@@ -186,7 +188,7 @@
 
                             <field name="location" placeholder="Online Meeting" readonly="not user_can_edit"/>
                             <label for="videocall_location" class="opacity-100"/>
-                            <div col="2">
+                            <div name="videocall_location_div" col="2">
                                 <field name="videocall_location" string="Videocall URL" widget="CopyClipboardChar" force_save="1" readonly="videocall_source == 'discuss' or not user_can_edit"/>
                                 <button name="clear_videocall_location" type="object" class="btn btn-link ps-0"
                                     invisible="not videocall_location or not user_can_edit" context="{'recurrence_update': recurrence_update}">
@@ -206,7 +208,7 @@
                             <label for="privacy"/>
                                     <div class="o_row">
                                         <field name="show_as" readonly="not user_can_edit" nolabel="1"/>
-                                        <field name="privacy" readonly="not user_can_edit" nolabel="1"/>
+                                        <field name="privacy" readonly="not user_can_edit" nolabel="1" placeholder="Default"/>
                                     </div>
                                     <field name="user_id" widget="many2one_avatar_user" readonly="not user_can_edit"/>
                                     <field name="description" options="{'height': 100}" placeholder="Add description" readonly="not user_can_edit"/>
@@ -239,17 +241,13 @@
                                     readonly="not user_can_edit"
                                 />
                             </div>
-                            <div class="alert alert-warning o_form_header mt-2" colspan="2" invisible="not invalid_email_partner_ids" role="status">
-                                <p><strong>The following attendees have invalid email addresses and won't receive any email notifications:</strong></p>
-                                <field name="invalid_email_partner_ids" widget="many2manyattendee" class="oe_inline"/>
-                            </div>
                         </group>
                     </group>
                     <notebook>
                         <page name="page_invitations" string="Invitations" groups="base.group_no_one" invisible="not user_can_edit">
                             <button name="action_sendmail" type="object" string="Send Invitations" icon="fa-envelope" class="oe_link"/>
-                            <field name="attendee_ids" widget="one2many" mode="tree,kanban" readonly="1">
-                                <tree string="Invitation details" editable="top" create="false" delete="false">
+                            <field name="attendee_ids" widget="one2many" mode="list,kanban" readonly="1">
+                                <list string="Invitation details" editable="top" create="false" delete="false">
                                     <field name="partner_id" />
                                     <field name="email" widget="email"/>
                                     <field name="phone" widget="phone"/>
@@ -257,25 +255,19 @@
                                     <button name="do_tentative" invisible="state not in ('needsAction', 'declined', 'accepted')" string="Uncertain" type="object" icon="fa-asterisk"/>
                                     <button name="do_accept" string="Accept" invisible="state not in ('needsAction', 'tentative', 'declined')" type="object" icon="fa-check text-success"/>
                                     <button name="do_decline" string="Decline" invisible="state not in ('needsAction', 'tentative', 'accepted')" type="object" icon="fa-times-circle text-danger"/>
-                                </tree>
+                                </list>
                                 <kanban class="o_kanban_mobile" create="false" delete="false">
-                                    <field name="partner_id" />
-                                    <field name="state" />
-                                    <field name="email" widget="email"/>
 
                                     <templates>
-                                        <t t-name="kanban-box">
-                                            <div class="d-flex flex-column justify-content-between">
-                                                <field name="partner_id"/>
-                                                <field name="email" widget="email"/>
-                                                <span>Status: <field name="state" /></span>
-
-                                                <div class="text-end">
-                                                    <button name="do_tentative" invisible="state not in ('needsAction', 'declined', 'accepted')" string="Uncertain" type="object" class="btn fa fa-asterisk"/>
-                                                    <button name="do_accept" invisible="state not in ('needsAction', 'tentative', 'declined')" string="Accept" type="object" class="btn fa fa-check text-success"/>
-                                                    <button name="do_decline" invisible="state not in ('needsAction', 'tentative', 'accepted')" string="Decline" type="object" class="btn fa fa-times-circle text-danger"/>
-                                                </div>
-                                            </div>
+                                        <t t-name="card">
+                                            <field name="partner_id"/>
+                                            <field name="email" widget="email"/>
+                                            <span>Status: <field name="state" /></span>
+                                            <footer class="justify-content-end">
+                                                <button name="do_tentative" invisible="state not in ('needsAction', 'declined', 'accepted')" string="Uncertain" type="object" class="btn fa fa-asterisk"/>
+                                                <button name="do_accept" invisible="state not in ('needsAction', 'tentative', 'declined')" string="Accept" type="object" class="btn fa fa-check text-success"/>
+                                                <button name="do_decline" invisible="state not in ('needsAction', 'tentative', 'accepted')" string="Decline" type="object" class="btn fa fa-times-circle text-danger"/>
+                                            </footer>
                                         </t>
                                     </templates>
                                 </kanban>
@@ -283,10 +275,7 @@
                         </page>
                     </notebook>
                 </sheet>
-                <div class="oe_chatter">
-                    <field name="message_follower_ids" readonly="not user_can_edit"/>
-                    <field name="message_ids" readonly="not user_can_edit"/>
-                </div>
+                <chatter/>
             </form>
         </field>
     </record>
@@ -301,6 +290,9 @@
                     <field name="recurrence_update" invisible="1"/>
                     <field name="videocall_source" invisible="1"/>
                     <field name="access_token" invisible="1" force_save="1"/>
+                    <field name="access_token" invisible="1"/>
+                    <field name="invalid_email_partner_ids" invisible="1"/> <!-- this field will be used in
+                        many2many_attendees widget -->
                     <div class="o_row">
                         <h1 class="w-100"><field name="name" nolabel="1" placeholder="Add title" colspan="2"/></h1>
                     </div>
@@ -343,7 +335,7 @@
         <field name="model">calendar.event</field>
         <field name="priority" eval="2"/>
         <field name="arch" type="xml">
-            <calendar js_class="attendee_calendar" string="Meetings" banner_route="/onboarding/calendar" date_start="start" date_stop="stop" date_delay="duration" all_day="allday"
+            <calendar js_class="attendee_calendar" string="Meetings" date_start="start" date_stop="stop" date_delay="duration" all_day="allday"
                 event_open_popup="true"
                 event_limit="5"
                 quick_create="true"
@@ -395,6 +387,7 @@
                 <filter string="Busy" name="busy" domain="[('show_as', '=', 'busy')]"/>
                 <filter string="Free" name="free" domain="[('show_as', '=', 'free')]"/>
                 <separator/>
+                <filter string="Default Privacy" name="default" domain="[('privacy', '=', False)]"/>
                 <filter string="Public" name="public" domain="[('privacy', '=', 'public')]"/>
                 <filter string="Private" name="private" domain="[('privacy', '=', 'private')]"/>
                 <filter string="Only Internal Users" name="confidential" domain="[('privacy', '=', 'confidential')]"/>
@@ -411,8 +404,9 @@
 
     <record id="action_calendar_event" model="ir.actions.act_window">
         <field name="name">Meetings</field>
+        <field name="path">calendar</field>
         <field name="res_model">calendar.event</field>
-        <field name="view_mode">calendar,tree,form</field>
+        <field name="view_mode">calendar,list,form</field>
         <field name="view_id" ref="view_calendar_event_calendar"/>
         <field name="search_view_id" ref="view_calendar_event_search"/>
         <field name="help" type="html">
@@ -451,7 +445,7 @@
     <record id="action_view_calendar_event_tree" model="ir.actions.act_window.view">
         <field name="act_window_id" ref="action_calendar_event"/>
         <field name="sequence" eval="2"/>
-        <field name="view_mode">tree</field>
+        <field name="view_mode">list</field>
         <field name="view_id" ref="view_calendar_event_tree"/>
     </record>
 
@@ -460,14 +454,6 @@
         <field name="sequence" eval="3"/>
         <field name="view_mode">form</field>
         <field name="view_id" ref="view_calendar_event_form"/>
-    </record>
-
-    <record id="action_view_start_calendar_sync" model="ir.actions.act_window">
-        <field name="name">Connect your Calendar</field>
-        <field name="res_model">calendar.provider.config</field>
-        <field name="view_mode">form</field>
-        <field name="target">new</field>
-        <field name="context">{'dialog_size': 'medium'}</field>
     </record>
 
     <record id="calendar_settings_action" model="ir.actions.act_window">

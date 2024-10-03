@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { registry } from "@web/core/registry";
 
 /**
@@ -14,15 +12,15 @@ export const livechatRoutingMap = registry.category("discuss.routing_map");
 
 livechatRoutingMap
     .add("/discuss/channel/messages", "/im_livechat/cors/channel/messages")
-    .add(
-        "/discuss/channel/set_last_seen_message",
-        "/im_livechat/cors/channel/set_last_seen_message"
-    )
+    .add("/discuss/channel/notify_typing", "/im_livechat/cors/channel/notify_typing")
+    .add("/discuss/channel/mark_as_read", "/im_livechat/cors/channel/mark_as_read")
+    .add("/discuss/channel/fold", "/im_livechat/cors/channel/fold")
     .add("/mail/attachment/delete", "/im_livechat/cors/attachment/delete")
     .add("/discuss/channel/ping", "/im_livechat/cors/channel/ping")
-    .add("/mail/init_messaging", "/im_livechat/cors/init_messaging")
+    .add("/mail/action", "/im_livechat/cors/action")
+    .add("/mail/data", "/im_livechat/cors/data")
     .add("/mail/link_preview", "/im_livechat/cors/link_preview")
-    .add("/mail/link_preview/delete", "/im_livechat/cors/link_preview/delete")
+    .add("/mail/link_preview/hide", "/im_livechat/cors/link_preview/hide")
     .add("/mail/message/post", "/im_livechat/cors/message/post")
     .add("/mail/message/reaction", "/im_livechat/cors/message/reaction")
     .add("/mail/message/update_content", "/im_livechat/cors/message/update_content")
@@ -37,4 +35,12 @@ livechatRoutingMap
         "/im_livechat/cors/rtc/session/update_and_broadcast"
     )
     .add("/im_livechat/visitor_leave_session", "/im_livechat/cors/visitor_leave_session")
-    .add("/im_livechat/get_session", "/im_livechat/cors/get_session");
+    .add("/im_livechat/get_session", "/im_livechat/cors/get_session")
+    .add("/im_livechat/init", "/im_livechat/cors/init")
+    .add("/im_livechat/feedback", "/im_livechat/cors/feedback")
+    .add("/im_livechat/history", "/im_livechat/cors/history")
+    .add("/im_livechat/email_livechat_transcript", "/im_livechat/cors/email_livechat_transcript")
+    .add("/chatbot/restart", "/chatbot/cors/restart")
+    .add("/chatbot/answer/save", "/chatbot/cors/answer/save")
+    .add("/chatbot/step/trigger", "/chatbot/cors/step/trigger")
+    .add("/chatbot/step/validate_email", "/chatbot/cors/step/validate_email");

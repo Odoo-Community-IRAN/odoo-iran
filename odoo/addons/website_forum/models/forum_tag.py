@@ -2,7 +2,6 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo import api, fields, models, _
-from odoo.addons.http_routing.models.ir_http import slug, unslug
 from odoo.exceptions import AccessError
 
 
@@ -16,9 +15,10 @@ class Tags(models.Model):
     ]
 
     name = fields.Char('Name', required=True)
+    color = fields.Integer('Color')
     forum_id = fields.Many2one('forum.forum', string='Forum', required=True, index=True)
     post_ids = fields.Many2many(
-        'forum.post', 'forum_tag_rel', 'forum_tag_id', 'forum_id',
+        'forum.post', 'forum_tag_rel', 'forum_tag_id', 'forum_post_id',
         string='Posts', domain=[('state', '=', 'active')])
     posts_count = fields.Integer('Number of Posts', compute='_compute_posts_count', store=True)
     website_url = fields.Char("Link to questions with the tag", compute='_compute_website_url')
@@ -34,7 +34,7 @@ class Tags(models.Model):
     @api.depends("forum_id", "forum_id.name", "name")
     def _compute_website_url(self):
         for tag in self:
-            tag.website_url = f'/forum/{slug(tag.forum_id)}/tag/{slug(tag)}/questions'
+            tag.website_url = f'/forum/{self.env["ir.http"]._slug(tag.forum_id)}/tag/{self.env["ir.http"]._slug(tag)}/questions'
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -58,7 +58,7 @@ class Tags(models.Model):
         }
         base_domain = []
         if forum := options.get("forum"):
-            forum_ids = (unslug(forum)[1],) if isinstance(forum, str) else forum.ids
+            forum_ids = (self.env['ir.http']._unslug(forum)[1],) if isinstance(forum, str) else forum.ids
             search_domain = options.get("domain")
             base_domain = [search_domain if search_domain is not None else [('forum_id', 'in', forum_ids)]]
         return {

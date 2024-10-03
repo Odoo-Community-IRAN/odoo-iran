@@ -27,7 +27,7 @@
                         <field name="parent_id" invisible="not parent_id"/>
                     </group>
                     <group name="post_details">
-                        <field name="tag_ids" widget="many2many_tags"/>
+                        <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"/>
                         <field name="state"/>
                         <field name="closed_reason_id" invisible="not closed_reason_id"/>
                         <field name="closed_uid" invisible="not closed_uid"/>
@@ -49,20 +49,17 @@
                     </group>
                 </group>
                 <group name="answers" string="Answers" invisible="parent_id">
-                    <field name="child_ids" nolabel="1" colspan="2">
-                        <tree>
+                    <field name="child_ids" nolabel="1">
+                        <list>
                             <field name="create_uid" string="Answered by"/>
                             <field name="vote_count"/>
                             <field name="state"/>
                             <field name="is_correct"/>
-                        </tree>
+                        </list>
                     </field>
                 </group>
             </sheet>
-            <div class="oe_chatter">
-                <field name="message_follower_ids" groups="base.group_user"/>
-                <field name="message_ids"/>
-            </div>
+            <chatter/>
         </form>
     </field>
 </record>
@@ -106,11 +103,11 @@
 </record>
 
 <record id="forum_post_view_tree" model="ir.ui.view">
-    <field name="name">forum.post.view.tree</field>
+    <field name="name">forum.post.view.list</field>
     <field name="model">forum.post</field>
     <field name="priority">99</field>
     <field name="arch" type="xml">
-        <tree js_class="website_pages_list" create="false" type="object" action="go_to_website" multi_edit="1">
+        <list js_class="website_pages_list" create="false" type="object" action="go_to_website" multi_edit="1">
             <field name="active" column_invisible="True"/>
             <field name="name"/>
             <field name="website_url"/>
@@ -126,7 +123,7 @@
             <field name="is_seo_optimized"/>
 
             <field name="website_id" groups="website.group_multi_website"/>
-        </tree>
+        </list>
     </field>
 </record>
 
@@ -136,28 +133,21 @@
     <field name="priority">99</field>
     <field name="arch" type="xml">
         <kanban js_class="website_pages_kanban" create="false" action="go_to_website" type="object" sample="1">
-            <field name="name"/>
-            <field name="forum_id"/>
             <field name="parent_id"/>
-            <field name="website_url" invisible="1"/>
             <templates>
-                <t t-name="kanban-box">
-                    <div class="d-flex flex-column">
-                        <div class="o_text_overflow fw-bold">
-                            <span t-esc="record.name.value"/>
-                            <div class="text-muted" t-if="record.website_id.value" groups="website.group_multi_website">
-                                <i class="fa fa-globe me-1" title="Website"/>
-                                <field name="website_id"/>
-                            </div>
-                            <div class="text-muted">
-                                <i class="fa fa-comments-o me-1" title="Forum"/><t t-esc="record.forum_id.value"/>
-                                <span t-if="!record.parent_id.raw_value" class="ms-3"><field name="child_count"/> Answers</span>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-6 text-primary"><i class="fa fa-eye me-1" title="Views"/><field name="views"/></div>
-                            <div class="col-6 text-end"><field name="create_uid" widget="many2one_avatar_user"/></div>
-                        </div>
+                <t t-name="card">
+                    <field name="name" class="text-truncate fw-bold"/>
+                    <div class="text-muted text-truncate fw-bold" t-if="record.website_id.value" groups="website.group_multi_website">
+                        <i class="fa fa-globe me-1" title="Website"/>
+                        <field name="website_id"/>
+                    </div>
+                    <div class="text-muted text-truncate fw-bold">
+                        <i class="fa fa-comments-o me-1" title="Forum"/><field name="forum_id"/>
+                        <span t-if="!record.parent_id.raw_value" class="ms-3"><field name="child_count"/> Answers</span>
+                    </div>
+                    <div class="row">
+                        <div class="col-6 text-primary"><i class="fa fa-eye me-1" title="Views"/><field name="views"/></div>
+                        <div class="col-6"><field name="create_uid" widget="many2one_avatar_user" class="float-end"/></div>
                     </div>
                 </t>
             </templates>
@@ -168,9 +158,9 @@
 <record id="forum_post_action" model="ir.actions.act_window">
     <field name="name">Forum Post Pages</field>
     <field name="res_model">forum.post</field>
-    <field name="view_mode">tree,kanban,graph</field>
+    <field name="view_mode">list,kanban,graph</field>
     <field name="view_ids" eval="[(5, 0, 0),
-        (0, 0, {'view_mode': 'tree', 'view_id': ref('forum_post_view_tree')}),
+        (0, 0, {'view_mode': 'list', 'view_id': ref('forum_post_view_tree')}),
         (0, 0, {'view_mode': 'kanban', 'view_id': ref('forum_post_view_kanban')}),
     ]"/>
     <field name="search_view_id" ref="forum_post_view_search"/>
@@ -185,14 +175,14 @@
 <record id="forum_post_action_favorites" model="ir.actions.act_window">
     <field name="name">Users favorite posts</field>
     <field name="res_model">forum.post</field>
-    <field name="view_mode">tree,form</field>
+    <field name="view_mode">list,form</field>
     <field name="domain">[('forum_id', '=', active_id), ('favourite_count', '>', 0), ('state', 'in', ('active', 'close'))]</field>
 </record>
 
 <record id="forum_post_action_forum_main" model="ir.actions.act_window">
     <field name="name">Posts</field>
     <field name="res_model">forum.post</field>
-    <field name="view_mode">tree,form</field>
+    <field name="view_mode">list,form</field>
     <field name="domain">[('forum_id', '=', active_id), ('parent_id', '=', False), ('state', 'in', ('active', 'close'))]</field>
 </record>
 

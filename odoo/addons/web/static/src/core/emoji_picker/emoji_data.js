@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 // Emoji data are generated from Unicode CLDR, falling under the following
 // licence:
 
@@ -55,10 +53,12 @@
 // Since JSON grammar is way simpler than JavaScript's grammar, it is actually
 // faster to parse the data as a JSON object than as a JavaScript object.
 
-import { _t as lazyTranslate } from "@web/core/l10n/translation";
-const _t = str => JSON.stringify(lazyTranslate(str)).slice(1, -1);
+import { _t as realT } from "@web/core/l10n/translation";
 
-export const categories = JSON.parse(`[
+// replace all double quotes with escaped double quotes
+const _t = (str) => realT(str).replace(/"/g, '\\"')
+
+const _getCategories = () => `[
     {
         "name": "Smileys & Emotion",
         "displayName": "`+ _t("Smileys & Emotion") + `",
@@ -107,9 +107,9 @@ export const categories = JSON.parse(`[
         "title": "🔠",
         "sortId": 8
     }
-]`);
+]`;
 
-const emojisData1 = `{
+const _getEmojisData1 = () => `{
     "category": "Smileys & Emotion",
     "codepoints": "😀",
     "emoticons": [],
@@ -2453,7 +2453,7 @@ const emojisData1 = `{
     ]
 },`;
 
-const emojisData2 = `{
+const _getEmojisData2 = () => `{
     "category": "People & Body",
     "codepoints": "👋",
     "emoticons": [],
@@ -7076,7 +7076,7 @@ const emojisData2 = `{
     ]
 },`;
 
-const emojisData3 = `{
+const _getEmojisData3 = () => `{
     "category": "Animals & Nature",
     "codepoints": "🐵",
     "emoticons": [],
@@ -8837,7 +8837,7 @@ const emojisData3 = `{
     ]
 },`;
 
-const emojisData4 = `{
+const _getEmojisData4 = () => `{
     "category": "Food & Drink",
     "codepoints": "🍇",
     "emoticons": [],
@@ -10692,7 +10692,7 @@ const emojisData4 = `{
     ]
 },`;
 
-const emojisData5 = `{
+const _getEmojisData5 = () => `{
     "category": "Travel & Places",
     "codepoints": "🌍",
     "emoticons": [],
@@ -13803,7 +13803,7 @@ const emojisData5 = `{
     ]
 },`;
 
-const emojisData6 = `{
+const _getEmojisData6 = () => `{
     "category": "Activities",
     "codepoints": "🎃",
     "emoticons": [],
@@ -15021,7 +15021,7 @@ const emojisData6 = `{
     ]
 },`;
 
-const emojisData7 = `{
+const _getEmojisData7 = () => `{
     "category": "Objects",
     "codepoints": "👓",
     "emoticons": [],
@@ -18479,7 +18479,7 @@ const emojisData7 = `{
     ]
 },`;
 
-const emojisData8 = `{
+const _getEmojisData8 = () => `{
     "category": "Symbols",
     "codepoints": "🏧",
     "emoticons": [],
@@ -21889,13 +21889,30 @@ const emojisData8 = `{
     ]
 }`;
 
-export const emojis = JSON.parse(`[
-    ${emojisData1}
-    ${emojisData2}
-    ${emojisData3}
-    ${emojisData4}
-    ${emojisData5}
-    ${emojisData6}
-    ${emojisData7}
-    ${emojisData8}
-]`);
+/** @type {string} */
+let parsedCategories;
+/** @type {string} */
+let parsedEmojis;
+
+export function getEmojis() {
+    if (!parsedEmojis) {
+        parsedEmojis = JSON.parse(`[
+            ${_getEmojisData1()}
+            ${_getEmojisData2()}
+            ${_getEmojisData3()}
+            ${_getEmojisData4()}
+            ${_getEmojisData5()}
+            ${_getEmojisData6()}
+            ${_getEmojisData7()}
+            ${_getEmojisData8()}
+        ]`);
+    }
+    return parsedEmojis;
+}
+
+export function getCategories() {
+    if (!parsedCategories) {
+        parsedCategories = JSON.parse(_getCategories());
+    }
+    return parsedCategories;
+}

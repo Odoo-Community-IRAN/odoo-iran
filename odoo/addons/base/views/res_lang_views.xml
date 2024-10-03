@@ -2,17 +2,16 @@
 <odoo>
     <data>
         <record id="res_lang_tree" model="ir.ui.view">
-            <field name="name">res.lang.tree</field>
+            <field name="name">res.lang.list</field>
             <field name="model">res.lang</field>
             <field name="arch" type="xml">
-                <tree string="Languages" limit="200">
+                <list string="Languages" limit="200">
                     <header>
                         <button name="action_activate_langs" type="object" string="Activate"/>
                     </header>
                     <field name="name"/>
                     <field name="code" groups="base.group_no_one"/>
                     <field name="iso_code" groups="base.group_no_one"/>
-                    <field name="url_code" groups="base.group_no_one" column_invisible="True"/>
                     <field name="direction" groups="base.group_no_one"/>
                     <field name="active"/>
                     <button name="%(base.action_view_base_language_install)d"
@@ -30,7 +29,7 @@
                         type="object"
                         icon="fa-times"
                         invisible="not active"/>
-                </tree>
+                </list>
             </field>
         </record>
 
@@ -59,7 +58,6 @@
                             <group>
                                 <field name="code"/>
                                 <field name="iso_code"/>
-                                <field name="url_code" invisible="1" required="0"/>
                                 <field name="active" widget="boolean_toggle"/>
                             </group>
                             <group>
@@ -69,6 +67,7 @@
                                 <field name="thousands_sep"/>
                                 <field name="date_format"/>
                                 <field name="time_format"/>
+                                <field name="short_time_format"/>
                                 <field name="week_start"/>
                             </group>
                         </group>

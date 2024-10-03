@@ -1,32 +1,22 @@
 /** @odoo-module */
+// @ts-check
 
-import { helpers, constants } from "@odoo/o-spreadsheet";
+import { registries, helpers, constants } from "@odoo/o-spreadsheet";
 import { deserializeDate } from "@web/core/l10n/dates";
 import { _t } from "@web/core/l10n/translation";
-import { sprintf } from "@web/core/utils/strings";
-import { session } from "@web/session";
-const { toNumber, formatValue } = helpers;
+import { user } from "@web/core/user";
+
+const { pivotTimeAdapterRegistry } = registries;
+const { formatValue, toNumber, toJsDate, toString } = helpers;
 const { DEFAULT_LOCALE } = constants;
 
 const { DateTime } = luxon;
 
 /**
- * @param {"day" | "week" | "month" | "quarter" | "month"} groupAggregate
- * @returns {PivotTimeAdapter}
- */
-export function pivotTimeAdapter(groupAggregate) {
-    return TIME_ADAPTERS[groupAggregate];
-}
-
-/**
  * The Time Adapter: Managing Time Periods for Pivot Functions
- *
- * Overview:
- * A time adapter is responsible for managing time periods associated with pivot functions.
- * Each type of period (day, week, month, quarter, etc.) has its own dedicated adapter.
- * The adapter's primary role is to normalize period values between spreadsheet functions,
- * the server, and the datasource.
- * By normalizing the period value, it can be stored consistently in the datasource.
+ * This is the extension of the one of o-spreadsheet to handle the normalization of
+ * data received from the server. It also manage the increment of a date, used in
+ * the autofill.
  *
  * Normalization Process:
  * When dealing with the server, the time adapter ensures that the received periods are
@@ -34,18 +24,11 @@ export function pivotTimeAdapter(groupAggregate) {
  * For example, if the server returns a day period as "2023-12-25 22:00:00," the time adapter
  * transforms it into the normalized form "12/25/2023" for storage in the datasource.
  *
- * Similarly, when working with functions in the spreadsheet, the time adapter normalizes
- * the provided period to facilitate accurate lookup of values in the datasource.
- * For instance, if the spreadsheet function represents a day period as a number generated
- * by the DATE function (DATE(2023, 12, 25)), the time adapter will normalize it accordingly.
- *
  * Example:
  * To illustrate the normalization process, let's consider the day period:
  *
  * 1. The server returns a day period as "2023-12-25 22:00:00"
  * 2. The time adapter normalizes this period to "12/25/2023" for storage in the datasource.
- * 3. Meanwhile, the spreadsheet function represents the day period as a number obtained from
- *    the DATE function (DATE(2023, 12, 25)).
  *
  * By applying the appropriate normalization, the time adapter ensures that the periods from
  * different sources are consistently represented and can be effectively utilized for lookup
@@ -61,68 +44,51 @@ export function pivotTimeAdapter(groupAggregate) {
  *
  * Limitations:
  * If a period value is provided as a **string** to a function, it will interpreted as being in the default locale.
- * e.g. in `ODOO.PIVOT(1, "amount", "create_date", "1/5/2023")`, the day is interpreted as being the 5th of January 2023,
+ * e.g. in `PIVOT.VALUE(1, "amount", "create_date", "1/5/2023")`, the day is interpreted as being the 5th of January 2023,
  * even if the spreadsheet locale is set to French and such a date is usually interpreted as the 1st of May 2023.
- * The reason is ODOO.PIVOT functions are currently generated without being aware of the spreadsheet locale.
- *
- * @typedef {Object} PivotTimeAdapter
- * @property {(groupBy: string, field: string, readGroupResult: object) => string} normalizeServerValue
- * @property {(value: string) => string} normalizeFunctionValue
- * @property {(normalizedValue: string, step: number) => string} increment
- * @property {(normalizedValue: string, locale: Object) => string} formatValue
- * @property {(locale: Object) => string} getFormat
- * @property {(normalizedValue: string) => string | number} toCellValue
+ * The reason is PIVOT functions are currently generated without being aware of the spreadsheet locale.
  */
 
-/**
- * @type {PivotTimeAdapter}
- * Normalized value: "12/25/2023"
- *
- * Note: Those two format are equivalent:
- * - "MM/dd/yyyy" (luxon format)
- * - "mm/dd/yyyy" (spreadsheet format)
- **/
-const dayAdapter = {
+const odooNumberDateAdapter = {
     normalizeServerValue(groupBy, field, readGroupResult) {
-        const serverDayValue = getGroupStartingDay(field, groupBy, readGroupResult);
-        const date = deserializeDate(serverDayValue).reconfigure({ numberingSystem: "latn" });
-        return date.toFormat("MM/dd/yyyy");
-    },
-    normalizeFunctionValue(value) {
-        const date = toNumber(value, DEFAULT_LOCALE);
-        return formatValue(date, { locale: DEFAULT_LOCALE, format: "mm/dd/yyyy" });
+        return Number(readGroupResult[groupBy]);
     },
     increment(normalizedValue, step) {
-        const date = DateTime.fromFormat(normalizedValue, "MM/dd/yyyy", {
-            numberingSystem: "latn",
-        });
-        return date.plus({ days: step }).toFormat("MM/dd/yyyy");
+        return normalizedValue + step;
     },
-    getFormat(locale) {
-        return locale.dateFormat;
+};
+
+const odooDayAdapter = {
+    normalizeServerValue(groupBy, field, readGroupResult) {
+        const serverDayValue = getGroupStartingDay(field, groupBy, readGroupResult);
+        return toNumber(serverDayValue, DEFAULT_LOCALE);
     },
-    formatValue(normalizedValue, locale) {
-        const value = toNumber(normalizedValue, DEFAULT_LOCALE);
-        return formatValue(value, { locale, format: this.getFormat(locale) });
-    },
-    toCellValue(normalizedValue) {
-        return toNumber(normalizedValue, DEFAULT_LOCALE);
+    increment(normalizedValue, step) {
+        return normalizedValue + step;
     },
 };
 
 /**
- * @type {PivotTimeAdapter}
  * Normalized value: "2/2023" for week 2 of 2023
  */
-const weekAdapter = {
+const odooWeekAdapter = {
+    normalizeFunctionValue(value) {
+        const [week, year] = toString(value).split("/");
+        return `${Number(week)}/${Number(year)}`;
+    },
+    toValueAndFormat(normalizedValue, locale) {
+        const [week, year] = normalizedValue.split("/");
+        return {
+            value: _t("W%(week)s %(year)s", { week, year }),
+        };
+    },
+    toFunctionValue(normalizedValue) {
+        return `"${normalizedValue}"`;
+    },
     normalizeServerValue(groupBy, field, readGroupResult) {
         const weekValue = readGroupResult[groupBy];
         const { week, year } = parseServerWeekHeader(weekValue);
         return `${week}/${year}`;
-    },
-    normalizeFunctionValue(value) {
-        const [week, year] = value.split("/");
-        return `${Number(week)}/${Number(year)}`;
     },
     increment(normalizedValue, step) {
         const [week, year] = normalizedValue.split("/");
@@ -132,64 +98,68 @@ const weekAdapter = {
         const nextWeek = date.plus({ weeks: step });
         return `${nextWeek.weekNumber}/${nextWeek.weekYear}`;
     },
-    getFormat(locale) {
-        return undefined;
-    },
-    formatValue(normalizedValue, locale) {
-        const [week, year] = normalizedValue.split("/");
-        return sprintf(_t("W%(week)s %(year)s"), { week, year });
-    },
-    toCellValue(normalizedValue) {
-        return this.formatValue(normalizedValue);
-    },
 };
 
 /**
- * @type {PivotTimeAdapter}
  * normalized month value is a string formatted as "MM/yyyy" (luxon format)
  * e.g. "01/2020" for January 2020
  */
-const monthAdapter = {
+const odooMonthAdapter = {
+    normalizeFunctionValue(value) {
+        const date = toNumber(value, DEFAULT_LOCALE);
+        return formatValue(date, { locale: DEFAULT_LOCALE, format: "mm/yyyy" });
+    },
+    toValueAndFormat(normalizedValue) {
+        return {
+            value: toNumber(normalizedValue, DEFAULT_LOCALE),
+            format: "mmmm yyyy",
+        };
+    },
+    toFunctionValue(normalizedValue) {
+        return `"${normalizedValue}"`;
+    },
     normalizeServerValue(groupBy, field, readGroupResult) {
         const firstOfTheMonth = getGroupStartingDay(field, groupBy, readGroupResult);
         const date = deserializeDate(firstOfTheMonth).reconfigure({ numberingSystem: "latn" });
         return date.toFormat("MM/yyyy");
-    },
-    normalizeFunctionValue(value) {
-        const date = toNumber(value, DEFAULT_LOCALE);
-        return formatValue(date, { DEFAULT_LOCALE, format: "mm/yyyy" });
     },
     increment(normalizedValue, step) {
         return DateTime.fromFormat(normalizedValue, "MM/yyyy", { numberingSystem: "latn" })
             .plus({ months: step })
             .toFormat("MM/yyyy");
     },
-    getFormat(locale) {
-        return "mmmm yyyy";
-    },
-    formatValue(normalizedValue, locale) {
-        const value = toNumber(normalizedValue, DEFAULT_LOCALE);
-        return formatValue(value, { locale, format: this.getFormat(locale) });
-    },
-    toCellValue(normalizedValue) {
-        return toNumber(normalizedValue, DEFAULT_LOCALE);
-    },
 };
 
+const NORMALIZED_QUARTER_REGEXP = /^[1-4]\/\d{4}$/;
+
 /**
- * @type {PivotTimeAdapter}
  * normalized quarter value is "quarter/year"
  * e.g. "1/2020" for Q1 2020
  */
-const quarterAdapter = {
+const odooQuarterAdapter = {
+    normalizeFunctionValue(value) {
+        // spreadsheet normally interprets "4/2020" as the 1st April
+        // but it should be understood as a quarter here.
+        if (typeof value === "string" && NORMALIZED_QUARTER_REGEXP.test(value)) {
+            return value;
+        }
+        // Any other value is interpreted as any date-like spreadsheet value
+        const dateTime = toJsDate(value, DEFAULT_LOCALE);
+        return `${dateTime.getQuarter()}/${dateTime.getFullYear()}`;
+    },
+    toValueAndFormat(normalizedValue) {
+        const [quarter, year] = normalizedValue.split("/");
+        return {
+            value: _t("Q%(quarter)s %(year)s", { quarter, year }),
+        };
+    },
+    toFunctionValue(normalizedValue) {
+        return `"${normalizedValue}"`;
+    },
     normalizeServerValue(groupBy, field, readGroupResult) {
         const firstOfTheQuarter = getGroupStartingDay(field, groupBy, readGroupResult);
         const date = deserializeDate(firstOfTheQuarter);
         return `${date.quarter}/${date.year}`;
-    },
-    normalizeFunctionValue(value) {
-        const [quarter, year] = value.split("/");
-        return `${quarter}/${year}`;
     },
     increment(normalizedValue, step) {
         const [quarter, year] = normalizedValue.split("/");
@@ -197,45 +167,47 @@ const quarterAdapter = {
         const nextQuarter = date.plus({ quarters: step });
         return `${nextQuarter.quarter}/${nextQuarter.year}`;
     },
-    getFormat(locale) {
-        return undefined;
+};
+
+const odooDayOfWeekAdapter = {
+    normalizeServerValue(groupBy, field, readGroupResult) {
+        /**
+         * 0: First day of the week in the locale.
+         */
+        return Number(readGroupResult[groupBy]) + 1;
     },
-    formatValue(normalizedValue, locale) {
-        const [quarter, year] = normalizedValue.split("/");
-        return sprintf(_t("Q%(quarter)s %(year)s"), { quarter, year });
-    },
-    toCellValue(normalizedValue) {
-        return this.formatValue(normalizedValue);
+    increment(normalizedValue, step) {
+        return (normalizedValue + step) % 7;
     },
 };
-/**
- * @type {PivotTimeAdapter}
- */
-const yearAdapter = {
+
+const odooHourNumberAdapter = {
     normalizeServerValue(groupBy, field, readGroupResult) {
         return Number(readGroupResult[groupBy]);
     },
-    normalizeFunctionValue(value) {
-        return toNumber(value, DEFAULT_LOCALE);
+    increment(normalizedValue, step) {
+        return (normalizedValue + step) % 24;
+    },
+};
+const odooMinuteNumberAdapter = {
+    normalizeServerValue(groupBy, field, readGroupResult) {
+        return Number(readGroupResult[groupBy]);
     },
     increment(normalizedValue, step) {
-        return normalizedValue + step;
+        return (normalizedValue + step) % 60;
     },
-    getFormat(locale) {
-        return "0";
+};
+const odooSecondNumberAdapter = {
+    normalizeServerValue(groupBy, field, readGroupResult) {
+        return Number(readGroupResult[groupBy]);
     },
-    formatValue(normalizedValue, locale) {
-        return formatValue(normalizedValue, { locale, format: "0" });
-    },
-    toCellValue(normalizedValue) {
-        return normalizedValue;
+    increment(normalizedValue, step) {
+        return (normalizedValue + step) % 60;
     },
 };
 
 /**
  * Decorate adapter functions to handle the empty value "false"
- * @param {PivotTimeAdapter} adapter
- * @returns {PivotTimeAdapter}
  */
 function falseHandlerDecorator(adapter) {
     return {
@@ -245,41 +217,65 @@ function falseHandlerDecorator(adapter) {
             }
             return adapter.normalizeServerValue(groupBy, field, readGroupResult);
         },
-        normalizeFunctionValue(value) {
-            if (value === false || value === "false") {
-                return false;
-            }
-            return adapter.normalizeFunctionValue(value);
-        },
         increment(normalizedValue, step) {
-            if (normalizedValue === false) {
+            if (
+                normalizedValue === false ||
+                (typeof normalizedValue === "string" && normalizedValue.toLowerCase() === "false")
+            ) {
                 return false;
             }
             return adapter.increment(normalizedValue, step);
         },
-        getFormat: adapter.getFormat.bind(adapter),
-        formatValue(normalizedValue, locale) {
-            if (normalizedValue === false) {
-                return _t("None");
+        normalizeFunctionValue(value) {
+            if (value.toLowerCase() === "false") {
+                return false;
             }
-            return adapter.formatValue(normalizedValue, locale);
+            return adapter.normalizeFunctionValue(value);
         },
-        toCellValue(normalizedValue) {
-            if (normalizedValue === false) {
-                return _t("None");
+        toValueAndFormat(normalizedValue, locale) {
+            if (
+                normalizedValue === false ||
+                (typeof normalizedValue === "string" && normalizedValue.toLowerCase() === "false")
+            ) {
+                return { value: _t("None") };
             }
-            return adapter.toCellValue(normalizedValue);
+            return adapter.toValueAndFormat(normalizedValue, locale);
+        },
+        toFunctionValue(value) {
+            if (value === false) {
+                return "FALSE";
+            }
+            return adapter.toFunctionValue(value);
         },
     };
 }
 
-const TIME_ADAPTERS = {
-    day: falseHandlerDecorator(dayAdapter),
-    week: falseHandlerDecorator(weekAdapter),
-    month: falseHandlerDecorator(monthAdapter),
-    quarter: falseHandlerDecorator(quarterAdapter),
-    year: falseHandlerDecorator(yearAdapter),
-};
+function extendSpreadsheetAdapter(granularity, adapter) {
+    const originalAdapter = pivotTimeAdapterRegistry.get(granularity);
+    pivotTimeAdapterRegistry.add(
+        granularity,
+        falseHandlerDecorator({
+            ...originalAdapter,
+            ...adapter,
+        })
+    );
+}
+
+pivotTimeAdapterRegistry.add("week", falseHandlerDecorator(odooWeekAdapter));
+pivotTimeAdapterRegistry.add("month", falseHandlerDecorator(odooMonthAdapter));
+pivotTimeAdapterRegistry.add("quarter", falseHandlerDecorator(odooQuarterAdapter));
+
+extendSpreadsheetAdapter("day", odooDayAdapter);
+extendSpreadsheetAdapter("year", odooNumberDateAdapter);
+extendSpreadsheetAdapter("day_of_month", odooNumberDateAdapter);
+extendSpreadsheetAdapter("day", odooDayAdapter);
+extendSpreadsheetAdapter("iso_week_number", odooNumberDateAdapter);
+extendSpreadsheetAdapter("month_number", odooNumberDateAdapter);
+extendSpreadsheetAdapter("quarter_number", odooNumberDateAdapter);
+extendSpreadsheetAdapter("day_of_week", odooDayOfWeekAdapter);
+extendSpreadsheetAdapter("hour_number", odooHourNumberAdapter);
+extendSpreadsheetAdapter("minute_number", odooMinuteNumberAdapter);
+extendSpreadsheetAdapter("second_number", odooSecondNumberAdapter);
 
 /**
  * When grouping by a time field, return
@@ -297,7 +293,7 @@ function getGroupStartingDay(field, groupBy, readGroup) {
     if (field.type === "date") {
         return sqlValue;
     }
-    const userTz = session.user_context.tz || luxon.Settings.defaultZoneName;
+    const userTz = user.tz || luxon.Settings.defaultZone.name;
     return DateTime.fromSQL(sqlValue, { zone: "utc" }).setZone(userTz).toISODate();
 }
 

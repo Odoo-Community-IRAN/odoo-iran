@@ -20,6 +20,5 @@ class AccountJournal(models.Model):
                 account_vals['tag_ids'].append(Command.link(self.env.ref('l10n_dk.account_tag_6481').id))
             elif vals.get('type') == 'cash':
                 account_vals['tag_ids'].append(Command.link(self.env.ref('l10n_dk.account_tag_6471').id))
-            account_vals['tag_ids'].append(Command.link(self.env.ref('l10n_dk.account_tag_liquidity').id))
 
         return account_vals

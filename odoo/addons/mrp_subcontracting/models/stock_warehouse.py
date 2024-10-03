@@ -22,7 +22,7 @@ class StockWarehouse(models.Model):
         domain=[('code', '=', 'mrp_operation')], copy=False)
     subcontracting_resupply_type_id = fields.Many2one(
         'stock.picking.type', 'Subcontracting Resupply Operation Type',
-        domain=[('code', '=', 'outgoing')], copy=False)
+        domain=[('code', '=', 'internal')], copy=False)
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -141,7 +141,7 @@ class StockWarehouse(models.Model):
             },
             'subcontracting_resupply_type_id': {
                 'name': _('Resupply Subcontractor'),
-                'code': 'outgoing',
+                'code': 'internal',
                 'use_create_lots': False,
                 'use_existing_lots': True,
                 'default_location_dest_id': self._get_subcontracting_location().id,
@@ -158,13 +158,13 @@ class StockWarehouse(models.Model):
         count = self.env['ir.sequence'].search_count([('prefix', '=like', self.code + '/SBC%/%')])
         values.update({
             'subcontracting_type_id': {
-                'name': self.name + ' ' + _('Sequence subcontracting'),
+                'name': _('%(name)s Sequence subcontracting', name=self.name),
                 'prefix': self.code + (('/SBC' + str(count) + '/') if count else '/SBC/'),
                 'padding': 5,
                 'company_id': self.company_id.id
             },
             'subcontracting_resupply_type_id': {
-                'name': self.name + ' ' + _('Sequence Resupply Subcontractor'),
+                'name': _('%(name)s Sequence Resupply Subcontractor', name=self.name),
                 'prefix': self.code + (('/RES' + str(count) + '/') if count else '/RES/'),
                 'padding': 5,
                 'company_id': self.company_id.id
@@ -185,7 +185,7 @@ class StockWarehouse(models.Model):
             'subcontracting_resupply_type_id': {
                 'default_location_src_id': self.lot_stock_id.id,
                 'default_location_dest_id': subcontract_location_id.id,
-                'barcode': self.code.replace(" ", "").upper() + "-RESUPPLY",
+                'barcode': self.code.replace(" ", "").upper() + "RESUP",
                 'active': self.subcontracting_to_resupply and self.active
             },
         })
@@ -197,7 +197,7 @@ class StockWarehouse(models.Model):
     def _get_subcontracting_locations(self):
         return self.env['stock.location'].search([
             ('company_id', 'in', self.company_id.ids),
-            ('is_subcontracting_location', '=', 'True'),
+            ('is_subcontracting_location', '=', True),
         ])
 
     def _update_subcontracting_locations_rules(self):

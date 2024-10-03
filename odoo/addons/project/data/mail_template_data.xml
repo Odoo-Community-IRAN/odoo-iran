@@ -7,14 +7,15 @@
             <field name="model_id" ref="project.model_project_task"/>
             <field name="subject">Reception of {{ object.name }}</field>
             <field name="use_default_to" eval="True"/>
-            <field name="description">Set this template on a project's stage to automate email when tasks reach stages</field>
+            <field name="description">Automatically send an email to customers when a task reaches a specific stage in a project by setting this template on that stage</field>
             <field name="body_html" type="html">
 <div>
-    Dear <t t-out="object.partner_id.name or 'customer'">Brandon Freeman</t>,<br/>
-    Thank you for your enquiry.<br />
-    If you have any questions, please let us know.
-    <br/><br/>
-    Thank you,
+    Dear <t t-out="object.partner_id.name or 'customer'">Brandon Freeman</t>,<br/><br/>
+    Thank you for contacting us. We appreciate your interest in our products/services.<br/>
+    Our team is currently reviewing your inquiry and will respond to your email as soon as possible.<br/>
+    If you have any further questions or concerns in the meantime, please do not hesitate to let us know. We are here to help.<br/><br/>
+    Thank you for your patience.<br/>
+    Best regards,
     <t t-if="user.signature">
         <br />
         <t t-out="user.signature or ''">--<br/>Mitchell Admin</t>
@@ -56,8 +57,8 @@
             </t>
         </td></tr>
         <tr><td style="text-align: center;">
-            <table border="0" cellpadding="0" cellspacing="0" width="590" summary="o_mail_notification" style="width:100%; margin: 32px 0px 32px 0px;">
-                <tr><td style="font-size: 13px;">
+            <table border="0" cellpadding="0" cellspacing="0" width="590" style="width:100%; margin: 32px 0px 32px 0px; display: inline-table;">
+                <tr><td style="font-size: 13px;text-align:center;">
                     <strong>Tell us how you feel about our services</strong><br/>
                     <span style="font-size: 12px; opacity: 0.5; color: #454748;">(click on one of these smileys)</span>
                 </td></tr>
@@ -65,17 +66,17 @@
                     <table style="width:100%;text-align:center;margin-top:2rem;">
                         <tr>
                             <td>
-                                <a t-attf-href="/rate/{{ access_token }}/5">
+                                <a t-attf-href="/rate/{{ access_token }}/5" t-att-class="'pe-none' if object._rating_get_operator() else ''">
                                     <img alt="Satisfied" src="/rating/static/src/img/rating_5.png" title="Satisfied"/>
                                 </a>
                             </td>
                             <td>
-                                <a t-attf-href="/rate/{{ access_token }}/3">
+                                <a t-attf-href="/rate/{{ access_token }}/3" t-att-class="'pe-none' if object._rating_get_operator() else ''">
                                     <img alt="Okay" src="/rating/static/src/img/rating_3.png" title="Okay"/>
                                 </a>
                             </td>
                             <td>
-                                <a t-attf-href="/rate/{{ access_token }}/1">
+                                <a t-attf-href="/rate/{{ access_token }}/1" t-att-class="'pe-none' if object._rating_get_operator() else ''">
                                     <img alt="Dissatisfied" src="/rating/static/src/img/rating_1.png" title="Dissatisfied"/>
                                 </a>
                             </td>
@@ -120,6 +121,15 @@
     Dear <t t-esc="assignee_name"/>,
     <br/><br/>
     <span style="margin-top: 8px;">You have been assigned to the <t t-esc="model_description or 'document'"/> <t t-esc="object.display_name"/>.</span>
+</div>
+        </template>
+
+        <!-- You have been invited to follow the task -->
+        <template id="task_invitation_follower">
+<div>
+    Hello <t t-out="partner_name"/>,
+    <br/><br/>
+    <span style="margin-top: 8px;">You have been invited to follow Task Document : <t t-out="object.display_name"/>.</span>
 </div>
         </template>
     </data>

@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from odoo import fields
 from odoo.addons.mail.tests.common import MailCommon
+from odoo.addons.mail.tools.discuss import Store
 from odoo.addons.test_mail.data.test_mail_data import MAIL_TEMPLATE
 from odoo.tests import Form, tagged, users
 from odoo.tools import mute_logger
@@ -100,14 +101,14 @@ class TestTracking(MailCommon):
             )
         # first record: tracking value should be hidden
         message_0 = records[0].message_ids[0]
-        formatted = message_0.message_format()[0]
+        formatted = Store(message_0, for_current_user=True).get_result()["mail.message"][0]
         self.assertEqual(formatted['trackingValues'], [], 'Hidden values should not be formatted')
         mail_render = records[0]._notify_by_email_prepare_rendering_context(message_0, {})
         self.assertEqual(mail_render['tracking_values'], [])
 
         # second record: all values displayed
         message_1 = records[1].message_ids[0]
-        formatted = message_1.message_format()[0]
+        formatted = Store(message_1, for_current_user=True).get_result()["mail.message"][0]
         self.assertEqual(len(formatted['trackingValues']), 1)
         self.assertDictEqual(
             formatted['trackingValues'][0],
@@ -679,6 +680,8 @@ class TestTrackingInternals(MailCommon):
         ])
 
     def test_track_groups(self):
+        """ Test field groups and filtering when using standard helpers """
+        # say that 'email_from' is accessible to erp_managers only
         field = self.record._fields['email_from']
         self.addCleanup(setattr, field, 'groups', field.groups)
         field.groups = 'base.group_erp_manager'
@@ -686,10 +689,14 @@ class TestTrackingInternals(MailCommon):
         self.record.sudo().write({'email_from': 'X'})
         self.flush_tracking()
 
-        msg_emp = self.record.message_ids.message_format()
-        msg_sudo = self.record.sudo().message_ids.message_format()
+        msg_emp = Store(self.record.message_ids, for_current_user=True).get_result()
+        msg_admin = Store(
+            self.record.with_user(self.user_admin).message_ids, for_current_user=True
+        ).get_result()
+        msg_sudo = Store(self.record.sudo().message_ids, for_current_user=True).get_result()
+
         tracking_values = self.env['mail.tracking.value'].search([('mail_message_id', '=', self.record.message_ids[0].id)])
-        formattedTrackingValues = [{
+        formatted_tracking_values = [{
             'changedField': 'Email From',
             'id': tracking_values[0]['id'],
             'fieldName': 'email_from',
@@ -703,13 +710,28 @@ class TestTrackingInternals(MailCommon):
                 'value': False,
             },
         }]
-        self.assertEqual(msg_emp[0].get('trackingValues'), [], "should not have protected tracking values")
-        self.assertEqual(msg_sudo[0].get('trackingValues'), formattedTrackingValues, "should have protected tracking values")
+        self.assertEqual(
+            msg_emp["mail.message"][0].get("trackingValues"),
+            [],
+            "should not have protected tracking values",
+        )
+        self.assertEqual(
+            msg_admin["mail.message"][0].get("trackingValues"),
+            formatted_tracking_values,
+            "should have protected tracking values",
+        )
+        self.assertEqual(
+            msg_sudo["mail.message"][0].get("trackingValues"),
+            formatted_tracking_values,
+            "should have protected tracking values",
+        )
 
-        msg_emp = self.record._notify_by_email_prepare_rendering_context(self.record.message_ids[0], {})
-        msg_sudo = self.record.sudo()._notify_by_email_prepare_rendering_context(self.record.message_ids[0], {})
-        self.assertFalse(msg_emp.get('tracking_values'), "should not have protected tracking values")
-        self.assertTrue(msg_sudo.get('tracking_values'), "should have protected tracking values")
+        values_emp = self.record._notify_by_email_prepare_rendering_context(self.record.message_ids[0], {})
+        values_admin = self.record.with_user(self.user_admin)._notify_by_email_prepare_rendering_context(self.record.message_ids[0], {})
+        values_sudo = self.record.sudo()._notify_by_email_prepare_rendering_context(self.record.message_ids[0], {})
+        self.assertFalse(values_emp.get('tracking_values'), "should not have protected tracking values")
+        self.assertTrue(values_admin.get('tracking_values'), "should have protected tracking values")
+        self.assertTrue(values_sudo.get('tracking_values'), "should have protected tracking values")
 
         # test editing the record with user not in the group of the field
         self.env.invalidate_all()
@@ -795,7 +817,11 @@ class TestTrackingInternals(MailCommon):
 
         # check groups, as it depends on model
         for tracking, exp_groups in zip(trackings, ['base.group_user', 'base.group_system', 'base.group_system']):
-            self.assertEqual(tracking.field_groups, exp_groups)
+            groups = 'base.group_system'
+            if tracking.field_id:
+                field = self.env[tracking.field_id.model]._fields[tracking.field_id.name]
+                groups = field.groups
+            self.assertEqual(groups, exp_groups)
 
         # check formatting, as it fetches info on model
         formatted = trackings._tracking_value_format()

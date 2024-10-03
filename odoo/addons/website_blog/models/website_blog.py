@@ -5,10 +5,10 @@ from datetime import datetime
 import random
 
 from odoo import api, models, fields, _
-from odoo.addons.http_routing.models.ir_http import slug, unslug
 from odoo.addons.website.tools import text_from_html
 from odoo.tools.json import scriptsafe as json_scriptsafe
 from odoo.tools.translate import html_translate
+from odoo.tools import html_escape
 
 
 class Blog(models.Model):
@@ -142,6 +142,7 @@ class BlogTag(models.Model):
 
     name = fields.Char('Name', required=True, translate=True)
     category_id = fields.Many2one('blog.tag.category', 'Category', index=True)
+    color = fields.Integer('Color')
     post_ids = fields.Many2many('blog.post', string='Posts')
 
     _sql_constraints = [
@@ -160,12 +161,13 @@ class BlogPost(models.Model):
     def _compute_website_url(self):
         super(BlogPost, self)._compute_website_url()
         for blog_post in self:
-            blog_post.website_url = "/blog/%s/%s" % (slug(blog_post.blog_id), slug(blog_post))
+            blog_post.website_url = "/blog/%s/%s" % (self.env['ir.http']._slug(blog_post.blog_id), self.env['ir.http']._slug(blog_post))
 
     def _default_content(self):
-        return '''
-            <p class="o_default_snippet_text">''' + _("Start writing here...") + '''</p>
-        '''
+        text = html_escape(_("Start writing here..."))
+        return """
+            <p class="o_default_snippet_text">%(text)s</p>
+        """ % {"text": text}
     name = fields.Char('Title', required=True, translate=True, default='')
     subtitle = fields.Char('Sub Title', translate=True)
     author_id = fields.Many2one('res.partner', 'Author', default=lambda self: self.env.user.partner_id, index='btree_not_null')
@@ -175,8 +177,8 @@ class BlogPost(models.Model):
     blog_id = fields.Many2one('blog.blog', 'Blog', required=True, ondelete='cascade', default=lambda self: self.env['blog.blog'].search([], limit=1))
     tag_ids = fields.Many2many('blog.tag', string='Tags')
     content = fields.Html('Content', default=_default_content, translate=html_translate, sanitize=False)
-    teaser = fields.Text('Teaser', compute='_compute_teaser', inverse='_set_teaser')
-    teaser_manual = fields.Text(string='Teaser Content')
+    teaser = fields.Text('Teaser', compute='_compute_teaser', inverse='_set_teaser', translate=True)
+    teaser_manual = fields.Text(string='Teaser Content', translate=True)
 
     website_message_ids = fields.One2many(domain=lambda self: [('model', '=', self._name), ('message_type', '=', 'comment')])
 
@@ -202,6 +204,14 @@ class BlogPost(models.Model):
 
     def _set_teaser(self):
         for blog_post in self:
+            if not blog_post.with_context(lang='en_US').teaser_manual:
+                # By default, if no teaser is set in english, it will use the
+                # first 200 characters of the content. We don't want to break
+                # that when adding a manual teaser in a translation.
+                # That's how the ORM work: when setting a translation value, if
+                # there is no source value, the source will also receive the
+                # translation value
+                blog_post.update_field_translations('teaser_manual', {'en_US': ''})
             blog_post.teaser_manual = blog_post.teaser
 
     @api.depends('create_date', 'published_date')
@@ -252,12 +262,9 @@ class BlogPost(models.Model):
         self._check_for_publication(vals)
         return result
 
-    @api.returns('self', lambda value: value.id)
     def copy_data(self, default=None):
-        self.ensure_one()
-        name = _("%s (copy)", self.name)
-        default = dict(default or {}, name=name)
-        return super(BlogPost, self).copy_data(default)
+        vals_list = super().copy_data(default=default)
+        return [dict(vals, name=self.env._("%s (copy)", blog.name)) for blog, vals in zip(self, vals_list)]
 
     def _get_access_action(self, access_uid=None, force_website=False):
         """ Instead of the classic form view, redirect to the post on website
@@ -323,9 +330,9 @@ class BlogPost(models.Model):
         state = options.get('state')
         domain = [website.website_domain()]
         if blog:
-            domain.append([('blog_id', '=', unslug(blog)[1])])
+            domain.append([('blog_id', '=', self.env['ir.http']._unslug(blog)[1])])
         if tags:
-            active_tag_ids = [unslug(tag)[1] for tag in tags.split(',')] or []
+            active_tag_ids = [self.env['ir.http']._unslug(tag)[1] for tag in tags.split(',')] or []
             if active_tag_ids:
                 domain.append([('tag_ids', 'in', active_tag_ids)])
         if date_begin and date_end:

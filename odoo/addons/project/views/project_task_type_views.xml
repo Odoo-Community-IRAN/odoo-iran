@@ -53,48 +53,25 @@
             </field>
         </record>
 
-        <!-- TODO: remove in master -->
-        <record id="personal_task_type_edit" model="ir.ui.view">
-            <field name="name">project.task.type.form</field>
-            <field name="model">project.task.type</field>
-            <field name="arch" type="xml">
-                <form string="Task Stage" delete="0">
-                    <field name="active" invisible="1" />
-                    <sheet>
-                        <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active" />
-                        <group>
-                            <group>
-                                <field name="name" placeholder="e.g. To Do"/>
-                                <field name="sequence" groups="base.group_no_one"/>
-                            </group>
-                            <group>
-                                <field name="fold"/>
-                            </group>
-                        </group>
-                    </sheet>
-                </form>
-            </field>
-        </record>
-
         <record id="task_type_tree" model="ir.ui.view">
-            <field name="name">project.task.type.tree</field>
+            <field name="name">project.task.type.list</field>
             <field name="model">project.task.type</field>
             <field name="arch" type="xml">
-                <tree string="Task Stage" delete="0" sample="1" multi_edit="1" editable="bottom" open_form_view="True">
+                <list string="Task Stage" delete="0" sample="1" multi_edit="1" editable="bottom" open_form_view="True">
                     <field name="sequence" widget="handle" optional="show"/>
                     <field name="name" placeholder="e.g. To Do"/>
                     <field name="fold" optional="show"/>
-                </tree>
+                </list>
             </field>
         </record>
 
         <record id="task_type_tree_inherited" model="ir.ui.view">
-            <field name="name">project.task.type.tree.inherited</field>
+            <field name="name">project.task.type.list.inherited</field>
             <field name="model">project.task.type</field>
             <field name="mode">primary</field>
             <field name="inherit_id" ref="task_type_tree"/>
             <field name="arch" type="xml">
-                <xpath expr="//tree" position="attributes">
+                <xpath expr="//list" position="attributes">
                     <attribute name="default_group_by">project_ids</attribute>
                 </xpath>
                 <xpath expr="//field[@name='name']" position="after">
@@ -110,24 +87,10 @@
             <field name="model">project.task.type</field>
             <field name="arch" type="xml">
                 <kanban class="o_kanban_mobile" sample="1" default_group_by="project_ids">
-                    <field name="name"/>
-                    <field name="fold"/>
-                    <field name="description"/>
-                    <field name="sequence" widget="handle"/>
                     <templates>
-                        <t t-name="kanban-box">
-                            <div t-attf-class="oe_kanban_global_click">
-                                <div class="row">
-                                    <div class="col-12">
-                                        <strong class="o_text_overflow"><t t-esc="record.name.value"/></strong>
-                                    </div>
-                                </div>
-                                <field name="project_ids" widget="many2many_tags" options="{'color_field': 'color'}"/>
-                                <t t-if="record.description.value">
-                                    <hr class="mt8 mb8"/>
-                                    <t t-esc="record.description.value"/>
-                                </t>
-                            </div>
+                        <t t-name="card">
+                            <field name="name" class="fw-bolder text-truncate"/>
+                            <field name="project_ids" widget="many2many_tags" options="{'color_field': 'color'}"/>
                         </t>
                     </templates>
                 </kanban>
@@ -137,7 +100,8 @@
         <record id="open_task_type_form" model="ir.actions.act_window">
             <field name="name">Task Stages</field>
             <field name="res_model">project.task.type</field>
-            <field name="view_mode">tree,kanban,form</field>
+            <field name="path">task-stages</field>
+            <field name="view_mode">list,kanban,form</field>
             <field name="view_id" ref="task_type_tree_inherited"/>
             <field name="domain">[('user_id', '=', False)]</field>
             <field name="context">{'default_project_id': False}</field>
@@ -153,7 +117,7 @@
         <record id="open_task_type_form_domain" model="ir.actions.act_window">
             <field name="name">Task Stages</field>
             <field name="res_model">project.task.type</field>
-            <field name="view_mode">tree,kanban,form</field>
+            <field name="view_mode">list,kanban,form</field>
             <field name="domain">[('project_ids','=', project_id)]</field>
             <field name="view_id" ref="task_type_tree_inherited"/>
             <field name="help" type="html">

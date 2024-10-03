@@ -1,6 +1,5 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
-from odoo.addons.http_routing.models.ir_http import slugify
+from ast import literal_eval
 from odoo import api, fields, models
 
 
@@ -12,21 +11,28 @@ class WebsiteControllerPage(models.Model):
         'website.searchable.mixin',
     ]
     _description = 'Model Page'
-    _order = 'website_id'
+    _order = 'website_id, id DESC'
+    _sql_constraints = [
+        ('unique_name_slugified', 'UNIQUE(name_slugified)', 'url should be unique')
+    ]
 
-    view_id = fields.Many2one('ir.ui.view', string='View', required=True, ondelete="cascade")
+    view_id = fields.Many2one('ir.ui.view', string='Listing view', required=True, ondelete="cascade")
+    record_view_id = fields.Many2one('ir.ui.view', string='Record view', ondelete="cascade")
     menu_ids = fields.One2many('website.menu', 'controller_page_id', 'Related Menus')
 
     website_id = fields.Many2one(related='view_id.website_id', store=True, readonly=False, ondelete='cascade')
 
+    name = fields.Char(string="The name is used to generate the URL and is shown in the browser title bar",
+        compute="_compute_name",
+        inverse="_inverse_name",
+        required=True,
+        store=True)
     # Bindings to model/records, to expose the page on the website.
     # Route: /model/<string:page_name_slugified>
-    page_name = fields.Char(string="Name", help="The name is used to generate the URL and is shown in the browser title bar", required=True)
     name_slugified = fields.Char(compute="_compute_name_slugified", store=True,
-        string="URL", help="The name of the page usable in a URL")
-    page_type = fields.Selection(selection=[("listing", "Listing"), ("single", "Single record")],
-        default="listing", string="Page Type",
-        help="The type of the page. If set, it indicates whether the page displays a list of records or a single record")
+        string="URL", help="The name of the page usable in a URL", inverse="_inverse_name_slugified")
+    url_demo = fields.Char(string="Demo URL", compute="_compute_url_demo")
+
     record_domain = fields.Char(string="Domain", help="Domain to restrict records that can be viewed publicly")
     default_layout = fields.Selection(
         selection=[
@@ -39,14 +45,50 @@ class WebsiteControllerPage(models.Model):
     @api.constrains('view_id', 'model_id', "model")
     def _check_user_has_model_access(self):
         for record in self:
-            self.env[record.model_id.model].check_access_rights('read')
+            self.env[record.model_id.model].check_access('read')
 
-    @api.depends("model_id", "page_name")
+    @api.depends("view_id")
+    def _compute_name(self):
+        for rec in self:
+            rec.name = rec.view_id.name
+
+    def _inverse_name(self):
+        for rec in self:
+            if rec.view_id:
+                rec.view_id.name = rec.name
+
+    @api.depends("model_id", "name")
     def _compute_name_slugified(self):
         for rec in self:
-            if not rec.model_id or not rec.page_type:
+            if not rec.model_id:
+                rec.name_slugified = False
                 continue
-            rec.name_slugified = slugify(rec.page_name or '')
+            rec.name_slugified = self.env['ir.http']._slugify(rec.name or '')
+
+    def _inverse_name_slugified(self):
+        for rec in self:
+            rec.name_slugified = self.env['ir.http']._slugify(rec.name_slugified)
+
+    @api.depends("name_slugified")
+    def _compute_url_demo(self):
+        for rec in self:
+            if not rec.name_slugified:
+                rec.url_demo = ""
+                continue
+            url = ["", "model", rec.name_slugified]
+            rec.url_demo = "/".join(url)
+
+    def _default_is_published(self):
+        return False
+
+    def write(self, vals):
+        res = super().write(vals)
+        for rec in self:
+            rec.menu_ids.write({
+                "url": f"/model/{rec.name_slugified}",
+                "name": rec.name,
+            })
+        return res
 
     def unlink(self):
         # When a website_controller_page is deleted, the ORM does not delete its
@@ -62,3 +104,10 @@ class WebsiteControllerPage(models.Model):
         # Make sure website._get_menu_ids() will be recomputed
         self.env.registry.clear_cache()
         return super().unlink()
+
+    def open_website_url(self):
+        url = f"/model/{self.name_slugified}"
+        return {
+            "type": "ir.actions.act_url",
+            "url": url
+        }

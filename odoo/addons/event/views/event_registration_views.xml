@@ -3,12 +3,13 @@
 
     <!-- EVENT.REGISTRATION VIEWS -->
     <record model="ir.ui.view" id="view_event_registration_tree">
-        <field name="name">event.registration.tree</field>
+        <field name="name">event.registration.list</field>
         <field name="model">event.registration</field>
         <field name="arch" type="xml">
-            <tree string="Registration" multi_edit="1" sample="1"
+            <list string="Registration" multi_edit="1" sample="1"
                   expand="1" default_order="create_date desc"
-                  class="o_event_registration_view_tree">
+                  class="o_event_registration_view_tree" js_class="registration_summary_dialog_list">
+                <field name="barcode" column_invisible="True"/>
                 <field name="active" column_invisible="True"/>
                 <field name="create_date" optional="show" string="Registration Date"/>
                 <field name="name"/>
@@ -32,7 +33,7 @@
                         class="o_btn_cancel_registration" icon="fa-times"
                         invisible="not active or (state != 'open' and state != 'draft')"/>
                 <field name="activity_exception_decoration" widget="activity_exception"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -52,7 +53,7 @@
                     <button name="action_cancel" string="Cancel Registration" type="object"
                             invisible="not active or state == 'cancel'"/>
                     <field name="state" nolabel="1" colspan="2" widget="statusbar" statusbar_visible="open,done"
-                            readonly="false" options="{'clickable': '1'}"/>
+                            readonly="False" options="{'clickable': '1'}"/>
                 </header>
                 <sheet string="Registration">
                     <div class="oe_button_box" name="button_box"/>
@@ -82,12 +83,37 @@
                         </group>
                     </group>
                     <field name="registration_properties" columns="2"/>
+                    <notebook>
+                        <page string="Questions" name="questions">
+                            <field name="registration_answer_ids" widget="one2many">
+                                <list editable="bottom">
+                                    <field name="event_id" column_invisible="True" />
+                                    <field name="question_id" domain="[('event_id', '=', event_id)]" options="{'no_create': True}" />
+                                    <field name="question_type" string="Type" />
+                                    <field name="value_answer_id"
+                                        invisible="question_type != 'simple_choice'"
+                                        domain="[('question_id', '=', question_id)]" options="{'no_create': True}"/>
+                                    <field name="value_text_box" invisible="question_type == 'simple_choice'" />
+                                </list>
+                                <kanban class="o_kanban_mobile" create="false" delete="false">
+                                    <field name="event_id"/>
+                                    <field name="question_type"/>
+                                    <templates>
+                                        <t t-name="card" class="justify-content-between">
+                                            <field class="fw-bold fs-5" name="question_id" domain="[('event_id', '=', event_id)]"/>
+                                            <field name="value_answer_id"
+                                                invisible="question_type != 'simple_choice'"
+                                                domain="[('question_id', '=', question_id)]" options="{'no_create': True}"/>
+                                            <field name="value_text_box"
+                                                invisible="question_type == 'simple_choice'"/>
+                                        </t>
+                                    </templates>
+                                </kanban>
+                            </field>
+                        </page>
+                    </notebook>
                 </sheet>
-                <div class="oe_chatter">
-                    <field name="message_follower_ids"/>
-                    <field name="activity_ids"/>
-                    <field name="message_ids" options="{'post_refresh': 'recipients'}"/>
-                </div>
+                <chatter reload_on_post="True"/>
             </form>
         </field>
     </record>
@@ -97,87 +123,61 @@
         <field name="model">event.registration</field>
         <field name="priority">10</field>
         <field name="arch" type="xml">
-            <kanban class="o_event_attendee_kanban_view" default_order="name, create_date desc" sample="1">
+            <kanban class="o_event_attendee_kanban_view" default_order="name, create_date desc" sample="1" js_class="registration_summary_dialog_kanban">
                 <field name="name"/>
-                <field name="partner_id"/>
                 <field name="state"/>
-                <field name="email"/>
-                <field name="event_ticket_id"/>
                 <field name="active"/>
+                <field name="barcode"/>
                 <templates>
                     <t t-name="event_attendees_kanban_icons_desktop">
+                        <!-- Will be removed in master -->
                         <div class="d-none d-md-block h-100">
                             <div id="event_attendees_kanban_icons_desktop" class="h-100 float-end p-2 d-flex align-items-end flex-column gap-1">
                                 <t t-if="record.active.raw_value">
-                                    <a class="btn btn-md btn-secondary" string="Confirm Registration" name="action_confirm" type="object" invisible="state != 'draft'" role="button">
-                                        <i class="fa fa-check" role="img" aria-label="Confirm button" title="Confirm Registration"/>
+                                    <a class="btn btn-md btn-secondary" string="Confirm Attendance" name="action_set_done" type="object" invisible="state == 'done'"
+                                        role="button" aria-label="Confirm Attendance Button" title="Confirm Attendance">
+                                        <i class="fa fa-check" role="img"/>
                                     </a>
-                                    <a class="btn btn-md btn-primary" string="Confirm Attendance" name="action_set_done" type="object" invisible="state != 'open'" role="button">
-                                        <i class="fa fa-check" role="img" aria-label="Attended button" title="Confirm Attendance"/>
+                                    <a class="btn btn-md btn-success" string="Reset To Registered" name="action_confirm" type="object" invisible="state != 'done'"
+                                        role="button" aria-label="Reset To Registered Button" title="Reset To Registered">
+                                        <i class="fa fa-check" role="img"/>
                                     </a>
-                                    <span class="text-muted" invisible="state != 'done'">Attended</span>
-                                    <span class="text-muted" invisible="state != 'cancel'">Canceled</span>
                                 </t>
-                                <a class="btn btn-md btn-secondary" string="Previous state" name="action_set_previous_state" type="object" role="button"
-                                    invisible="state in ('cancel', 'draft')">
-                                    <i class="fa fa-undo" role="img" aria-label="Previous state button" title="Previous state"/>
-                                </a>
                             </div>
                         </div>
                     </t>
                     <t t-name="event_attendees_kanban_icons_mobile">
+                        <!-- Will be removed in master -->
                         <div id="event_attendees_kanban_icons_mobile" class="d-md-none d-flex align-items-end flex-column gap-1 h-100 ps-4">
                             <t t-if="record.active.raw_value">
                                 <a class="btn btn-secondary d-flex justify-content-center align-items-center h-100 w-100"
-                                    string="Confirm Registration" name="action_confirm" type="object" invisible="state != 'draft'" role="button">
-                                    <i class="fa fa-check fa-3x" role="img" aria-label="Confirm button" title="Confirm Registration"/>
+                                    string="Confirm Attendance" name="action_set_done" type="object" invisible="state == 'done'" role="button">
+                                    <i class="fa fa-check fa-3x" role="img" aria-label="Confirm Attendance Button" title="Confirm Attendance"/>
                                 </a>
-                                <a class="btn btn-primary d-flex justify-content-center align-items-center h-100 w-100"
-                                    string="Confirm Attendance" name="action_set_done" type="object" invisible="state != 'open'" role="button">
-                                    <i class="fa fa-check fa-3x" role="img" aria-label="Attended button" title="Confirm Attendance"/>
+                                <a class="btn btn-success d-flex justify-content-center align-items-center h-100 w-100"
+                                    string="Reset To Registered" name="action_confirm" type="object" invisible="state != 'done'" role="button">
+                                    <i class="fa fa-check fa-3x" role="img" aria-label="Reset To Registered Button" title="Reset To Registered"/>
                                 </a>
-                                <div class="d-flex justify-content-center align-items-center h-100 w-100"
-                                    invisible="state in ('open', 'draft')">
-                                    <span class="text-muted" invisible="state != 'done'">Attended</span>
-                                    <span class="text-muted" invisible="state != 'cancel'">Canceled</span>
-                                </div>
                             </t>
-                            <a class="btn btn-secondary d-flex justify-content-center align-items-center h-100 w-100"
-                                string="Previous state" name="action_set_previous_state" type="object" role="button"
-                                invisible="state in ('cancel', 'draft')">
-                                <i class="fa fa-undo fa-3x" role="img" aria-label="Previous state button" title="Previous state"/>
-                            </a>
                         </div>
                     </t>
-                    <t t-name="kanban-box">
-                        <div t-attf-class="#{!record.active.raw_value ? 'oe_kanban_card_ribbon' : ''} oe_kanban_global_click o_event_registration_kanban container-fluid">
-                            <div t-if="!record.active.raw_value" class="ribbon ribbon-top-right">
-                                <span class="text-bg-danger">Archived</span>
+                    <t t-name="card" class="row g-0">
+                        <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                        <div class="col-8 col-md-9">
+                            <field class="d-block fw-bold fs-5" name="name"/>
+                            <field name="state" widget="badge" decoration-success="state == 'done'" class="position-absolute top-0 end-0 o_event_registration_kanban_badge"/>
+                            <div class="o_kanban_event_registration_event_name">
+                                <field class="text-truncate text-primary" name="event_id" invisible="context.get('default_event_id')"/>
                             </div>
-                            <div class="row g-0 h-100">
-                                <div class="col-8 col-md-9">
-                                    <div class="oe_kanban_content h-100">
-                                        <div class="o_kanban_record_body h-100 d-flex flex-column">
-                                            <b class="o_kanban_record_title"><field name="name"/></b>
-                                            <field class="o_text_overflow text-primary" name="event_id" invisible="context.get('default_event_id')" readonly="state != 'draft'"/>
-                                            <span class="o_text_overflow" invisible="not company_name">
-                                                <i class="fa fa-building" title="Attendee Company"/> <field name="company_name"/>
-                                            </span>
-                                            <span class="o_text_overflow" invisible="not partner_id">Booked by <field name="partner_id" /></span>
-                                            <div id="event_ticket_id" class="o_field_many2many_tags o_field_widget d-flex mt-auto align-items-center">
-                                            <field name="registration_properties"/>
-                                                <t t-if="record.event_ticket_id.raw_value">
-                                                    <i class="fa fa-ticket" title="Ticket type"/>
-                                                    <b><span class="o_badge_text o_text_overflow ms-1"><t t-out="record.event_ticket_id.value"/></span></b>
-                                                </t>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div id="event_attendees_kanban_icons" class="col-4 col-md-3">
-                                    <t t-call="event_attendees_kanban_icons_desktop"/>
-                                    <t t-call="event_attendees_kanban_icons_mobile"/>
-                                </div>
+                            <span class="text-truncate" invisible="not company_name">
+                                <i class="fa fa-building" title="Attendee Company"/> <field name="company_name"/>
+                            </span>
+                            <div id="event_ticket_id">
+                                <field name="registration_properties"/>
+                                <t t-if="record.event_ticket_id.raw_value">
+                                    <i class="fa fa-ticket" title="Ticket type"/>
+                                    <field name="event_ticket_id" class="fw-bold text-truncate ms-1"/>
+                                </t>
                             </div>
                         </div>
                     </t>
@@ -291,7 +291,8 @@
     <record id="act_event_registration_from_event" model="ir.actions.act_window">
         <field name="res_model">event.registration</field>
         <field name="name">Attendees</field>
-        <field name="view_mode">tree,kanban,form,calendar,graph</field>
+        <field name="path">attendees</field>
+        <field name="view_mode">list,kanban,form,calendar,graph</field>
         <field name="domain">[('event_id', '=', active_id)]</field>
         <field name="context">{
             'default_event_id': active_id,
@@ -313,7 +314,7 @@
     <record id="event_registration_action_kanban" model="ir.actions.act_window">
         <field name="res_model">event.registration</field>
         <field name="name">Attendees</field>
-        <field name="view_mode">kanban,tree,form,calendar,graph</field>
+        <field name="view_mode">kanban,list,form</field>
         <field name="domain">[('event_id', '=', active_id)]</field>
         <field name="context">{'default_event_id': active_id}</field>
         <field name="help" type="html">
@@ -328,7 +329,8 @@
     <record id="event_registration_action" model="ir.actions.act_window">
         <field name="res_model">event.registration</field>
         <field name="name">Attendees</field>
-        <field name="view_mode">kanban,tree,form,calendar,graph</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="context">{'search_default_filter_is_ongoing': True}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 No Attendees expected yet!
@@ -341,14 +343,14 @@
     <record id="event_registration_action_tree" model="ir.actions.act_window">
        <field name="name">Event registrations</field>
        <field name="res_model">event.registration</field>
-       <field name="view_mode">tree,kanban,form,calendar,graph</field>
+       <field name="view_mode">list,kanban,form,calendar,graph</field>
     </record>
 
     <record id="action_registration" model="ir.actions.act_window">
         <field name="name">Attendees</field>
         <field name="res_model">event.registration</field>
         <field name="domain"></field>
-        <field name="view_mode">graph,pivot,kanban,tree,form</field>
+        <field name="view_mode">graph,pivot,kanban,list,form</field>
         <field name="context">{
                 'search_default_filter_last_month_creation': 1,
                 'search_default_taken': 1,
@@ -371,7 +373,7 @@
     <record id="event_registration_action_stats_from_event" model="ir.actions.act_window">
         <field name="name">Registration statistics</field>
         <field name="res_model">event.registration</field>
-        <field name="view_mode">graph,pivot,kanban,tree,form</field>
+        <field name="view_mode">graph,pivot,kanban,list,form</field>
         <field name="domain">[('event_id', '=', active_id)]</field>
         <field name="context">{
                 'default_event_id': active_id,

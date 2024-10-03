@@ -43,11 +43,11 @@ class HrEmployee(models.Model):
         compute='_compute_hours_today',
         groups="hr_attendance.group_hr_attendance_officer,hr.group_hr_user")
     hours_last_month_display = fields.Char(
-        compute='_compute_hours_last_month')
+        compute='_compute_hours_last_month', groups="hr.group_hr_user")
     overtime_ids = fields.One2many(
         'hr.attendance.overtime', 'employee_id', groups="hr_attendance.group_hr_attendance_officer,hr.group_hr_user")
     total_overtime = fields.Float(
-        compute='_compute_total_overtime', compute_sudo=True)
+        compute='_compute_total_overtime', compute_sudo=True, groups="hr_attendance.group_hr_attendance_officer,hr.group_hr_user")
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -76,13 +76,22 @@ class HrEmployee(models.Model):
 
         return res
 
-    @api.depends('overtime_ids.duration', 'attendance_ids')
+    @api.depends('overtime_ids.duration', 'attendance_ids', 'attendance_ids.overtime_status')
     def _compute_total_overtime(self):
+        mapped_validated_overtimes = dict(self.env['hr.attendance']._read_group(
+            domain=[('overtime_status', '=', 'approved')],
+            groupby=['employee_id'],
+            aggregates=['validated_overtime_hours:sum']
+        ))
+
+        mapped_overtime_adjustments = dict(self.env['hr.attendance.overtime']._read_group(
+            domain=[('adjustment', '=', True)],
+            groupby=['employee_id'],
+            aggregates=['duration:sum']
+        ))
+
         for employee in self:
-            if employee.company_id.hr_attendance_overtime:
-                employee.total_overtime = float_round(sum(employee.overtime_ids.mapped('duration')), 2)
-            else:
-                employee.total_overtime = 0
+            employee.total_overtime = mapped_validated_overtimes.get(employee, 0) + mapped_overtime_adjustments.get(employee, 0)
 
     def _compute_hours_last_month(self):
         """
@@ -119,7 +128,7 @@ class HrEmployee(models.Model):
             start_naive = start_tz.astimezone(pytz.utc).replace(tzinfo=None)
 
             attendances = self.env['hr.attendance'].search([
-                ('employee_id', '=', employee.id),
+                ('employee_id', 'in', employee.ids),
                 ('check_in', '<=', now),
                 '|', ('check_out', '>=', start_naive), ('check_out', '=', False),
             ], order='check_in asc')
@@ -140,7 +149,7 @@ class HrEmployee(models.Model):
     def _compute_last_attendance_id(self):
         for employee in self:
             employee.last_attendance_id = self.env['hr.attendance'].search([
-                ('employee_id', '=', employee.id),
+                ('employee_id', 'in', employee.ids),
             ], order="check_in desc", limit=1)
 
     @api.depends('last_attendance_id.check_in', 'last_attendance_id.check_out', 'last_attendance_id')
@@ -194,7 +203,7 @@ class HrEmployee(models.Model):
             "type": "ir.actions.act_window",
             "name": _("Attendances This Month"),
             "res_model": "hr.attendance",
-            "views": [[self.env.ref('hr_attendance.hr_attendance_employee_simple_tree_view').id, "tree"]],
+            "views": [[self.env.ref('hr_attendance.hr_attendance_employee_simple_tree_view').id, "list"]],
             "context": {
                 "create": 0
             },
@@ -206,11 +215,11 @@ class HrEmployee(models.Model):
         self.ensure_one()
         return {
             "type": "ir.actions.act_window",
-            "name": _("Overtime"),
-            "res_model": "hr.attendance.overtime",
-            "views": [[False, "tree"]],
+            "name": _("Attendances This Month"),
+            "res_model": "hr.attendance",
+            "views": [[self.env.ref('hr_attendance.hr_attendance_validated_hours_employee_simple_tree_view').id, "list"]],
             "context": {
                 "create": 0
             },
-            "domain": [('employee_id', '=', self.id)]
+            "domain": [('employee_id', '=', self.id), ('overtime_status', '=', 'approved')]
         }

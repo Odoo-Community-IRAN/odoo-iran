@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo import api, fields, models, SUPERUSER_ID
+from odoo import api, fields, models
 
 
 class Lead(models.Model):
@@ -47,7 +47,7 @@ class Lead(models.Model):
     def website_form_input_filter(self, request, values):
         values['medium_id'] = values.get('medium_id') or \
                               self.sudo().default_get(['medium_id']).get('medium_id') or \
-                              self.sudo().env.ref('utm.utm_medium_website').id
+                              self.env['utm.medium']._fetch_or_create_utm_medium('website').id
         values['team_id'] = values.get('team_id') or \
                             request.website.crm_default_team_id.id
         values['user_id'] = values.get('user_id') or \
@@ -55,6 +55,6 @@ class Lead(models.Model):
         if values.get('team_id'):
             values['type'] = 'lead' if self.env['crm.team'].sudo().browse(values['team_id']).use_leads else 'opportunity'
         else:
-            values['type'] = 'lead' if self.with_user(SUPERUSER_ID).env['res.users'].has_group('crm.group_use_lead') else 'opportunity'
+            values['type'] = 'lead' if self.env.user.has_group('crm.group_use_lead') else 'opportunity'
 
         return values

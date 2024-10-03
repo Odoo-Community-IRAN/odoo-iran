@@ -28,8 +28,8 @@
 <!-- Main topbar -->
 <template id="session_topbar" name="Tracks Tools">
     <div>
-        <div class="o_wesession_topbar_filters o_wevent_index_topbar_filters d-print-none d-flex flex-wrap align-items-center justify-content-end gap-2 w-100 mb-3">
-            <h3 class="mt-3 mb-3 me-auto pe-sm-4">Talks</h3>
+        <div class="o_wesession_topbar_filters o_wevent_index_topbar_filters d-print-none d-flex flex-wrap align-items-center justify-content-end gap-2 w-100 mt-1 mt-lg-3 mb-3">
+            <h3 class="my-0 me-auto pe-sm-4">Talks</h3>
             <!-- Optional wishlist filter -->
             <div t-if="option_track_wishlist" class="dropdown d-none d-lg-block">
                 <a href="#" role="button" class="btn btn-light dropdown-toggle" data-bs-toggle="dropdown">
@@ -53,10 +53,11 @@
                 </div>
             </div>
             <div class="o_wevent_search d-flex w-100 w-lg-auto">
+                <t t-set="event_search_placeholder">Search a talk ...</t>
                 <t t-call="website_event.events_search_box">
                     <t t-set="_searches" t-value="searches"/>
                     <t t-set="action" t-value="'/event/%s/track' % (slug(event))"/>
-                    <t t-set="_placeholder" t-value="'Search a talk ...'"/>
+                    <t t-set="_placeholder" t-value="event_search_placeholder"/>
                 </t>
                 <button class="btn btn-light position-relative ms-2 d-lg-none"
                     data-bs-toggle="offcanvas"
@@ -126,14 +127,14 @@
                                 <ul class="list-group list-group-flush">
                                     <t t-if="tag_category.tag_ids and any(tag.color for tag in tag_category.tag_ids)" t-foreach="tag_category.tag_ids" t-as="tag">
                                         <li class="list-group-item border-0 px-0">
-                                                <a t-att-href="'/event/%s/track?%s' % (
-                                                        slug(event),
-                                                        keep_query('*', tags=str((search_tags - tag).ids if tag in search_tags else (tag | search_tags).ids))
-                                                    )"
-                                                    t-if="tag.color"
-                                                    t-attf-class="d-flex align-items-center justify-content-between text-reset #{'active' if tag in search_tags else ''}">
-                                                    <t t-out="tag.name"/>
-                                                </a>
+                                            <span t-if="tag.color"
+                                                t-att-data-post="'/event/%s/track?%s' % (
+                                                    slug(event),
+                                                    keep_query('*', tags=str((search_tags - tag).ids if tag in search_tags else (tag | search_tags).ids), prevent_redirect=True)
+                                                )"
+                                                t-attf-class="post_link cursot-pointer d-flex align-items-center justify-content-between text-reset #{'active' if tag in search_tags else ''}">
+                                                <t t-out="tag.name"/>
+                                            </span>
                                         </li>
                                     </t>
                                 </ul>
@@ -154,20 +155,20 @@
     active="True">
     <xpath expr="//div[hasclass('o_wevent_search')]" position="before">
         <t t-foreach="tag_categories" t-as="tag_category">
-            <div t-if="tag_category.tag_ids and any(tag.color for tag in tag_category.tag_ids)" class="dropdown d-none d-lg-block me-2 my-1">
+            <div t-if="tag_category.tag_ids and any(tag.color for tag in tag_category.tag_ids)" class="dropdown d-none d-lg-block my-1">
                 <a href="#" role="button" class="btn btn-light dropdown-toggle" data-bs-toggle="dropdown">
                     <t t-out="tag_category.name"/>
                 </a>
                 <div class="dropdown-menu">
                     <t t-foreach="tag_category.tag_ids" t-as="tag">
-                        <a t-att-href="'/event/%s/track?%s' % (
+                        <span t-att-data-post="'/event/%s/track?%s' % (
                                 slug(event),
-                                keep_query('*', tags=str((search_tags - tag).ids if tag in search_tags else (tag | search_tags).ids))
+                                keep_query('*', tags=str((search_tags - tag).ids if tag in search_tags else (tag | search_tags).ids), prevent_redirect=True)
                             )"
                             t-if="tag.color"
-                            t-attf-class="dropdown-item d-flex align-items-center justify-content-between #{'active' if tag in search_tags else ''}">
+                            t-attf-class="post_link cursor-pointer dropdown-item d-flex align-items-center justify-content-between #{'active' if tag in search_tags else ''}">
                             <t t-out="tag.name"/>
-                        </a>
+                        </span>
                     </t>
                 </div>
             </div>
@@ -197,7 +198,7 @@
         <p t-if="search_key">We could not find any track matching your search for: <strong t-out="search_key"/>.</p>
         <p t-else="">We could not find any track at this moment.</p>
         <div class="o_not_editable my-3" groups="event.group_event_user">
-            <a class="o_wevent_cta btn" target="_blank" t-att-href="'/web?#action=website_event_track.action_event_track_from_event&amp;active_id=%s' % event.id">
+            <a class="o_wevent_cta btn" target="_blank" t-att-href="'/odoo/%s/action-website_event_track.action_event_track_from_event' % event.id">
                 <span class="fa fa-plus me-1"/> Schedule Tracks
             </a>
         </div>
@@ -230,9 +231,9 @@
 
 <!-- Tracks: List-based display -->
 <template id="tracks_display_list" name="Tracks: List Display">
-    <div t-if="tracks">
-        <h4>Book your talks</h4>
-        <p class="mb-3">Plan your experience by adding your favorites talks to your wishlist</p>
+    <div t-if="tracks" class="pt24">
+        <h5>Book your talks</h5>
+        <p>Plan your experience by adding your favorites talks to your wishlist</p>
     </div>
     <div t-if="tracks" class="o_wesession_list mb-3">
         <ul class="list-unstyled">
@@ -242,15 +243,14 @@
                 <t t-set="tracks" t-value="tracks_info['tracks']"/>
                 <!-- DAY HEADER -->
                 <div class="o_we_track_day_header d-flex align-items-center position-relative py-3">
-                    <div class="d-flex flex-grow-1 flex-column" t-if="tracks_date">
-                        <span class="m-0 fw-bold" t-out="tracks_date"
-                            t-options="{'widget': 'date', 'format': 'EEEE '}"/>
-                        <div class="d-flex align-items-center justify-content-start">
-                            <span class="h3 mb-0 fw-bold" t-out="tracks_date"
-                                t-options="{'widget': 'date', 'format': 'dd MMMM YYYY'}"/>
-                                <span class="small ms-2 fw-light">(<t t-out="event.date_tz"/>)</span>
+                   <time class="d-flex flex-grow-1 align-items-end gap-2" t-if="tracks_date" t-att-datetime="tracks_date">
+                        <span class="o_wevent_day_header_number lh-1" t-out="tracks_date" t-options="{'widget': 'date', 'format': 'dd'}"/>
+                        <div class="small">
+                            <div class="lh-1 fw-bold" t-out="tracks_date" t-options="{'widget': 'date', 'format': 'MMMM YYYY'}"/>
+                            <span class="lh-1" t-out="tracks_date" t-options="{'widget': 'date', 'format': 'EEEE '}"/>
+                            <span class="d-none d-md-inline small lh-1 text-muted">(timezone: <t t-out="event.date_tz"/>)</span>
                         </div>
-                    </div>
+                    </time>
                     <div class="d-flex flex-grow-1" t-elif="tracks_header_name">
                         <span class="h4 m-0"
                             t-out="tracks_header_name"/>
@@ -268,23 +268,29 @@
                 <div t-attf-class="collapse {{ '' if tracks_info['default_collapsed'] else 'show' }}"
                     t-attf-id="collapse_session_list_{{ tracks_info_index }}">
                     <div t-foreach="tracks" t-as="track"
-                        t-att-class="'o_wesession_list_item p-3 event_color_%d' % (track.color)">
+                        t-att-class="'o_wesession_list_item p-3 o_color_%d' % (track.color)">
                         <div class="row g-0">
                             <div class="col-12 d-flex justify-content-between">
                                 <!-- Hour: Live > Remaining > Hour: desktop only -->
-                                <div t-if="tracks_date and today_tz &lt;= tracks_date"
-                                    >
-                                    <span t-if="track.is_track_live and not track.is_track_done"
-                                        class="alert alert-danger px-2 py-1">Live</span>
-                                    <span class="fw-bold" t-elif="not track.is_track_done and track.is_track_soon">
-                                        <span t-out="track.track_start_remaining"
-                                            t-options="{'widget': 'duration', 'digital': False, 'format': 'narrow',
-                                                        'add_direction': True, 'unit': 'second', 'round': 'minute'}"/>
-                                    </span>
-                                    <span class="fw-bold" t-elif="not track.is_track_done and not track.is_track_soon"
-                                        t-out="track.date"
-                                        t-options="{'widget': 'datetime', 'time_only': True, 'format': 'short', 'tz_name': event.date_tz}"/>
-                                    <span t-else="" class="alert alert-dark px-2 py-1 small">Finished</span>
+                                <div class="d-flex align-items-center gap-1 flex-wrap">
+                                    <div t-if="tracks_date and today_tz &lt;= tracks_date"
+                                        >
+                                        <span t-if="track.is_track_live and not track.is_track_done"
+                                            class="alert alert-danger px-2 py-1">Live</span>
+                                        <span class="fw-bold" t-elif="not track.is_track_done and track.is_track_soon">
+                                            <span t-out="track.track_start_remaining"
+                                                t-options="{'widget': 'duration', 'digital': False, 'format': 'narrow',
+                                                            'add_direction': True, 'unit': 'second', 'round': 'minute'}"/>
+                                        </span>
+                                        <span class="fw-bold" t-elif="not track.is_track_done and not track.is_track_soon"
+                                            t-out="track.date"
+                                            t-options="{'widget': 'datetime', 'time_only': True, 'format': 'short', 'tz_name': event.date_tz}"/>
+                                        <span t-else="" class="alert alert-dark px-2 py-1 small">Finished</span>
+                                    </div>
+                                    <span t-if="tracks_date and today_tz &lt;= tracks_date and track.location_id">-</span>
+                                    <div t-if="track.location_id">
+                                        <i class="fa fa-map-marker" role="img"/> <span t-field="track.location_id"/>
+                                    </div>
                                 </div>
                                 <!-- reminder -->
                                 <div t-if="not event.is_done and (not track.date or today_tz &lt;= tracks_date) and option_track_wishlist"
@@ -306,13 +312,12 @@
                                     <t t-else="">
                                         <span class="text-reset me-2" t-field="track.name"/>
                                     </t>
-                                    <span t-if="not track.website_published and is_event_user"
-                                        class="badge text-bg-danger o_wevent_online_badge_unpublished">
-                                        Unpublished
-                                    </span>
+                                </span>
+                                <span t-if="not track.website_published and is_event_user" class="alert alert-danger px-2 py-1 align-top small">
+                                    Unpublished
                                 </span>
                             </div>
-                            
+
                             <div class="col-12 d-flex justify-content-between align-items-end">
                                 <div class="d-flex align-items-center w-100 gap-2 text-muted">
                                     <span class="text-muted" t-out="track.partner_tag_line"/>
@@ -359,8 +364,7 @@
 </template>
 
 <template id="track_card" name="Track Card">
-    <article t-att-class="'card o_wesession_track_card h-100 %s' % ('o_wesession_track_card_unpublished' if (not track.website_published and is_event_user) else '')"
-        itemscope="itemscope" itemtype="http://schema.org/Event">
+    <article t-att-class="'card o_wesession_track_card h-100 %s' % ('o_wesession_track_card_unpublished' if (not track.website_published and is_event_user) else '')">
         <div class="h-100 row g-0">
             <header class="overflow-hidden bg-secondary col-12">
                 <small t-if="not track.website_published and is_event_user" class="o_wesession_track_card_header_badge bg-danger">
@@ -395,7 +399,7 @@
                     </div>
                     <!-- Title -->
                     <h5 class="card-title mb-0 text-truncate">
-                        <span t-field="track.name" itemprop="name"/>
+                        <span t-field="track.name"/>
                     </h5>
                 </main>
             </div>
@@ -403,15 +407,15 @@
             <footer class="small align-self-end w-100 p-3">
                 <div class="d-flex justify-content-between align-items-center">
                     <!-- Speaker -->
-                    <span class="opacity-75 text-truncate" t-field="track.partner_name" itemprop="performer"/>
+                    <span class="opacity-75 text-truncate" t-field="track.partner_name"/>
                     <!-- Starts -->
                     <span class="opacity-75 ms-auto">
                         <t t-if="track.track_start_remaining &gt;= 60">In
-                            <span class="ms-auto" t-field="track.track_start_remaining" itemprop="duration"
+                            <span class="ms-auto" t-field="track.track_start_remaining"
                                 t-options="{'widget': 'duration', 'digital': False, 'format': 'short', 'unit': 'second', 'round': 'minute'}"/>
                         </t>
                         <t t-elif="track.track_start_relative &gt;= 60">
-                            <span class="ms-auto" t-field="track.track_start_relative" itemprop="duration"
+                            <span class="ms-auto" t-field="track.track_start_relative"
                                 t-options="{'widget': 'duration', 'digital': False, 'format': 'short', 'unit': 'second', 'round': 'minute'}"/>
                             ago
                         </t>
@@ -441,10 +445,10 @@
             <span class="align-items-baseline border d-inline-flex rounded">
                 <i class="fa fa-tag mx-2 text-muted"/>
                 <t t-out="tag.display_name"/>
-                <a t-att-href="'/event/%s/track?%s' % (slug(event), keep_query('*', tags=str((search_tags - tag).ids)))"
-                    class="btn border-0 py-1">
+                <span t-att-data-post="'/event/%s/track?%s' % (slug(event), keep_query('*', tags=str((search_tags - tag).ids), prevent_redirect=True))"
+                    class="post_link cursor-pointer btn border-0 py-1">
                     &#215;
-                </a>
+                </span>
             </span>
         </t>
     </div>
@@ -455,28 +459,28 @@
 <!-- ============================================================ -->
 
 <template id="track_tag_badge_link" name="Track: Tag Badge Link">
-    <a t-if="search_tags"
-        t-att-href="'/event/%s/track?%s'% (
+    <span t-if="search_tags"
+        t-att-data-post="'/event/%s/track?%s'% (
             slug(event),
-            keep_query('*', tags=str((search_tags - tag).ids if tag in search_tags else (tag | search_tags).ids))
+            keep_query('*', tags=str((search_tags - tag).ids if tag in search_tags else (tag | search_tags).ids), prevent_redirect=True)
         )"
-        t-att-class="'badge rounded-pill text-decoration-none %s' % ('text-bg-primary opacity-75-hover' if tag in search_tags else 'o_tag_color_hovered_0')"
+        t-att-class="'post_link cursor-pointer badge rounded-pill text-decoration-none %s' % ('text-bg-primary opacity-75-hover' if tag in search_tags else 'o_badge o_badge_clickable o_color_0')"
         t-out="tag.name"/>
-    <a t-else=""
-        t-att-href="'/event/%s/track?%s'% (
+    <span t-else=""
+        t-att-data-post="'/event/%s/track?%s'% (
             slug(event),
-            keep_query('*', tags=str(tag.ids))
+            keep_query('*', tags=str(tag.ids), prevent_redirect=True)
         )"
-        t-att-class="'badge rounded-pill text-decoration-none o_tag_color_hovered_%s' % (tag.color)"
+        t-att-class="'post_link cursor-pointer badge rounded-pill text-decoration-none o_badge o_badge_clickable o_color_%s' % (tag.color)"
         t-out="tag.name"/>
 </template>
 
 <template id="track_tag_badge_info" name="Track: Tag Badge Info">
     <span t-if="search_tags"
-        t-att-class="'badge %s' % ('text-bg-primary' if tag in search_tags else 'o_tag_color_0')"
+        t-att-class="'badge %s' % ('text-bg-primary' if tag in search_tags else 'o_color_0')"
         t-out="tag.name"/>
     <span t-else=""
-        t-att-class="'badge rounded-pill o_tag_color_%s' % (tag.color)"
+        t-att-class="'badge rounded-pill o_color_%s' % (tag.color)"
         t-out="tag.name"/>
 </template>
 

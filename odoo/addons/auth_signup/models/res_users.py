@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import contextlib
@@ -11,11 +10,10 @@ from dateutil.relativedelta import relativedelta
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 from odoo.osv import expression
-from odoo.tools.misc import ustr
 from odoo.http import request
 
 from odoo.addons.base.models.ir_mail_server import MailDeliveryException
-from odoo.addons.auth_signup.models.res_partner import SignupError, now
+from odoo.addons.auth_signup.models.res_partner import SignupError
 
 _logger = logging.getLogger(__name__)
 
@@ -68,8 +66,7 @@ class ResUsers(models.Model):
             # signup with a token: find the corresponding partner id
             partner = self.env['res.partner']._signup_retrieve_partner(token, check_validity=True, raise_exception=True)
             # invalidate signup token
-            partner.write({'signup_token': False, 'signup_type': False, 'signup_expiration': False})
-
+            partner.write({'signup_type': False})
             partner_user = partner.user_ids and partner.user_ids[0] or False
 
             # avoid overwriting existing (presumably correct) values with geolocation data
@@ -121,26 +118,23 @@ class ResUsers(models.Model):
         return self._create_user_from_template(values)
 
     @classmethod
-    def authenticate(cls, db, login, password, user_agent_env):
-        uid = super().authenticate(db, login, password, user_agent_env)
+    def authenticate(cls, db, credential, user_agent_env):
+        auth_info = super().authenticate(db, credential, user_agent_env)
         try:
             with cls.pool.cursor() as cr:
-                env = api.Environment(cr, uid, {})
+                env = api.Environment(cr, auth_info['uid'], {})
                 if env.user._should_alert_new_device():
                     env.user._alert_new_device()
         except MailDeliveryException:
             pass
-        return uid
+        return auth_info
 
     def _notify_inviter(self):
         for user in self:
-            invite_partner = user.create_uid.partner_id
-            if invite_partner:
-                # notify invite user that new user is connected
-                self.env['bus.bus']._sendone(invite_partner, 'res.users/connection', {
-                    'username': user.name,
-                    'partnerId': user.partner_id.id,
-                })
+            # notify invite user that new user is connected
+            user.create_uid._bus_send(
+                "res.users/connection", {"username": user.name, "partnerId": user.partner_id.id}
+            )
 
     def _create_user_from_template(self, values):
         template_user_id = literal_eval(self.env['ir.config_parameter'].sudo().get_param('base.template_portal_user_id', 'False'))
@@ -160,7 +154,7 @@ class ResUsers(models.Model):
                 return template_user.with_context(no_reset_password=True).copy(values)
         except Exception as e:
             # copy may failed if asked login is not available.
-            raise SignupError(ustr(e))
+            raise SignupError(str(e))
 
     def reset_password(self, login):
         """ retrieve the user corresponding to login (login or email),
@@ -177,14 +171,17 @@ class ResUsers(models.Model):
 
     def action_reset_password(self):
         try:
-            return self._action_reset_password()
+            if self.env.context.get('create_user') == 1:
+                return self._action_reset_password(signup_type="signup")
+            else:
+                return self._action_reset_password(signup_type="reset")
         except MailDeliveryException as mde:
             if len(mde.args) == 2 and isinstance(mde.args[1], ConnectionRefusedError):
                 raise UserError(_("Could not contact the mail server, please check your outgoing email server configuration")) from mde
             else:
                 raise UserError(_("There was an error when trying to deliver your Email, please check your configuration")) from mde
 
-    def _action_reset_password(self):
+    def _action_reset_password(self, signup_type="reset"):
         """ create signup token for each user, and send their signup url by email """
         if self.env.context.get('install_mode') or self.env.context.get('import_file'):
             return
@@ -193,10 +190,7 @@ class ResUsers(models.Model):
         # prepare reset password signup
         create_mode = bool(self.env.context.get('create_user'))
 
-        # no time limit for initial invitation, only for reset password
-        expiration = False if create_mode else now(days=+1)
-
-        self.mapped('partner_id').signup_prepare(signup_type="reset", expiration=expiration)
+        self.mapped('partner_id').signup_prepare(signup_type=signup_type)
 
         # send email to users with their signup url
         account_created_template = None
@@ -236,9 +230,23 @@ class ResUsers(models.Model):
                         **email_values,
                     })
                     mail.send()
-            _logger.info("Password reset email sent for user <%s> to <%s>", user.login, user.email)
+            if signup_type == 'reset':
+                _logger.info("Password reset email sent for user <%s> to <%s>", user.login, user.email)
+                message = _('A reset password link was send by email')
+            else:
+                _logger.info("Signup email sent for user <%s> to <%s>", user.login, user.email)
+                message = _('A signup link was send by email')
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Notification',
+                'message': message,
+                'sticky': False
+            }
+        }
 
-    def send_unregistered_user_reminder(self, after_days=5):
+    def send_unregistered_user_reminder(self, after_days=5, batch_size=100):
         email_template = self.env.ref('auth_signup.mail_template_data_unregistered_users', raise_if_not_found=False)
         if not email_template:
             _logger.warning("Template 'auth_signup.mail_template_data_unregistered_users' was not found. Cannot send reminder notifications.")
@@ -246,12 +254,13 @@ class ResUsers(models.Model):
         datetime_min = fields.Datetime.today() - relativedelta(days=after_days)
         datetime_max = datetime_min + relativedelta(hours=23, minutes=59, seconds=59)
 
-        res_users_with_details = self.env['res.users'].search_read([
-            ('share', '=', False),
+        domain = [('share', '=', False),
             ('create_uid.email', '!=', False),
             ('create_date', '>=', datetime_min),
             ('create_date', '<=', datetime_max),
-            ('log_ids', '=', False)], ['create_uid', 'name', 'login'])
+            ('log_ids', '=', False)]
+
+        res_users_with_details = self.env['res.users'].search_read(domain, ['create_uid', 'name', 'login'], limit=batch_size)
 
         # group by invited by
         invited_users = defaultdict(list)
@@ -262,6 +271,12 @@ class ResUsers(models.Model):
         for user in invited_users:
             template = email_template.with_context(dbname=self._cr.dbname, invited_users=invited_users[user])
             template.send_mail(user, email_layout_xmlid='mail.mail_notification_light', force_send=False)
+
+        done = len(res_users_with_details)
+        self.env['ir.cron']._notify_progress(
+            done=done,
+            remaining=0 if done < batch_size else self.env['res.users'].search_count(domain)
+        )
 
     def _alert_new_device(self):
         self.ensure_one()
@@ -339,16 +354,14 @@ class ResUsers(models.Model):
             users_with_email = users.filtered('email')
             if users_with_email:
                 try:
-                    users_with_email.with_context(create_user=True)._action_reset_password()
+                    users_with_email.with_context(create_user=True)._action_reset_password(signup_type='signup')
                 except MailDeliveryException:
                     users_with_email.partner_id.with_context(create_user=True).signup_cancel()
         return users
 
-    @api.returns('self', lambda value: value.id)
     def copy(self, default=None):
         self.ensure_one()
-        sup = super(ResUsers, self)
         if not default or not default.get('email'):
             # avoid sending email to the user we are duplicating
-            sup = super(ResUsers, self.with_context(no_reset_password=True))
-        return sup.copy(default=default)
+            self = self.with_context(no_reset_password=True)
+        return super().copy(default=default)

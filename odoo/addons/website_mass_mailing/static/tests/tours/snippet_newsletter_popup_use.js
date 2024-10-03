@@ -1,10 +1,11 @@
 /** @odoo-module **/
 
+import { isVisible } from "@odoo/hoot-dom";
 import { registry } from "@web/core/registry";
 
 function ensurePopupNotVisible() {
-    const $modal = this.$anchor.find('.o_newsletter_popup .modal');
-    if ($modal.length !== 1) {
+    const modals = this.anchor.querySelectorAll(".o_newsletter_popup .modal");
+    if (modals.length !== 1) {
         // Avoid the tour to succeed if the modal can't be found while
         // it should. Indeed, if the selector ever becomes wrong and the
         // expected element is actually not found anymore, the test
@@ -12,8 +13,8 @@ function ensurePopupNotVisible() {
         // always be truthy on empty jQuery element.
         console.error("Modal couldn't be found in the DOM. The tour is not working as expected.");
     }
-    if ($modal.is(':visible')) {
-        console.error('Modal should not be opened.');
+    if (isVisible(Array.from(modals).at(0))) {
+        console.error("Modal should not be opened.");
     }
 }
 
@@ -29,12 +30,12 @@ registry.category("web_tour.tours").add('snippet_newsletter_popup_use', {
     {
         content: "Check the modal is now opened and enter text in the subscribe input",
         trigger: '.o_newsletter_popup .modal input',
-        in_modal: false,
-        run: 'text hello@world.com',
+        run: "edit hello@world.com",
     },
     {
         content: "Subscribe",
         trigger: '.modal-dialog .btn-primary',
+        run: "click",
     },
     {
         content: "Check the modal is now closed",

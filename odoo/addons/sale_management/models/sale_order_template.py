@@ -1,13 +1,13 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo import api, fields, models, _
+from odoo import Command, _, api, fields, models
 from odoo.exceptions import ValidationError
 
 
 class SaleOrderTemplate(models.Model):
     _name = "sale.order.template"
     _description = "Quotation Template"
+    _order = 'sequence, id'
 
     active = fields.Boolean(
         default=True,
@@ -16,6 +16,7 @@ class SaleOrderTemplate(models.Model):
 
     name = fields.Char(string="Quotation Template", required=True)
     note = fields.Html(string="Terms and conditions", translate=True)
+    sequence = fields.Integer(default=10)
 
     mail_template_id = fields.Many2one(
         comodel_name='mail.template',
@@ -121,7 +122,7 @@ class SaleOrderTemplate(models.Model):
         return result
 
     def _update_product_translations(self):
-        languages = self.env['res.lang'].search([('active', '=', 'true')])
+        languages = self.env['res.lang'].search([('active', '=', True)])
         for lang in languages:
             for line in self.sale_order_template_line_ids:
                 if line.name == line.product_id.get_product_multiline_description_sale():
@@ -129,3 +130,47 @@ class SaleOrderTemplate(models.Model):
             for option in self.sale_order_template_option_ids:
                 if option.name == option.product_id.get_product_multiline_description_sale():
                     option.with_context(lang=lang.code).name = option.product_id.with_context(lang=lang.code).get_product_multiline_description_sale()
+
+    @api.model
+    def _demo_configure_template(self):
+        demo_template = self.env.ref(
+            'sale_management.sale_order_template_1', raise_if_not_found=False
+        )
+        if not demo_template or demo_template.sale_order_template_line_ids:
+            # Skip if template not found, or already configured
+            return
+
+        acoustic_bloc_screen_product = self.env.ref(
+            'product.product_template_acoustic_bloc_screens'
+        ).product_variant_id
+        chair_protection_product = self.env.ref(
+            'sale.product_product_1_product_template'
+        ).product_variant_id
+        demo_template.sale_order_template_line_ids = [
+            Command.create({
+                'product_id': self.env.ref('product.consu_delivery_02').id,
+            }),
+            Command.create({
+                'product_id': self.env.ref('product.product_delivery_01').id,
+                'product_uom_qty': 8,
+            }),
+            Command.create({
+                'product_id': acoustic_bloc_screen_product.id,
+            }),
+            Command.create({
+                'product_id': chair_protection_product.id,
+                'product_uom_qty': 8,
+            })
+        ]
+
+        demo_template.sale_order_template_option_ids = [
+            Command.create({
+                'product_id': self.env.ref('product.product_product_16').id,
+            }),
+            Command.create({
+                'product_id': self.env.ref('product.product_product_6').id,
+            }),
+            Command.create({
+                'product_id': self.env.ref('product.product_product_12').id,
+            }),
+        ]

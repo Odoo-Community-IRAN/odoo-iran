@@ -6,6 +6,7 @@ from unittest.mock import patch
 from odoo import Command, fields
 from odoo.tools import mute_logger
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
+from odoo.addons.mail.tests.common import mail_new_test_user
 from odoo.addons.pos_online_payment.tests.online_payment_common import OnlinePaymentCommon
 from odoo.addons.account.models.account_payment_method import AccountPaymentMethod
 from odoo.osv.expression import AND
@@ -17,16 +18,22 @@ import odoo.tests
 @odoo.tests.tagged('post_install', '-at_install')
 class TestUi(AccountTestInvoicingCommon, OnlinePaymentCommon):
 
+    def _get_url(self):
+        return f"/pos/ui?config_id={self.pos_config.id}"
+
+    def start_pos_tour(self, tour_name, login="pos_user", **kwargs):
+        self.start_tour(self._get_url(), tour_name, login=login, **kwargs)
+
     @classmethod
-    def setUpClass(cls, chart_template_ref=None):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
 
         # Code from addons/account_payment/tests/common.py:
         Method_get_payment_method_information = AccountPaymentMethod._get_payment_method_information
 
         def _get_payment_method_information(self):
             res = Method_get_payment_method_information(self)
-            res['none'] = {'mode': 'multi', 'domain': [('type', '=', 'bank')]}
+            res['none'] = {'mode': 'multi', 'type': ('bank',)}
             return res
 
         with patch.object(AccountPaymentMethod, '_get_payment_method_information', _get_payment_method_information):
@@ -96,16 +103,15 @@ class TestUi(AccountTestInvoicingCommon, OnlinePaymentCommon):
         })
 
         # Code from addons/point_of_sale/tests/test_frontend.py:
-        cls.pos_user = cls.env['res.users'].create({
-            'name': 'A simple PoS man!',
-            'login': 'pos_op_user',
-            'password': 'pos_op_user',
-            'groups_id': [
-                (4, cls.env.ref('base.group_user').id),
-                (4, cls.env.ref('point_of_sale.group_pos_user').id),
-            ],
-        })
-        cls.pos_user.partner_id.email = 'pos_op_user@test.com'
+        cls.pos_user = mail_new_test_user(
+            cls.env,
+            email="pos_op_user@test.com",
+            groups="base.group_user,point_of_sale.group_pos_user,account.group_account_invoice",
+            login="pos_op_user",
+            name="A simple PoS man!",
+            tz="Europe/Brussels",
+        )
+
         # End of code from addons/point_of_sale/tests/test_frontend.py
 
         archive_products(cls.env)
@@ -115,7 +121,7 @@ class TestUi(AccountTestInvoicingCommon, OnlinePaymentCommon):
         })
         cls.letter_tray = cls.env['product.product'].create({
             'name': 'Letter Tray',
-            'type': 'product',
+            'is_storable': True,
             'available_in_pos': True,
             'list_price': 4.8,
             'taxes_id': False,
@@ -147,7 +153,7 @@ class TestUi(AccountTestInvoicingCommon, OnlinePaymentCommon):
     # End of code from addons/account_payment/tests/common.py
 
     def setUp(self):
-        self.enable_reconcile_after_done_patcher = False
+        self.enable_post_process_patcher = False
 
         super(TestUi, self).setUp()
 
@@ -162,26 +168,11 @@ class TestUi(AccountTestInvoicingCommon, OnlinePaymentCommon):
         self.assertTrue(self.pos_config)
         self.assertTrue(self.pos_user)
 
-    def _open_session_ui(self):
+    def _open_session_fake_cashier_unpaid_order(self):
         self.pos_config.with_user(self.pos_user).open_ui()
 
-        # Checks that the products used in the tours are available in this pos_config.
-        # This code is executed here because _loader_params_product_product is defined in pos.session
-        # and not in pos.config.
-        pos_config_products_domain = self.pos_config._get_available_product_domain()
-        self.assertTrue(pos_config_products_domain)
-        tests_products_domain = AND([pos_config_products_domain, ['&', '&', ('name', '=', 'Letter Tray'), ('list_price', '=', 4.8), ('available_in_pos', '=', True)]])
-        # active_test=False to follow pos.config:get_pos_ui_product_product_by_params
-        self.assertEqual(self.env['product.product'].with_context(active_test=False).search_count(tests_products_domain, limit=1), 1)
-
-    def _start_tour(self, tour_name):
-        self.start_tour("/pos/ui?config_id=%d" % self.pos_config.id, tour_name, login="pos_op_user")
-
-    def _open_session_fake_cashier_unpaid_order(self):
-        self._open_session_ui()
-
         current_session = self.pos_config.current_session_id
-        current_session.set_cashbox_pos(0, None)
+        current_session.set_opening_control(0, None)
 
         # Simulate a cashier saving an unpaid order on the server
         product = self.letter_tray
@@ -190,38 +181,36 @@ class TestUi(AccountTestInvoicingCommon, OnlinePaymentCommon):
 
         untax, atax = self.compute_tax(product, product.list_price)
         order_data = {
-            'data': {
-                'uid': order_uid,
-                'name': order_pos_reference,
-                'pos_session_id': current_session.id,
-                'sequence_number': 1,
-                'user_id': self.pos_user.id,
-                'partner_id': False,
-                'access_token': str(uuid.uuid4()),
-                'amount_paid': 0,
-                'amount_return': 0,
-                'amount_tax': atax,
-                'amount_total': untax + atax,
-                'date_order': fields.Datetime.to_string(fields.Datetime.now()),
-                'fiscal_position_id': False,
-                'lines': [[0, 0, {
-                    'product_id': product.id,
-                    'qty': 1,
-                    'discount': 0,
-                    'tax_ids': [(6, 0, product.taxes_id.ids)],
-                    'price_unit': product.list_price,
-                    'price_subtotal': untax,
-                    'price_subtotal_incl': untax + atax,
-                    'pack_lot_ids': [],
-                }]],
-                'statement_ids': [],
-            },
-            'to_invoice': False,
+            'uuid': order_uid,
+            'name': order_pos_reference,
+            'session_id': current_session.id,
+            'sequence_number': 1,
+            'user_id': self.pos_user.id,
+            'partner_id': False,
+            'access_token': str(uuid.uuid4()),
+            'amount_paid': 0,
+            'amount_return': 0,
+            'state': 'draft',
+            'amount_tax': atax,
+            'amount_total': untax + atax,
+            'date_order': fields.Datetime.to_string(fields.Datetime.now()),
+            'fiscal_position_id': False,
+            'lines': [[0, 0, {
+                'product_id': product.id,
+                'qty': 1,
+                'discount': 0,
+                'tax_ids': [(6, 0, product.taxes_id.ids)],
+                'price_unit': product.list_price,
+                'price_subtotal': untax,
+                'price_subtotal_incl': untax + atax,
+                'pack_lot_ids': [],
+            }]],
+            'payment_ids': [],
         }
 
-        create_result = self.env['pos.order'].with_user(self.pos_user).create_from_ui([order_data], draft=True)
+        create_result = self.env['pos.order'].with_user(self.pos_user).sync_from_ui([order_data])
         self.assertEqual(len(current_session.order_ids), 1)
-        order_id = next(result_order_data for result_order_data in create_result if result_order_data['pos_reference'] == order_pos_reference)['id']
+        order_id = next(result_order_data for result_order_data in create_result['pos.order'] if result_order_data['pos_reference'] == order_pos_reference)['id']
 
         order = self.env['pos.order'].search([('id', '=', order_id)])
         self.assertEqual(order.state, 'draft')
@@ -288,13 +277,9 @@ class TestUi(AccountTestInvoicingCommon, OnlinePaymentCommon):
 
         self.assertEqual(order.state, 'draft')
 
-    def test_local_fake_paid_data_tour(self):
-        self._open_session_ui()
-        self._start_tour('OnlinePaymentLocalFakePaidDataTour')
-
     def test_errors_tour(self):
-        self._open_session_ui()
-        self._start_tour('OnlinePaymentErrorsTour')
+        self.pos_config.with_user(self.pos_user).open_ui()
+        self.start_pos_tour('OnlinePaymentErrorsTour', login="pos_op_user")
 
     @classmethod
     def tearDownClass(cls):

@@ -3,13 +3,13 @@
 The module :mod:`odoo.tests.form` provides an implementation of a client form
 view for server-side unit tests.
 """
+from __future__ import annotations
+
 import ast
 import collections
 import itertools
 import logging
-import time
 from datetime import datetime, date
-from dateutil.relativedelta import relativedelta
 
 from lxml import etree
 
@@ -96,15 +96,13 @@ class Form:
                    the view in "creation" mode from default values, while a
                    singleton will put it in "edit" mode and only load the
                    view's data.
-    :type record: odoo.models.Model
     :param view: the id, xmlid or actual view object to use for onchanges and
                  view constraints. If none is provided, simply loads the
                  default view for the model.
-    :type view: int | str | odoo.model.Model
 
     .. versionadded:: 12.0
     """
-    def __init__(self, record, view=None):
+    def __init__(self, record: BaseModel, view: None | int | str | BaseModel = None) -> None:
         assert isinstance(record, BaseModel)
         assert len(record) <= 1
 
@@ -123,7 +121,7 @@ class Form:
 
         views = record.get_views([(view_id, 'form')])
         object.__setattr__(self, '_models_info', views['models'])
-        # self._models_info = {model_name: {field_name: field_info}}
+        # self._models_info = {model_name: {fields: {field_name: field_info}}}
         tree = etree.fromstring(views['views']['form']['arch'])
         view = self._process_view(tree, record)
         object.__setattr__(self, '_view', view)
@@ -143,6 +141,31 @@ class Form:
         else:
             self._init_from_defaults()
 
+    @classmethod
+    def from_action(cls, env: odoo.api.Environment, action: dict) -> Form:
+        assert action['type'] == 'ir.actions.act_window', \
+            f"only window actions are valid, got {action['type']}"
+        # ensure the first-requested view is a form view
+        if views := action.get('views'):
+            assert views[0][1] == 'form', \
+                f"the actions dict should have a form as first view, got {views[0][1]}"
+            view_id = views[0][0]
+        else:
+            view_mode = action.get('view_mode', '')
+            if not view_mode.startswith('form'):
+                raise ValueError(f"The actions dict should have a form first view mode, got {view_mode}")
+            view_id = action.get('view_id')
+            if view_id and ',' in view_mode:
+                raise ValueError(f"A `view_id` is only valid if the action has a single `view_mode`, got {view_mode}")
+        context = action.get('context', {})
+        if isinstance(context, str):
+            context = ast.literal_eval(context)
+        record = env[action['res_model']]\
+            .with_context(context)\
+            .browse(action.get('res_id'))
+
+        return cls(record, view_id)
+
     def _process_view(self, tree, model, level=2):
         """ Post-processes to augment the view_get with:
         * an id field (may not be present if not in the view but needed)
@@ -160,7 +183,7 @@ class Form:
             field_name = node.get('name')
 
             # add field_info into fields
-            field_info = self._models_info.get(model._name, {}).get(field_name) or {'type': None}
+            field_info = self._models_info.get(model._name, {}).get("fields", {}).get(field_name) or {'type': None}
             fields[field_name] = field_info
             fields_spec[field_name] = field_spec = {}
 
@@ -251,7 +274,7 @@ class Form:
         views = {
             view.tag: view for view in node.xpath('./*[descendant::field]')
         }
-        for view_type in ['tree', 'form']:
+        for view_type in ['list', 'form']:
             if view_type in views:
                 continue
             if field_info['invisible'] == 'True':
@@ -263,14 +286,17 @@ class Form:
             subnode = etree.fromstring(subviews['views'][view_type]['arch'])
             views[view_type] = subnode
             node.append(subnode)
-            for model_name, fields in subviews['models'].items():
-                self._models_info.setdefault(model_name, {}).update(fields)
+            for model_name, value in subviews['models'].items():
+                model_info = self._models_info.setdefault(model_name, {})
+                if "fields" not in model_info:
+                    model_info["fields"] = {}
+                model_info["fields"].update(value["fields"])
 
         # pick the first editable subview
         view_type = next(
-            vtype for vtype in node.get('mode', 'tree').split(',') if vtype != 'form'
+            vtype for vtype in node.get('mode', 'list').split(',') if vtype != 'form'
         )
-        if not (view_type == 'tree' and views['tree'].get('editable')):
+        if not (view_type == 'list' and views['list'].get('editable')):
             view_type = 'form'
 
         # don't recursively process o2ms in o2ms

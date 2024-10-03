@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo import api, fields, models, _
-from odoo.osv import expression
-from odoo.tools import email_normalize, html_escape, html2plaintext, plaintext2html
+from odoo.addons.mail.tools.discuss import Store
+from odoo.tools import email_normalize, html2plaintext, plaintext2html
 
 from markupsafe import Markup
 
@@ -37,32 +36,47 @@ class DiscussChannel(models.Model):
             end = record.message_ids[0].date if record.message_ids else fields.Datetime.now()
             record.duration = (end - start).total_seconds() / 3600
 
-    def _compute_is_chat(self):
-        super()._compute_is_chat()
-        for record in self:
-            if record.channel_type == 'livechat':
-                record.is_chat = True
-
-    def _channel_info(self):
-        """ Extends the channel header by adding the livechat operator and the 'anonymous' profile
-            :rtype : list(dict)
-        """
-        channel_infos = super()._channel_info()
-        channel_infos_dict = dict((c['id'], c) for c in channel_infos)
+    def _to_store(self, store: Store):
+        """Extends the channel header by adding the livechat operator and the 'anonymous' profile"""
+        super()._to_store(store)
+        chatbot_lang = self.env["chatbot.script"]._get_chatbot_language()
         for channel in self:
+            channel_info = {}
             if channel.chatbot_current_step_id:
-                # sudo: chatbot.script.step - returning the current script of the channel
-                channel_infos_dict[channel.id]["chatbot_script_id"] = channel.chatbot_current_step_id.sudo().chatbot_script_id.id
-            channel_infos_dict[channel.id]['anonymous_name'] = channel.anonymous_name
-            channel_infos_dict[channel.id]['anonymous_country'] = {
+                # sudo: chatbot.script.step - returning the current script/step of the channel
+                current_step_sudo = channel.chatbot_current_step_id.sudo().with_context(lang=chatbot_lang)
+                chatbot_script = current_step_sudo.chatbot_script_id
+                # sudo: channel - accessing chatbot messages to get the current step message
+                step_message = next((
+                    m.mail_message_id for m in channel.sudo().chatbot_message_ids
+                    if m.script_step_id == current_step_sudo
+                    and m.mail_message_id.author_id == chatbot_script.operator_partner_id
+                ), None) if channel.chatbot_current_step_id.sudo().step_type != 'forward_operator' else None
+                current_step = {
+                    'scriptStep': current_step_sudo._format_for_frontend(),
+                    "message": Store.one_id(step_message),
+                    'operatorFound': current_step_sudo.step_type == 'forward_operator' and len(channel.channel_member_ids) > 2,
+                }
+                channel_info["chatbot"] = {
+                    'script': chatbot_script._format_for_frontend(),
+                    'steps': [current_step],
+                    'currentStep': current_step,
+                }
+            channel_info['anonymous_name'] = channel.anonymous_name
+            channel_info['anonymous_country'] = {
                 'code': channel.country_id.code,
                 'id': channel.country_id.id,
                 'name': channel.country_id.name,
             } if channel.country_id else False
-            if channel.livechat_operator_id:
-                display_name = channel.livechat_operator_id.user_livechat_username or channel.livechat_operator_id.display_name
-                channel_infos_dict[channel.id]['operator_pid'] = (channel.livechat_operator_id.id, display_name.replace(',', ''))
-        return list(channel_infos_dict.values())
+            if channel.channel_type == "livechat":
+                channel_info["operator"] = Store.one(
+                    channel.livechat_operator_id, fields=["user_livechat_username", "write_date"]
+                )
+            if channel.channel_type == "livechat" and self.env.user._is_internal():
+                channel_info["livechatChannel"] = Store.one(
+                    channel.livechat_channel_id, fields=["name"]
+                )
+            store.add(channel, channel_info)
 
     @api.autovacuum
     def _gc_empty_livechat_sessions(self):
@@ -80,35 +94,8 @@ class DiscussChannel(models.Model):
         empty_channel_ids = [item['id'] for item in self.env.cr.dictfetchall()]
         self.browse(empty_channel_ids).unlink()
 
-    def _execute_command_help_message_extra(self):
-        msg = super()._execute_command_help_message_extra()
-        if self.channel_type == 'livechat':
-            return msg + html_escape(
-                _("%(new_line)sType %(bold_start)s:shortcut%(bold_end)s to insert a canned response in your message.")
-            ) % {"bold_start": Markup("<b>"), "bold_end": Markup("</b>"), "new_line": Markup("<br>")}
-        return msg
-
     def execute_command_history(self, **kwargs):
-        self.env['bus.bus']._sendone(self, 'im_livechat.history_command', {'id': self.id})
-
-    def _send_history_message(self, pid, page_history):
-        message_body = _('No history found')
-        if page_history:
-            html_links = ['<li><a href="%s" target="_blank">%s</a></li>' % (html_escape(page), html_escape(page)) for page in page_history]
-            message_body = '<ul>%s</ul>' % (''.join(html_links))
-        self._send_transient_message(self.env['res.partner'].browse(pid), message_body)
-
-    def _message_update_content(self, message, body, attachment_ids=None, partner_ids=None, strict=True, **kwargs):
-        super()._message_update_content(
-            message=message, body=body, attachment_ids=attachment_ids, partner_ids=partner_ids, strict=strict, **kwargs
-        )
-        if self.channel_type == 'livechat':
-            self.env['bus.bus']._sendone(self.uuid, 'mail.record/insert', {
-                'Message': {
-                    'id': message.id,
-                    'body': message.body,
-                }
-            })
+        self._bus_send("im_livechat.history_command", {"id": self.id})
 
     def _get_visitor_leave_message(self, operator=False, cancel=False):
         return _('Visitor left the conversation.')
@@ -117,12 +104,19 @@ class DiscussChannel(models.Model):
         """ Set deactivate the livechat channel and notify (the operator) the reason of closing the session."""
         self.ensure_one()
         if self.livechat_active:
-            self.livechat_active = False
+            member = self.channel_member_ids.filtered(lambda m: m.is_self)
+            if member:
+                member.fold_state = "closed"
+                # sudo: discuss.channel.rtc.session - member of current user can leave call
+                member.sudo()._rtc_leave_call()
+            # sudo: discuss.channel - visitor left the conversation, state must be updated
+            self.sudo().livechat_active = False
             # avoid useless notification if the channel is empty
             if not self.message_ids:
                 return
             # Notify that the visitor has left the conversation
-            self.message_post(
+            # sudo: mail.message - posting visitor leave message is allowed
+            self.sudo().message_post(
                 author_id=self.env.ref('base.partner_root').id,
                 body=Markup('<div class="o_mail_notification o_hide_author">%s</div>')
                 % self._get_visitor_leave_message(**kwargs),
@@ -175,7 +169,8 @@ class DiscussChannel(models.Model):
         """
         values = {}
         filtered_message_ids = self.chatbot_message_ids.filtered(
-            lambda m: m.script_step_id.step_type in step_type_to_field.keys()
+            # sudo: chatbot.script.step - getting the type of the current step
+            lambda m: m.script_step_id.sudo().step_type in step_type_to_field
         )
         for message_id in filtered_message_ids:
             field_name = step_type_to_field[message_id.script_step_id.step_type]
@@ -189,8 +184,9 @@ class DiscussChannel(models.Model):
 
         :param record chatbot_script
         :param string body: message HTML body """
-
-        return self.with_context(mail_create_nosubscribe=True).message_post(
+        # sudo: mail.message - chat bot is allowed to post a message which
+        # requires reading its partner among other things.
+        return self.with_context(mail_create_nosubscribe=True).sudo().message_post(
             author_id=chatbot_script.sudo().operator_partner_id.id,
             body=body,
             message_type='comment',
@@ -218,7 +214,7 @@ class DiscussChannel(models.Model):
 
     def _message_post_after_hook(self, message, msg_vals):
         """
-        This method is called just before _notify_thread() method which is calling the _message_format()
+        This method is called just before _notify_thread() method which is calling the _to_store()
         method. We need a 'chatbot.message' record before it happens to correctly display the message.
         It's created only if the mail channel is linked to a chatbot step.
         """
@@ -231,12 +227,10 @@ class DiscussChannel(models.Model):
         return super()._message_post_after_hook(message, msg_vals)
 
     def _chatbot_restart(self, chatbot_script):
-        self.write({
-            'chatbot_current_step_id': False
-        })
-
-        self.chatbot_message_ids.unlink()
-
+        # sudo: discuss.channel - visitor can clear current step to restart the script
+        self.sudo().chatbot_current_step_id = False
+        # sudo: chatbot.message - visitor can clear chatbot messages to restart the script
+        self.sudo().chatbot_message_ids.unlink()
         return self._chatbot_post_message(
             chatbot_script,
             Markup('<div class="o_mail_notification">%s</div>') % _('Restarting conversation...'),

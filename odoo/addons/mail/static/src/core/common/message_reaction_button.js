@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { Component, useRef, useState } from "@odoo/owl";
 import { useEmojiPicker } from "@web/core/emoji_picker/emoji_picker";
 import { useService } from "@web/core/utils/hooks";
@@ -11,10 +9,10 @@ import { useService } from "@web/core/utils/hooks";
  */
 export class MessageReactionButton extends Component {
     static template = "mail.MessageReactionButton";
-    static props = ["message"];
+    static props = ["message", "classNames?", "action"];
 
     setup() {
-        this.messageService = useState(useService("mail.message"));
+        super.setup();
         this.store = useState(useService("mail.store"));
         this.emojiPickerRef = useRef("emoji-picker");
         this.emojiPicker = useEmojiPicker(this.emojiPickerRef, {
@@ -24,7 +22,7 @@ export class MessageReactionButton extends Component {
                         content === emoji && personas.find((persona) => persona.eq(this.store.self))
                 );
                 if (!reaction) {
-                    this.messageService.react(this.props.message, emoji);
+                    this.props.message.react(emoji);
                 }
             },
         });

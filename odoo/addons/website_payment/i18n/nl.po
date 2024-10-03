@@ -3,16 +3,16 @@
 # 	* website_payment
 # 
 # Translators:
-# Wil Odoo, 2023
-# Jolien De Paepe, 2023
+# Wil Odoo, 2024
+# Manon Rondou, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:56+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Jolien De Paepe, 2023\n"
+"POT-Creation-Date: 2024-09-26 08:56+0000\n"
+"PO-Revision-Date: 2024-09-25 09:42+0000\n"
+"Last-Translator: Manon Rondou, 2024\n"
 "Language-Team: Dutch (https://app.transifex.com/odoo/teams/41243/nl/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -71,13 +71,29 @@ msgid "<option value=\"\">Country...</option>"
 msgstr "<option value=\"\">Land...</option>"
 
 #. module: website_payment
-#: model_terms:ir.ui.view,arch_db:website_payment.donation_pay
-msgid ""
-"<strong>No suitable payment option could be found.</strong><br/>\n"
-"                                If you believe that it is an error, please contact the website administrator."
+#: model_terms:ir.ui.view,arch_db:website_payment.s_donation_button
+msgid "<span class=\"s_donation_currency pe-1\">$</span>"
 msgstr ""
-"<strong>Geen geschikte betalingsoptie gevonden.</strong><br/>\n"
-"                                 Als je denkt dat het een fout is, neem dan contact op met de beheerder van de website."
+
+#. module: website_payment
+#: model_terms:ir.ui.view,arch_db:website_payment.s_donation_button
+msgid "<span class=\"s_donation_currency pe-1\">$</span>10"
+msgstr ""
+
+#. module: website_payment
+#: model_terms:ir.ui.view,arch_db:website_payment.s_donation_button
+msgid "<span class=\"s_donation_currency pe-1\">$</span>100"
+msgstr ""
+
+#. module: website_payment
+#: model_terms:ir.ui.view,arch_db:website_payment.s_donation_button
+msgid "<span class=\"s_donation_currency pe-1\">$</span>25"
+msgstr ""
+
+#. module: website_payment
+#: model_terms:ir.ui.view,arch_db:website_payment.s_donation_button
+msgid "<span class=\"s_donation_currency pe-1\">$</span>50"
+msgstr ""
 
 #. module: website_payment
 #: model_terms:ir.ui.view,arch_db:website_payment.donation_pay
@@ -87,7 +103,6 @@ msgstr "<strong>Waarschuwing</strong> De valuta ontbreekt of is onjuist."
 #. module: website_payment
 #. odoo-python
 #: code:addons/website_payment/models/payment_transaction.py:0
-#, python-format
 msgid "A donation has been made on your website"
 msgstr "Er is een donatie gedaan op je website"
 
@@ -102,7 +117,6 @@ msgid "Activate Payments"
 msgstr "Betalingen activeren"
 
 #. module: website_payment
-#: model:ir.actions.server,name:website_payment.action_activate_stripe
 #: model_terms:ir.ui.view,arch_db:website_payment.res_config_settings_view_form
 msgid "Activate Stripe"
 msgstr "Activeer Stripe"
@@ -110,22 +124,19 @@ msgstr "Activeer Stripe"
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/snippets/s_donation/options.js:0
-#, python-format
 msgid "Add a description here"
 msgstr "Voeg hier een omschrijving toe"
 
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/snippets/s_donation/options.js:0
-#, python-format
 msgid "Add new pre-filled option"
 msgstr "Nieuwe vooraf ingevulde optie toevoegen"
 
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/snippets/s_donation/options.xml:0
-#: code:addons/website_payment/static/src/snippets/s_donation/options.xml:0
-#, python-format
+#: model_terms:ir.ui.view,arch_db:website_payment.s_donation_button
 msgid "Amount"
 msgstr "Bedrag"
 
@@ -147,7 +158,6 @@ msgstr "1 maand voor een baby zorgen."
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/snippets/s_donation/options.xml:0
-#, python-format
 msgid "Choose Your Amount"
 msgstr "Je bedrag kiezen"
 
@@ -159,15 +169,12 @@ msgstr "Configuratie instellingen"
 #. module: website_payment
 #. odoo-python
 #: code:addons/website_payment/models/res_config_settings.py:0
-#, python-format
 msgid "Configure %s"
 msgstr "Configureer %s"
 
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/js/payment_form.js:0
-#: model:ir.model,name:website_payment.model_res_country
-#, python-format
 msgid "Country"
 msgstr "Land"
 
@@ -183,17 +190,15 @@ msgstr ""
 #. module: website_payment
 #. odoo-python
 #: code:addons/website_payment/controllers/portal.py:0
-#, python-format
 msgid "Country is required."
 msgstr "Land is verplicht."
 
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/snippets/s_donation/options.xml:0
-#: code:addons/website_payment/static/src/snippets/s_donation/options.xml:0
 #: model_terms:ir.ui.view,arch_db:website_payment.donation_input
+#: model_terms:ir.ui.view,arch_db:website_payment.s_donation_button
 #: model_terms:ir.ui.view,arch_db:website_payment.s_donation_options
-#, python-format
 msgid "Custom Amount"
 msgstr "Aangepast bedrag"
 
@@ -220,7 +225,6 @@ msgstr "Weergaveopties"
 #. module: website_payment
 #. odoo-python
 #: code:addons/website_payment/controllers/portal.py:0
-#, python-format
 msgid "Donate"
 msgstr "Doneren"
 
@@ -244,14 +248,12 @@ msgstr "Donatieknop"
 #. module: website_payment
 #. odoo-python
 #: code:addons/website_payment/controllers/portal.py:0
-#, python-format
 msgid "Donation amount must be at least %.2f."
 msgstr "Het donatiebedrag moet minimaal %.2f zijn."
 
 #. module: website_payment
 #. odoo-python
 #: code:addons/website_payment/models/payment_transaction.py:0
-#, python-format
 msgid "Donation confirmation"
 msgstr "Donatiebevestiging"
 
@@ -263,7 +265,6 @@ msgstr "Donatiemelding"
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/js/payment_form.js:0
-#, python-format
 msgid "Email"
 msgstr "E-mail"
 
@@ -279,21 +280,18 @@ msgstr ""
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/js/payment_form.js:0
-#, python-format
 msgid "Email is invalid"
 msgstr "E-mail is ongeldig"
 
 #. module: website_payment
 #. odoo-python
 #: code:addons/website_payment/controllers/portal.py:0
-#, python-format
 msgid "Email is required."
 msgstr "E-mail is vereist."
 
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/js/payment_form.js:0
-#, python-format
 msgid "Field '%s' is mandatory"
 msgstr "Veld '%s' is verplicht"
 
@@ -314,7 +312,6 @@ msgstr "Is donatie"
 
 #. module: website_payment
 #: model:ir.model.fields,field_description:website_payment.field_res_config_settings__is_stripe_supported_country
-#: model:ir.model.fields,field_description:website_payment.field_res_country__is_stripe_supported_country
 msgid "Is Stripe Supported Country"
 msgstr "Is een land dat Stripe ondersteunt"
 
@@ -341,7 +338,6 @@ msgstr "Minimum"
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/js/payment_form.js:0
-#, python-format
 msgid "Name"
 msgstr "Naam"
 
@@ -357,7 +353,6 @@ msgstr ""
 #. module: website_payment
 #. odoo-python
 #: code:addons/website_payment/controllers/portal.py:0
-#, python-format
 msgid "Name is required."
 msgstr "Naam is vereist."
 
@@ -400,14 +395,12 @@ msgstr "Betalingstransactie"
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/js/payment_form.js:0
-#, python-format
 msgid "Payment processing failed"
 msgstr "Betalingsverwerking mislukt"
 
 #. module: website_payment
 #. odoo-python
 #: code:addons/website_payment/models/payment_transaction.py:0
-#, python-format
 msgid "Payment received from donation with following details:"
 msgstr "Betaling ontvangen van donatie met de volgende details:"
 
@@ -424,7 +417,6 @@ msgstr "Enkel Paypal"
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/snippets/s_donation/000.js:0
-#, python-format
 msgid "Please select or enter an amount"
 msgstr "Selecteer of vul een bedrag in"
 
@@ -461,7 +453,6 @@ msgstr "Klein of groot, je bijdrage is essentieel."
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/js/payment_form.js:0
-#, python-format
 msgid "Some information is missing to process your payment."
 msgstr "Er ontbreken enkele gegevens om je betaling te verwerken."
 
@@ -496,9 +487,8 @@ msgstr "Bedankt voor je donatie van"
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/snippets/s_donation/000.js:0
-#, python-format
-msgid "The minimum donation amount is %s%s%s"
-msgstr "Het minimale donatiebedrag is %s%s%s"
+msgid "The minimum donation amount is %(amount)s"
+msgstr "Het minimale donatiebedrag is %(amount)s"
 
 #. module: website_payment
 #: model_terms:ir.ui.view,arch_db:website_payment.donation_pay

@@ -4,14 +4,31 @@
 import werkzeug.urls
 
 from odoo import http
-from odoo.addons.http_routing.models.ir_http import unslug, slug
 from odoo.addons.website.models.ir_http import sitemap_qs2dom
+from odoo.addons.website_google_map.controllers.main import GoogleMap
 from odoo.tools.translate import _
 from odoo.http import request
 
 
-class WebsiteCustomer(http.Controller):
+class WebsiteCustomer(GoogleMap):
     _references_per_page = 20
+
+    def _get_gmap_domains(self, **kw):
+        if kw.get('dom', '') != "website_customer.customers":
+            return super()._get_gmap_domains(**kw)
+
+        current_industry = kw.get('current_industry')
+        current_country = kw.get('current_country')
+
+        domain = [('assigned_partner_id', '!=', False)]
+
+        if current_country and current_country != '0':
+            domain += [('country_id', '=', int(current_country))]
+
+        if current_industry and current_industry != '0':
+            domain += [('industry_id', '=', int(current_industry))]
+
+        return domain
 
     def sitemap_industry(env, rule, qs):
         if not qs or qs.lower() in '/customers':
@@ -20,7 +37,7 @@ class WebsiteCustomer(http.Controller):
         Industry = env['res.partner.industry']
         dom = sitemap_qs2dom(qs, '/customers/industry', Industry._rec_name)
         for industry in Industry.search(dom):
-            loc = '/customers/industry/%s' % slug(industry)
+            loc = '/customers/industry/%s' % env['ir.http']._slug(industry)
             if not qs or qs.lower() in loc:
                 yield {'loc': loc}
 
@@ -28,7 +45,7 @@ class WebsiteCustomer(http.Controller):
         dom += sitemap_qs2dom(qs, '/customers/country')
         countries = env['res.partner'].sudo()._read_group(dom, ['country_id'])
         for [country] in countries:
-            loc = '/customers/country/%s' % slug(country)
+            loc = '/customers/country/%s' % env['ir.http']._slug(country)
             if not qs or qs.lower() in loc:
                 yield {'loc': loc}
 
@@ -58,7 +75,7 @@ class WebsiteCustomer(http.Controller):
 
         tag_id = post.get('tag_id')
         if tag_id:
-            tag_id = unslug(tag_id)[1] or 0
+            tag_id = request.env['ir.http']._unslug(tag_id)[1] or 0
             domain += [('website_tag_ids', 'in', tag_id)]
 
         # group by industry, based on customers found with the search(domain)
@@ -85,15 +102,15 @@ class WebsiteCustomer(http.Controller):
         countries = Partner.sudo().read_group(domain, ["id", "country_id"], groupby="country_id", orderby="country_id")
         country_count = Partner.sudo().search_count(domain)
 
+        fallback_all_countries = False
         if country:
-            domain += [('country_id', '=', country.id)]
-            if country.id not in (x['country_id'][0] for x in countries if x['country_id']):
-                if country.exists():
-                    countries.append({
-                        'country_id_count': 0,
-                        'country_id': (country.id, country.name)
-                    })
-                    countries.sort(key=lambda d: (d['country_id'] or (0, ""))[1])
+            if country_count > 0 and country.id not in (x['country_id'][0] for x in countries if x['country_id']):
+                # fallback on all countries if no customer found for the country
+                # and there are matching customers for other countries
+                fallback_all_countries = True
+                country = None
+            else:
+                domain += [('country_id', '=', country.id)]
 
         countries.insert(0, {
             'country_id_count': country_count,
@@ -115,7 +132,6 @@ class WebsiteCustomer(http.Controller):
         )
 
         partners = Partner.sudo().search(domain, offset=pager['offset'], limit=self._references_per_page)
-        google_map_partner_ids = ','.join(str(it) for it in partners.ids)
         google_maps_api_key = request.website.google_maps_api_key
 
         tags = Tag.search([('website_published', '=', True), ('partner_ids', 'in', partners.ids)], order='classname, name ASC')
@@ -123,32 +139,32 @@ class WebsiteCustomer(http.Controller):
 
         values = {
             'countries': countries,
-            'current_country_id': country.id if country else 0,
-            'current_country': country or False,
+            'current_country_id': country.id if country and partners else 0,
+            'current_country': country if partners and country else False,
             'industries': industries,
             'current_industry_id': industry.id if industry else 0,
             'current_industry': industry or False,
             'partners': partners,
-            'google_map_partner_ids': google_map_partner_ids,
             'pager': pager,
             'post': post,
             'search_path': "?%s" % werkzeug.urls.url_encode(post),
             'tag': tag,
             'tags': tags,
             'google_maps_api_key': google_maps_api_key,
+            'fallback_all_countries': fallback_all_countries,
         }
         return request.render("website_customer.index", values)
 
     # Do not use semantic controller due to SUPERUSER_ID
     @http.route(['/customers/<partner_id>'], type='http', auth="public", website=True)
-    def partners_detail(self, partner_id, **post):
+    def customers_detail(self, partner_id, **post):
         current_slug = partner_id
-        _, partner_id = unslug(partner_id)
+        _, partner_id = request.env['ir.http']._unslug(partner_id)
         if partner_id:
             partner = request.env['res.partner'].sudo().browse(partner_id)
             if partner.exists() and partner.website_published:
-                if slug(partner) != current_slug:
-                    return request.redirect('/customers/%s' % slug(partner))
+                if request.env['ir.http']._slug(partner) != current_slug:
+                    return request.redirect('/customers/%s' % request.env['ir.http']._slug(partner))
                 values = {}
                 values['main_object'] = values['partner'] = partner
                 return request.render("website_customer.details", values)

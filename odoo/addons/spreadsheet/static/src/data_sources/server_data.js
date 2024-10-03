@@ -1,5 +1,8 @@
 /** @odoo-module */
-import { LoadingDataError } from "../o_spreadsheet/errors";
+// @ts-check
+
+import { EvaluationError } from "@odoo/o-spreadsheet";
+import { LoadingDataError, isLoadingError } from "../o_spreadsheet/errors";
 
 /**
  * @param {T[]} array
@@ -85,13 +88,15 @@ class ListRequestBatch {
 
 export class ServerData {
     /**
-     * @param {any} orm
+     * @param {import("@web/core/orm_service").ORM} orm
      * @param {object} params
-     * @param {function} params.whenDataIsFetched
+     * @param {(promise: Promise<any>) => void} [params.whenDataStartLoading]
      */
-    constructor(orm, { whenDataIsFetched }) {
+    constructor(orm, { whenDataStartLoading }) {
+        /** @type {import("@web/core/orm_service").ORM} */
         this.orm = orm;
-        this.dataFetchedCallback = whenDataIsFetched;
+        /** @type {(promise: Promise<any>) => void} */
+        this.startLoadingCallback = whenDataStartLoading ?? (() => {});
         /** @type {Record<string, unknown>}*/
         this.cache = {};
         /** @type {Record<string, Promise<unknown>>}*/
@@ -135,11 +140,16 @@ export class ServerData {
         if (!(request.key in this.cache)) {
             const error = new LoadingDataError();
             this.cache[request.key] = error;
-            this.orm
+            const promise = this.orm
                 .call(resModel, method, args)
                 .then((result) => (this.cache[request.key] = result))
-                .catch((error) => (this.cache[request.key] = error))
-                .finally(() => this.dataFetchedCallback());
+                .catch(
+                    (error) =>
+                        (this.cache[request.key] = new EvaluationError(
+                            error.data?.message || error.message
+                        ))
+                );
+            this.startLoadingCallback(promise);
             throw error;
         }
         return this._getOrThrowCachedResponse(request);
@@ -177,7 +187,7 @@ export class ServerData {
      */
     _getOrThrowCachedResponse(request) {
         const data = this.cache[request.key];
-        if (data instanceof Error) {
+        if (data instanceof Error || isLoadingError({ value: data })) {
             throw data;
         }
         return data;
@@ -205,9 +215,14 @@ export class ServerData {
      */
     _createBatchEndpoint(resModel, method) {
         return new BatchEndpoint(this.orm, resModel, method, {
-            whenDataIsFetched: () => this.dataFetchedCallback(),
-            successCallback: (request, result) => (this.cache[request.key] = result),
-            failureCallback: (request, error) => (this.cache[request.key] = error),
+            whenDataStartLoading: (promise) => this.startLoadingCallback(promise),
+            successCallback: (request, result) => {
+                this.cache[request.key] = result;
+            },
+            failureCallback: (request, error) =>
+                (this.cache[request.key] = new EvaluationError(
+                    error.data?.message || error.message
+                )),
         });
     }
 }
@@ -223,15 +238,15 @@ export class BatchEndpoint {
      * @param {object} callbacks
      * @param {function} callbacks.successCallback
      * @param {function} callbacks.failureCallback
-     * @param {function} callbacks.whenDataIsFetched
+     * @param {(promise: Promise<any>) => void} callbacks.whenDataStartLoading
      */
-    constructor(orm, resModel, method, { successCallback, failureCallback, whenDataIsFetched }) {
+    constructor(orm, resModel, method, { successCallback, failureCallback, whenDataStartLoading }) {
         this.orm = orm;
         this.resModel = resModel;
         this.method = method;
         this.successCallback = successCallback;
         this.failureCallback = failureCallback;
-        this.batchedFetchedCallback = whenDataIsFetched;
+        this.batchStartsLoadingCallback = whenDataStartLoading;
 
         this._isScheduled = false;
         this._pendingBatch = new ListRequestBatch(resModel, method);
@@ -268,19 +283,16 @@ export class BatchEndpoint {
         }
         this._isScheduled = true;
         queueMicrotask(async () => {
-            try {
-                this._isScheduled = false;
-                const batch = this._pendingBatch;
-                const { resModel, method } = batch;
-                this._pendingBatch = new ListRequestBatch(resModel, method);
-                await this.orm
-                    .call(resModel, method, batch.payload)
-                    .then((result) => batch.splitResponse(result))
-                    .catch(() => this._retryOneByOne(batch))
-                    .then((batchResults) => this._notifyResults(batchResults));
-            } finally {
-                this.batchedFetchedCallback();
-            }
+            this._isScheduled = false;
+            const batch = this._pendingBatch;
+            const { resModel, method } = batch;
+            this._pendingBatch = new ListRequestBatch(resModel, method);
+            const promise = this.orm
+                .call(resModel, method, batch.payload)
+                .then((result) => batch.splitResponse(result))
+                .catch(() => this._retryOneByOne(batch))
+                .then((batchResults) => this._notifyResults(batchResults));
+            this.batchStartsLoadingCallback(promise);
         });
     }
 

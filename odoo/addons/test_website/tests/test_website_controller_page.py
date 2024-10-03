@@ -1,5 +1,4 @@
 from lxml import html
-from odoo.addons.http_routing.models.ir_http import slug
 
 from odoo.tools import mute_logger
 from odoo.exceptions import AccessError
@@ -45,14 +44,6 @@ class TestWebsiteControllerPage(HttpCase):
             </t> """
         })
 
-        cls.listing_controller_page = cls.env["website.controller.page"].create({
-            "page_name": "Exposed Model",
-            "page_type": "listing",
-            "view_id": cls.listing_view.id,
-            "record_domain": "[('name', '=ilike', 'test_partner_%')]",
-            "website_published": True,
-        })
-
         cls.single_view = cls.env["ir.ui.view"].create({
             "type": "qweb",
             "model": cls.model.model,
@@ -61,16 +52,19 @@ class TestWebsiteControllerPage(HttpCase):
             </t> """
         })
 
-        cls.single_controller_page = cls.env["website.controller.page"].create({
-            "page_name": "Exposed Model",
-            "page_type": "single",
-            "website_id": False,
-            "view_id": cls.single_view.id,
+        cls.listing_controller_page = cls.env["website.controller.page"].create({
+            "name": "Exposed Model",
+            "view_id": cls.listing_view.id,
+            "record_view_id": cls.single_view.id,
             "record_domain": "[('name', '=ilike', 'test_partner_%')]",
             "website_published": True,
         })
 
-        records_to_create = [{"name": f"test_partner_{i}"} for i in range(2)]
+        partner_data = {}
+        if "is_published" in cls.env[cls.model.model]._fields:
+            partner_data["is_published"] = True
+
+        records_to_create = [dict(name=f"test_partner_{i}", **partner_data) for i in range(2)]
         cls.exposed_records = cls.env[cls.model.model].create(records_to_create)
 
     def test_cannot_bypass_read_rights(self):
@@ -78,8 +72,7 @@ class TestWebsiteControllerPage(HttpCase):
 
         with self.assertRaises(AccessError) as cm:
             self.env["website.controller.page"].with_user(2).create({
-                "page_name": "Exposed Model",
-                "page_type": "single",
+                "name": "Exposed Model",
                 "website_id": False,
                 "view_id": self.single_view.id,
                 "record_domain": "[('name', '=ilike', 'test_partner_%')]",
@@ -115,22 +108,23 @@ class TestWebsiteControllerPage(HttpCase):
     def test_expose_model(self):
         self.authenticate(None, None)
 
+        slug = self.env['ir.http']._slug
         response = self.url_open(f"/model/{self.listing_controller_page.name_slugified}")
         tree = html.fromstring(response.content.decode())
         rec_nodes = tree.xpath("//a[@class='test_record_listing']")
         self.assertEqual(len(rec_nodes), 2)
         for n, record in zip(rec_nodes, self.exposed_records):
-            self.assertEqual(n.get("href"), f"/model/{self.single_controller_page.name_slugified}/{slug(record)}")
+            self.assertEqual(n.get("href"), f"/model/{self.listing_controller_page.name_slugified}/{slug(record)}")
 
-        response = self.url_open(f"/model/{self.single_controller_page.name_slugified}/{slug(self.exposed_records[0])}")
+        response = self.url_open(f"/model/{self.listing_controller_page.name_slugified}/{slug(self.exposed_records[0])}")
         tree = html.fromstring(response.content.decode())
         self.assertEqual(len(tree.xpath("//div[@class='test_record']")), 1)
 
-        response = self.url_open(f"/model/{self.single_controller_page.name_slugified}/fake-slug-{self.exposed_records[0].id}")
+        response = self.url_open(f"/model/{self.listing_controller_page.name_slugified}/fake-slug-{self.exposed_records[0].id}")
         self.assertEqual(response.status_code, 404)
 
         non_reachable_record = self.env[self.model.model].create({"name": "non_reachable"})
-        response = self.url_open(f"/model/{self.single_controller_page.name_slugified}/{slug(non_reachable_record)}")
+        response = self.url_open(f"/model/{self.listing_controller_page.name_slugified}/{slug(non_reachable_record)}")
         self.assertEqual(response.status_code, 404)
 
         response = self.url_open("/model/some-other-slug")
@@ -143,18 +137,19 @@ class TestWebsiteControllerPage(HttpCase):
     def test_search_listing(self):
         self.authenticate(None, None)
 
+        slug = self.env['ir.http']._slug
         response = self.url_open(f"/model/{self.listing_controller_page.name_slugified}?search=1")
         tree = html.fromstring(response.content.decode())
         rec_nodes = tree.xpath("//a[@class='test_record_listing']")
         self.assertEqual(len(rec_nodes), 1)
-        self.assertEqual(rec_nodes[0].get("href"), f"/model/{self.single_controller_page.name_slugified}/{slug(self.exposed_records[1])}")
+        self.assertEqual(rec_nodes[0].get("href"), f"/model/{self.listing_controller_page.name_slugified}/{slug(self.exposed_records[1])}")
 
         self.patch(ModelPageController, "pager_step", 1)
         response = self.url_open(f"/model/{self.listing_controller_page.name_slugified}/page/2")
         tree = html.fromstring(response.content.decode())
         rec_nodes = tree.xpath("//a[@class='test_record_listing']")
         self.assertEqual(len(rec_nodes), 1)
-        self.assertEqual(rec_nodes[0].get("href"), f"/model/{self.single_controller_page.name_slugified}/{slug(self.exposed_records[1])}")
+        self.assertEqual(rec_nodes[0].get("href"), f"/model/{self.listing_controller_page.name_slugified}/{slug(self.exposed_records[1])}")
 
     def test_default_layout(self):
         self.assertEqual(self.listing_controller_page.default_layout, 'grid')

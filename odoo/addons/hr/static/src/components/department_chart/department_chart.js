@@ -7,6 +7,11 @@ import { standardWidgetProps } from "@web/views/widgets/standard_widget_props";
 import { onWillStart, useState, onWillUpdateProps, Component } from "@odoo/owl";
 
 export class DepartmentChart extends Component {
+    static template = "hr.DepartmentChart";
+    static props = {
+        ...standardWidgetProps,
+    };
+
     setup() {
         super.setup();
 
@@ -28,18 +33,14 @@ export class DepartmentChart extends Component {
         ]);
     }
 
-    openDepartmentEmployees(departmentId) {
-        this.action.doAction("hr.act_employee_from_department", {
+    async openDepartmentEmployees(departmentId) {
+        this.action.doAction("hr.action_employee_from_department" , {
             additionalContext: {
                 active_id: departmentId,
             },
         });
     }
 }
-DepartmentChart.template = "hr.DepartmentChart";
-DepartmentChart.props = {
-    ...standardWidgetProps,
-};
 
 export const departmentChart = {
     component: DepartmentChart,

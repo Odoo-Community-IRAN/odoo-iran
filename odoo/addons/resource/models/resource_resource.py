@@ -5,7 +5,7 @@ from collections import defaultdict
 from dateutil.relativedelta import relativedelta
 from pytz import timezone
 
-from odoo import api, fields, models, _
+from odoo import api, fields, models
 from odoo.addons.base.models.res_partner import _tz_get
 
 from .utils import timezone_datetime, make_aware, Intervals
@@ -34,13 +34,19 @@ class ResourceResource(models.Model):
         ('material', 'Material')], string='Type',
         default='user', required=True)
     user_id = fields.Many2one('res.users', string='User', help='Related user name for the resource to manage its access.')
+    avatar_128 = fields.Image(compute='_compute_avatar_128')
+    share = fields.Boolean(related='user_id.share')
+    email = fields.Char(related='user_id.email')
+    phone = fields.Char(related='user_id.phone')
+
     time_efficiency = fields.Float(
         'Efficiency Factor', default=100, required=True,
         help="This field is used to calculate the expected duration of a work order at this work center. For example, if a work order takes one hour and the efficiency factor is 100%, then the expected duration will be one hour. If the efficiency factor is 200%, however the expected duration will be 30 minutes.")
     calendar_id = fields.Many2one(
         "resource.calendar", string='Working Time',
         default=lambda self: self.env.company.resource_calendar_id,
-        domain="[('company_id', '=', company_id)]")
+        domain="[('company_id', '=', company_id)]",
+        help="Define the working schedule of the resource. If not set, the resource will have fully flexible working hours.")
     tz = fields.Selection(
         _tz_get, string='Timezone', required=True,
         default=lambda self: self._context.get('tz') or self.env.user.tz or 'UTC')
@@ -49,10 +55,15 @@ class ResourceResource(models.Model):
         ('check_time_efficiency', 'CHECK(time_efficiency>0)', 'Time efficiency must be strictly positive'),
     ]
 
+    @api.depends('user_id')
+    def _compute_avatar_128(self):
+        for resource in self:
+            resource.avatar_128 = resource.user_id.avatar_128
+
     @api.model_create_multi
     def create(self, vals_list):
         for values in vals_list:
-            if values.get('company_id') and not values.get('calendar_id'):
+            if values.get('company_id') and not 'calendar_id' in values:
                 values['calendar_id'] = self.env['res.company'].browse(values['company_id']).resource_calendar_id.id
             if not values.get('tz'):
                 # retrieve timezone on user or calendar
@@ -62,14 +73,9 @@ class ResourceResource(models.Model):
                     values['tz'] = tz
         return super().create(vals_list)
 
-    @api.returns('self', lambda value: value.id)
-    def copy(self, default=None):
-        self.ensure_one()
-        if default is None:
-            default = {}
-        if not default.get('name'):
-            default['name'] = _('%s (copy)', self.name)
-        return super().copy(default)
+    def copy_data(self, default=None):
+        vals_list = super().copy_data(default=default)
+        return [dict(vals, name=self.env._("%s (copy)", resource.name)) for resource, vals in zip(self, vals_list)]
 
     def write(self, values):
         if self.env.context.get('check_idempotence') and len(self) == 1:
@@ -168,11 +174,13 @@ class ResourceResource(models.Model):
             resource_calendars_within_period[resource.id][calendar] = Intervals([(start, end, self.env['resource.calendar.attendance'])])
         return resource_calendars_within_period
 
-    def _get_valid_work_intervals(self, start, end, calendars=None):
+    def _get_valid_work_intervals(self, start, end, calendars=None, compute_leaves=True):
         """ Gets the valid work intervals of the resource following their calendars between ``start`` and ``end``
 
             This methods handle the eventuality of a resource having multiple resource calendars, see _get_calendars_validity_within_period method
             for further explanation.
+
+            For flexible calendars and fully flexible resources: -> return the whole interval
         """
         assert start.tzinfo and end.tzinfo
         resource_calendar_validity_intervals = {}
@@ -188,11 +196,28 @@ class ResourceResource(models.Model):
         for calendar in (calendars or []):
             calendar_resources[calendar] |= self.env['resource.resource']
         for calendar, resources in calendar_resources.items():
+            # for fully flexible resource, return the whole interval
+            if not calendar:
+                for resource in resources:
+                    resource_work_intervals[resource.id] |= Intervals([(start, end, self.env['resource.calendar.attendance'])])
+                continue
             # For each calendar used by the resources, retrieve the work intervals for every resources using it
-            work_intervals_batch = calendar._work_intervals_batch(start, end, resources=resources)
+            work_intervals_batch = calendar._work_intervals_batch(start, end, resources=resources, compute_leaves=compute_leaves)
             for resource in resources:
                 # Make the conjunction between work intervals and calendar validity
                 resource_work_intervals[resource.id] |= work_intervals_batch[resource.id] & resource_calendar_validity_intervals[resource.id][calendar]
             calendar_work_intervals[calendar.id] = work_intervals_batch[False]
 
         return resource_work_intervals, calendar_work_intervals
+
+    def _is_fully_flexible(self):
+        """ employee has a fully flexible schedule has no working calendar set """
+        self.ensure_one()
+        return not self.calendar_id
+
+    def _is_flexible(self):
+        """ An employee is considered flexible if the field flexible_hours is True on the calendar
+            or the employee is not assigned any calendar, in which case is considered as Fully flexible.
+        """
+        self.ensure_one()
+        return self._is_fully_flexible() or (self.calendar_id and self.calendar_id.flexible_hours)

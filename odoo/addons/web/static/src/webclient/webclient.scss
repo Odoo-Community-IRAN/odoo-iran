@@ -56,6 +56,14 @@ kbd {
 .badge {
   min-width: $o-badge-min-width;
   line-height: 1.1;
+  border: 0;
+  font-size: 0.85em;
+  user-select: none;
+  background-color: $o-gray-300;
+  font-weight: 500;
+  @include o-text-overflow;
+  transition: none; // remove transition to prevent badges from flickering at reload
+  color: $o-black;
 }
 
 // == Boostrap Dropdown
@@ -259,4 +267,15 @@ select {
 .label {
   border-radius: 0;
   font-size: 1em; // Override 75% of .label
+}
+
+//------------------------------------------------------------------------------
+// Print Style
+//------------------------------------------------------------------------------
+
+@include media-only(print) {
+  html, body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
 }

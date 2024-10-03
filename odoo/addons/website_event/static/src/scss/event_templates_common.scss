@@ -6,51 +6,17 @@ $o-wevent-color: $body-color;
 
 .o_wevent_index, .o_wevent_event {
 
-    // Simple colored tags according to assigned background color
-    @for $size from 1 through length($o-colors) {
-        .o_tag_color_#{$size - 1} {
-            @if $size == 1 {
-                & {
-                    background-color: white;
-                    color: nth($o-colors, $size);
-                    box-shadow: inset 0 0 0 2px nth($o-colors, $size);
-                }
-                &::after {
-                    background-color: nth($o-colors, $size);
-                }
-            } @else {
-                &, &::after {
-                    background-color: nth($o-colors, $size);
-                    color: $white;
-                }
-            }
-        }
+    .event_track > div {
+        border-top: $border-width * 3 solid var(--bg-solid);
+        background-color: var(--bg-light);
+        color: var(--bg-light-contrast);
     }
 
-    // Complex colored tags according to assigned background color with hover effect
-    @for $size from 1 through length($o-colors) {
-        .o_tag_color_hovered_#{$size - 1} {
-            $background-color: $o-wevent-bg-color-base;
-            // no color selected
-            @if $size == 1 {
-                & {
-                    color: color-contrast($background-color);
-                    background-color: $background-color;
-                    box-shadow: inset 0 0 0 1px nth($o-colors, $size);
-                }
-            } @else {
-                $background-color: nth($o-colors, $size);
-                & {
-                    color: white;
-                    background-color: $background-color;
-                }
-            }
-            @at-root a#{&} {
-                &:hover {
-                    background-color: darken($background-color, 20%);
-                }
-            }
-        }
+    .o_wesession_list_item {
+        background: var(--bg-light);
+        color: var(--bg-light-contrast);
+        border: $border-width solid var(--o-border-color);
+        border-left: $border-width * 3 solid var(--bg-solid);
     }
 
     /*
@@ -73,36 +39,9 @@ $o-wevent-color: $body-color;
         .o_wevent_online_badge_unpublished{
             opacity: 0.4;
         }
-        .o_wesession_list_item{
-            margin: 1rem 0;
-            border: 1px solid;
-            border-left: 10px solid;
-        }
-        // background color-based for new styling
-        @for $size from 2 through length($o-colors) {
-            .event_color_#{$size - 1} {
-                &.event_track{
-                    $-bg: adjust-color(nth($o-colors, $size), $lightness: 40%, $saturation: 15%);
-                    @include o-print-color($-bg, background-color, bg-opacity);
-                    > div{
-                        border-top: 3px solid adjust-color(nth($o-colors, $size), $lightness: 10%, $saturation: 15%);
-                    }
-                }
-                &.o_wesession_list_item{
-                    border-color: adjust-color(nth($o-colors, $size), $lightness: 30%, $saturation: 15%);
-                    background-color: unset;
-                }
-            }
-        }
-        .event_color_0 {
-            color: $o-wevent-bg-color-base-contrast;
 
-            &.event_track{
-                border-top: 1px solid lighten($o-wevent-bg-color-base-contrast, 50%);
-            }
-            &.o_wesession_list_item{
-                border-color: $o-wevent-bg-color-light;
-            }
+        .o_wesession_list_item {
+            margin: map-get($spacers, 2) 0;
         }
 
         .o_wevent_online_page_container {

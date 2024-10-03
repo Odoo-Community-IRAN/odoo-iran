@@ -53,11 +53,7 @@
                         </page>
                     </notebook>
                 </sheet>
-                <div class="oe_chatter">
-                    <field name="message_follower_ids" options="{'post_refresh':True}" groups="base.group_user"/>
-                    <field name="activity_ids"/>
-                    <field name="message_ids"/>
-                </div>
+                <chatter class="d-print-none" reload_on_follower="True"/>
             </form>
         </field>
     </record>
@@ -66,38 +62,34 @@
         <field name="name">project.update.view.kanban</field>
         <field name="model">project.update</field>
         <field name="arch" type="xml">
-            <kanban sample="1" js_class="project_update_kanban">
+            <kanban highlight_color="color" sample="1" js_class="project_update_kanban">
                 <field name="color"/>
                 <templates>
-                    <t t-name="kanban-box">
-                        <div t-attf-class="{{!selection_mode ? 'oe_kanban_color_' + record.color.raw_value : ''}} oe_kanban_global_click o_pupdate_kanban_card">
-                            <!-- Project Update Kanban View is always ungrouped - see js_class -->
-                            <div class="o_kanban_detail_ungrouped row">
-                                <div class="col-sm-4 col-6 o_pupdate_name">
-                                    <b><field name="name_cropped"/></b>
-                                    <div class="d-flex gap-1">
-                                        <field name="user_id" widget="many2one_avatar_user"/>
-                                        <t t-esc="record.user_id.value"/>
-                                    </div>
-                                </div>
-                                <div class="col-sm-2 text-sm-start col-6 align-end">
-                                    <field name="color" invisible="1"/>
-                                    <b><field name="status" readonly="1" widget="status_with_color"/></b>
-                                </div>
-                                <div class="col-sm-2 col-6 pb-0">
-                                    <b><field name="progress_percentage" widget="percentage"/></b>
-                                    <div>Progress</div>
-                                </div>
-                                <div class="col-sm-2 col-6 pb-0">
-                                    <b id="tasks_stats">
-                                        <field name="closed_task_count"/> / <field name="task_count"/> Tasks<span invisible="not task_count"> (<field name="closed_task_percentage"/>%)</span>
-                                    </b>
-                                </div>
-                                <div class="col-sm-2 col-6 pb-0 pt-2">
-                                    <b><field name="date"/></b>
-                                    <div>Date</div>
-                                </div>
+                    <t t-name="card" class="flex-row align-items-center">
+                        <!-- Project Update Kanban View is always ungrouped - see js_class -->
+                        <div class="pb-0 mb-2 mr8 o_pupdate_kanban_width">
+                            <field name="name_cropped" class="fw-bolder"/>
+                            <div class="d-flex gap-1">
+                                <field name="user_id" widget="many2one_avatar_user"/>
+                                <field name="user_id"/>
                             </div>
+                        </div>
+                        <div class="mr8 text-sm-start o_pupdate_kanban_width">
+                            <field name="color" invisible="1"/>
+                            <field name="status" class="fw-bolder" readonly="1" widget="status_with_color"/>
+                        </div>
+                        <div class="mr8 o_pupdate_kanban_width">
+                            <field name="progress_percentage" class="fw-bolder" widget="percentage"/>
+                            <div>Progress</div>
+                        </div>
+                        <div class="mr8 o_pupdate_kanban_width">
+                            <b id="tasks_stats">
+                                <field name="closed_task_count"/> / <field name="task_count"/> Tasks<span invisible="not task_count"> (<field name="closed_task_percentage"/>%)</span>
+                            </b>
+                        </div>
+                        <div class="mr8 o_pupdate_kanban_width">
+                            <field name="date" class="fw-bolder"/>
+                            <div>Date</div>
                         </div>
                     </t>
                 </templates>
@@ -106,24 +98,25 @@
     </record>
 
     <record id="project_update_view_tree" model="ir.ui.view">
-        <field name="name">project.update.view.tree</field>
+        <field name="name">project.update.view.list</field>
         <field name="model">project.update</field>
         <field name="arch" type="xml">
-            <tree sample="1" js_class="project_update_list">
+            <list sample="1" js_class="project_update_list">
                 <field name="name"/>
-                <field name="user_id" widget="many2one_avatar_user" class="fw-bold" optional="show"/>
+                <field name="user_id" widget="many2one_avatar_user" class="fw-bolder" optional="show"/>
                 <field name="date" optional="show"/>
                 <field name="progress" string="Progress" widget="progressbar" optional="show"/>
                 <field name="color" column_invisible="True"/>
                 <field name="status" widget="status_with_color"/>
-            </tree>
+            </list>
         </field>
     </record>
 
     <record id="project_update_all_action" model="ir.actions.act_window">
-        <field name="name">Project Updates</field>
+        <field name="name">Dashboard</field>
         <field name="res_model">project.update</field>
-        <field name="view_mode">kanban,tree,form</field>
+        <field name="path">project-dashboard</field>
+        <field name="view_mode">kanban,list,form</field>
         <field name="domain">[('project_id', '=', active_id)]</field>
         <field name="search_view_id" ref="project_update_view_search"/>
         <field name="help" type="html">

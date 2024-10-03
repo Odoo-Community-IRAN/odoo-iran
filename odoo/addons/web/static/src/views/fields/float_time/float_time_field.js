@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
 import { formatFloatTime } from "../formatters";
@@ -23,7 +21,7 @@ export class FloatTimeField extends Component {
     };
 
     setup() {
-        useInputField({
+        this.inputFloatTimeRef = useInputField({
             getValue: () => this.formattedValue,
             refName: "numpadDecimal",
             parse: (v) => parseFloatTime(v),

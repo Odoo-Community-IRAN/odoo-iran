@@ -23,8 +23,8 @@
                     <span class="o-EmojiPicker-empty">😢</span>
                     <span class="fs-5 text-muted">No emoji match your search</span>
                 </t>
-                <t t-if="recentEmojis.length > 0 and !searchTerm">
-                    <t t-call="web.EmojiPicker.section">
+                <t t-if="recentEmojis.length > 0">
+                    <t t-if="!searchTerm" t-call="web.EmojiPicker.section">
                         <t t-set="category" t-value="recentCategory"/>
                     </t>
                     <t t-foreach="recentEmojis" t-as="emoji" t-key="'recent_' + emoji_index">
@@ -82,7 +82,7 @@
 </t>
 
 <t t-name="web.EmojiPicker.searchInput">
-    <input class="form-control border-0 flex-grow-1 rounded-3 rounded-end-0 o-active" placeholder="Search for an emoji" t-model="localState.searchTerm" t-ref="autofocus" t-att-model="localState.searchTerm" t-on-input="() => this.state.activeEmojiIndex = 0"/>
+    <input class="form-control border-0 flex-grow-1 rounded-3 rounded-end-0 o-active" placeholder="Search for an emoji" t-model="localState.searchTerm" t-ref="autofocus" t-att-model="localState.searchTerm" t-on-input="() => this.state.activeEmojiIndex = 0" t-att-tabindex="isMobileOS ? -1 : 0"/>
 </t>
 
 </templates>

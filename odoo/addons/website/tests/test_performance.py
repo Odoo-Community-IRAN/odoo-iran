@@ -1,27 +1,34 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-import copy
+import logging
 from odoo.addons.base.tests.common import HttpCaseWithUserPortal, HttpCaseWithUserDemo
 
 from contextlib import nullcontext
 
+from odoo.sql_db import categorize_query
 from odoo.tools import mute_logger
 from odoo.tests.common import HttpCase, tagged
 
-EXTRA_REQUEST = 2 - 1
-""" During tests, the query on 'base_registry_signaling, base_cache_signaling'
-won't be executed on hot state, but new queries related to the test cursor will
-be added:
 
-    cr = Cursor() # SAVEPOINT
-    cr.execute(...)
-    cr.commit() # RELEASE
-    cr.close()
-"""
+_logger = logging.getLogger(__name__)
+
 
 class UtilPerf(HttpCaseWithUserPortal, HttpCaseWithUserDemo):
-    def _get_url_hot_query(self, url, cache=True, table_count=False):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # remove menu containing a slug url (only website_helpdesk normally), to
+        # avoid the menu cache being disabled, which would increase sql queries
+        cls.env['website.menu'].search([
+            ('url', '=like', '/%/%-%'),
+        ]).unlink()
+        # if website_livechat is installed before another module, the
+        # get_livechat_channel_info add unrelated query for the current test.
+        # So we disable it.
+        if 'channel_id' in cls.env['website']:
+            cls.env['website'].search([]).channel_id = False
+
+    def _get_url_hot_query(self, url, cache=True, query_list=False):
         """ This method returns the number of SQL Queries used inside a request.
         The returned query number will be the same as a "real" (outside of test
         mode) case: the method takes care of removing the extra queries related
@@ -37,11 +44,11 @@ class UtilPerf(HttpCaseWithUserPortal, HttpCaseWithUserDemo):
 
         :param str url: url to be checked
         :param bool cache: whether the QWeb `t-cache` should be disabled or not
-        :param bool table_count: whether the method should also return data
-            about the queried table
-        :return: the query count plus the queried table data if ``table_count``
+        :param bool query_list: whether the method should also return list of
+            queries (without test cursor savepoint queries)
+        :return: the query count plus the list of queries if ``query_list``
             is ``True``
-        :rtype: int|tuple(int, dict)
+        :rtype: int|tuple(int, list)
         """
         url += ('?' not in url and '?' or '')
         if cache:
@@ -53,35 +60,47 @@ class UtilPerf(HttpCaseWithUserPortal, HttpCaseWithUserDemo):
         self.url_open(url)
         self.url_open(url)
         self.url_open(url)
-        sql_count_before = self.cr.sql_log_count
 
-        with (self.cr._enable_table_tracking() if table_count else nullcontext()):
-            if table_count:
-                sql_from_log_before = copy.deepcopy(self.cr.sql_from_log)
-                sql_into_log_before = copy.deepcopy(self.cr.sql_into_log)
-
+        nested_profiler = self.profile(collectors=['sql'], db=False)
+        with nested_profiler:
+            self.registry.get_sequences(self.cr)
             self.url_open(url)
-            sql_count = self.cr.sql_log_count - sql_count_before - EXTRA_REQUEST
-            if table_count:
-                sql_from_tables = {'base_registry_signaling': 1}  # see EXTRA_REQUEST
-                sql_into_tables = {}
-                for table, stats in self.cr.sql_from_log.items():
-                    query_count = stats[0] - sql_from_log_before.get(table, [0])[0]
-                    if query_count:
-                        sql_from_tables[table] = query_count
-                for table, stats in self.cr.sql_into_log.items():
-                    query_count = stats[0] - sql_into_log_before.get(table, [0])[0]
-                    if query_count:
-                        sql_into_tables[table] = query_count
-                return sql_count, sql_from_tables, sql_into_tables
 
+        profiler = nested_profiler.profiler
+        self.assertEqual(len(profiler.sub_profilers), 1, "we expect to have only one accessed url") # if not adapt the code below
+        route_profiler = profiler.sub_profilers[0]
+        route_entries = route_profiler.collectors[0].entries
+        entries = profiler.collectors[0].entries + route_entries
+        sql_queries = [entry['full_query'].strip() for entry in entries]
+        sql_count = len(sql_queries)
+        if not query_list:
             return sql_count
+        return sql_count, sql_queries
 
     def _check_url_hot_query(self, url, expected_query_count, select_tables_perf=None, insert_tables_perf=None):
-        query_count, select_tables, insert_tables = self._get_url_hot_query(url, table_count=True)
-        self.assertEqual(query_count, expected_query_count)
-        self.assertEqual(select_tables, select_tables_perf or {})
-        self.assertEqual(insert_tables, insert_tables_perf or {})
+        query_count, sql_queries = self._get_url_hot_query(url, query_list=True)
+
+        sql_from_tables = {}
+        sql_into_tables = {}
+
+        query_separator = '\n' + '-' * 100 + '\n'
+        queries = query_separator.join(sql_queries)
+
+        for query in sql_queries:
+            query_type, table = categorize_query(query)
+            if query_type == 'into':
+                log_target = sql_into_tables
+            elif query_type == 'from':
+                log_target = sql_from_tables
+            else:
+                _logger.warning("Query type %s for query %s is not supported by _check_url_hot_query", query_type, query)
+            log_target.setdefault(table, 0)
+            log_target[table] = log_target[table] + 1
+        if query_count != expected_query_count:
+            msq = f"Expected {expected_query_count} queries but {query_count} where ran: {query_separator}{queries}{query_separator}"
+            self.fail(msq)
+        self.assertEqual(sql_from_tables, select_tables_perf or {}, f'Select queries does not match: {query_separator}{queries}{query_separator}')
+        self.assertEqual(sql_into_tables, insert_tables_perf or {}, f'Insert queries does not match: {query_separator}{queries}{query_separator}')
 
 
 class TestStandardPerformance(UtilPerf):
@@ -136,7 +155,7 @@ class TestStandardPerformance(UtilPerf):
         self.assertEqual(self._get_url_hot_query(url, cache=False), 5)
 
 
-class TestWebsitePerformance(UtilPerf):
+class TestWebsitePerformanceCommon(UtilPerf):
 
     def setUp(self):
         super().setUp()
@@ -168,69 +187,96 @@ class TestWebsitePerformance(UtilPerf):
         })
         return (page, menu)
 
+
+class TestWebsitePerformance(TestWebsitePerformanceCommon):
+
     def test_10_perf_sql_queries_page(self):
         # standard untracked website.page
-        select_tables_perf = {
-            'base_registry_signaling': 1,
-            'ir_attachment': 1,
-            # `_get_serve_attachment` dispatcher fallback
-            'website_page': 2,
-            # 1. `_serve_page` search page matching URL..
-            # 2. ..then reads it (`is_visible`)
-            'website': 1,
-            'ir_ui_view': 1,
-            # Check if `view.track` to track visitor or not
-        }
-        self._check_url_hot_query(self.page.url, 6, select_tables_perf)
-        self.assertEqual(self._get_url_hot_query(self.page.url, cache=False), 10)
-        self.menu.unlink()  # page being or not in menu shouldn't add queries
-        self._check_url_hot_query(self.page.url, 6, select_tables_perf)
-        self.assertEqual(self._get_url_hot_query(self.page.url, cache=False), 10)
+        for readonly_enabled in (True, False):
+            self.env.registry.test_readonly_enabled = readonly_enabled
+            with self.subTest(readonly_enabled=readonly_enabled), self.env.cr.savepoint() as savepoint:
+                select_tables_perf = {
+                    'base_registry_signaling': 1,
+                    'ir_attachment': 1,
+                    # `_get_serve_attachment` dispatcher fallback
+                    'website_page': 2,
+                    # 1. `_serve_page` search page matching URL..
+                    # 2. ..then reads it (`is_visible`)
+                    'website': 1,
+                }
+                expected_query_count = 5
+                if not readonly_enabled:
+                    select_tables_perf['ir_ui_view'] = 1 # Check if `view.track` to track visitor or not
+                    expected_query_count += 1
+                self._check_url_hot_query(self.page.url, expected_query_count, select_tables_perf)
+                self.assertEqual(self._get_url_hot_query(self.page.url, cache=False), 10)
+                self.menu.unlink()  # page being or not in menu shouldn't add queries
+                self._check_url_hot_query(self.page.url, expected_query_count, select_tables_perf)
+                self.assertEqual(self._get_url_hot_query(self.page.url, cache=False), 10)
+                savepoint.rollback()
 
     def test_15_perf_sql_queries_page(self):
         # standard tracked website.page
-        select_tables_perf = {
-            'base_registry_signaling': 1,
-            'ir_attachment': 1,
-            # `_get_serve_attachment` dispatcher fallback
-            'website_page': 2,
-            # 1. `_serve_page` search page matching URL..
-            # 2. ..then reads it (`is_visible`)
-            'website': 1,
-            'ir_ui_view': 1,
-            # Check if `view.track` to track visitor or not
-        }
-        insert_tables_perf = {
-            'website_visitor': 1,
-            # Visitor upsert
-        }
-        self.page.track = True
-        self._check_url_hot_query(self.page.url, 7, select_tables_perf, insert_tables_perf)
-        self.assertEqual(self._get_url_hot_query(self.page.url, cache=False), 11)
+        for readonly_enabled in (True, False):
+            self.env.registry.test_readonly_enabled = readonly_enabled
+            with self.subTest(readonly_enabled=readonly_enabled), self.env.cr.savepoint() as savepoint:
+                select_tables_perf = {
+                    'base_registry_signaling': 1,
+                    'ir_attachment': 1,
+                    # `_get_serve_attachment` dispatcher fallback
+                    'website_page': 2,
+                    # 1. `_serve_page` search page matching URL..
+                    # 2. ..then reads it (`is_visible`)
+                    'website': 1,
+                }
+                expected_query_count = 5
+                expected_query_count_no_cache = 10
+                insert_tables_perf = {}
+                if not readonly_enabled:
+                    select_tables_perf['ir_ui_view'] = 1 # Check if `view.track` to track visitor or not
+                    insert_tables_perf = {
+                        'website_visitor': 1,
+                        # Visitor upsert
+                    }
+                    expected_query_count += 2
+                    expected_query_count_no_cache += 1
+                self.page.track = True
+                self._check_url_hot_query(self.page.url, expected_query_count, select_tables_perf, insert_tables_perf)
+                self.assertEqual(self._get_url_hot_query(self.page.url, cache=False), expected_query_count_no_cache)
 
-        self.menu.unlink()  # page being or not in menu shouldn't add queries
-        self._check_url_hot_query(self.page.url, 7, select_tables_perf, insert_tables_perf)
-        self.assertEqual(self._get_url_hot_query(self.page.url, cache=False), 11)
+                self.menu.unlink()  # page being or not in menu shouldn't add queries
+                self._check_url_hot_query(self.page.url, expected_query_count, select_tables_perf, insert_tables_perf)
+                self.assertEqual(self._get_url_hot_query(self.page.url, cache=False), expected_query_count_no_cache)
+                savepoint.rollback()
 
     def test_20_perf_sql_queries_homepage(self):
         # homepage "/" has its own controller
-        select_tables_perf = {
-            'base_registry_signaling': 1,
-            'website_menu': 1,
-            # homepage controller is prefetching all menus for perf in one go
-            'website_page': 2,
-            # 1. the menu prefetching is also prefetching all menu's pages
-            # 2. find page matching the `/` url
-            'website': 1,
-            'ir_ui_view': 1,
-            # Check if `view.track` to track visitor or not
-        }
-        insert_tables_perf = {
-            'website_visitor': 1,
-            # Visitor upsert
-        }
-        self._check_url_hot_query('/', 7, select_tables_perf, insert_tables_perf)
-        self.assertEqual(self._get_url_hot_query('/', cache=False), 9)
+        for readonly_enabled in (True, False):
+            self.env.registry.test_readonly_enabled = readonly_enabled
+            with self.subTest(readonly=readonly_enabled), self.env.cr.savepoint() as savepoint:
+                select_tables_perf = {
+                    'base_registry_signaling': 1,
+                    'website_menu': 1,
+                    # homepage controller is prefetching all menus for perf in one go
+                    'website_page': 2,
+                    # 1. the menu prefetching is also prefetching all menu's pages
+                    # 2. find page matching the `/` url
+                    'website': 1,
+                }
+                expected_query_count = 5
+                expected_query_count_no_cache = 8
+                insert_tables_perf = {}
+                if not readonly_enabled:
+                    select_tables_perf['ir_ui_view'] = 1 # Check if `view.track` to track visitor or not
+                    insert_tables_perf = {
+                        'website_visitor': 1,
+                        # Visitor upsert
+                    }
+                    expected_query_count += 2
+                    expected_query_count_no_cache += 1
+                self._check_url_hot_query('/', expected_query_count, select_tables_perf, insert_tables_perf)
+                self.assertEqual(self._get_url_hot_query('/', cache=False), expected_query_count_no_cache)
+                savepoint.rollback()
 
     def test_30_perf_sql_queries_page_no_layout(self):
         # untrack website.page with no call to layout templates
@@ -242,11 +288,13 @@ class TestWebsitePerformance(UtilPerf):
             'website_page': 2,
             # 1. `_serve_page` search page matching URL..
             # 2. ..then reads it (`is_visible`)
+            'website': 1,
+            # Check if website.cookies_bar is active
             'ir_ui_view': 1,
             # Check if `view.track` to track visitor or not
         }
-        self._check_url_hot_query(self.page.url, 5, select_tables_perf)
-        self.assertEqual(self._get_url_hot_query(self.page.url, cache=False), 5)
+        self._check_url_hot_query(self.page.url, 6, select_tables_perf)
+        self.assertEqual(self._get_url_hot_query(self.page.url, cache=False), 6)
 
     def test_40_perf_sql_queries_page_multi_level_menu(self):
         # menu structure should not impact SQL requests
@@ -277,7 +325,6 @@ class TestWebsitePerformance(UtilPerf):
         }
         self._check_url_hot_query(self.page.url, 6, select_tables_perf)
         self.assertEqual(self._get_url_hot_query(self.page.url, cache=False), 10)
-
 
 @tagged('-at_install', 'post_install')
 class TestWebsitePerformancePost(UtilPerf):

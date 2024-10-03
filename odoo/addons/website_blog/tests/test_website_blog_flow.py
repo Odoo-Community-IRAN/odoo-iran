@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo.exceptions import UserError
 from odoo.tests.common import users
 from odoo.addons.website.tools import MockRequest
 from odoo.addons.website_blog.tests.common import TestWebsiteBlogCommon
-from odoo.addons.portal.controllers.mail import PortalChatter
+from odoo.addons.mail.controllers.thread import ThreadController
 
 
 class TestWebsiteBlogFlow(TestWebsiteBlogCommon):
@@ -78,11 +77,10 @@ class TestWebsiteBlogFlow(TestWebsiteBlogCommon):
         })
 
         with MockRequest(self.env):
-            PortalChatter().portal_chatter_post(
+            ThreadController().mail_message_post(
                 'blog.post',
                 self.test_blog_post.id,
-                'Test message blog post',
-                attachment_ids=[attachment.id],
+                {'body': 'Test message blog post', 'attachment_ids': [attachment.id]},
                 attachment_tokens=[attachment.access_token]
             )
 
@@ -98,11 +96,10 @@ class TestWebsiteBlogFlow(TestWebsiteBlogCommon):
         })
 
         with self.assertRaises(UserError), MockRequest(self.env):
-            PortalChatter().portal_chatter_post(
+            ThreadController().mail_message_post(
                 'blog.post',
                 self.test_blog_post.id,
-                'Test message blog post',
-                attachment_ids=[second_attachment.id],
+                {'body': 'Test message blog post', 'attachment_ids': [second_attachment.id]},
                 attachment_tokens=['wrong_token']
             )
 
@@ -116,3 +113,61 @@ class TestWebsiteBlogFlow(TestWebsiteBlogCommon):
         self.test_blog_post.content = "<h2>Test Content</h2>"
 
         self.assertEqual(self.test_blog_post.teaser, "Test Content...")
+
+
+class TestWebsiteBlogTranslationFlow(TestWebsiteBlogCommon):
+    def setUp(self):
+        self.parseltongue = self.env['res.lang'].create({
+            'name': 'Parseltongue',
+            'code': 'pa_GB',
+            'iso_code': 'pa_GB',
+            'url_code': 'pa_GB',
+        })
+        self.env["base.language.install"].create({
+            'overwrite': True,
+            'lang_ids': [(6, 0, [self.parseltongue.id])],
+        }).lang_install()
+
+    def test_teaser_manual(self):
+        super().setUp()
+        blog_post_parseltongue = self.test_blog_post.with_context(lang=self.parseltongue.code)
+
+        # No manual teaser, ensure everything works as expected in multi langs
+        self.test_blog_post.content = "English Content"
+        self.test_blog_post.update_field_translations('content', {
+            self.parseltongue.code: {
+                "English Content": "Parseltongue Content",
+            }
+        })
+        self.assertEqual(self.test_blog_post.teaser, "English Content...")
+        self.assertEqual(blog_post_parseltongue.teaser, "Parseltongue Content...")
+        self.assertFalse(self.test_blog_post.teaser_manual)
+        self.assertFalse(blog_post_parseltongue.teaser_manual)
+
+        # Manual teaser in translation but not in main lang
+        blog_post_parseltongue.teaser = "Parseltongue Teaser Manual"
+        self.assertEqual(self.test_blog_post.teaser, "English Content...")
+        self.assertEqual(blog_post_parseltongue.teaser, "Parseltongue Teaser Manual")
+        self.assertFalse(self.test_blog_post.teaser_manual)
+        self.assertEqual(blog_post_parseltongue.teaser_manual, "Parseltongue Teaser Manual")
+
+        # Manual teaser in both langs
+        self.test_blog_post.teaser = "English Teaser Manual"
+        self.assertEqual(self.test_blog_post.teaser, "English Teaser Manual")
+        self.assertEqual(blog_post_parseltongue.teaser, "Parseltongue Teaser Manual")
+        self.assertEqual(self.test_blog_post.teaser_manual, "English Teaser Manual")
+        self.assertEqual(blog_post_parseltongue.teaser_manual, "Parseltongue Teaser Manual")
+
+        # Empty manual teaser in translation, english one should remain
+        blog_post_parseltongue.teaser = ""
+        self.assertEqual(self.test_blog_post.teaser, "English Teaser Manual")
+        self.assertEqual(blog_post_parseltongue.teaser, "Parseltongue Content...", "Should fallback again to content")
+        self.assertEqual(self.test_blog_post.teaser_manual, "English Teaser Manual")
+        self.assertFalse(blog_post_parseltongue.teaser_manual, "Should have been emptied")
+
+        # Modifying content should be reflected in teaser if not manually set
+        blog_post_parseltongue.content = "New Parseltongue Content"
+        self.assertEqual(self.test_blog_post.teaser, "English Teaser Manual")
+        self.assertEqual(blog_post_parseltongue.teaser, "New Parseltongue Content...", "Should still fallback to content")
+        self.assertEqual(self.test_blog_post.teaser_manual, "English Teaser Manual")
+        self.assertFalse(blog_post_parseltongue.teaser_manual, "Should still be empty")

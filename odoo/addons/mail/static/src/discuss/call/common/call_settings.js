@@ -1,25 +1,41 @@
-/* @odoo-module */
-
-import { ActionPanel } from "@mail/discuss/core/common/action_panel";
-
 import { Component, onWillStart, useExternalListener, useState } from "@odoo/owl";
 
 import { _t } from "@web/core/l10n/translation";
 import { browser } from "@web/core/browser/browser";
+import { debounce } from "@web/core/utils/timing";
+import { isMobileOS } from "@web/core/browser/feature_detection";
 import { useService } from "@web/core/utils/hooks";
+import { ActionPanel } from "@mail/discuss/core/common/action_panel";
 
 export class CallSettings extends Component {
-    static components = { ActionPanel };
     static template = "discuss.CallSettings";
-    static props = ["thread", "className?"];
+    static props = ["withActionPanel?", "*"];
+    static defaultProps = {
+        withActionPanel: true,
+    };
+    static components = { ActionPanel };
 
     setup() {
+        super.setup();
         this.notification = useService("notification");
-        this.userSettings = useState(useService("mail.user_settings"));
+        this.store = useState(useService("mail.store"));
         this.rtc = useState(useService("discuss.rtc"));
         this.state = useState({
             userDevices: [],
         });
+        this.pttExtService = useState(useService("discuss.ptt_extension"));
+        this.saveBackgroundBlurAmount = debounce(() => {
+            browser.localStorage.setItem(
+                "mail_user_setting_background_blur_amount",
+                this.store.settings.backgroundBlurAmount.toString()
+            );
+        }, 2000);
+        this.saveEdgeBlurAmount = debounce(() => {
+            browser.localStorage.setItem(
+                "mail_user_setting_edge_blur_amount",
+                this.store.settings.edgeBlurAmount.toString()
+            );
+        }, 2000);
         useExternalListener(browser, "keydown", this._onKeyDown, { capture: true });
         useExternalListener(browser, "keyup", this._onKeyUp, { capture: true });
         onWillStart(async () => {
@@ -37,7 +53,7 @@ export class CallSettings extends Component {
     }
 
     get pushToTalkKeyText() {
-        const { shiftKey, ctrlKey, altKey, key } = this.userSettings.pushToTalkKeyFormat();
+        const { shiftKey, ctrlKey, altKey, key } = this.store.settings.pushToTalkKeyFormat();
         const f = (k, name) => (k ? name : "");
         const keys = [f(ctrlKey, "Ctrl"), f(altKey, "Alt"), f(shiftKey, "Shift"), key].filter(
             Boolean
@@ -45,37 +61,34 @@ export class CallSettings extends Component {
         return keys.join(" + ");
     }
 
+    get isMobileOS() {
+        return isMobileOS();
+    }
+
     _onKeyDown(ev) {
-        if (!this.userSettings.isRegisteringKey) {
+        if (!this.store.settings.isRegisteringKey) {
             return;
         }
         ev.stopPropagation();
         ev.preventDefault();
-        this.userSettings.setPushToTalkKey(ev);
+        this.store.settings.setPushToTalkKey(ev);
     }
 
     _onKeyUp(ev) {
-        if (!this.userSettings.isRegisteringKey) {
+        if (!this.store.settings.isRegisteringKey) {
             return;
         }
         ev.stopPropagation();
         ev.preventDefault();
-        this.userSettings.isRegisteringKey = false;
+        this.store.settings.isRegisteringKey = false;
     }
 
-    onChangeLogRtcCheckbox(ev) {
-        this.userSettings.logRtc = ev.target.checked;
+    onChangeLogRtc(ev) {
+        this.store.settings.logRtc = ev.target.checked;
     }
 
     onChangeSelectAudioInput(ev) {
-        this.userSettings.setAudioInputDevice(ev.target.value);
-    }
-
-    onChangePushToTalk() {
-        if (this.userSettings.usePushToTalk) {
-            this.userSettings.isRegisteringKey = false;
-        }
-        this.userSettings.togglePushToTalk();
+        this.store.settings.setAudioInputDevice(ev.target.value);
     }
 
     onClickDownloadLogs() {
@@ -93,39 +106,46 @@ export class CallSettings extends Component {
     }
 
     onClickRegisterKeyButton() {
-        this.userSettings.isRegisteringKey = !this.userSettings.isRegisteringKey;
+        this.store.settings.isRegisteringKey = !this.store.settings.isRegisteringKey;
     }
 
     onChangeDelay(ev) {
-        this.userSettings.setDelayValue(ev.target.value);
+        this.store.settings.setDelayValue(ev.target.value);
     }
 
     onChangeThreshold(ev) {
-        this.userSettings.setThresholdValue(parseFloat(ev.target.value));
+        this.store.settings.setThresholdValue(parseFloat(ev.target.value));
     }
 
     onChangeBlur(ev) {
-        this.userSettings.useBlur = ev.target.checked;
+        this.store.settings.useBlur = ev.target.checked;
+        browser.localStorage.setItem("mail_user_setting_use_blur", this.store.settings.useBlur);
     }
 
-    onChangeVideoFilterCheckbox(ev) {
+    onChangeShowOnlyVideo(ev) {
         const showOnlyVideo = ev.target.checked;
-        this.props.thread.showOnlyVideo = showOnlyVideo;
-        const activeRtcSession = this.props.thread.activeRtcSession;
-        if (showOnlyVideo && activeRtcSession && !activeRtcSession.videoStream) {
-            this.props.thread.activeRtcSession = undefined;
+        this.store.settings.showOnlyVideo = showOnlyVideo;
+        browser.localStorage.setItem(
+            "mail_user_setting_show_only_video",
+            this.store.settings.showOnlyVideo
+        );
+        const activeRtcSessions = this.store.allActiveRtcSessions;
+        if (showOnlyVideo && activeRtcSessions) {
+            activeRtcSessions
+                .filter((rtcSession) => !rtcSession.videoStream)
+                .forEach((rtcSession) => {
+                    rtcSession.channel.activeRtcSession = undefined;
+                });
         }
     }
 
     onChangeBackgroundBlurAmount(ev) {
-        this.userSettings.backgroundBlurAmount = Number(ev.target.value);
+        this.store.settings.backgroundBlurAmount = Number(ev.target.value);
+        this.saveBackgroundBlurAmount();
     }
 
     onChangeEdgeBlurAmount(ev) {
-        this.userSettings.edgeBlurAmount = Number(ev.target.value);
-    }
-
-    get title() {
-        return _t("Voice Settings");
+        this.store.settings.edgeBlurAmount = Number(ev.target.value);
+        this.saveEdgeBlurAmount();
     }
 }

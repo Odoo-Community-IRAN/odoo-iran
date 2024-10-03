@@ -1,11 +1,17 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
 import { FileUploadProgressBar } from "./file_upload_progress_bar";
 
 import { Component } from "@odoo/owl";
 
 export class FileUploadProgressRecord extends Component {
+    static template = "";
+    static components = {
+        FileUploadProgressBar,
+    };
+    static props = {
+        fileUpload: Object,
+        selector: { type: String, optional: true },
+    };
     getProgressTexts() {
         const fileUpload = this.props.fileUpload;
         const percent = Math.round(fileUpload.progress * 100);
@@ -19,17 +25,16 @@ export class FileUploadProgressRecord extends Component {
             const mbTotal = Math.round(fileUpload.total / 1000000);
             return {
                 left: _t("Uploading... (%s%)", percent),
-                right: _t("(%s/%sMB)", mbLoaded, mbTotal),
+                right: _t("(%(mbLoaded)s/%(mbTotal)sMB)", { mbLoaded, mbTotal }),
             };
         }
     }
 }
-FileUploadProgressRecord.components = {
-    FileUploadProgressBar,
-};
 
-export class FileUploadProgressKanbanRecord extends FileUploadProgressRecord {}
-FileUploadProgressKanbanRecord.template = "web.FileUploadProgressKanbanRecord";
+export class FileUploadProgressKanbanRecord extends FileUploadProgressRecord {
+    static template = "web.FileUploadProgressKanbanRecord";
+}
 
-export class FileUploadProgressDataRow extends FileUploadProgressRecord {}
-FileUploadProgressDataRow.template = "web.FileUploadProgressDataRow";
+export class FileUploadProgressDataRow extends FileUploadProgressRecord {
+    static template = "web.FileUploadProgressDataRow";
+}

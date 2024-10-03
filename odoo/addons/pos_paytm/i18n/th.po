@@ -3,16 +3,15 @@
 # 	* pos_paytm
 # 
 # Translators:
-# Wil Odoo, 2023
-# Rasareeyar Lappiam, 2023
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:55+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Rasareeyar Lappiam, 2023\n"
+"POT-Creation-Date: 2024-09-25 08:39+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Thai (https://app.transifex.com/odoo/teams/41243/th/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -46,9 +45,41 @@ msgid "Card"
 msgstr "การ์ด"
 
 #. module: pos_paytm
+#: model:ir.model.fields,help:pos_paytm.field_pos_payment_method__accept_payment
+msgid ""
+"Choose accept payment mode: \n"
+" Manually or Automatically"
+msgstr ""
+"เลือกวิธีรับการชำระเงิน:\n"
+" ด้วยตนเองหรือโดยอัตโนมัติ"
+
+#. module: pos_paytm
+#: model:ir.model.fields,help:pos_paytm.field_pos_payment_method__allowed_payment_modes
+msgid ""
+"Choose allow payment mode: \n"
+" All/Card or QR"
+msgstr ""
+"เลือกอนุญาตโหมดการชำระเงิน:\n"
+"ทั้งหมด/บัตร หรือ QR โค้ด"
+
+#. module: pos_paytm
+#: model:ir.model.fields,help:pos_paytm.field_pos_payment_method__paytm_mid
+msgid "Go to https://business.paytm.com/ and create the merchant account"
+msgstr "ไปที่ https://business.paytm.com/ และสร้างบัญชีผู้ค้า"
+
+#. module: pos_paytm
 #: model:ir.model.fields.selection,name:pos_paytm.selection__pos_payment_method__accept_payment__manual
 msgid "Manually"
 msgstr "ด้วยตนเอง"
+
+#. module: pos_paytm
+#: model:ir.model.fields,help:pos_paytm.field_pos_payment_method__paytm_merchant_key
+msgid ""
+"Merchant/AES key \n"
+" ex: B1o6Ivjy8L1@abc9"
+msgstr ""
+"รหัสผู้ขาย/AES\n"
+"ตัวอย่าง: B1o6Ivjy8L1@abc9"
 
 #. module: pos_paytm
 #: model:ir.model.fields,field_description:pos_paytm.field_pos_payment_method__channel_id
@@ -58,7 +89,6 @@ msgstr "รหัสช่อง PayTM"
 #. module: pos_paytm
 #. odoo-javascript
 #: code:addons/pos_paytm/static/src/js/payment_paytm.js:0
-#, python-format
 msgid "PayTM Error"
 msgstr "ข้อผิดพลาด PayTM"
 
@@ -83,49 +113,9 @@ msgid "PayTM Test Mode"
 msgstr "โหมดทดสอบ PayTM"
 
 #. module: pos_paytm
-#: model:ir.model.fields,field_description:pos_paytm.field_pos_payment__paytm_authcode
-msgid "Paytm APPR Code"
-msgstr "รหัส APPR ของ Paytm"
-
-#. module: pos_paytm
-#: model:ir.model.fields,field_description:pos_paytm.field_pos_payment__paytm_card_scheme
-msgid "Paytm Card Scheme"
-msgstr "โครงการบัตร Paytm"
-
-#. module: pos_paytm
-#: model:ir.model.fields,field_description:pos_paytm.field_pos_payment__paytm_issuer_card_no
-msgid "Paytm Issue Mask Card No."
-msgstr "หมายเลขบัตร Mask Card ของ Paytm"
-
-#. module: pos_paytm
-#: model:ir.model.fields,field_description:pos_paytm.field_pos_payment__paytm_issuer_bank
-msgid "Paytm Issuer Bank"
-msgstr "ธนาคารผู้ออก Paytm"
-
-#. module: pos_paytm
-#: model:ir.model.fields,field_description:pos_paytm.field_pos_payment__paytm_reference_no
-msgid "Paytm Merchant Reference No."
-msgstr "หมายเลขอ้างอิงผู้ค้า Paytm"
-
-#. module: pos_paytm
-#: model:ir.model.fields,field_description:pos_paytm.field_pos_payment__paytm_payment_method
-msgid "Paytm Payment Method"
-msgstr "วิธีการชำระเงิน Paytm"
-
-#. module: pos_paytm
-#: model:ir.model,name:pos_paytm.model_pos_order
-msgid "Point of Sale Orders"
-msgstr "คำสั่งซื้อการขายหน้าร้าน"
-
-#. module: pos_paytm
 #: model:ir.model,name:pos_paytm.model_pos_payment_method
 msgid "Point of Sale Payment Methods"
 msgstr "วิธีการชำระเงินการขายหน้าร้าน"
-
-#. module: pos_paytm
-#: model:ir.model,name:pos_paytm.model_pos_payment
-msgid "Point of Sale Payments"
-msgstr "การชำระเงินระบบขายหน้าร้าน"
 
 #. module: pos_paytm
 #: model:ir.model.fields.selection,name:pos_paytm.selection__pos_payment_method__allowed_payment_modes__qr
@@ -135,48 +125,55 @@ msgstr "QR"
 #. module: pos_paytm
 #. odoo-javascript
 #: code:addons/pos_paytm/static/src/js/payment_paytm.js:0
-#, python-format
 msgid "Reference number mismatched"
 msgstr "หมายเลขอ้างอิงไม่ตรงกัน"
 
 #. module: pos_paytm
 #. odoo-python
 #: code:addons/pos_paytm/models/pos_payment_method.py:0
-#, python-format
 msgid "Something went wrong with paytm request. Please try later."
 msgstr "เกิดข้อผิดพลาดกับคำขอ paytm โปรดลองอีกครั้งในภายหลัง"
 
 #. module: pos_paytm
-#. odoo-python
-#: code:addons/pos_paytm/models/pos_payment_method.py:0
-#, python-format
-msgid "This Payment Terminal is only valid for INR Currency"
-msgstr "ช่องทางการชำระเงินนี้ใช้ได้เฉพาะกับสกุลเงิน INR เท่านั้น"
+#: model:ir.model.fields,help:pos_paytm.field_pos_payment_method__paytm_tid
+msgid ""
+"Terminal model or Activation code \n"
+" ex: 70000123"
+msgstr ""
+"รุ่นเทอร์มินัลหรือรหัสเปิดใช้งาน\n"
+" เช่น 70000123"
 
 #. module: pos_paytm
 #. odoo-python
 #: code:addons/pos_paytm/models/pos_payment_method.py:0
-#, python-format
+msgid "This Payment Terminal is only valid for INR Currency"
+msgstr "ช่องทางการชำระเงินนี้ใช้ได้เฉพาะกับสกุลเงิน INR เท่านั้น"
+
+#. module: pos_paytm
+#: model:ir.model.fields,help:pos_paytm.field_pos_payment_method__paytm_test_mode
+msgid "Turn it on when in Test Mode"
+msgstr "เปิดเครื่องเมื่ออยู่ในโหมดทดสอบ"
+
+#. module: pos_paytm
+#. odoo-python
+#: code:addons/pos_paytm/models/pos_payment_method.py:0
 msgid "makePaymentRequest expected resultCode not found in the response"
 msgstr "การดำเนินการคำขอการชำระเงินไม่พบรหัสผลลัพธ์ที่คาดหวังในการตอบกลับ"
 
 #. module: pos_paytm
 #. odoo-python
 #: code:addons/pos_paytm/models/pos_payment_method.py:0
-#, python-format
 msgid "paymentFetchRequest expected resultCode not found in the response"
 msgstr "การดึงข้อมูลคำขอการชำระเงินไม่พบรหัสผลลัพธ์ที่คาดหวังในการตอบกลับ"
 
 #. module: pos_paytm
 #. odoo-python
 #: code:addons/pos_paytm/models/pos_payment_method.py:0
-#, python-format
 msgid "paytm transaction failure"
 msgstr "การทำธุรกรรม Paytm ล้มเหลว"
 
 #. module: pos_paytm
 #. odoo-python
 #: code:addons/pos_paytm/models/pos_payment_method.py:0
-#, python-format
 msgid "paytm transaction request declined"
 msgstr "คำขอธุรกรรม paytm ถูกปฏิเสธ"

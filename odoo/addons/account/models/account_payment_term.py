@@ -96,7 +96,7 @@ class AccountPaymentTerm(models.Model):
                 discount_amount = record._get_amount_due_after_discount(record.example_amount, 0.0)
                 record.example_preview_discount = _(
                     "Early Payment Discount: <b>%(amount)s</b> if paid before <b>%(date)s</b>",
-                    amount=formatLang(self.env, discount_amount, monetary=True, currency_obj=currency),
+                    amount=formatLang(self.env, discount_amount, currency_obj=currency),
                     date=date,
                 )
 
@@ -117,7 +117,7 @@ class AccountPaymentTerm(models.Model):
                     example_preview += _(
                         "<b>%(count)s#</b> Installment of <b>%(amount)s</b> due on <b style='color: #704A66;'>%(date)s</b>",
                         count=i+1,
-                        amount=formatLang(self.env, amount, monetary=True, currency_obj=currency),
+                        amount=formatLang(self.env, amount, currency_obj=currency),
                         date=date,
                     )
                     example_preview += "</div>"
@@ -250,15 +250,8 @@ class AccountPaymentTerm(models.Model):
 
     @api.ondelete(at_uninstall=False)
     def _unlink_except_referenced_terms(self):
-        if self.env['account.move'].search([('invoice_payment_term_id', 'in', self.ids)]):
+        if self.env['account.move'].search_count([('invoice_payment_term_id', 'in', self.ids)], limit=1):
             raise UserError(_('You can not delete payment terms as other records still reference it. However, you can archive it.'))
-
-    def unlink(self):
-        for terms in self:
-            self.env['ir.property'].sudo().search(
-                [('value_reference', 'in', ['account.payment.term,%s'%payment_term.id for payment_term in terms])]
-            ).unlink()
-        return super(AccountPaymentTerm, self).unlink()
 
     def _get_last_discount_date(self, date_ref):
         self.ensure_one()
@@ -287,7 +280,15 @@ class AccountPaymentTermLine(models.Model):
             ('days_after', 'Days after invoice date'),
             ('days_after_end_of_month', 'Days after end of month'),
             ('days_after_end_of_next_month', 'Days after end of next month'),
+            ('days_end_of_month_on_the', 'Days end of month on the'),
         ], required=True, default='days_after')
+    display_days_next_month = fields.Boolean(compute='_compute_display_days_next_month')
+    days_next_month = fields.Char(
+        string='Days on the next month',
+        readonly=False,
+        default='10',
+        size=2,
+    )
     nb_days = fields.Integer(string='Days', readonly=False, store=True, compute='_compute_days')
     payment_id = fields.Many2one('account.payment.term', string='Payment Terms', required=True, index=True, ondelete='cascade')
 
@@ -298,7 +299,31 @@ class AccountPaymentTermLine(models.Model):
             return date_utils.end_of(due_date, 'month') + relativedelta(days=self.nb_days)
         elif self.delay_type == 'days_after_end_of_next_month':
             return date_utils.end_of(due_date + relativedelta(months=1), 'month') + relativedelta(days=self.nb_days)
+        elif self.delay_type == 'days_end_of_month_on_the':
+            try:
+                days_next_month = int(self.days_next_month)
+            except ValueError:
+                days_next_month = 1
+
+            if not days_next_month:
+                return date_utils.end_of(due_date + relativedelta(days=self.nb_days), 'month')
+
+            return due_date + relativedelta(days=self.nb_days) + relativedelta(months=1, day=days_next_month)
         return due_date + relativedelta(days=self.nb_days)
+
+    @api.constrains('days_next_month')
+    def _check_valid_char_value(self):
+        for record in self:
+            if record.days_next_month and record.days_next_month.isnumeric():
+                if not (0 <= int(record.days_next_month) <= 31):
+                    raise ValidationError(_('The days added must be between 0 and 31.'))
+            else:
+                raise ValidationError(_('The days added must be a number and has to be between 0 and 31.'))
+
+    @api.depends('delay_type')
+    def _compute_display_days_next_month(self):
+        for record in self:
+            record.display_days_next_month = record.delay_type == 'days_end_of_month_on_the'
 
     @api.constrains('value', 'value_amount')
     def _check_percent(self):

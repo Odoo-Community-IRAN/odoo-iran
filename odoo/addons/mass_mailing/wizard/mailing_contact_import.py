@@ -15,7 +15,7 @@ class MailingContactImport(models.TransientModel):
     def action_import(self):
         """Import each lines of "contact_list" as a new contact."""
         self.ensure_one()
-        contacts = tools.email_split_tuples(', '.join((self.contact_list or '').splitlines()))
+        contacts = tools.mail.email_split_tuples(', '.join((self.contact_list or '').splitlines()))
         if not contacts:
             return {
                 'type': 'ir.actions.client',
@@ -89,16 +89,20 @@ class MailingContactImport(models.TransientModel):
             for email, values in unique_contacts.items()
         ])
 
-        ignored = len(contacts) - len(unique_contacts)
+        if ignored := len(contacts) - len(unique_contacts):
+            message = _(
+                "Contacts successfully imported. Number of contacts imported: %(imported_count)s. Number of duplicates ignored: %(duplicate_count)s",
+                imported_count=len(unique_contacts),
+                duplicate_count=ignored,
+            )
+        else:
+            message = _("Contacts successfully imported. Number of contacts imported: %(imported_count)s", imported_count=len(unique_contacts))
 
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'message': (
-                    _('%i Contacts have been imported.', len(unique_contacts))
-                    + (_(' %i duplicates have been ignored.', ignored) if ignored else '')
-                ),
+                'message': message,
                 'type': 'success',
                 'sticky': False,
                 'next': {

@@ -1,8 +1,14 @@
 /** @odoo-module */
+// @ts-check
 
 import { LoadingDataError } from "@spreadsheet/o_spreadsheet/errors";
-import { RPCError } from "@web/core/network/rpc_service";
+import { RPCError } from "@web/core/network/rpc";
 import { KeepLast } from "@web/core/utils/concurrency";
+import { CellErrorType, EvaluationError } from "@odoo/o-spreadsheet";
+
+/**
+ * @typedef {import("./odoo_data_provider").OdooDataProvider} OdooDataProvider
+ */
 
 /**
  * DataSource is an abstract class that contains the logic of fetching and
@@ -15,11 +21,13 @@ import { KeepLast } from "@web/core/utils/concurrency";
  * particular data.
  */
 export class LoadableDataSource {
-    constructor(params) {
-        this._orm = params.orm;
-        this._metadataRepository = params.metadataRepository;
-        this._notifyWhenPromiseResolves = params.notifyWhenPromiseResolves;
-        this._cancelPromise = params.cancelPromise;
+    /**
+     * @param {Object} param0
+     * @param {OdooDataProvider} param0.odooDataProvider
+     */
+    constructor({ odooDataProvider }) {
+        /** @protected */
+        this.odooDataProvider = odooDataProvider;
 
         /**
          * Last time that this dataSource has been updated
@@ -33,7 +41,15 @@ export class LoadableDataSource {
         this._loadPromise = undefined;
         this._isFullyLoaded = false;
         this._isValid = true;
-        this._loadErrorMessage = "";
+        this._loadError = undefined;
+    }
+
+    get _orm() {
+        return this.odooDataProvider.orm;
+    }
+
+    get serverData() {
+        return this.odooDataProvider.serverData;
     }
 
     /**
@@ -45,24 +61,27 @@ export class LoadableDataSource {
      */
     async load(params) {
         if (params && params.reload) {
-            this._cancelPromise(this._loadPromise);
+            this.odooDataProvider.cancelPromise(this._loadPromise);
             this._loadPromise = undefined;
         }
         if (!this._loadPromise) {
             this._isFullyLoaded = false;
             this._isValid = true;
-            this._loadErrorMessage = "";
+            this._loadError = undefined;
             this._loadPromise = this._concurrency
                 .add(this._load())
                 .catch((e) => {
                     this._isValid = false;
-                    this._loadErrorMessage = e instanceof RPCError ? e.data.message : e.message;
+                    this._loadError = Object.assign(
+                        new EvaluationError(e instanceof RPCError ? e.data.message : e.message),
+                        { cause: e }
+                    );
                 })
                 .finally(() => {
                     this._lastUpdate = Date.now();
                     this._isFullyLoaded = true;
                 });
-            await this._notifyWhenPromiseResolves(this._loadPromise);
+            await this.odooDataProvider.notifyWhenPromiseResolves(this._loadPromise);
         }
         return this._loadPromise;
     }
@@ -78,16 +97,27 @@ export class LoadableDataSource {
         return this._isFullyLoaded;
     }
 
-    /**
-     * @protected
-     */
-    _assertDataIsLoaded() {
+    isLoading() {
+        return !!this._loadPromise && !this.isReady();
+    }
+
+    isValid() {
+        return this.isReady() && this._isValid;
+    }
+
+    assertIsValid({ throwOnError } = { throwOnError: true }) {
         if (!this._isFullyLoaded) {
             this.load();
-            throw LOADING_ERROR;
+            if (throwOnError) {
+                throw LOADING_ERROR;
+            }
+            return LOADING_ERROR;
         }
         if (!this._isValid) {
-            throw new Error(this._loadErrorMessage);
+            if (throwOnError) {
+                throw this._loadError;
+            }
+            return { value: CellErrorType.GenericError, message: this._loadError.message };
         }
     }
 
@@ -100,4 +130,4 @@ export class LoadableDataSource {
     async _load() {}
 }
 
-const LOADING_ERROR = new LoadingDataError();
+export const LOADING_ERROR = new LoadingDataError();

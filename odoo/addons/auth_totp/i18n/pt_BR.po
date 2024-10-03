@@ -3,16 +3,16 @@
 # 	* auth_totp
 # 
 # Translators:
-# Wil Odoo, 2023
-# Maitê Dietze, 2023
+# Wil Odoo, 2024
+# Maitê Dietze, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:55+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Maitê Dietze, 2023\n"
+"POT-Creation-Date: 2024-09-25 08:40+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Maitê Dietze, 2024\n"
 "Language-Team: Portuguese (Brazil) (https://app.transifex.com/odoo/teams/41243/pt_BR/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -23,39 +23,19 @@ msgstr ""
 #. module: auth_totp
 #. odoo-python
 #: code:addons/auth_totp/controllers/home.py:0
-#, python-format
 msgid "%(browser)s on %(platform)s"
 msgstr "%(browser)s em %(platform)s"
 
 #. module: auth_totp
 #: model:ir.model,name:auth_totp.model_auth_totp_wizard
 msgid "2-Factor Setup Wizard"
-msgstr "Assistente de configuração de dois fatores"
+msgstr "Assistente de autenticação de dois fatores"
 
 #. module: auth_totp
 #. odoo-python
 #: code:addons/auth_totp/wizard/auth_totp_wizard.py:0
-#, python-format
 msgid "2-Factor authentication is now enabled."
 msgstr "A autenticação de dois fatores agora está habilitada."
-
-#. module: auth_totp
-#: model_terms:ir.ui.view,arch_db:auth_totp.view_totp_form
-msgid ""
-"<i title=\"Documentation\" class=\"fa fa-fw o_button_icon fa-info-circle\"/>\n"
-"                                    Learn More"
-msgstr ""
-"<i title=\"Documentation\" class=\"fa fa-fw o_button_icon fa-info-circle\"/>\n"
-"                                    Saiba mais"
-
-#. module: auth_totp
-#: model_terms:ir.ui.view,arch_db:auth_totp.view_totp_field
-msgid ""
-"<i title=\"Documentation\" class=\"fa fa-fw o_button_icon fa-info-circle\"/>\n"
-"                            Learn More"
-msgstr ""
-"<i title=\"Documentation\" class=\"fa fa-fw o_button_icon fa-info-circle\"/>\n"
-"                            Saiba mais"
 
 #. module: auth_totp
 #: model_terms:ir.ui.view,arch_db:auth_totp.view_totp_wizard
@@ -72,7 +52,7 @@ msgid ""
 "<span class=\"d-none d-md-block\">When requested to do so, scan the barcode below</span>\n"
 "                                    <span class=\"d-block d-md-none\">When requested to do so, copy the key below</span>"
 msgstr ""
-"<span class=\"d-none d-md-block\">Se solicitado, escaneie o código de barras abaixo</span>\n"
+"<span class=\"d-none d-md-block\">Se solicitado, leia o código de barras abaixo</span>\n"
 "                                    <span class=\"d-block d-md-none\">Se solicitado, copie a chave abaixo</span>"
 
 #. module: auth_totp
@@ -81,7 +61,7 @@ msgid ""
 "<span class=\"text-muted\">Popular ones include Authy, Google Authenticator "
 "or the Microsoft Authenticator.</span>"
 msgstr ""
-"<span class=\"text-muted\">Algumas opções populares são o Authy, oGoogle "
+"<span class=\"text-muted\">Algumas opções populares são o Authy, o Google "
 "Authenticator e o Microsoft Authenticator.</span>"
 
 #. module: auth_totp
@@ -101,11 +81,6 @@ msgid ""
 msgstr ""
 "<span invisible=\"not totp_enabled\" class=\"text-muted\">Sua conta está "
 "protegida!</span>"
-
-#. module: auth_totp
-#: model_terms:ir.ui.view,arch_db:auth_totp.view_totp_form
-msgid "Account Security"
-msgstr "Segurança da conta"
 
 #. module: auth_totp
 #: model_terms:ir.ui.view,arch_db:auth_totp.view_totp_wizard
@@ -227,9 +202,9 @@ msgid "Enter your six-digit code below"
 msgstr "Insira seu código de seis dígitos abaixo"
 
 #. module: auth_totp
-#: model:ir.model,name:auth_totp.model_ir_http
-msgid "HTTP Routing"
-msgstr "Roteamento HTTP"
+#: model:ir.model.fields,field_description:auth_totp.field_auth_totp_device__expiration_date
+msgid "Expiration Date"
+msgstr "Data de expiração"
 
 #. module: auth_totp
 #: model:ir.model.fields,field_description:auth_totp.field_auth_totp_device__id
@@ -240,7 +215,6 @@ msgstr "ID"
 #. module: auth_totp
 #. odoo-python
 #: code:addons/auth_totp/controllers/home.py:0
-#, python-format
 msgid "Invalid authentication code format."
 msgstr "Formato de código de autenticação inválido."
 
@@ -311,7 +285,6 @@ msgstr "Segredo"
 #. module: auth_totp
 #. odoo-python
 #: code:addons/auth_totp/wizard/auth_totp_wizard.py:0
-#, python-format
 msgid "The verification code should only contain numbers"
 msgstr "O código de verificação deve conter apenas números"
 
@@ -339,7 +312,6 @@ msgstr "Dispositivos confiáveis"
 #. module: auth_totp
 #. odoo-python
 #: code:addons/auth_totp/models/res_users.py:0
-#, python-format
 msgid "Two-Factor Authentication Activation"
 msgstr "Ativação da autenticação de dois fatores"
 
@@ -351,18 +323,8 @@ msgid "Two-factor Authentication"
 msgstr "Autenticação de dois fatores"
 
 #. module: auth_totp
-#: model_terms:ir.ui.view,arch_db:auth_totp.view_totp_form
-msgid ""
-"Two-factor Authentication (\"2FA\") is a system of double authentication.\n"
-"                                The first one is done with your password and the second one with a code you get from a dedicated mobile app.\n"
-"                                Popular ones include Authy, Google Authenticator or the Microsoft Authenticator."
-msgstr ""
-"Autenticação de dois fatores (\"2FA\") é um sistema de autenticação dupla.\n"
-"                                A primeira é realizada com a senha e a segunda, com um código obtido de um aplicativo móvel dedicado.\n"
-"                                Os mais populares incluem Authy, Google Authenticator ou Microsoft Authenticator."
-
-#. module: auth_totp
 #: model_terms:ir.ui.view,arch_db:auth_totp.view_totp_field
+#: model_terms:ir.ui.view,arch_db:auth_totp.view_totp_form
 msgid ""
 "Two-factor Authentication (\"2FA\") is a system of double authentication.\n"
 "                        The first one is done with your password and the second one with a code you get from a dedicated mobile app.\n"
@@ -390,21 +352,18 @@ msgstr "Autenticação de dois fatores habilitada"
 #. module: auth_totp
 #. odoo-python
 #: code:addons/auth_totp/models/res_users.py:0
-#, python-format
 msgid "Two-factor authentication already enabled"
 msgstr "A autenticação de dois fatores já está habilitada"
 
 #. module: auth_totp
 #. odoo-python
 #: code:addons/auth_totp/models/res_users.py:0
-#, python-format
 msgid "Two-factor authentication can only be enabled for yourself"
 msgstr "A autenticação de dois fatores só pode ser habilitada por você mesmo"
 
 #. module: auth_totp
 #. odoo-python
 #: code:addons/auth_totp/models/res_users.py:0
-#, python-format
 msgid "Two-factor authentication disabled for the following user(s): %s"
 msgstr ""
 "Autenticação de dois fatores desabilitada para o(s) seguinte(s) usuário(s): "
@@ -432,7 +391,6 @@ msgstr "Código de verificação"
 #. odoo-python
 #: code:addons/auth_totp/models/res_users.py:0
 #: code:addons/auth_totp/wizard/auth_totp_wizard.py:0
-#, python-format
 msgid "Verification failed, please double-check the 6-digit code"
 msgstr "A verificação falhou, confira o código de 6 dígitos"
 

@@ -1,12 +1,10 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
 import { SignatureDialog } from "@web/core/signature/signature_dialog";
 import { useService } from "@web/core/utils/hooks";
-import { url } from "@web/core/utils/urls";
+import { imageUrl } from "@web/core/utils/urls";
 import { isBinarySize } from "@web/core/utils/binary";
-import { fileTypeMagicWordMap, imageCacheKey } from "@web/views/fields/image/image_field";
+import { fileTypeMagicWordMap } from "@web/views/fields/image/image_field";
 import { standardFieldProps } from "@web/views/fields/standard_field_props";
 
 import { Component, useState } from "@odoo/owl";
@@ -22,6 +20,10 @@ export class SignatureField extends Component {
         height: { type: Number, optional: true },
         previewImage: { type: String, optional: true },
         width: { type: Number, optional: true },
+        type: { validate: (t) => ["initial", "signature"].includes(t), optional: true },
+    };
+    static defaultProps = {
+        type: "signature",
     };
 
     setup() {
@@ -41,11 +43,8 @@ export class SignatureField extends Component {
         const { name, previewImage, record } = this.props;
         if (this.state.isValid && this.value) {
             if (isBinarySize(this.value)) {
-                return url("/web/image", {
-                    model: record.resModel,
-                    id: record.resId,
-                    field: previewImage || name,
-                    unique: imageCacheKey(this.rawCacheKey),
+                return imageUrl(record.resModel, record.resId, previewImage || name, {
+                    unique: this.rawCacheKey,
                 });
             } else {
                 // Use magic-word technique for detecting image type
@@ -88,7 +87,7 @@ export class SignatureField extends Component {
         if (!this.props.readonly) {
             const nameAndSignatureProps = {
                 displaySignatureRatio: 3,
-                signatureType: "signature",
+                signatureType: this.props.type,
                 noInputName: true,
             };
             const { fullName, record } = this.props;
@@ -129,7 +128,9 @@ export class SignatureField extends Component {
      * @private
      */
     uploadSignature({ signatureImage }) {
-        return this.props.record.update({ [this.props.name]: signatureImage[1] || false });
+        return this.props.record.update({
+            [this.props.name]: signatureImage.split(",")[1] || false,
+        });
     }
 }
 
@@ -171,6 +172,7 @@ export const signatureField = {
         fullName: options.full_name,
         height: options.size ? options.size[1] || undefined : attrs.height,
         previewImage: options.preview_image,
+        type: options.type,
         width: options.size ? options.size[0] || undefined : attrs.width,
     }),
 };

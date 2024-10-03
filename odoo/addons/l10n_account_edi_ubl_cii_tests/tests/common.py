@@ -2,7 +2,6 @@
 import base64
 
 from freezegun import freeze_time
-from collections import Counter
 from os.path import join as opj
 
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
@@ -15,17 +14,13 @@ from lxml import etree
 class TestUBLCommon(AccountTestInvoicingCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref=None):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
+
+        cls.other_currency = cls.setup_other_currency('USD', rounding=0.001)
 
         # Required for `product_uom_id` to be visible in the form views
         cls.env.user.groups_id += cls.env.ref('uom.group_uom')
-
-        # Ensure the testing currency is using a valid ISO code.
-        real_usd = cls.env.ref('base.USD')
-        real_usd.name = 'FUSD'
-        real_usd.flush_model(['name'])
-        cls.currency_data['currency'].name = 'USD'
 
         # remove this tax, otherwise, at import, this tax with children taxes can be selected and the total is wrong
         cls.tax_armageddon.children_tax_ids.unlink()
@@ -59,20 +54,6 @@ class TestUBLCommon(AccountTestInvoicingCommon):
             'include_base_amount': True,
             'sequence': 2,
         })
-
-    @classmethod
-    def setup_company_data(cls, company_name, chart_template=None, **kwargs):
-        # OVERRIDE to force the company with EUR currency.
-        eur = cls.env.ref('base.EUR')
-        if not eur.active:
-            eur.active = True
-
-        res = super().setup_company_data(company_name, chart_template=chart_template, **kwargs)
-        res['company'].write({
-            'currency_id': eur.id,
-            'invoice_is_ubl_cii': True,  # check the ubl_cii format by default in the send & print wizard
-        })
-        return res
 
     def assert_same_invoice(self, invoice1, invoice2, **invoice_kwargs):
         self.assertEqual(len(invoice1.invoice_line_ids), len(invoice2.invoice_line_ids))
@@ -127,60 +108,24 @@ class TestUBLCommon(AccountTestInvoicingCommon):
             })
             invoice.message_post(attachment_ids=[attachment.id])
 
-    def _assert_imported_invoice_from_file(self, subfolder, filename, amount_total, amount_tax, list_line_subtotals,
-                                           list_line_price_unit=None, list_line_discount=None, list_line_taxes=None,
-                                           list_line_quantity=None,
-                                           move_type='in_invoice', currency_id=None):
-        """
-        Create an empty account.move, update the file to fill its fields, asserts the currency, total and tax amounts
-        are as expected.
-        """
-        if not currency_id:
-            currency_id = self.env.ref('base.EUR').id
-
-        # Create empty account.move, then update a file
+    def _assert_imported_invoice_from_file(self, subfolder, filename, invoice_vals, move_type='in_invoice'):
+        """ Create an empty account.move, update the xml file, and then check the invoice values. """
         if move_type in self.env['account.move'].get_purchase_types():
             journal = self.company_data['default_journal_purchase']
         else:
             journal = self.company_data['default_journal_sale']
-
-        invoice = self.env['account.move'].create({
-            'move_type': move_type,
-            'journal_id': journal.id,
-        })
-
-        invoice_count = len(self.env['account.move'].search([]))
-
+        invoice = self.env['account.move'].create({'move_type': move_type, 'journal_id': journal.id})
         self._update_invoice_from_file(
             module_name='l10n_account_edi_ubl_cii_tests',
             subfolder=subfolder,
             filename=filename,
             invoice=invoice,
         )
-
-        # Checks
-        self.assertEqual(len(self.env['account.move'].search([])), invoice_count)
-        self.assertRecordValues(invoice, [{
-            'amount_total': amount_total,
-            'amount_tax': amount_tax,
-            'currency_id': currency_id,
-        }])
-        self.assertEqual(
-            Counter(invoice.invoice_line_ids.mapped('price_subtotal')),
-            Counter(list_line_subtotals),
-        )
-        if list_line_price_unit:
-            self.assertEqual(invoice.invoice_line_ids.mapped('price_unit'), list_line_price_unit)
-        if list_line_discount:
-            # See test_import_tax_included: sometimes, it's impossible to retrieve the exact discount at import because
-            # of rounding during export. The obtained discount might be 10.001 while the expected is 10.
-            dp = self.env.ref('product.decimal_discount').precision_get("Discount")
-            self.assertEqual([round(d, dp) for d in invoice.invoice_line_ids.mapped('discount')], list_line_discount)
-        if list_line_taxes:
-            for line, taxes in zip(invoice.invoice_line_ids, list_line_taxes):
-                self.assertEqual(line.tax_ids, taxes)
-        if list_line_quantity:
-            self.assertEqual(invoice.invoice_line_ids.mapped('quantity'), list_line_quantity)
+        invoice_vals = invoice_vals.copy()
+        invoice_lines = invoice_vals.pop('invoice_lines', False)
+        self.assertRecordValues(invoice, [invoice_vals])
+        if invoice_lines:
+            self.assertRecordValues(invoice.invoice_line_ids, invoice_lines)
 
     # -------------------------------------------------------------------------
     # EXPORT HELPERS
@@ -210,7 +155,7 @@ class TestUBLCommon(AccountTestInvoicingCommon):
             'invoice_payment_term_id': self.pay_terms_b.id,
             'invoice_date': '2017-01-01',
             'date': '2017-01-01',
-            'currency_id': self.currency_data['currency'].id,
+            'currency_id': self.other_currency.id,
             'narration': 'test narration',
             'ref': 'ref_move',
             **invoice_kwargs,
@@ -225,7 +170,8 @@ class TestUBLCommon(AccountTestInvoicingCommon):
 
         account_move.action_post()
         if send:
-            account_move._generate_pdf_and_send_invoice(self.move_template)
+            # will set the right UBL format by default thanks to the partner's compute
+            account_move._generate_and_send(sending_methods=['manual'])
         return account_move
 
     def _assert_invoice_attachment(self, attachment, xpaths, expected_file_path):

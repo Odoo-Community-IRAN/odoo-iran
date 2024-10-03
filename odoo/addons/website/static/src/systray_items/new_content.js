@@ -1,8 +1,11 @@
 /** @odoo-module **/
 
 import { _t } from "@web/core/l10n/translation";
+import { rpc } from "@web/core/network/rpc";
 import { registry } from '@web/core/registry';
+import { user } from "@web/core/user";
 import { useService } from '@web/core/utils/hooks';
+import { redirect } from "@web/core/utils/urls";
 import { WebsiteDialog } from "@website/components/dialog/dialog";
 import { AddPageDialog } from "@website/components/dialog/add_page_dialog";
 import { useHotkey } from "@web/core/hotkeys/hotkey_hook";
@@ -17,6 +20,19 @@ export const MODULE_STATUS = {
 };
 
 class NewContentElement extends Component {
+    static template = "website.NewContentElement";
+    static props = {
+        name: { type: String, optional: true },
+        title: String,
+        onClick: Function,
+        status: { type: String, optional: true },
+        moduleXmlId: { type: String, optional: true },
+        slots: Object,
+    };
+    static defaultProps = {
+        status: MODULE_STATUS.INSTALLED,
+    };
+
     setup() {
         this.MODULE_STATUS = MODULE_STATUS;
     }
@@ -27,20 +43,17 @@ class NewContentElement extends Component {
         this.props.onClick();
     }
 }
-NewContentElement.template = "website.NewContentElement";
-NewContentElement.props = {
-    name: { type: String, optional: true },
-    title: String,
-    onClick: Function,
-    status: { type: String, optional: true },
-    moduleXmlId: { type: String, optional: true },
-    slots: Object,
-};
-NewContentElement.defaultProps = {
-    status: MODULE_STATUS.INSTALLED,
-};
 
 class InstallModuleDialog extends Component {
+    static components = { WebsiteDialog };
+    static template = "website.InstallModuleDialog";
+    static props = {
+        title: String,
+        installationText: String,
+        installModule: Function,
+        close: Function,
+    };
+
     setup() {
         this.installButton = _t("Install");
     }
@@ -50,18 +63,18 @@ class InstallModuleDialog extends Component {
         this.props.installModule();
     }
 }
-InstallModuleDialog.components = { WebsiteDialog };
-InstallModuleDialog.template = "website.InstallModuleDialog";
 
 export class NewContentModal extends Component {
+    static template = "website.NewContentModal";
+    static components = { NewContentElement };
+    static props = {};
+
     setup() {
-        this.user = useService('user');
         this.orm = useService('orm');
-        this.rpc = useService('rpc');
         this.dialogs = useService('dialog');
         this.website = useService('website');
         this.action = useService('action');
-        this.isSystem = this.user.isSystem;
+        this.isSystem = user.isSystem;
 
         this.newContentText = {
             failed: _t('Failed to install "%s"'),
@@ -137,8 +150,8 @@ export class NewContentModal extends Component {
     }
 
     async onWillStart() {
-        this.isDesigner = await this.user.hasGroup('website.group_website_designer');
-        this.canInstall = await this.user.isAdmin;
+        this.isDesigner = await user.hasGroup('website.group_website_designer');
+        this.canInstall = await user.isAdmin;
         if (this.canInstall) {
             const moduleNames = this.state.newContentElements.filter(({status}) => status === MODULE_STATUS.NOT_INSTALLED).map(({moduleName}) => moduleName);
             this.modulesInfo = {};
@@ -158,7 +171,7 @@ export class NewContentModal extends Component {
                 elementsToUpdate[element.model] = element;
             }
         }
-        const accesses = await this.rpc("/website/check_new_content_access_rights", {
+        const accesses = await rpc("/website/check_new_content_access_rights", {
             models: modelsToCheck,
         });
         for (const [model, access] of Object.entries(accesses)) {
@@ -195,7 +208,7 @@ export class NewContentModal extends Component {
             // A reload is needed after installing a new module, to instantiate
             // a NewContentModal with patches from the installed module.
             this.website.prepareOutLoader();
-            window.location.replace(`/web#action=website.website_preview&website_id=${id}&path=${encodeURIComponent(url.toString())}&display_new_content=true`);
+            redirect(`/odoo/action-website.website_preview?website_id=${id}&path=${encodeURIComponent(url.toString())}&display_new_content=true`);
         }
     }
 
@@ -267,12 +280,13 @@ export class NewContentModal extends Component {
         });
     }
 }
-NewContentModal.template = "website.NewContentModal";
-NewContentModal.components = { NewContentElement };
 
 class NewContentSystray extends Component {
+    static template = "website.NewContentSystray";
+    static components = { NewContentModal };
+    static props = {};
+
     setup() {
-        this.rpc = useService('rpc');
         this.website = useService('website');
         this.websiteContext = useState(this.website.context);
     }
@@ -281,11 +295,9 @@ class NewContentSystray extends Component {
         this.websiteContext.showNewContentModal = !this.websiteContext.showNewContentModal;
     }
 }
-NewContentSystray.template = "website.NewContentSystray";
-NewContentSystray.components = { NewContentModal };
 
 export const systrayItem = {
     Component: NewContentSystray,
 };
 
-registry.category("website_systray").add("NewContent", systrayItem, { sequence: 10 });
+registry.category("website_systray").add("NewContent", systrayItem, { sequence: 9 });

@@ -1,7 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 {
     'name': 'Taiwan - Accounting',
-    'website': 'https://www.odoo.com/documentation/17.0/applications/finance/fiscal_localizations.html',
+    'website': 'https://www.odoo.com/documentation/master/applications/finance/fiscal_localizations.html',
     'icon': '/account/static/description/l10n.png',
     'countries': ['tw'],
     'author': 'Odoo PS',
@@ -15,6 +15,7 @@ This is the base module to manage the accounting chart for Taiwan in Odoo.
         'account',
         'base_address_extended',
     ],
+    'auto_install': ['account'],
     'data': [
         'data/res.country.state.csv',
         'data/res_currency_data.xml',

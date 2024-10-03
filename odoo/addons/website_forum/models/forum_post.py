@@ -7,10 +7,10 @@ import re
 from datetime import datetime
 
 from odoo import api, fields, models, tools, _
-from odoo.addons.http_routing.models.ir_http import slug, unslug
 from odoo.exceptions import UserError, ValidationError, AccessError
 from odoo.osv import expression
-from odoo.tools import sql
+from odoo.tools import sql, SQL
+from odoo.tools.json import scriptsafe as json_safe
 
 _logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class Post(models.Model):
     plain_content = fields.Text(
         'Plain Content',
         compute='_compute_plain_content', store=True)
-    tag_ids = fields.Many2many('forum.tag', 'forum_tag_rel', 'forum_id', 'forum_tag_id', string='Tags')
+    tag_ids = fields.Many2many('forum.tag', 'forum_tag_rel', 'forum_post_id', 'forum_tag_id', string='Tags')
     state = fields.Selection(
         [
             ('active', 'Active'), ('pending', 'Waiting Validation'),
@@ -163,7 +163,7 @@ class Post(models.Model):
 
     @api.constrains('parent_id')
     def _check_parent_id(self):
-        if not self._check_recursion():
+        if self._has_cycle():
             raise ValidationError(_('You cannot create recursive forum posts.'))
 
     @api.depends('content')
@@ -176,7 +176,7 @@ class Post(models.Model):
         self.website_url = False
         for post in self.filtered(lambda post: post.id):
             anchor = f'#answer_{post.id}' if post.parent_id else ''
-            post.website_url = f'/forum/{slug(post.forum_id)}/{slug(post)}{anchor}'
+            post.website_url = f'/forum/{self.env["ir.http"]._slug(post.forum_id)}/{self.env["ir.http"]._slug(post)}{anchor}'
 
     @api.depends('vote_count', 'forum_id.relevancy_post_vote', 'forum_id.relevancy_time_decay')
     def _compute_relevancy(self):
@@ -279,24 +279,21 @@ class Post(models.Model):
         if self.env.is_admin():
             return [(1, '=', 1)]
 
-        req = """
+        sql = SQL("""(
             SELECT p.id
             FROM forum_post p
                    LEFT JOIN res_users u ON p.create_uid = u.id
                    LEFT JOIN forum_forum f ON p.forum_id = f.id
             WHERE
-                (p.create_uid = %s and f.karma_close_own <= %s)
-                or (p.create_uid != %s and f.karma_close_all <= %s)
+                (p.create_uid = %(user_id)s and f.karma_close_own <= %(karma)s)
+                or (p.create_uid != %(user_id)s and f.karma_close_all <= %(karma)s)
                 or (
                     u.karma > 0
-                    and (p.active or p.create_uid = %s)
+                    and (p.active or p.create_uid = %(user_id)s)
                 )
-        """
-
-        op = 'inselect' if operator == '=' else "not inselect"
-
-        # don't use param named because orm will add other param (test_active, ...)
-        return [('id', op, (req, (user.id, user.karma, user.id, user.karma, user.id)))]
+        )""", user_id=user.id, karma=user.karma)
+        op = 'in' if operator == '=' else "not in"
+        return [('id', op, sql)]
 
     # EXTENDS WEBSITE.SEO.METADATA
 
@@ -336,7 +333,7 @@ class Post(models.Model):
             # add karma for posting new questions
             if not post.parent_id and post.state == 'active':
                 post.create_uid.sudo()._add_karma(post.forum_id.karma_gen_question_new, post, _('Ask a new question'))
-        posts.post_notification()
+        posts.sudo()._notify_state_update()
         return posts
 
     def unlink(self):
@@ -351,7 +348,7 @@ class Post(models.Model):
         trusted_keys = ['active', 'is_correct', 'tag_ids']  # fields where security is checked manually
         if 'forum_id' in vals:
             forum = self.env['forum.forum'].browse(vals['forum_id'])
-            forum.check_access_rule('write')
+            forum.check_access('write')
         if 'content' in vals:
             vals['content'] = self._update_content(vals['content'], self.forum_id.id)
 
@@ -445,7 +442,7 @@ class Post(models.Model):
     # BUSINESS
     # ----------------------------------------------------------------------
 
-    def post_notification(self):
+    def _notify_state_update(self):
         for post in self:
             tag_partners = post.tag_ids.sudo().mapped('message_partner_ids')
 
@@ -545,17 +542,17 @@ class Post(models.Model):
                 'active': True,
                 'moderator_id': self.env.user.id,
             })
-            post.post_notification()
+            post.sudo()._notify_state_update()
         return True
 
-    def refuse(self):
+    def _refuse(self):
         for post in self:
             if not post.can_moderate:
                 raise AccessError(_('%d karma required to refuse a post.', post.forum_id.karma_moderate))
             post.moderator_id = self.env.user
         return True
 
-    def flag(self):
+    def _flag(self):
         res = []
         for post in self:
             if not post.can_flag:
@@ -577,7 +574,7 @@ class Post(models.Model):
                 res.append({'error': 'post_non_flaggable'})
         return res
 
-    def mark_as_offensive(self, reason_id):
+    def _mark_as_offensive(self, reason_id):
         for post in self:
             if not post.can_moderate:
                 raise AccessError(_('%d karma required to mark a post as offensive.', post.forum_id.karma_moderate))
@@ -605,7 +602,7 @@ class Post(models.Model):
 
         reason_id = self.env.ref('website_forum.reason_8').id
         _logger.info('User %s marked as spams (in batch): %s' % (self.env.uid, spams))
-        return spams.mark_as_offensive(reason_id)
+        return spams._mark_as_offensive(reason_id)
 
     def vote(self, upvote=True):
         self.ensure_one()
@@ -792,6 +789,66 @@ class Post(models.Model):
     # WEBSITE
     # ----------------------------------------------------------------------
 
+    def _get_microdata(self):
+        """
+        Generate structured data (microdata) for the post.
+
+        Returns:
+            str or None: Microdata in JSON format representing the post, or None
+            if not applicable.
+        """
+        self.ensure_one()
+        # Return if it's not a question.
+        if self.parent_id:
+            return None
+        correct_posts = self.child_ids.filtered(lambda post: post.is_correct)
+        suggested_posts = self.child_ids.filtered(lambda post: not post.is_correct)[:5]
+        # A QAPage schema must have one accepted answer or at least one suggested answer
+        if not suggested_posts and not correct_posts:
+            return None
+
+        structured_data = {
+            "@context": "https://schema.org",
+            "@type": "QAPage",
+            "mainEntity": self._get_structured_data(post_type="question"),
+        }
+        if correct_posts:
+            structured_data["mainEntity"]["acceptedAnswer"] = correct_posts[0]._get_structured_data()
+        if suggested_posts:
+            structured_data["mainEntity"]["suggestedAnswer"] = [
+                suggested_post._get_structured_data()
+                for suggested_post in suggested_posts
+            ]
+        return json_safe.dumps(structured_data, indent=2)
+
+    def _get_structured_data(self, post_type="answer"):
+        """
+        Generate structured data (microdata) for an answer or a question.
+
+        Returns:
+            dict: microdata.
+        """
+        res = {
+            "upvoteCount": self.vote_count,
+            "datePublished": self.create_date.isoformat() + 'Z',
+            "url": self.website_url,
+            "author": {
+                "@type": "Person",
+                "name": self.create_uid.sudo().name,
+            },
+        }
+        if post_type == "answer":
+            res["@type"] = "Answer"
+            res["text"] = self.plain_content
+        else:
+            res["@type"] = "Question"
+            res["name"] = self.name
+            res["text"] = self.plain_content or self.name
+            res["answerCount"] = self.child_count
+        if self.create_uid.sudo().website_published:
+            res["author"]["url"] = f"/forum/user/{ self.create_uid.sudo().id }"
+        return res
+
     def go_to_website(self):
         self.ensure_one()
         if not self.website_url:
@@ -816,10 +873,10 @@ class Post(models.Model):
             domain = expression.AND([domain, [('parent_id', '=', False)]])
         forum = options.get('forum')
         if forum:
-            domain = expression.AND([domain, [('forum_id', '=', unslug(forum)[1])]])
+            domain = expression.AND([domain, [('forum_id', '=', self.env['ir.http']._unslug(forum)[1])]])
         tags = options.get('tag')
         if tags:
-            domain = expression.AND([domain, [('tag_ids', 'in', [unslug(tag)[1] for tag in tags.split(',')])]])
+            domain = expression.AND([domain, [('tag_ids', 'in', [self.env['ir.http']._unslug(tag)[1] for tag in tags.split(',')])]])
         filters = options.get('filters')
         if filters == 'unanswered':
             domain = expression.AND([domain, [('child_ids', '=', False)]])
@@ -871,3 +928,38 @@ class Post(models.Model):
             if with_date:
                 data['date'] = self.env['ir.qweb.field.date'].record_to_html(post, 'write_date', {})
         return results_data
+
+    def _get_related_posts(self, limit=5):
+        """Return at most a list of {limit} posts related to the main post, based on tag
+        Jaccard similarity. It computes similarity of sets based on ratio of sets
+        intersection divided by sets union (and thus varies from 0 to 1, 1 being
+        identical sets)."""
+
+        self.ensure_one()
+
+        if not self.tag_ids:
+            return self.env['forum.post']
+
+        self.env.cr.execute(SQL("""
+            SELECT forum_post.id,
+              -- Jaccard similarity
+                   (COUNT(DISTINCT intersection_tag_rel.forum_tag_id))::DECIMAL
+                   / COUNT(DISTINCT union_tag_rel.forum_tag_id)::DECIMAL AS similarity
+              FROM forum_post
+              -- common tags (intersection)
+              JOIN forum_tag_rel AS intersection_tag_rel
+                ON intersection_tag_rel.forum_post_id = forum_post.id
+               AND intersection_tag_rel.forum_tag_id = ANY(%(tag_ids)s)
+              -- union tags
+        RIGHT JOIN forum_tag_rel AS union_tag_rel
+                ON union_tag_rel.forum_post_id = forum_post.id
+                OR union_tag_rel.forum_post_id = %(current_post_id)s
+             WHERE id != %(current_post_id)s
+          GROUP BY forum_post.id
+          ORDER BY similarity DESC,
+                   forum_post.last_activity_date DESC
+             LIMIT %(limit)s
+        """, current_post_id=self.id, tag_ids=self.tag_ids.ids, limit=limit))
+
+        result = self.env.cr.dictfetchall()
+        return self.browse([r["id"] for r in result])

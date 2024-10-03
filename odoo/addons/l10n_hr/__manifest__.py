@@ -1,7 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 {
     'name': 'Croatia - Accounting (Euro)',
-    'website': 'https://www.odoo.com/documentation/17.0/applications/finance/fiscal_localizations.html',
+    'website': 'https://www.odoo.com/documentation/master/applications/finance/fiscal_localizations.html',
     'icon': '/account/static/description/l10n.png',
     'countries': ['hr'],
     'description': """
@@ -18,6 +18,7 @@ https://www.rrif.hr/dok/preuzimanje/RRIF-RP2021-ENG.PDF
         'account',
         'base_vat',
     ],
+    'auto_install': ['account'],
     'data': [
         'data/l10n_hr_chart_data.xml',
         'data/account_tax_report_data.xml',

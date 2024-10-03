@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 import { MockServer } from "@web/../tests/helpers/mock_server";
-import testUtils from "@web/../tests/legacy/helpers/test_utils";
+import testUtils from "@web/../tests/legacy_tests/helpers/test_utils";
 import { patch } from "@web/core/utils/patch";
 import * as OdooEditorLib from "@web_editor/js/editor/odoo-editor/src/OdooEditor";
 import { Wysiwyg } from '@web_editor/js/wysiwyg/wysiwyg';
@@ -42,31 +42,25 @@ export const COLOR_PICKER_TEMPLATE = `
     </colorpicker>
 `;
 const SNIPPETS_TEMPLATE = `
-    <h2 id="snippets_menu">Add blocks</h2>
-    <div id="o_scroll">
-        <div id="snippet_structure" class="o_panel">
-            <div class="o_panel_header">First Panel</div>
-            <div class="o_panel_body">
-                <div name="Separator" data-oe-type="snippet" data-oe-thumbnail="/web_editor/static/src/img/snippets_thumbs/s_hr.svg">
-                    <div class="s_hr pt32 pb32">
-                        <hr class="s_hr_1px s_hr_solid w-100 mx-auto"/>
-                    </div>
-                </div>
-                <div name="Content" data-oe-type="snippet" data-oe-thumbnail="/website/static/src/img/snippets_thumbs/s_text_block.png">
-                    <section name="Content+Options" class="test_option_all pt32 pb32" data-oe-type="snippet" data-oe-thumbnail="/website/static/src/img/snippets_thumbs/s_text_block.png">
-                        <div class="container">
-                            <div class="row">
-                                <div class="col-lg-10 offset-lg-1 pt32 pb32">
-                                    <h2>Title</h2>
-                                    <p class="lead o_default_snippet_text">Content</p>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-                </div>
+    <snippets id="snippet_structure">
+        <div name="Separator" data-oe-type="snippet" data-oe-thumbnail="/web_editor/static/src/img/snippets_thumbs/s_hr.svg">
+            <div class="s_hr pt32 pb32">
+                <hr class="s_hr_1px s_hr_solid w-100 mx-auto"/>
             </div>
         </div>
-    </div>
+        <div name="Content" data-oe-type="snippet" data-oe-thumbnail="/website/static/src/img/snippets_thumbs/s_text_block.png">
+            <section name="Content+Options" class="test_option_all pt32 pb32" data-oe-type="snippet" data-oe-thumbnail="/website/static/src/img/snippets_thumbs/s_text_block.png">
+                <div class="container">
+                    <div class="row">
+                        <div class="col-lg-10 offset-lg-1 pt32 pb32">
+                            <h2>Title</h2>
+                            <p class="lead o_default_snippet_text">Content</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </snippets>
     <div id="snippet_options" class="d-none">
         <div data-js="many2one" data-selector="[data-oe-many2one-model]:not([data-oe-readonly])" data-no-check="true"/>
         <div data-js="content"
@@ -110,6 +104,9 @@ patch(MockServer.prototype, {
             if (args.args[0] === "web_editor.snippets") {
                 return SNIPPETS_TEMPLATE;
             }
+        }
+        if (args.model === "res.lang" && args.method === "get_installed") {
+            return [["en_US", "English"]];
         }
         return super._performRPC(...arguments);
     },
@@ -285,7 +282,7 @@ var testKeyboard = function ($editable, assert, keyboardTests, addTests) {
         var event = $.Event("keydown", keypress);
         $target.trigger(event);
 
-        if (!event.isDefaultPrevented()) {
+        if (!event.defaultPrevented) {
             if (keypress.key.length === 1) {
                 textInput($target[0], keypress.key);
             } else {
@@ -558,7 +555,7 @@ var keydown = function (key, $editable, options) {
     var event = $.Event("keydown", keyPress);
     $target.trigger(event);
 
-    if (!event.isDefaultPrevented()) {
+    if (!event.defaultPrevented) {
         if (keyPress.key.length === 1) {
             textInput($target[0], keyPress.key);
         } else {

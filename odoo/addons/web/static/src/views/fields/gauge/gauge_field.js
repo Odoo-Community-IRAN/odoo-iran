@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
 import { loadBundle } from "@web/core/assets";
 import { registry } from "@web/core/registry";
@@ -9,6 +7,13 @@ import { standardFieldProps } from "@web/views/fields/standard_field_props";
 import { Component, onWillStart, useEffect, useRef } from "@odoo/owl";
 
 export class GaugeField extends Component {
+    static template = "web.GaugeField";
+    static props = {
+        ...standardFieldProps,
+        maxValueField: { type: String },
+        title: { type: String, optional: true },
+    };
+
     setup() {
         this.chart = null;
         this.canvasRef = useRef("canvas");
@@ -75,9 +80,9 @@ export class GaugeField extends Component {
                         callbacks: {
                             label: function (tooltipItem) {
                                 if (tooltipItem.dataIndex === 0) {
-                                    return _t("Value: ") + gaugeValue;
+                                    return _t("Value: %(value)s", { value: gaugeValue });
                                 }
-                                return _t("Max: ") + maxLabel;
+                                return _t("Max: %(max)s", { max: maxLabel });
                             },
                         },
                     },
@@ -88,13 +93,6 @@ export class GaugeField extends Component {
         this.chart = new Chart(this.canvasRef.el, config);
     }
 }
-
-GaugeField.template = "web.GaugeField";
-GaugeField.props = {
-    ...standardFieldProps,
-    maxValueField: { type: String },
-    title: { type: String, optional: true },
-};
 
 export const gaugeField = {
     component: GaugeField,

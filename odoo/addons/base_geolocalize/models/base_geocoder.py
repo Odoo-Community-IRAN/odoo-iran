@@ -144,8 +144,7 @@ class GeoCoder(models.AbstractModel):
             state,
             country
         ]
-        address_list = [item for item in address_list if item]
-        return tools.ustr(', '.join(address_list))
+        return ', '.join(filter(None, address_list))
 
     @api.model
     def _geo_query_address_googlemap(self, street=None, zip=None, city=None, state=None, country=None):
@@ -157,4 +156,4 @@ class GeoCoder(models.AbstractModel):
         return self._geo_query_address_default(street=street, zip=zip, city=city, state=state, country=country)
 
     def _raise_query_error(self, error):
-        raise UserError(_('Error with geolocation server:') + ' %s' % error)
+        raise UserError(_('Error with geolocation server: %s', error))

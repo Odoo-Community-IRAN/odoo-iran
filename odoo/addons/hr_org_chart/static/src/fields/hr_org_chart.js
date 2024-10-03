@@ -1,16 +1,23 @@
 /** @odoo-module */
 
+import { rpc } from "@web/core/network/rpc";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { usePopover } from "@web/core/popover/popover_hook";
+import { user } from "@web/core/user";
 import { onEmployeeSubRedirect } from './hooks';
 import { Component, onWillStart, onWillRender, useState } from "@odoo/owl";
+import { standardFieldProps } from "@web/views/fields/standard_field_props";
 
 class HrOrgChartPopover extends Component {
+    static template = "hr_org_chart.hr_orgchart_emp_popover";
+    static props = {
+        employee: Object,
+        close: Function,
+    };
     async setup() {
         super.setup();
 
-        this.rpc = useService('rpc');
         this.orm = useService('orm');
         this.actionService = useService("action");
         this._onEmployeeSubRedirect = onEmployeeSubRedirect();
@@ -28,16 +35,15 @@ class HrOrgChartPopover extends Component {
         this.actionService.doAction(action); 
     }
 }
-HrOrgChartPopover.template = 'hr_org_chart.hr_orgchart_emp_popover';
 
 export class HrOrgChart extends Component {
+    static template = "hr_org_chart.hr_org_chart";
+    static props = {...standardFieldProps};
     async setup() {
         super.setup();
 
-        this.rpc = useService('rpc');
         this.orm = useService('orm');
         this.actionService = useService("action");
-        this.user = useService("user");
         this.popover = usePopover(HrOrgChartPopover);
 
         this.state = useState({'employee_id': null});
@@ -72,11 +78,11 @@ export class HrOrgChart extends Component {
             this.view_employee_id = null;
         } else if (employeeId !== this.view_employee_id || force) {
             this.view_employee_id = employeeId;
-            let orgData = await this.rpc(
+            let orgData = await rpc(
                 '/hr/get_org_chart',
                 {
                     employee_id: employeeId,
-                    context: this.user.context,
+                    context: user.context,
                 }
             );
             if (Object.keys(orgData).length === 0) {
@@ -114,8 +120,6 @@ export class HrOrgChart extends Component {
         this.state.employee_id = managerId;
     }
 }
-
-HrOrgChart.template = 'hr_org_chart.hr_org_chart';
 
 export const hrOrgChart = {
     component: HrOrgChart,

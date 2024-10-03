@@ -1,7 +1,5 @@
-/** @odoo-module */
-
 import { _t } from "@web/core/l10n/translation";
-import { ErrorPopup } from "@point_of_sale/app/errors/popups/error_popup";
+import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
 import { patch } from "@web/core/utils/patch";
 
@@ -16,11 +14,11 @@ patch(PaymentScreen.prototype, {
         }
         const currentPartner = this.currentOrder.get_partner();
         if (currentPartner && !currentPartner.vat) {
-            this.popup.add(ErrorPopup, {
+            this.pos.editPartner(currentPartner);
+            this.dialog.add(AlertDialog, {
                 title: _t("Missing Field"),
-                body: _t("A Identification Number Is Required"),
+                body: _t("An Identification Number Is Required"),
             });
-            this.selectPartner(true, ["vat"]);
             return false;
         }
         return res;

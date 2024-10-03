@@ -1,22 +1,20 @@
 # -*- coding: utf-8 -*-
-from typing import Dict, List
+from __future__ import annotations
 
-import babel.dates
 import base64
-import copy
 import itertools
 import json
-import pytz
 
-from odoo import _, _lt, api, fields, models
+from odoo import api, models
 from odoo.fields import Command
 from odoo.models import BaseModel, NewId
 from odoo.osv.expression import AND, TRUE_DOMAIN, normalize_domain
-from odoo.tools import date_utils, unique
-from odoo.tools.misc import OrderedSet, get_lang
-from odoo.exceptions import UserError
+from odoo.tools import unique, OrderedSet
+from odoo.exceptions import AccessError, UserError
 from collections import defaultdict
+from odoo.tools.translate import LazyTranslate
 
+_lt = LazyTranslate(__name__)
 SEARCH_PANEL_ERROR_MESSAGE = _lt("Too many items to display.")
 
 def is_true_domain(domain):
@@ -42,6 +40,7 @@ class Base(models.AbstractModel):
     _inherit = 'base'
 
     @api.model
+    @api.readonly
     def web_search_read(self, domain, specification, offset=0, limit=None, order=None, count_limit=None):
         records = self.search_fetch(domain, specification.keys(), offset=offset, limit=limit, order=order)
         values_records = records.web_read(specification)
@@ -66,7 +65,7 @@ class Base(models.AbstractModel):
             'records': records,
         }
 
-    def web_save(self, vals, specification: Dict[str, Dict], next_id=None) -> List[Dict]:
+    def web_save(self, vals, specification: dict[str, dict], next_id=None) -> list[dict]:
         if self:
             self.write(vals)
         else:
@@ -75,7 +74,8 @@ class Base(models.AbstractModel):
             self = self.browse(next_id)
         return self.with_context(bin_size=True).web_read(specification)
 
-    def web_read(self, specification: Dict[str, Dict]) -> List[Dict]:
+    @api.readonly
+    def web_read(self, specification: dict[str, dict]) -> list[dict]:
         fields_to_read = list(specification) or ['id']
 
         if fields_to_read == ['id']:
@@ -83,12 +83,12 @@ class Base(models.AbstractModel):
             # this also avoid a call to read on the co-model that might have different access rules
             values_list = [{'id': id_} for id_ in self._ids]
         else:
-            values_list: List[Dict] = self.read(fields_to_read, load=None)
+            values_list: list[dict] = self.read(fields_to_read, load=None)
 
         if not values_list:
             return values_list
 
-        def cleanup(vals: Dict) -> Dict:
+        def cleanup(vals: dict) -> dict:
             """ Fixup vals['id'] of a new record. """
             if not vals['id']:
                 vals['id'] = vals['id'].origin or False
@@ -187,7 +187,10 @@ class Base(models.AbstractModel):
                         co_record = co_record.with_context(**field_spec['context'])
 
                     if 'fields' in field_spec:
-                        reference_read = co_record.web_read(field_spec['fields'])
+                        try:
+                            reference_read = co_record.web_read(field_spec['fields'])
+                        except AccessError:
+                            reference_read = [{'id': co_record.id, 'display_name': self.env._("You don't have access to this record")}]
                         if any(fname != 'id' for fname in field_spec['fields']):
                             # we can infer that if we can read fields for the co-record, it exists
                             co_record_exists = bool(reference_read)
@@ -218,6 +221,7 @@ class Base(models.AbstractModel):
         return values_list
 
     @api.model
+    @api.readonly
     def web_read_group(self, domain, fields, groupby, limit=None, offset=0, orderby=False, lazy=True):
         """
         Returns the result of a read_group and the total number of groups matching the search domain.
@@ -239,10 +243,10 @@ class Base(models.AbstractModel):
         if not groups:
             length = 0
         elif limit and len(groups) == limit:
-            annoted_groupby = self._read_group_get_annoted_groupby(groupby, lazy=lazy)
+            annotated_groupby = self._read_group_get_annotated_groupby(groupby, lazy=lazy)
             length = limit + len(self._read_group(
                 domain,
-                groupby=annoted_groupby.values(),
+                groupby=annotated_groupby.values(),
                 offset=limit,
             ))
 
@@ -265,6 +269,7 @@ class Base(models.AbstractModel):
         return groups
 
     @api.model
+    @api.readonly
     def read_progress_bar(self, domain, group_by, progress_bar):
         """
         Gets the data needed for all the kanban column progressbars.
@@ -278,21 +283,13 @@ class Base(models.AbstractModel):
         :return a dictionnary mapping group_by values to dictionnaries mapping
                 progress bar field values to the related number of records
         """
-        group_by_fullname = group_by.partition(':')[0]
-        group_by_fieldname = group_by_fullname.split(".")[0]  # split on "." in case we group on a property
-        field_type = self._fields[group_by_fieldname].type
-        if field_type == 'selection':
-            selection_labels = dict(self.fields_get()[group_by]['selection'])
-
         def adapt(value):
-            if field_type == 'selection':
-                value = selection_labels.get(value, False)
             if isinstance(value, tuple):
-                value = value[1]  # FIXME should use technical value (0)
+                value = value[0]
             return value
 
         result = {}
-        for group in self._read_progress_bar(domain, group_by, progress_bar):
+        for group in self.read_group(domain, ['__count'], [group_by, progress_bar['field']], lazy=False):
             group_by_value = str(adapt(group[group_by]))
             field_value = group[progress_bar['field']]
             if group_by_value not in result:
@@ -300,67 +297,6 @@ class Base(models.AbstractModel):
             if field_value in result[group_by_value]:
                 result[group_by_value][field_value] += group['__count']
         return result
-
-    def _read_progress_bar(self, domain, group_by, progress_bar):
-        """ Implementation of read_progress_bar() that returns results in the
-            format of read_group().
-        """
-        try:
-            fname = progress_bar['field']
-            return self.read_group(domain, [fname], [group_by, fname], lazy=False)
-        except ValueError:
-            # possibly failed because of grouping on or aggregating non-stored
-            # field; fallback on alternative implementation
-            pass
-
-        # Workaround to match read_group's infrastructure
-        # TO DO in master: harmonize this function and readgroup to allow factorization
-        group_by_fullname = group_by.partition(':')[0]
-        group_by_fieldname = group_by_fullname.split(".")[0]  # split on "." in case we group on a property
-        group_by_modifier = group_by.partition(':')[2] or 'month'
-
-        records_values = self.search_read(domain or [], [progress_bar['field'], group_by_fieldname])
-        field_type = self._fields[group_by_fieldname].type
-
-        for record_values in records_values:
-            group_by_value = record_values.pop(group_by_fieldname)
-            property_name = group_by_fullname.partition('.')[2]
-            if field_type == "properties" and group_by_value:
-                group_by_value = next(
-                    (definition['value'] for definition in group_by_value
-                     if definition['name'] == property_name),
-                    False,
-                )
-
-            # Again, imitating what _read_group_format_result and _read_group_prepare_data do
-            if group_by_value and field_type in ['date', 'datetime']:
-                locale = get_lang(self.env).code
-                group_by_value = fields.Datetime.to_datetime(group_by_value)
-                if group_by_modifier != 'week':
-                    # start_of(v, 'week') does not take into account the locale
-                    # to determine the first day of the week; this part is not
-                    # necessary, since the formatting below handles the locale
-                    # as expected, and outputs correct results
-                    group_by_value = date_utils.start_of(group_by_value, group_by_modifier)
-                group_by_value = pytz.timezone('UTC').localize(group_by_value)
-                tz_info = None
-                if field_type == 'datetime' and self._context.get('tz') in pytz.all_timezones:
-                    tz_info = self._context.get('tz')
-                    group_by_value = babel.dates.format_datetime(
-                        group_by_value, format=DISPLAY_DATE_FORMATS[group_by_modifier],
-                        tzinfo=tz_info, locale=locale)
-                else:
-                    group_by_value = babel.dates.format_date(
-                        group_by_value, format=DISPLAY_DATE_FORMATS[group_by_modifier],
-                        locale=locale)
-
-            if field_type == 'many2many' and isinstance(group_by_value, list):
-                group_by_value = str(tuple(group_by_value)) or False
-
-            record_values[group_by] = group_by_value
-            record_values['__count'] = 1
-
-        return records_values
 
     @api.model
     def _search_panel_field_image(self, field_name, **kwargs):
@@ -613,7 +549,7 @@ class Base(models.AbstractModel):
         supported_types = ['many2one', 'selection']
         if field.type not in supported_types:
             types = dict(self.env["ir.model.fields"]._fields["ttype"]._description_selection(self.env))
-            raise UserError(_(
+            raise UserError(self.env._(
                 'Only types %(supported_types)s are supported for category (found type %(field_type)s)',
                 supported_types=", ".join(types[t] for t in supported_types),
                 field_type=types[field.type],
@@ -742,8 +678,9 @@ class Base(models.AbstractModel):
         field = self._fields[field_name]
         supported_types = ['many2one', 'many2many', 'selection']
         if field.type not in supported_types:
-            raise UserError(_('Only types %(supported_types)s are supported for filter (found type %(field_type)s)',
-                              supported_types=supported_types, field_type=field.type))
+            raise UserError(self.env._(
+                'Only types %(supported_types)s are supported for filter (found type %(field_type)s)',
+                supported_types=supported_types, field_type=field.type))
 
         model_domain = kwargs.get('search_domain', [])
         extra_domain = AND([
@@ -769,19 +706,19 @@ class Base(models.AbstractModel):
 
             if group_by_field.type == 'many2one':
                 def group_id_name(value):
-                    return value or (False, _("Not Set"))
+                    return value or (False, self.env._("Not Set"))
 
             elif group_by_field.type == 'selection':
                 desc = Comodel.fields_get([group_by])[group_by]
                 group_by_selection = dict(desc['selection'])
-                group_by_selection[False] = _("Not Set")
+                group_by_selection[False] = self.env._("Not Set")
 
                 def group_id_name(value):
                     return value, group_by_selection[value]
 
             else:
                 def group_id_name(value):
-                    return (value, value) if value else (False, _("Not Set"))
+                    return (value, value) if value else (False, self.env._("Not Set"))
 
         comodel_domain = kwargs.get('comodel_domain', [])
         enable_counters = kwargs.get('enable_counters')
@@ -789,16 +726,8 @@ class Base(models.AbstractModel):
 
         if field.type == 'many2many':
             if not expand:
-                if field.base_field.groupable:
-                    domain_image = self._search_panel_domain_image(field_name, model_domain, limit=limit)
-                    image_element_ids = list(domain_image.keys())
-                else:
-                    model_records = self.search_read(model_domain, [field_name])
-                    image_element_ids = OrderedSet()
-                    for rec in model_records:
-                        if rec[field_name]:
-                            image_element_ids.update(rec[field_name])
-                    image_element_ids = list(image_element_ids)
+                domain_image = self._search_panel_domain_image(field_name, model_domain, limit=limit)
+                image_element_ids = list(domain_image.keys())
                 comodel_domain = AND([
                     comodel_domain,
                     [('id', 'in', image_element_ids)],
@@ -890,7 +819,7 @@ class Base(models.AbstractModel):
 
             return { 'values': field_range, }
 
-    def onchange(self, values: Dict, field_names: List[str], fields_spec: Dict):
+    def onchange(self, values: dict, field_names: list[str], fields_spec: dict):
         """
         Perform an onchange on the given fields, and return the result.
 
@@ -1045,7 +974,11 @@ class Base(models.AbstractModel):
         done = set()
 
         # mark fields to do as modified to trigger recomputations
-        protected = [self._fields[fname] for fname in field_names]
+        protected = [
+            field
+            for mod_field in [self._fields[fname] for fname in field_names]
+            for field in self.pool.field_computed.get(mod_field) or [mod_field]
+        ]
         with self.env.protecting(protected, record):
             record.modified(todo)
             for field_name in todo:
@@ -1092,7 +1025,7 @@ class Base(models.AbstractModel):
             result['warning'] = dict(title=title, message=message, type=type_)
         elif len(warnings) > 1:
             # concatenate warning titles and messages
-            title = _("Warnings")
+            title = self.env._("Warnings")
             message = '\n\n'.join([warn_title + '\n\n' + warn_message for warn_title, warn_message, warn_type in warnings])
             result['warning'] = dict(title=title, message=message, type='dialog')
 
@@ -1158,7 +1091,7 @@ class RecordSnapshot(dict):
     """ A dict with the values of a record, following a prefix tree. """
     __slots__ = ['record', 'fields_spec']
 
-    def __init__(self, record: BaseModel, fields_spec: Dict, fetch=True):
+    def __init__(self, record: BaseModel, fields_spec: dict, fetch=True):
         # put record in dict to include it when comparing snapshots
         super().__init__()
         self.record = record

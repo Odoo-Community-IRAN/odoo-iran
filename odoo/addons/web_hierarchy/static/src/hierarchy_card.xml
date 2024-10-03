@@ -2,8 +2,8 @@
 <templates>
 
     <t t-name="web_hierarchy.HierarchyCard">
-        <div class="o_hierarchy_node_container d-flex flex-column" t-att-class="classNames" t-att-data-node-id="props.node.id">
-            <div class="o_hierarchy_node_button_container w-100 d-flex justify-content-center">
+        <div class="o_hierarchy_node_container mb-4 d-flex flex-column" t-att-class="classNames" t-att-data-node-id="props.node.id">
+            <div class="o_hierarchy_node_button_container w-100 d-flex justify-content-end">
                 <button t-if="props.node.parentResId !== false and !props.node.parentNode"
                         name="hierarchy_search_parent_node"
                         class="btn p-0"
@@ -12,7 +12,7 @@
                     <i class="fa fa-chevron-up"/>
                 </button>
             </div>
-            <div class="o_hierarchy_node w-100 h-100 d-flex flex-column justify-content-between border mt-4"
+            <div class="o_hierarchy_node w-100 h-100 d-flex flex-column justify-content-between border"
                 t-att-class="{
                     'border-bottom-0': props.node.nodes.length or props.node.canShowChildNodes,
                 }"

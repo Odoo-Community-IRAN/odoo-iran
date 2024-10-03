@@ -7,8 +7,8 @@ from unittest.mock import patch
 from odoo import SUPERUSER_ID
 from odoo.addons.base.models.res_users import is_selection_groups, get_selection_groups, name_selection_groups
 from odoo.exceptions import UserError
-from odoo.service import security
-from odoo.tests.common import Form, TransactionCase, new_test_user, tagged, HttpCase, users
+from odoo.http import _request_stack
+from odoo.tests import Form, TransactionCase, new_test_user, tagged, HttpCase, users
 from odoo.tools import mute_logger
 
 
@@ -228,6 +228,21 @@ class TestUsers(TransactionCase):
 @tagged('post_install', '-at_install')
 class TestUsers2(TransactionCase):
 
+    def test_change_user_login(self):
+        """ Check that partner email is updated when changing user's login """
+
+        User = self.env['res.users']
+        with Form(User, view='base.view_users_form') as UserForm:
+            UserForm.name = "Test User"
+            UserForm.login = "test-user1"
+            self.assertFalse(UserForm.email)
+
+            UserForm.login = "test-user1@mycompany.example.org"
+            self.assertEqual(
+                UserForm.email, "test-user1@mycompany.example.org",
+                "Setting a valid email as login should update the partner's email"
+            )
+
     def test_reified_groups(self):
         """ The groups handler doesn't use the "real" view with pseudo-fields
         during installation, so it always works (because it uses the normal
@@ -307,10 +322,8 @@ class TestUsers2(TransactionCase):
             if fname.startswith(('in_group_', 'sel_groups_'))
         )
 
-        # check that the reified field name has no effect in fields
-        res_with_reified = User.read_group([], fnames + [reified_fname], ['company_id'])
-        res_without_reified = User.read_group([], fnames, ['company_id'])
-        self.assertEqual(res_with_reified, res_without_reified, "Reified fields should be ignored in read_group")
+        # check that the reified field name is not aggregable
+        self.assertFalse(User.fields_get([reified_fname], ['aggregator'])[reified_fname].get('aggregator'))
 
         # check that the reified fields are not considered invalid in search_read
         # and are ignored
@@ -547,27 +560,33 @@ class TestUsersIdentitycheck(HttpCase):
         """
         # Change the password to 8 characters for security reasons
         self.env.user.password = "admin@odoo"
-        # Create a session
+
+        # Create a first session that will be used to revoke other sessions
         session = self.authenticate('admin', 'admin@odoo')
+
+        # Create a second session that will be used to check it has been revoked
+        self.authenticate('admin', 'admin@odoo')
         # Test the session is valid
-        self.assertTrue(security.check_session(session, self.env))
         # Valid session -> not redirected from /web to /web/login
         self.assertTrue(self.url_open('/web').url.endswith('/web'))
 
+        # Push a fake request to the request stack, because @check_identity requires a request.
+        # Use the first session created above, used to invalid other sessions than itself.
+        _request_stack.push(SimpleNamespace(session=session, env=self.env))
+        self.addCleanup(_request_stack.pop)
         # The user clicks the button logout from all devices from his profile
         action = self.env.user.action_revoke_all_devices()
-        # The form of the wizard opens with a new record
-        form = Form(self.env[action['res_model']].create({}), action['view_id'])
+        # The form of the check identity wizard opens
+        form = Form(self.env[action['res_model']].browse(action['res_id']), action.get('view_id'))
         # The user fills his password
         form.password = 'admin@odoo'
         # The user clicks the button "Log out from all devices", which triggers a save then a call to the button method
         user_identity_check = form.save()
-        user_identity_check.revoke_all_devices()
+        action = user_identity_check.run_check()
 
         # Test the session is no longer valid
-        self.assertFalse(security.check_session(session, self.env))
         # Invalid session -> redirected from /web to /web/login
-        self.assertTrue(self.url_open('/web').url.endswith('/web/login'))
+        self.assertTrue(self.url_open('/web').url.endswith('/web/login?redirect=%2Fweb%3F'))
 
-        # In addition, the wizard must have been deleted
-        self.assertFalse(user_identity_check.exists())
+        # In addition, the password must have been emptied from the wizard
+        self.assertFalse(user_identity_check.password)

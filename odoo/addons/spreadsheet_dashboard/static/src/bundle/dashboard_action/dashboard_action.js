@@ -3,8 +3,8 @@
 import { registry } from "@web/core/registry";
 import { ControlPanel } from "@web/search/control_panel/control_panel";
 import { DashboardLoader, Status } from "./dashboard_loader";
-import { Spreadsheet } from "@odoo/o-spreadsheet";
-import { useSetupAction } from "@web/webclient/actions/action_hook";
+import { SpreadsheetComponent } from "@spreadsheet/actions/spreadsheet_component";
+import { useSetupAction } from "@web/search/action_hook";
 import { DashboardMobileSearchPanel } from "./mobile_search_panel/mobile_search_panel";
 import { MobileFigureContainer } from "./mobile_figure_container/mobile_figure_container";
 import { FilterValue } from "@spreadsheet/global_filters/components/filter_value/filter_value";
@@ -12,15 +12,30 @@ import { useService } from "@web/core/utils/hooks";
 import { standardActionServiceProps } from "@web/webclient/actions/action_service";
 import { SpreadsheetShareButton } from "@spreadsheet/components/share_button/share_button";
 import { useSpreadsheetPrint } from "@spreadsheet/hooks";
+import { Registry } from "@odoo/o-spreadsheet";
+import { router } from "@web/core/browser/router";
 
 import { Component, onWillStart, useState, useEffect } from "@odoo/owl";
 
+export const dashboardActionRegistry = new Registry();
+
 export class SpreadsheetDashboardAction extends Component {
+    static template = "spreadsheet_dashboard.DashboardAction";
+    static components = {
+        ControlPanel,
+        SpreadsheetComponent,
+        FilterValue,
+        DashboardMobileSearchPanel,
+        MobileFigureContainer,
+        SpreadsheetShareButton,
+    };
+    static props = { ...standardActionServiceProps };
+
     setup() {
         this.Status = Status;
         this.controlPanelDisplay = {};
         this.orm = useService("orm");
-        this.router = useService("router");
+        this.actionService = useService("action");
         // Use the non-protected orm service (`this.env.services.orm` instead of `useService("orm")`)
         // because spreadsheets models are preserved across multiple components when navigating
         // with the breadcrumb
@@ -40,7 +55,7 @@ export class SpreadsheetDashboardAction extends Component {
             }
         });
         useEffect(
-            () => this.router.pushState({ dashboard_id: this.activeDashboardId }),
+            () => router.pushState({ dashboard_id: this.activeDashboardId }),
             () => [this.activeDashboardId]
         );
         useEffect(
@@ -67,7 +82,11 @@ export class SpreadsheetDashboardAction extends Component {
         });
         useSpreadsheetPrint(() => this.state.activeDashboard?.model);
         /** @type {{ activeDashboard: import("./dashboard_loader").Dashboard}} */
-        this.state = useState({ activeDashboard: undefined });
+        this.state = useState({ activeDashboard: undefined, sidebarExpanded: true });
+    }
+
+    get dashboardButton() {
+        return dashboardActionRegistry.getAll()[0];
     }
 
     /**
@@ -117,6 +136,19 @@ export class SpreadsheetDashboardAction extends Component {
         this.state.activeDashboard = this.loader.getDashboard(dashboardId);
     }
 
+    /**
+     * @param {number} id - The ID of the dashboard to be edited.
+     * @returns {Promise<void>}
+     */
+    async editDashboard(id) {
+        const action = await this.env.services.orm.call(
+            "spreadsheet.dashboard",
+            "action_edit_dashboard",
+            [id]
+        );
+        this.actionService.doAction(action);
+    }
+
     async shareSpreadsheet(data, excelExport) {
         const url = await this.orm.call("spreadsheet.dashboard.share", "action_get_share_url", [
             {
@@ -127,17 +159,17 @@ export class SpreadsheetDashboardAction extends Component {
         ]);
         return url;
     }
+
+    toggleSidebar() {
+        this.state.sidebarExpanded = !this.state.sidebarExpanded;
+    }
+
+    get activeDashboardGroupName() {
+        return this.getDashboardGroups().find((group) =>
+            group.dashboards.some((d) => d.id === this.activeDashboardId)
+        )?.name;
+    }
 }
-SpreadsheetDashboardAction.template = "spreadsheet_dashboard.DashboardAction";
-SpreadsheetDashboardAction.components = {
-    ControlPanel,
-    Spreadsheet,
-    FilterValue,
-    DashboardMobileSearchPanel,
-    MobileFigureContainer,
-    SpreadsheetShareButton,
-};
-SpreadsheetDashboardAction.props = { ...standardActionServiceProps };
 
 registry
     .category("actions")

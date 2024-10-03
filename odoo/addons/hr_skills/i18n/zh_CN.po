@@ -3,24 +3,29 @@
 # 	* hr_skills
 # 
 # Translators:
-# 山西清水欧度(QQ:54773801) <54773801@qq.com>, 2023
-# 上官飞鸿 <jackadam@sina.com>, 2023
-# Wil Odoo, 2024
 # Chloe Wang, 2024
+# Martin Trigaux, 2024
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-08-13 10:26+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Chloe Wang, 2024\n"
+"POT-Creation-Date: 2024-09-25 08:39+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Chinese (China) (https://app.transifex.com/odoo/teams/41243/zh_CN/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: \n"
 "Language: zh_CN\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
+
+#. module: hr_skills
+#. odoo-python
+#: code:addons/hr_skills/models/hr_skill_type.py:0
+msgid "%s (copy)"
+msgstr "%s（副本）"
 
 #. module: hr_skills
 #: model:ir.actions.report,print_report_name:hr_skills.action_report_employee_cv
@@ -43,7 +48,7 @@ msgid "2023"
 msgstr "2023"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_line_admin_7
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_line_admin_7
 msgid "A 2D/3D map generator for incremental games."
 msgstr "用于增量游戏的 2D/3D 地图生成器。"
 
@@ -51,9 +56,24 @@ msgstr "用于增量游戏的 2D/3D 地图生成器。"
 #. odoo-javascript
 #: code:addons/hr_skills/static/src/fields/skills_one2many/skills_one2many.xml:0
 #: code:addons/hr_skills/static/src/xml/resume_templates.xml:0
-#, python-format
 msgid "ADD"
 msgstr "添加"
+
+#. module: hr_skills
+#: model:ir.model.fields,field_description:hr_skills.field_hr_employee_skill_report__active
+#: model:ir.model.fields,field_description:hr_skills.field_hr_skill_type__active
+msgid "Active"
+msgstr "已启用"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_adaptability
+msgid "Adaptability"
+msgstr ""
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_agile_scrum
+msgid "Agile and Scrum methodologies"
+msgstr ""
 
 #. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_jog_allenkeller
@@ -61,27 +81,49 @@ msgid "Allen-Keller"
 msgstr "Allen-Keller"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_line_admin_5
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_line_admin_5
 msgid ""
 "Allows to encrypt/decrypt plain text or files. Available as a web app or as "
 "an API."
 msgstr "允许加密/解密纯文本或文件。以网络应用程序或应用程序接口的形式提供。"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_jth_goodman_inc
-#: model:hr.resume.line,description:hr_skills.employee_resume_ngh_jackson_schwartz_and_aguirre
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_jth_goodman_inc
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_ngh_jackson_schwartz_and_aguirre
 msgid "Analytical chemist"
 msgstr "分析化学家"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_stw_green_ltd
+#: model:hr.skill,name:hr_skills.hr_skill_analytics
+msgid "Analytics"
+msgstr "分析"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_android
+msgid "Android"
+msgstr "Android"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_arabic
+msgid "Arabic"
+msgstr "阿拉伯"
+
+#. module: hr_skills
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_stw_green_ltd
 msgid "Arboriculturist"
 msgstr "树艺家"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_jth_wilkinson_plc
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_jth_wilkinson_plc
 msgid "Architectural technologist"
 msgstr "建筑技术专家"
+
+#. module: hr_skills
+#: model_terms:ir.ui.view,arch_db:hr_skills.hr_employee_skill_report_view_search
+#: model_terms:ir.ui.view,arch_db:hr_skills.hr_employee_skill_type_view_form
+#: model_terms:ir.ui.view,arch_db:hr_skills.hr_skill_type_view_search
+msgid "Archived"
+msgstr "已存档"
 
 #. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_ngh_armidale_city_public_school
@@ -109,7 +151,17 @@ msgid "Bathurst West Public School"
 msgstr "Bathurst West Public School"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_fme_russellwebster
+#: model:hr.skill,name:hr_skills.hr_skill_bengali
+msgid "Bengali"
+msgstr "孟加拉"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_big_data_technologies
+msgid "Big data technologies (Hadoop,Spark)"
+msgstr ""
+
+#. module: hr_skills
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_fme_russellwebster
 msgid "Biochemist, clinical"
 msgstr "临床生化学家"
 
@@ -134,11 +186,25 @@ msgid "Burtho Inc."
 msgstr "Burtho Inc."
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_c
+msgid "C/C++"
+msgstr ""
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_cms
+msgid "CMS"
+msgstr ""
+
+#. module: hr_skills
 #. odoo-javascript
 #: code:addons/hr_skills/static/src/xml/resume_templates.xml:0
-#, python-format
 msgid "CREATE A NEW ENTRY"
 msgstr "创建新条目"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_css
+msgid "CSS"
+msgstr ""
 
 #. module: hr_skills
 #: model:ir.model.fields,field_description:hr_skills.field_hr_employee_cv_wizard__can_show_others
@@ -151,7 +217,7 @@ msgid "Can Show Skills"
 msgstr "能展示技能"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_jep_garcia_and_sons
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_jep_garcia_and_sons
 msgid "Careers information officer"
 msgstr "职业信息专员"
 
@@ -166,7 +232,7 @@ msgid "Christian Outreach College"
 msgstr "Christian Outreach College"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_admin_lewisbailey
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_admin_lewisbailey
 msgid "Civil Service fast streamer"
 msgstr "公务员项目参加者"
 
@@ -181,9 +247,21 @@ msgid "Classic"
 msgstr "经典"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_cloud_computing
+msgid "Cloud computing"
+msgstr ""
+
+#. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_jep_cole_ltd
 msgid "Cole Ltd"
 msgstr "Cole Ltd"
+
+#. module: hr_skills
+#: model:ir.model.fields,field_description:hr_skills.field_hr_employee_skill__color
+#: model:ir.model.fields,field_description:hr_skills.field_hr_skill__color
+#: model:ir.model.fields,field_description:hr_skills.field_hr_skill_type__color
+msgid "Color"
+msgstr "颜色"
 
 #. module: hr_skills
 #: model_terms:ir.ui.view,arch_db:hr_skills.hr_employee_cv_wizard_view_form
@@ -191,14 +269,25 @@ msgid "Colors"
 msgstr "颜色"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_com
+#: model:hr.skill,name:hr_skills.hr_skill_communication
+msgid "Communication"
+msgstr "通信"
+
+#. module: hr_skills
 #: model:ir.model.fields,field_description:hr_skills.field_hr_employee_skill_report__company_id
 msgid "Company"
 msgstr "公司"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_fpi_hubbarddean
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_fpi_hubbarddean
 msgid "Conference centre manager"
 msgstr "会议中心经理"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_conflict_management
+msgid "Conflict Management"
+msgstr ""
 
 #. module: hr_skills
 #: model:ir.model.fields,field_description:hr_skills.field_hr_employee_cv_wizard__show_contact
@@ -206,7 +295,7 @@ msgid "Contact Information"
 msgstr "联系信息"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_stw_finley_rowe_and_adams
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_stw_finley_rowe_and_adams
 msgid "Copywriter, advertising"
 msgstr "广告文案撰稿人"
 
@@ -218,21 +307,12 @@ msgstr "Craigmore South Junior Primary School"
 #. module: hr_skills
 #. odoo-javascript
 #: code:addons/hr_skills/static/src/fields/resume_one2many/resume_one2many.xml:0
-#, python-format
 msgid "Create a new entry"
 msgstr "创建新条目"
 
 #. module: hr_skills
 #. odoo-javascript
-#: code:addons/hr_skills/static/src/fields/resume_one2many/resume_one2many.js:0
-#, python-format
-msgid "Create a resume line"
-msgstr "创建简历行"
-
-#. module: hr_skills
-#. odoo-javascript
 #: code:addons/hr_skills/static/src/fields/skills_one2many/skills_one2many.xml:0
-#, python-format
 msgid "Create new Skills"
 msgstr "创建新技能"
 
@@ -261,16 +341,30 @@ msgid "Created on"
 msgstr "创建日期"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_creativity
+msgid "Creativity"
+msgstr ""
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_critical_thinking
+msgid "Critical Thinking"
+msgstr ""
+
+#. module: hr_skills
 #. odoo-javascript
 #: code:addons/hr_skills/static/src/fields/resume_one2many/resume_one2many.xml:0
-#, python-format
 msgid "Current"
 msgstr "当前"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_jep_davis_sanchez_and_miller
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_jep_davis_sanchez_and_miller
 msgid "Customer service manager"
 msgstr "客户服务经理"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_cybersecurity
+msgid "Cybersecurity"
+msgstr "信息安全"
 
 #. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_hne_dandenong_north_primary_school
@@ -281,6 +375,16 @@ msgstr "Dandenong North Primary School"
 #: model:hr.resume.line,name:hr_skills.employee_resume_mit_darlington_primary_school
 msgid "Darlington Primary School"
 msgstr "Darlington Primary School"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_data_analysis
+msgid "Data analysis/visualization"
+msgstr ""
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_database_management
+msgid "Database Management"
+msgstr ""
 
 #. module: hr_skills
 #: model:ir.model.fields,field_description:hr_skills.field_hr_employee_skill_log__date
@@ -315,6 +419,11 @@ msgid "Davis, Sanchez and Miller"
 msgstr "Davis, Sanchez and Miller"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_decision_making
+msgid "Decision-Making"
+msgstr ""
+
+#. module: hr_skills
 #: model:ir.model.fields,field_description:hr_skills.field_hr_skill_level__default_level
 msgid "Default Level"
 msgstr "默认等级"
@@ -343,14 +452,29 @@ msgid "Description"
 msgstr "描述"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_admin_white_inc
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_admin_white_inc
 msgid "Designer, television/film set"
 msgstr "电视/电影布景设计师"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_devops
+msgid "DevOps"
+msgstr ""
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_digital_ad
+msgid "Digital advertising"
+msgstr ""
 
 #. module: hr_skills
 #: model_terms:ir.ui.view,arch_db:hr_skills.hr_employee_cv_wizard_view_form
 msgid "Discard"
 msgstr "丢弃"
+
+#. module: hr_skills
+#: model_terms:ir.ui.view,arch_db:hr_skills.hr_employee_skill_type_view_form
+msgid "Display"
+msgstr "显示"
 
 #. module: hr_skills
 #: model:ir.model.fields,field_description:hr_skills.field_hr_employee_cv_wizard__display_name
@@ -370,6 +494,11 @@ msgid "Display Type"
 msgstr "显示类型"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_django
+msgid "Django"
+msgstr ""
+
+#. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_jog_douglas_thompson_and_conner
 msgid "Douglas, Thompson and Conner"
 msgstr "Douglas, Thompson and Conner"
@@ -380,6 +509,11 @@ msgid "Duration"
 msgstr "持续时间"
 
 #. module: hr_skills
+#: model:hr.resume.line.type,name:hr_skills.resume_type_education
+msgid "Education"
+msgstr "教育"
+
+#. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_jve_ellinbank_primary_school
 msgid "Ellinbank Primary School"
 msgstr "Ellinbank Primary School"
@@ -388,6 +522,11 @@ msgstr "Ellinbank Primary School"
 #: model:hr.resume.line,name:hr_skills.employee_resume_han_elphinstone_primary_school
 msgid "Elphinstone Primary School"
 msgstr "Elphinstone Primary School"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_email
+msgid "Email Marketing"
+msgstr "邮件营销"
 
 #. module: hr_skills
 #: model:ir.model,name:hr_skills.model_hr_employee
@@ -438,37 +577,38 @@ msgid "Encryption/decryption"
 msgstr "加密/解密"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_al_jones_ltd
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_al_jones_ltd
 msgid "Energy manager"
 msgstr "能源经理"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_qdp_hughes_parker_and_barber
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_qdp_hughes_parker_and_barber
 msgid "Engineer, drilling"
 msgstr "钻探工程师"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_admin_schultz_inc
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_admin_schultz_inc
 msgid "Engineer, electrical"
 msgstr "电气工程师"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_fme_johnson_shaw_and_carroll
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_fme_johnson_shaw_and_carroll
 msgid "Engineer, mining"
 msgstr "采矿工程师"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_han_davis_plc
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_han_davis_plc
 msgid "Engineer, production"
 msgstr "生产工程师"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_english
 #: model_terms:ir.ui.view,arch_db:hr_skills.report_employee_cv_main_panel
 msgid "English"
 msgstr "英语"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_line_admin_6
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_line_admin_6
 msgid ""
 "Enter your finance data and the app tries to forecast what will be your "
 "future incomes/expenses. The application uses machine learning to train "
@@ -481,14 +621,20 @@ msgid "Evans, Cooper and White"
 msgstr "Evans, Cooper and White"
 
 #. module: hr_skills
+#: model:hr.resume.line.type,name:hr_skills.resume_type_experience
 #: model_terms:ir.ui.view,arch_db:hr_skills.report_employee_cv_main_panel
 msgid "Experience"
 msgstr "经验"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_jep_cole_ltd
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_jep_cole_ltd
 msgid "Fast food restaurant manager"
 msgstr "快餐店经理"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_filipino
+msgid "Filipino"
+msgstr "菲律宾语"
 
 #. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_line_admin_6
@@ -516,6 +662,11 @@ msgid "Freeman, Williams and Berger"
 msgstr "Freeman, Williams and Berger"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_french
+msgid "French"
+msgstr "法语"
+
+#. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_jgo_galilee_catholic_school
 msgid "Galilee Catholic School"
 msgstr "Galilee Catholic School"
@@ -536,21 +687,31 @@ msgid "Garcia, Smith and King"
 msgstr "Garcia, Smith and King"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_chs_hanson_roach_and_jordan
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_chs_hanson_roach_and_jordan
 msgid "Geographical information systems officer"
 msgstr "地理信息系统专员"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_han_perezmorgan
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_han_perezmorgan
 msgid "Geoscientist"
 msgstr "地球科学家"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_lur_ramirez_inc
-#: model:hr.resume.line,description:hr_skills.employee_resume_mit_hill_group
-#: model:hr.resume.line,description:hr_skills.employee_resume_ngh_stanleymendez
+#: model:hr.skill,name:hr_skills.hr_skill_german
+msgid "German"
+msgstr "德语"
+
+#. module: hr_skills
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_lur_ramirez_inc
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_mit_hill_group
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_ngh_stanleymendez
 msgid "Glass blower/designer"
 msgstr "玻璃吹制师/设计师"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_go
+msgid "Go"
+msgstr ""
 
 #. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_jth_goodman_inc
@@ -578,6 +739,16 @@ msgid "Group By..."
 msgstr "分组原则......"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_html
+msgid "HTML"
+msgstr "HTML"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_hadoop
+msgid "Hadoop"
+msgstr ""
+
+#. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_chs_hanson_roach_and_jordan
 msgid "Hanson, Roach and Jordan"
 msgstr "Hanson, Roach and Jordan"
@@ -588,7 +759,12 @@ msgid "Harrington Park Public School"
 msgstr "Harrington Park Public School"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_jve_davis_and_sons
+#: model:ir.model.fields,field_description:hr_skills.field_hr_employee_skill_report__has_department_manager_access
+msgid "Has Department Manager Access"
+msgstr ""
+
+#. module: hr_skills
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_jve_davis_and_sons
 msgid "Health physicist"
 msgstr "保健物理学家"
 
@@ -598,12 +774,17 @@ msgid "Hill Group"
 msgstr "Hill Group"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_hindi
+msgid "Hindi"
+msgstr "印地语"
+
+#. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_lur_holy_family_primary_school
 msgid "Holy Family Primary School"
 msgstr "Holy Family Primary School"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_hne_nortonsilva
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_hne_nortonsilva
 msgid "Horticulturist, commercial"
 msgstr "商业园艺师"
 
@@ -618,7 +799,7 @@ msgid "Hughes, Parker and Barber"
 msgstr "Hughes, Parker and Barber"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_chs_freeman_williams_and_berger
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_chs_freeman_williams_and_berger
 msgid "Human resources officer"
 msgstr "人力资源专员"
 
@@ -636,12 +817,37 @@ msgid "ID"
 msgstr "ID"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_jth_simmonswilcox
+#: model:hr.skill.type,name:hr_skills.hr_skill_type_it
+msgid "IT"
+msgstr "IT"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_it_governance_compliance
+msgid "IT governance and compliance (GDPR,HIPAA,...)"
+msgstr ""
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_it_infrastructure_architecture
+msgid "IT infrastructure and architecture"
+msgstr ""
+
+#. module: hr_skills
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_jth_simmonswilcox
 msgid "IT sales professional"
 msgstr "IT 销售专员"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_jgo_martin_stanley_and_duncan
+#: model:hr.skill,name:hr_skills.hr_skill_it_service_management
+msgid "IT service management (ITSM)"
+msgstr ""
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_it_support
+msgid "IT support"
+msgstr ""
+
+#. module: hr_skills
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_jgo_martin_stanley_and_duncan
 msgid "IT technical support officer"
 msgstr "IT 技术支助专员"
 
@@ -655,14 +861,30 @@ msgstr "如果选中，此级别将是选择此技能时选择的默认级别。
 #. module: hr_skills
 #. odoo-javascript
 #: code:addons/hr_skills/static/src/fields/skills_one2many/skills_one2many.xml:0
-#, python-format
 msgid "If skills are missing, they can be created by an HR officer."
 msgstr "如果缺少技能，可由人力资源官员创建。"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_niv_arroyo_ltd
+#: model:ir.model.fields,help:hr_skills.field_hr_employee_skill_report__active
+msgid ""
+"If the active field is set to False, it will allow you to hide the resource "
+"record without removing it."
+msgstr "如果该启用字段设置为错误，则可以隐藏而非删除源记录。"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_indonesian
+msgid "Indonesian"
+msgstr "印度尼西亚语"
+
+#. module: hr_skills
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_niv_arroyo_ltd
 msgid "Insurance risk surveyor"
 msgstr "保险风险调查员"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_iot_embedded_systems
+msgid "IoT and embedded systems"
+msgstr ""
 
 #. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_ngh_jackson_schwartz_and_aguirre
@@ -670,39 +892,47 @@ msgid "Jackson, Schwartz and Aguirre"
 msgstr "Jackson, Schwartz and Aguirre"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_jve_saundersadkins
+#: model:hr.skill,name:hr_skills.hr_skill_japanese
+msgid "Japanese"
+msgstr "日语"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_java
+msgid "Java"
+msgstr ""
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_javanese
+msgid "Javanese"
+msgstr ""
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_js
+msgid "Javascript"
+msgstr ""
+
+#. module: hr_skills
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_jve_saundersadkins
 msgid "Jewellery designer"
 msgstr "珠宝设计师"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_line_admin_4
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_line_admin_4
 msgid ""
 "Job position: Development team leader\n"
 "- Supported technical operations with investigating and correcting varied production support issues (Java, Perl, Shell scripts, SQL).\n"
 "- Led quality assurance planning for multiple concurrent projects relative to overall system architecture or trading system changes/new developments.\n"
-"- Configured and released business critical alpha and risk models using MATLAB and SQL with inputs from Portfolio Managers.\n"
-"        "
+"- Configured and released business critical alpha and risk models using MATLAB and SQL with inputs from Portfolio Managers."
 msgstr ""
-"职位：开发团队经理\n"
-"- 支持技术操作，调查和纠正各种生产支持问题（Java，Perl，Shell 脚本，SQL）。\n"
-"- 在整体系统架构或交易系统变化/新开发方面，领导多个并发项目的质量保证计划。\n"
-"- 使用MATLAB和SQL配置和发布基于业务的关键alpha和风险模型，并根据投资组合经理提供的输入进行操作。\n"
-"        "
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_line_admin_3
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_line_admin_3
 msgid ""
 "Job position: Product manager\n"
 "- Coordinated and managed software deployment across five system environments from development to production.\n"
 "- Developed stored procedures to assist Java level programming efforts.\n"
-"- Developed multiple renewable energy plant architectures, both commercial installations and defense-related.\n"
-"        "
+"- Developed multiple renewable energy plant architectures, both commercial installations and defense-related."
 msgstr ""
-"职位：产品经理\n"
-"- 协调和管理从开发到生产的五个系统环境的软件部署。\n"
-"- 开发存储过程，协助 Java 级编程工作。\n"
-"- 开发多个可再生能源工厂架构，包括商业设施和国防相关设施。\n"
-"        "
 
 #. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_fme_johnson_shaw_and_carroll
@@ -725,11 +955,22 @@ msgid "King Island District High School"
 msgstr "King Island District High School"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_qdp_rivera_shaw_and_hughes
+#: model:hr.skill,name:hr_skills.hr_skill_korean
+msgid "Korean"
+msgstr "韩语"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_kotlin
+msgid "Kotlin"
+msgstr ""
+
+#. module: hr_skills
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_qdp_rivera_shaw_and_hughes
 msgid "Landscape architect"
 msgstr "景观设计师"
 
 #. module: hr_skills
+#: model:hr.skill.type,name:hr_skills.hr_skill_type_lang
 #: model_terms:ir.ui.view,arch_db:hr_skills.report_employee_cv_main_panel
 msgid "Languages"
 msgstr "语言"
@@ -764,7 +1005,12 @@ msgid "Lawson Public School"
 msgstr "Lawson Public School"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_vad_gallegos_little_and_walters
+#: model:hr.skill,name:hr_skills.hr_skill_leadership
+msgid "Leadership"
+msgstr ""
+
+#. module: hr_skills
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_vad_gallegos_little_and_walters
 msgid "Lecturer, higher education"
 msgstr "高等院校讲师"
 
@@ -795,7 +1041,7 @@ msgid "Lewis-Bailey"
 msgstr "Lewis-Bailey"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_jog_allenkeller
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_jog_allenkeller
 msgid "Lexicographer"
 msgstr "词典编纂者"
 
@@ -825,9 +1071,19 @@ msgid "Lynch-Hodges"
 msgstr "Lynch-Hodges"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_admin_greeneorr
+#: model:hr.skill,name:hr_skills.hr_skill_machine_learning
+msgid "Machine Learning (AI)"
+msgstr ""
+
+#. module: hr_skills
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_admin_greeneorr
 msgid "Magazine journalist"
 msgstr "杂志记者"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_mandarin_chinese
+msgid "Mandarin Chinese"
+msgstr ""
 
 #. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_jog_mandurah_catholic_college
@@ -840,9 +1096,19 @@ msgid "Map Generator"
 msgstr "地图生成器"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_marathi
+msgid "Marathi"
+msgstr "马拉地语"
+
+#. module: hr_skills
 #: model_terms:ir.ui.view,arch_db:hr_skills.report_employee_cv_sidepanel
 msgid "Marc Demo"
 msgstr "马克-迪莫"
+
+#. module: hr_skills
+#: model:hr.skill.type,name:hr_skills.hr_skill_type_marketing
+msgid "Marketing"
+msgstr "营销"
 
 #. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_jgo_martin_stanley_and_duncan
@@ -850,7 +1116,7 @@ msgid "Martin, Stanley and Duncan"
 msgstr "Martin, Stanley and Duncan"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_line_admin_1
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_line_admin_1
 msgid ""
 "Master in Electrical engineering\n"
 "            Master thesis: Better grid management and control through machine learning"
@@ -859,32 +1125,42 @@ msgstr ""
 "            硕士论文： 通过机器学习改善电网管理和控制"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_matlab
+msgid "Matlab"
+msgstr ""
+
+#. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_jep_mcneil_rodriguez_and_warren
 msgid "Mcneil, Rodriguez and Warren"
 msgstr "Mcneil, Rodriguez and Warren"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_al_garcia_smith_and_king
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_al_garcia_smith_and_king
 msgid "Medical illustrator"
 msgstr "医学插画师"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_chs_boyd_wilson_and_moore
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_chs_boyd_wilson_and_moore
 msgid "Medical physicist"
 msgstr "医学物理学家"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_fpi_chavez_group
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_fpi_chavez_group
 msgid "Mental health nurse"
 msgstr "心理健康护士"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_jgo_fox_and_sons
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_jgo_fox_and_sons
 msgid "Merchant navy officer"
 msgstr "Merchant navy officer"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_jog_douglas_thompson_and_conner
+#: model:hr.skill,name:hr_skills.hr_skill_mobile_app_development
+msgid "Mobile app development"
+msgstr ""
+
+#. module: hr_skills
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_jog_douglas_thompson_and_conner
 msgid "Music therapist"
 msgstr "音乐治疗师"
 
@@ -908,6 +1184,22 @@ msgid "Narrogin Primary School"
 msgstr "Narrogin Primary School"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_network_administration
+msgid "Network administration"
+msgstr ""
+
+#. module: hr_skills
+#. odoo-javascript
+#: code:addons/hr_skills/static/src/fields/resume_one2many/resume_one2many.js:0
+msgid "New Resume line"
+msgstr "新简历行"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_nosql
+msgid "NoSQL"
+msgstr ""
+
+#. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_stw_northern_bay_p12_college
 msgid "Northern Bay P-12 College"
 msgstr "Northern Bay P-12 College"
@@ -923,11 +1215,20 @@ msgid "Odoo SA"
 msgstr "Odoo SA"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_openness_to_criticism
+msgid "Openness to criticism"
+msgstr ""
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_organizational
+msgid "Organizational"
+msgstr ""
+
+#. module: hr_skills
 #. odoo-javascript
 #. odoo-python
 #: code:addons/hr_skills/report/hr_employee_cv_report.py:0
 #: code:addons/hr_skills/static/src/views/skills_list_renderer.js:0
-#, python-format
 msgid "Other"
 msgstr "其他"
 
@@ -940,6 +1241,11 @@ msgstr "其它"
 #: model:hr.resume.line,name:hr_skills.employee_resume_fpi_our_lady_star_of_the_sea_school
 msgid "Our Lady Star of the Sea School"
 msgstr "Our Lady Star of the Sea School"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_php
+msgid "PHP"
+msgstr ""
 
 #. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_admin_park_lake_state_school
@@ -962,12 +1268,22 @@ msgid "Perez-Morgan"
 msgstr "Perez-Morgan"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_jve_arnoldcohen
+#: model:hr.skill,name:hr_skills.hr_skill_perl
+msgid "Perl"
+msgstr ""
+
+#. module: hr_skills
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_jve_arnoldcohen
 msgid "Personnel officer"
 msgstr "人事专员"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_vad_loganmartin
+#: model:hr.skill,name:hr_skills.hr_skill_persuasion
+msgid "Persuasion"
+msgstr ""
+
+#. module: hr_skills
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_vad_loganmartin
 msgid "Petroleum engineer"
 msgstr "石油工程师"
 
@@ -979,12 +1295,11 @@ msgstr "Phillips, Jones and Brown"
 #. module: hr_skills
 #. odoo-javascript
 #: code:addons/hr_skills/static/src/fields/skills_one2many/skills_one2many.xml:0
-#, python-format
 msgid "Pick a skill from the list"
 msgstr "从列表中选择一项技能"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_mit_burns_lester_and_cuevas
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_mit_burns_lester_and_cuevas
 msgid "Police officer"
 msgstr "警察"
 
@@ -992,6 +1307,11 @@ msgstr "警察"
 #: model:hr.resume.line,name:hr_skills.employee_resume_jog_port_curtis_road_state_school
 msgid "Port Curtis Road State School"
 msgstr "Port Curtis Road State School"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_portuguese
+msgid "Portuguese"
+msgstr ""
 
 #. module: hr_skills
 #: model_terms:ir.ui.view,arch_db:hr_skills.report_employee_cv_main_panel
@@ -1015,9 +1335,18 @@ msgstr "打印"
 #: model:ir.actions.server,name:hr_skills.action_print_employees_cv
 #: model:ir.model,name:hr_skills.model_hr_employee_cv_wizard
 #: model_terms:ir.ui.view,arch_db:hr_skills.hr_employee_cv_wizard_view_form
-#, python-format
 msgid "Print Resume"
 msgstr "打印简历"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_problem_solving
+msgid "Problem-Solving"
+msgstr ""
+
+#. module: hr_skills
+#: model:hr.skill.type,name:hr_skills.hr_skill_type_dev
+msgid "Programming Languages"
+msgstr "程序语言"
 
 #. module: hr_skills
 #: model:ir.model.fields,field_description:hr_skills.field_hr_employee_skill__level_progress
@@ -1049,7 +1378,12 @@ msgid "Progress should be a number between 0 and 100."
 msgstr "进度应该是在0到100之间的数字。"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_mit_robinson_crawford_and_norman
+#: model:hr.skill,name:hr_skills.hr_skill_project_management
+msgid "Project Management"
+msgstr ""
+
+#. module: hr_skills
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_mit_robinson_crawford_and_norman
 msgid "Psychiatric nurse"
 msgstr "精神科护士"
 
@@ -1059,19 +1393,50 @@ msgid "Public Employee"
 msgstr "公共员工"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_stw_lynchhodges
+#: model:hr.skill,name:hr_skills.hr_skill_public
+msgid "Public Speaking"
+msgstr ""
+
+#. module: hr_skills
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_stw_lynchhodges
 msgid "Publishing rights manager"
 msgstr "出版权经理"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_punjabi
+msgid "Punjabi"
+msgstr "旁遮普语"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_python
 #: model_terms:ir.ui.view,arch_db:hr_skills.report_employee_cv_main_panel
 msgid "Python"
 msgstr "Python"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_sql
+msgid "RDMS"
+msgstr ""
+
+#. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_lur_ramirez_inc
 msgid "Ramirez Inc"
 msgstr "Ramirez Inc"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_react
+msgid "React"
+msgstr ""
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_resourcefulness
+msgid "Resourcefulness"
+msgstr ""
+
+#. module: hr_skills
+#: model:ir.model,name:hr_skills.model_resource_resource
+msgid "Resources"
+msgstr "资源"
 
 #. module: hr_skills
 #: model:ir.ui.menu,name:hr_skills.menu_human_resources_configuration_resume
@@ -1087,7 +1452,6 @@ msgstr "简历"
 #. module: hr_skills
 #. odoo-python
 #: code:addons/hr_skills/controllers/main.py:0
-#, python-format
 msgid "Resume %s"
 msgstr "简历%s"
 
@@ -1111,7 +1475,6 @@ msgstr "简历行"
 #. module: hr_skills
 #. odoo-python
 #: code:addons/hr_skills/controllers/main.py:0
-#, python-format
 msgid "Resumes"
 msgstr "简历"
 
@@ -1126,9 +1489,24 @@ msgid "Robinson, Crawford and Norman"
 msgstr "Robinson, Crawford and Norman"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_ruby
+msgid "Ruby"
+msgstr ""
+
+#. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_fme_russellwebster
 msgid "Russell-Webster"
 msgstr "Russell-Webster"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_russian
+msgid "Russian"
+msgstr "俄语"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_rust
+msgid "Rust"
+msgstr ""
 
 #. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_line_admin_2
@@ -1141,17 +1519,22 @@ msgid "Saunders-Adkins"
 msgstr "Saunders-Adkins"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_scala
+msgid "Scala"
+msgstr ""
+
+#. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_admin_schultz_inc
 msgid "Schultz Inc"
 msgstr "Schultz Inc"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_line_admin_2
-msgid "Science & math"
-msgstr "科学与数学"
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_line_admin_2
+msgid "Science &amp; math"
+msgstr ""
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_mit_parker_roberson_and_acosta
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_mit_parker_roberson_and_acosta
 msgid "Science writer"
 msgstr "科普作家"
 
@@ -1166,33 +1549,35 @@ msgid "Search Skill"
 msgstr "搜索技能"
 
 #. module: hr_skills
+#: model_terms:ir.ui.view,arch_db:hr_skills.hr_skill_type_view_search
+msgid "Search Skill Type"
+msgstr "搜索技能类型"
+
+#. module: hr_skills
 #: model:ir.model.fields,field_description:hr_skills.field_hr_employee_cv_wizard__color_secondary
 msgid "Secondary Color"
 msgstr "次要颜色"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_chs_davis_plc
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_chs_davis_plc
 msgid "Secretary, company"
 msgstr "公司秘书"
 
 #. module: hr_skills
 #. odoo-javascript
 #: code:addons/hr_skills/static/src/fields/form_view_one2many/form_view_one2many.xml:0
-#, python-format
 msgid "Select & Close"
 msgstr "选择并关闭"
 
 #. module: hr_skills
 #. odoo-javascript
 #: code:addons/hr_skills/static/src/fields/form_view_one2many/form_view_one2many.xml:0
-#, python-format
 msgid "Select & New"
 msgstr "选择与新"
 
 #. module: hr_skills
 #. odoo-javascript
 #: code:addons/hr_skills/static/src/fields/skills_one2many/skills_one2many.js:0
-#, python-format
 msgid "Select Skills"
 msgstr "请选择技能"
 
@@ -1206,6 +1591,11 @@ msgstr "序列"
 #: model:hr.resume.line,name:hr_skills.employee_resume_mit_seymour_p12_college
 msgid "Seymour P-12 College"
 msgstr "Seymour P-12 College"
+
+#. module: hr_skills
+#: model:hr.resume.line.type,name:hr_skills.resume_type_side_projects
+msgid "Side Projects"
+msgstr "副项目"
 
 #. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_jth_simmonswilcox
@@ -1263,6 +1653,7 @@ msgstr "技能类型"
 #. module: hr_skills
 #: model:ir.actions.act_window,name:hr_skills.hr_skill_type_action
 #: model:ir.ui.menu,name:hr_skills.hr_skill_type_menu
+#: model_terms:ir.ui.view,arch_db:hr_skills.hr_skill_type_view_search
 #: model_terms:ir.ui.view,arch_db:hr_skills.hr_skill_type_view_tree
 msgid "Skill Types"
 msgstr "技能类型"
@@ -1274,19 +1665,19 @@ msgstr "员工的技能等级"
 
 #. module: hr_skills
 #. odoo-javascript
+#: code:addons/hr_skills/static/src/components/avatar_card_resource/avatar_card_resource_popover.xml:0
 #: code:addons/hr_skills/static/src/fields/skills_one2many/skills_one2many.xml:0
 #: model:ir.model.fields,field_description:hr_skills.field_hr_employee__employee_skill_ids
 #: model:ir.model.fields,field_description:hr_skills.field_hr_employee_cv_wizard__show_skills
 #: model:ir.model.fields,field_description:hr_skills.field_hr_employee_public__employee_skill_ids
 #: model:ir.model.fields,field_description:hr_skills.field_hr_skill_type__skill_ids
 #: model:ir.model.fields,field_description:hr_skills.field_res_users__employee_skill_ids
+#: model:ir.model.fields,field_description:hr_skills.field_resource_resource__employee_skill_ids
 #: model:ir.ui.menu,name:hr_skills.hr_employee_skill_report_menu
 #: model_terms:ir.ui.view,arch_db:hr_skills.employee_skill_view_form
 #: model_terms:ir.ui.view,arch_db:hr_skills.hr_employee_skill_type_view_form
-#: model_terms:ir.ui.view,arch_db:hr_skills.hr_employee_view_search
 #: model_terms:ir.ui.view,arch_db:hr_skills.hr_skill_view_form
 #: model_terms:ir.ui.view,arch_db:hr_skills.report_employee_cv_main_panel
-#, python-format
 msgid "Skills"
 msgstr "技能"
 
@@ -1302,9 +1693,18 @@ msgstr "技能历史"
 #. module: hr_skills
 #. odoo-javascript
 #: code:addons/hr_skills/static/src/fields/skills_one2many/skills_one2many.js:0
-#, python-format
 msgid "Skills Report"
 msgstr "技能报告"
+
+#. module: hr_skills
+#: model:hr.resume.line.type,name:hr_skills.resume_type_social_media
+msgid "Social Media"
+msgstr "社交媒体"
+
+#. module: hr_skills
+#: model:hr.skill.type,name:hr_skills.hr_skill_type_softskill
+msgid "Soft Skills"
+msgstr "软技能"
 
 #. module: hr_skills
 #: model_terms:ir.ui.view,arch_db:hr_skills.report_employee_cv_main_panel
@@ -1313,12 +1713,22 @@ msgid "Software Developer"
 msgstr "软件开发人员"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_lur_whitebell
+#: model:hr.skill,name:hr_skills.hr_skill_spanish
+msgid "Spanish"
+msgstr "西班牙语"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_spark
+msgid "Spark"
+msgstr ""
+
+#. module: hr_skills
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_lur_whitebell
 msgid "Sports coach"
 msgstr "体育教练"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_fme_lewis_group
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_fme_lewis_group
 msgid "Sports development officer"
 msgstr "体育运动发展专员"
 
@@ -1343,7 +1753,12 @@ msgid "Stanley-Mendez"
 msgstr "Stanley-Mendez"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_jep_mcneil_rodriguez_and_warren
+#: model:hr.skill,name:hr_skills.hr_skill_stress_management
+msgid "Stress management"
+msgstr ""
+
+#. module: hr_skills
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_jep_mcneil_rodriguez_and_warren
 msgid "Sub"
 msgstr "子"
 
@@ -1353,26 +1768,44 @@ msgid "Sutherland Dianella Primary School"
 msgstr "Sutherland Dianella Primary School"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_swift
+msgid "Swift"
+msgstr ""
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_system_administration
+msgid "System Administration (Linux, Windows)"
+msgstr ""
+
+#. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_jve_talbot_primary_school
 msgid "Talbot Primary School"
 msgstr "Talbot Primary School"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_qdp_phillips_jones_and_brown
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_qdp_phillips_jones_and_brown
 msgid "Teacher, special educational needs"
 msgstr "特殊教育教师"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_teamwork
+msgid "Teamwork"
+msgstr ""
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_telugu
+msgid "Telugu"
+msgstr "泰卢固语"
+
+#. module: hr_skills
 #. odoo-python
 #: code:addons/hr_skills/models/hr_employee_skill.py:0
-#, python-format
 msgid "The skill %(name)s and skill type %(type)s doesn't match"
 msgstr "技能 %(name)s 技能类型 %(type)s 未找到"
 
 #. module: hr_skills
 #. odoo-python
 #: code:addons/hr_skills/models/hr_employee_skill.py:0
-#, python-format
 msgid "The skill level %(level)s is not valid for skill type: %(type)s"
 msgstr "技能等级 %(level)s 不可用于技能类型: %(type)s"
 
@@ -1382,16 +1815,30 @@ msgid "The start date must be anterior to the end date."
 msgstr "开始日期必须早于结束日期。"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_qdp_evans_cooper_and_white
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_qdp_evans_cooper_and_white
 msgid "Therapist, speech and language"
 msgstr "言语和语言治疗师"
 
 #. module: hr_skills
 #. odoo-javascript
+#: code:addons/hr_skills/static/src/fields/resume_one2many/resume_one2many.xml:0
+msgid ""
+"There are no resume lines on this employee.\n"
+"                        Why not add a new one?"
+msgstr ""
+
+#. module: hr_skills
+#. odoo-javascript
 #: code:addons/hr_skills/static/src/fields/skills_one2many/skills_one2many.xml:0
-#, python-format
 msgid "There are no skills defined in the library."
 msgstr "资料中没有技能定义。"
+
+#. module: hr_skills
+#: model_terms:ir.actions.act_window,help:hr_skills.hr_employee_skill_report_action
+msgid ""
+"This report will give you an overview of the skills per Employee.\n"
+"                Create them in configuration and add them on the Employee."
+msgstr ""
 
 #. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_vad_thomas_chirnside_primary_school
@@ -1399,9 +1846,13 @@ msgid "Thomas Chirnside Primary School"
 msgstr "Thomas Chirnside Primary School"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_time_management
+msgid "Time Management"
+msgstr "时间管理"
+
+#. module: hr_skills
 #. odoo-javascript
 #: code:addons/hr_skills/static/src/fields/skills_one2many/skills_one2many.xml:0
-#, python-format
 msgid "Timeline"
 msgstr "时间线"
 
@@ -1416,7 +1867,7 @@ msgid "Tottenham Central School"
 msgstr "Tottenham Central School"
 
 #. module: hr_skills
-#: model:hr.resume.line,description:hr_skills.employee_resume_jod_wilson_ltd
+#: model_terms:hr.resume.line,description:hr_skills.employee_resume_jod_wilson_ltd
 msgid "Trade union research officer"
 msgstr "工会研究专员"
 
@@ -1424,6 +1875,11 @@ msgstr "工会研究专员"
 #: model:hr.resume.line,name:hr_skills.employee_resume_jep_trinity_college
 msgid "Trinity College"
 msgstr "圣三一学院"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_turkish
+msgid "Turkish"
+msgstr "土耳其"
 
 #. module: hr_skills
 #: model:ir.model.constraint,message:hr_skills.constraint_hr_employee_skill__unique_skill
@@ -1451,6 +1907,11 @@ msgid "Type of a resume line"
 msgstr "简历行的类型"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_typescript
+msgid "TypeScript"
+msgstr ""
+
+#. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_jod_umbakumba_school
 msgid "Umbakumba School"
 msgstr "Umbakumba School"
@@ -1461,9 +1922,24 @@ msgid "Université Libre de Bruxelles - Polytechnique"
 msgstr "布鲁塞尔自由大学-理工学院"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_urdu
+msgid "Urdu"
+msgstr "乌尔都语"
+
+#. module: hr_skills
 #: model:ir.model,name:hr_skills.model_res_users
 msgid "User"
 msgstr "用户"
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_virtualization_containerization
+msgid "Virtualization and Containerization"
+msgstr ""
+
+#. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_web_development
+msgid "Web Development"
+msgstr ""
 
 #. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_admin_white_inc
@@ -1483,7 +1959,6 @@ msgstr "Whitsunday Anglican School"
 #. module: hr_skills
 #. odoo-javascript
 #: code:addons/hr_skills/static/src/fields/skills_one2many/skills_one2many.xml:0
-#, python-format
 msgid "Why not try adding some ?"
 msgstr "为什么不加一些呢？"
 
@@ -1518,6 +1993,11 @@ msgid "Woodridge State School"
 msgstr "Woodridge State School"
 
 #. module: hr_skills
+#: model:hr.skill,name:hr_skills.hr_skill_wu_chinese
+msgid "Wu Chinese"
+msgstr ""
+
+#. module: hr_skills
 #: model:hr.resume.line,name:hr_skills.employee_resume_vad_wycheproof_p12_college
 msgid "Wycheproof P-12 College"
 msgstr "Wycheproof P-12 College"
@@ -1525,7 +2005,6 @@ msgstr "Wycheproof P-12 College"
 #. module: hr_skills
 #. odoo-javascript
 #: code:addons/hr_skills/static/src/fields/skills_one2many/skills_one2many.xml:0
-#, python-format
 msgid "You can add skills from our library to the employee profile."
 msgstr "您可以将我们资料库中的技能添加到员工档案中。"
 

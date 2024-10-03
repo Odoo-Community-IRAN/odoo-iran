@@ -44,7 +44,7 @@
                                 t-on-pointerenter="() => (state.hoveredDate = itemInfo.range[0])"
                                 t-on-click="() => this.zoomOrSelect(itemInfo)"
                             >
-                                <span t-esc="itemInfo.label" class="z-index-1" />
+                                <span t-esc="itemInfo.label" class="z-1" />
                             </button>
                         </t>
                     </t>
@@ -115,7 +115,7 @@
                     t-att-disabled="!itemInfo.isValid"
                     t-on-click="() => this.zoomOrSelect(itemInfo)"
                 >
-                    <span t-esc="itemInfo.label" class="z-index-1" />
+                    <span t-esc="itemInfo.label" class="z-1" />
                 </button>
             </t>
         </div>
@@ -148,14 +148,13 @@
         >
             <nav class="o_datetime_picker_header btn-group">
                 <button class="o_previous btn btn-light flex-grow-0"
-                        tabindex="-1"
-                        t-att-class="isLastPrecisionLevel ? 'order-1 btn-sm px-1' : ''" t-on-click="previous">
+                        t-att-class="isLastPrecisionLevel ? 'order-1 btn-sm px-1' : ''" t-on-click="previous" tabindex="-1">
                     <i class="oi oi-chevron-left" t-att-title="activePrecisionLevel.prevTitle" />
                 </button>
                 <button
                     class="o_zoom_out o_datetime_button btn btn-light d-flex align-items-center px-0 text-truncate"
-                    t-att-class="isLastPrecisionLevel ? 'pe-none text-start' : 'justify-content-around'"
                     tabindex="-1"
+                    t-att-class="isLastPrecisionLevel ? 'pe-none text-start' : 'justify-content-around'"
                     t-att-title="!isLastPrecisionLevel and activePrecisionLevel.mainTitle"
                     t-on-click="zoomOut"
                 >
@@ -171,8 +170,8 @@
                 </button>
                 <button class="o_next btn btn-light flex-grow-0"
                         t-att-class="isLastPrecisionLevel ? 'order-2 btn-sm px-1' : ''"
-                        tabindex="-1"
-                        t-on-click="next">
+                        t-on-click="next"
+                        tabindex="-1">
                     <i class="oi oi-chevron-right" t-att-title="activePrecisionLevel.nextTitle" />
                 </button>
             </nav>

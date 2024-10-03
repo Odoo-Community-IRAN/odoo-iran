@@ -2,16 +2,13 @@
 #----------------------------------------------------------
 # ir_http modular http routing
 #----------------------------------------------------------
-import base64
 import hashlib
 import json
 import logging
-import mimetypes
 import os
 import re
-import sys
-import traceback
 import threading
+import unicodedata
 
 import werkzeug
 import werkzeug.exceptions
@@ -23,16 +20,34 @@ try:
 except ImportError:
     from werkzeug.routing.converters import NumberConverter  # moved in werkzeug 2.2.2
 
+# optional python-slugify import (https://github.com/un33k/python-slugify)
+try:
+    import slugify as slugify_lib
+except ImportError:
+    slugify_lib = None
+
 import odoo
 from odoo import api, http, models, tools, SUPERUSER_ID
-from odoo.exceptions import AccessDenied, AccessError, MissingError
-from odoo.http import request, Response, ROUTING_KEYS, Stream
+from odoo.exceptions import AccessDenied
+from odoo.http import request, Response, ROUTING_KEYS
 from odoo.modules.registry import Registry
 from odoo.service import security
-from odoo.tools import get_lang, submap
+from odoo.tools.json import json_default
+from odoo.tools.misc import get_lang, submap
 from odoo.tools.translate import code_translations
 
 _logger = logging.getLogger(__name__)
+
+# see also mimetypes module: https://docs.python.org/3/library/mimetypes.html and odoo.tools.mimetypes
+EXTENSION_TO_WEB_MIMETYPES = {
+    '.css': 'text/css',
+    '.less': 'text/less',
+    '.scss': 'text/scss',
+    '.js': 'text/javascript',
+    '.xml': 'text/xml',
+    '.csv': 'text/csv',
+    '.html': 'text/html',
+}
 
 
 class RequestUID(object):
@@ -47,13 +62,17 @@ class ModelConverter(werkzeug.routing.BaseConverter):
         self.model = model
         self.regex = r'([0-9]+)'
 
-    def to_python(self, value):
+        IrHttp = Registry(threading.current_thread().dbname)['ir.http']
+        self.slug = IrHttp._slug
+        self.unslug = IrHttp._unslug
+
+    def to_python(self, value: str) -> models.BaseModel:
         _uid = RequestUID(value=value, converter=self)
         env = api.Environment(request.cr, _uid, request.context)
-        return env[self.model].browse(int(value))
+        return env[self.model].browse(self.unslug(value)[1])
 
-    def to_url(self, value):
-        return value.id
+    def to_url(self, value: models.BaseModel) -> str:
+        return self.slug(value)
 
 
 class ModelsConverter(werkzeug.routing.BaseConverter):
@@ -64,12 +83,12 @@ class ModelsConverter(werkzeug.routing.BaseConverter):
         # TODO add support for slug in the form [A-Za-z0-9-] bla-bla-89 -> id 89
         self.regex = r'([0-9,]+)'
 
-    def to_python(self, value):
+    def to_python(self, value: str) -> models.BaseModel:
         _uid = RequestUID(value=value, converter=self)
         env = api.Environment(request.cr, _uid, request.context)
         return env[self.model].browse(int(v) for v in value.split(','))
 
-    def to_url(self, value):
+    def to_url(self, value: models.BaseModel) -> str:
         return ",".join(value.ids)
 
 
@@ -118,12 +137,59 @@ class IrHttp(models.AbstractModel):
     _name = 'ir.http'
     _description = "HTTP Routing"
 
+    @classmethod
+    def _slugify_one(cls, value: str, max_length: int = 0) -> str:
+        """ Transform a string to a slug that can be used in a url path.
+            This method will first try to do the job with python-slugify if present.
+            Otherwise it will process string by stripping leading and ending spaces,
+            converting unicode chars to ascii, lowering all chars and replacing spaces
+            and underscore with hyphen "-".
+        """
+        if slugify_lib:
+            # There are 2 different libraries only python-slugify is supported
+            try:
+                return slugify_lib.slugify(value, max_length=max_length)
+            except TypeError:
+                pass
+        uni = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
+        slug_str = re.sub(r'[\W_]+', '-', uni).strip('-').lower()
+        return slug_str[:max_length] if max_length > 0 else slug_str
+
+    @classmethod
+    def _slugify(cls, value: str, max_length: int = 0, path: bool = False) -> str:
+        if not path:
+            return cls._slugify_one(value, max_length=max_length)
+        else:
+            res = []
+            for u in value.split('/'):
+                s = cls._slugify_one(u, max_length=max_length)
+                if s:
+                    res.append(s)
+            # check if supported extension
+            path_no_ext, ext = os.path.splitext(value)
+            if ext in EXTENSION_TO_WEB_MIMETYPES:
+                res[-1] = cls._slugify_one(path_no_ext) + ext
+            return '/'.join(res)
+
+    @classmethod
+    def _slug(cls, value: models.BaseModel | tuple[int, str]) -> str:
+        if isinstance(value, tuple):
+            return str(value[0])
+        return str(value.id)
+
+    @classmethod
+    def _unslug(cls, value: str) -> tuple[str | None, int] | tuple[None, None]:
+        try:
+            return None, int(value)
+        except ValueError:
+            return None, None
+
     #------------------------------------------------------
     # Routing map
     #------------------------------------------------------
 
     @classmethod
-    def _get_converters(cls):
+    def _get_converters(cls) -> dict[str, type]:
         return {'model': ModelConverter, 'models': ModelsConverter, 'int': SignedIntConverter}
 
     @classmethod
@@ -134,6 +200,44 @@ class IrHttp(models.AbstractModel):
     @classmethod
     def _get_public_users(cls):
         return [request.env['ir.model.data']._xmlid_to_res_model_res_id('base.public_user')[1]]
+
+    @classmethod
+    def _auth_method_bearer(cls):
+        headers = request.httprequest.headers
+
+        def get_http_authorization_bearer_token():
+            # werkzeug<2.3 doesn't expose `authorization.token` (for bearer authentication)
+            # check header directly
+            header = headers.get("Authorization")
+            if header and (m := re.match(r"^bearer\s+(.+)$", header, re.IGNORECASE)):
+                return m.group(1)
+            return None
+
+        def check_sec_headers():
+            """Protection against CSRF attacks.
+            Modern browsers automatically add Sec- headers that we can check to protect against CSRF.
+            https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-User
+            """
+            return (
+                headers.get("Sec-Fetch-Dest") == "document"
+                and headers.get("Sec-Fetch-Mode") == "navigate"
+                and headers.get("Sec-Fetch-Site") in ('none', 'same-origin')
+                and headers.get("Sec-Fetch-User") == "?1"
+            )
+
+        if token := get_http_authorization_bearer_token():
+            # 'rpc' scope does not really exist, we basically require a global key (scope NULL)
+            uid = request.env['res.users.apikeys']._check_credentials(scope='rpc', key=token)
+            if not uid:
+                raise werkzeug.exceptions.Unauthorized("Invalid apikey")
+            if request.env.uid and request.env.uid != uid:
+                raise AccessDenied("Session user does not match the used apikey")
+            request.update_env(user=uid)
+        elif not request.env.uid:
+            raise werkzeug.exceptions.Unauthorized('User not authenticated, use the "Authorization" header')
+        elif not check_sec_headers():
+            raise AccessDenied("Missing \"Authorization\" or Sec-headers for interactive usage")
+        cls._auth_method_user()
 
     @classmethod
     def _auth_method_user(cls):
@@ -153,10 +257,13 @@ class IrHttp(models.AbstractModel):
     @classmethod
     def _authenticate(cls, endpoint):
         auth = 'none' if http.is_cors_preflight(request, endpoint) else endpoint.routing['auth']
+        cls._authenticate_explicit(auth)
 
+    @classmethod
+    def _authenticate_explicit(cls, auth):
         try:
             if request.session.uid is not None:
-                if not security.check_session(request.session, request.env):
+                if not security.check_session(request.session, request.env, request):
                     request.session.logout(keep_db=True)
                     request.env = api.Environment(request.env.cr, None, request.session.context)
             getattr(cls, f'_auth_method_{auth}')()
@@ -169,6 +276,10 @@ class IrHttp(models.AbstractModel):
     @classmethod
     def _geoip_resolve(cls):
         return request._geoip_resolve()
+
+    @classmethod
+    def _sanitize_cookies(cls, cookies):
+        pass
 
     @classmethod
     def _pre_dispatch(cls, rule, args):
@@ -189,25 +300,22 @@ class IrHttp(models.AbstractModel):
 
         request.dispatcher.pre_dispatch(rule, args)
 
-        # Replace uid placeholder by the current request.env.uid
-        for key, val in list(args.items()):
-            if isinstance(val, models.BaseModel) and isinstance(val._uid, RequestUID):
-                args[key] = val.with_user(request.env.uid)
-
         # verify the default language set in the context is valid,
         # otherwise fallback on the company lang, english or the first
         # lang installed
         env = request.env if request.env.uid else request.env['base'].with_user(SUPERUSER_ID).env
-        request.update_context(lang=get_lang(env)._get_cached('code'))
+        request.update_context(lang=get_lang(env).code)
 
         for key, val in list(args.items()):
             if not isinstance(val, models.BaseModel):
                 continue
 
+            # Replace uid and lang placeholder by the current request.env.uid and request.env.lang
+            args[key] = val.with_env(request.env)
+
             try:
                 # explicitly crash now, instead of crashing later
-                args[key].check_access_rights('read')
-                args[key].check_access_rule('read')
+                args[key].check_access('read')
             except (odoo.exceptions.AccessError, odoo.exceptions.MissingError) as e:
                 # custom behavior in case a record is not accessible / has been removed
                 if handle_error := rule.endpoint.routing.get('handle_params_access_error'):
@@ -241,7 +349,7 @@ class IrHttp(models.AbstractModel):
         model = request.env['ir.attachment']
         attach = model.sudo()._get_serve_attachment(request.httprequest.path)
         if attach and (attach.store_fname or attach.db_datas):
-            return Stream.from_attachment(attach).get_response()
+            return attach._to_http_stream().get_response()
 
     @classmethod
     def _redirect(cls, location, code=303):
@@ -255,8 +363,6 @@ class IrHttp(models.AbstractModel):
         _logger.info("Generating routing map for key %s", str(key))
         registry = Registry(threading.current_thread().dbname)
         installed = registry._init_modules.union(odoo.conf.server_wide_modules)
-        if tools.config['test_enable'] and odoo.modules.module.current_test:
-            installed.add(odoo.modules.module.current_test)
         mods = sorted(installed)
         # Note : when routing map is generated, we put it on the class `cls`
         # to make it available for all instance. Since `env` create an new instance
@@ -276,9 +382,7 @@ class IrHttp(models.AbstractModel):
     def _gc_sessions(self):
         if os.getenv("ODOO_SKIP_GC_SESSIONS"):
             return
-        ICP = self.env["ir.config_parameter"]
-        max_lifetime = int(ICP.get_param('sessions.max_inactivity_seconds', http.SESSION_LIFETIME))
-        http.root.session_store.vacuum(max_lifetime=max_lifetime)
+        http.root.session_store.vacuum(max_lifetime=http.get_session_max_inactivity(self.env))
 
     @api.model
     def get_translations_for_webclient(self, modules, lang):
@@ -286,21 +390,19 @@ class IrHttp(models.AbstractModel):
             modules = self.pool._init_modules
         if not lang:
             lang = self._context.get("lang")
-        langs = self.env['res.lang']._lang_get(lang)
-        lang_params = None
-        if langs:
-            lang_params = {
-                "name": langs.name,
-                "direction": langs.direction,
-                "date_format": langs.date_format,
-                "time_format": langs.time_format,
-                "grouping": langs.grouping,
-                "decimal_point": langs.decimal_point,
-                "thousands_sep": langs.thousands_sep,
-                "week_start": langs.week_start,
-            }
-            lang_params['week_start'] = int(lang_params['week_start'])
-            lang_params['code'] = lang
+        lang_data = self.env['res.lang']._get_data(code=lang)
+        lang_params = {
+            "name": lang_data.name,
+            "code": lang_data.code,
+            "direction": lang_data.direction,
+            "date_format": lang_data.date_format,
+            "time_format": lang_data.time_format,
+            "short_time_format": lang_data.short_time_format,
+            "grouping": lang_data.grouping,
+            "decimal_point": lang_data.decimal_point,
+            "thousands_sep": lang_data.thousands_sep,
+            "week_start": int(lang_data.week_start),
+        } if lang_data else None
 
         # Regional languages (ll_CC) must inherit/override their parent lang (ll), but this is
         # done server-side when the language is loaded, so we only need to load the user's lang.
@@ -320,7 +422,7 @@ class IrHttp(models.AbstractModel):
             'lang': lang,
             'multi_lang': len(self.env['res.lang'].sudo().get_installed()) > 1,
         }
-        return hashlib.sha1(json.dumps(translation_cache, sort_keys=True).encode()).hexdigest()
+        return hashlib.sha1(json.dumps(translation_cache, sort_keys=True, default=json_default).encode()).hexdigest()
 
     @classmethod
     def _is_allowed_cookie(cls, cookie_type):

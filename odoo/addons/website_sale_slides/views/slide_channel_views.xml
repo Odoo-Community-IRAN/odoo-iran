@@ -9,7 +9,15 @@
                 <field name="product_id"
                     invisible="enroll != 'payment'"
                     required="enroll == 'payment'"
-                    context="{'default_detailed_type': 'course', 'default_invoice_policy': 'order', 'default_purchase_ok': False, 'default_sale_ok': True, 'default_website_published': True}"/>
+                    context="{
+                        'default_type': 'service',
+                        'default_service_tracking': 'course',
+                        'default_invoice_policy': 'order',
+                        'default_purchase_ok': False,
+                        'default_sale_ok': True,
+                        'default_website_published': True,
+                    }"
+                />
             </xpath>
             <xpath expr="//button[@name='action_redirect_to_members']" position="after">
                 <button name="action_view_sales"
@@ -25,7 +33,7 @@
     </record>
 
     <record id="slide_channel_view_tree_report" model="ir.ui.view">
-        <field name="name">slide.channel.view.tree.report.inherit.sale_slides</field>
+        <field name="name">slide.channel.view.list.report.inherit.sale_slides</field>
         <field name="model">slide.channel</field>
         <field name="inherit_id" ref="website_slides.slide_channel_view_tree_report"/>
         <field name="arch" type="xml">
@@ -43,8 +51,8 @@
         <field name="arch" type="xml">
             <xpath expr="//div[@name='info_avg_rating']" position="after">
                 <div class="d-flex" invisible="enroll != 'payment'">
-                    <span class="me-auto"><label for="product_sale_revenues" class="mb0">Sales</label></span>
-                    <field name="product_sale_revenues" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                    <label for="product_sale_revenues" class="mb0 me-auto">Sales</label>
+                    <field class="text-nowrap" name="product_sale_revenues" widget="monetary" options="{'currency_field': 'currency_id'}"/>
                     <field name="currency_id" invisible="True"/>
                 </div>
             </xpath>
@@ -59,7 +67,15 @@
             <xpath expr="//field[@name='allow_comment']" position="after">
                 <field name="enroll" widget="radio" options="{'horizontal': true}" string="Enroll Policy"/>
                 <field name="product_id" invisible="enroll != 'payment'" required="enroll == 'payment'"
-                context="{'default_detailed_type': 'course', 'default_invoice_policy': 'order', 'default_purchase_ok': False, 'default_sale_ok': True, 'default_website_published': True}"/>
+                    context="{
+                        'default_type': 'service',
+                        'default_service_tracking': 'course',
+                        'default_invoice_policy': 'order',
+                        'default_purchase_ok': False,
+                        'default_sale_ok': True,
+                        'default_website_published': True,
+                    }"
+                />
     		</xpath>
         </field>
     </record>

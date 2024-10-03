@@ -4,7 +4,7 @@
 from datetime import datetime
 
 from odoo import fields
-from odoo.tests.common import TransactionCase, Form
+from odoo.tests import Form, TransactionCase
 from odoo.tools import DEFAULT_SERVER_DATETIME_FORMAT
 
 
@@ -40,7 +40,7 @@ class TestOnchangeProductId(TransactionCase):
         partner_id = self.res_partner_model.create(dict(name="George"))
         tax_include_id = self.tax_model.create(dict(name="Include tax",
                                                     amount='21.00',
-                                                    price_include=True,
+                                                    price_include_override='tax_included',
                                                     type_tax_use='purchase'))
         tax_exclude_id = self.tax_model.create(dict(name="Exclude tax",
                                                     amount='0.00',

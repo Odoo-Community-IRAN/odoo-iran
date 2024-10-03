@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { PyDate, PyDateTime, PyRelativeDelta, PyTime, PyTimeDelta } from "./py_date";
 
 export class EvaluationError extends Error {}
@@ -66,6 +64,16 @@ export const BUILTINS = {
         return execOnIterable(iterable, (iterable) => {
             return new Set(iterable);
         });
+    },
+
+    max(...args) {
+        // kwargs are not supported by Math.max.
+        return Math.max(...args.slice(0, -1));
+    },
+
+    min(...args) {
+        // kwargs are not supported by Math.min.
+        return Math.min(...args.slice(0, -1));
     },
 
     time: {

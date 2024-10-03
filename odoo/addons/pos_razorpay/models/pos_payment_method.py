@@ -6,11 +6,11 @@ from .razorpay_pos_request import RazorpayPosRequest
 class PosPaymentMethod(models.Model):
     _inherit = 'pos.payment.method'
 
-    razorpay_tid = fields.Char(string='Razorpay Device Serial No', help="Device Serial No \n ex: 7000012300")
-    razorpay_allowed_payment_modes = fields.Selection(selection=[('all', 'All'), ('card', 'Card'), ('upi', 'UPI'), ('bharatqr', 'BHARATQR')], default='all', help="Choose allow payment mode: \n All/Card/UPI or QR")
-    razorpay_username = fields.Char(string="Razorpay Username", help="Username(Device Login) \n ex: 1234500121")
-    razorpay_api_key = fields.Char(string="Razorpay API Key", help="Used when connecting to Razorpay: https://razorpay.com/docs/payments/dashboard/account-settings/api-keys/")
-    razorpay_test_mode = fields.Boolean(string="Razorpay Test Mode", default=False, help="Turn it on when in Test Mode")
+    razorpay_tid = fields.Char(string='Razorpay Device Serial No', help='Device Serial No \n ex: 7000012300')
+    razorpay_allowed_payment_modes = fields.Selection(selection=[('all', 'All'), ('card', 'Card'), ('upi', 'UPI'), ('bharatqr', 'BHARATQR')], default='all', help='Choose allow payment mode: \n All/Card/UPI or QR')
+    razorpay_username = fields.Char(string='Razorpay Username', help='Username(Device Login) \n ex: 1234500121')
+    razorpay_api_key = fields.Char(string='Razorpay API Key', help='Used when connecting to Razorpay: https://razorpay.com/docs/payments/dashboard/account-settings/api-keys/')
+    razorpay_test_mode = fields.Boolean(string='Razorpay Test Mode', default=False, help='Turn it on when in Test Mode')
 
     def _get_payment_terminal_selection(self):
         return super()._get_payment_terminal_selection() + [('razorpay', 'Razorpay')]
@@ -22,7 +22,7 @@ class PosPaymentMethod(models.Model):
             'amount': data.get('amount'),
             'externalRefNumber': data.get('referenceId')
         })
-        response = razorpay._call_razorpay(endpoint="pay", payload=body)
+        response = razorpay._call_razorpay(endpoint='pay', payload=body)
         if response.get('success') and not response.get('errorCode'):
             return {
                 'success': True,
@@ -36,7 +36,7 @@ class PosPaymentMethod(models.Model):
         razorpay = RazorpayPosRequest(self)
         body = razorpay._razorpay_get_payment_status_request_body()
         body.update({'origP2pRequestId': data.get('p2pRequestId')})
-        response = razorpay._call_razorpay(endpoint="status", payload=body)
+        response = razorpay._call_razorpay(endpoint='status', payload=body)
         if response.get('success') and not response.get('errorCode'):
             payment_status = response.get('status')
             payment_messageCode = response.get('messageCode')
@@ -56,9 +56,10 @@ class PosPaymentMethod(models.Model):
                     'createdTime': response.get('createdTime'),
                 }
             elif payment_status == 'FAILED' or payment_messageCode == 'P2P_DEVICE_CANCELED':
-                return {'error': str(response.get('message', _('Razorpay POS transaction failed')))}
+                return {'error': str(response.get('message', _('Razorpay POS transaction failed'))),
+                        'payment_messageCode': payment_messageCode}
             elif payment_messageCode in ['P2P_DEVICE_RECEIVED', 'P2P_DEVICE_SENT', 'P2P_STATUS_QUEUED']:
-                return {'status': payment_messageCode.split("_")[-1]}
+                return {'status': payment_messageCode.split('_')[-1]}
         default_error_msg = _('Razorpay POS payment status request expected errorCode not found in the response')
         error = response.get('errorMessage') or default_error_msg
         return {'error': str(error)}
@@ -67,7 +68,7 @@ class PosPaymentMethod(models.Model):
         razorpay = RazorpayPosRequest(self)
         body = razorpay._razorpay_get_payment_request_body(payment_mode=False)
         body.update({'origP2pRequestId': data.get('p2pRequestId')})
-        response = razorpay._call_razorpay(endpoint="cancel", payload=body)
+        response = razorpay._call_razorpay(endpoint='cancel', payload=body)
         if response.get('success') and not response.get('errorCode'):
             return {'error': _('Razorpay POS transaction canceled successfully')}
         default_error_msg = _('Razorpay POS payment cancel request expected errorCode not found in the response')

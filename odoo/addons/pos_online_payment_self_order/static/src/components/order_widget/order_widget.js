@@ -1,4 +1,3 @@
-/** @odoo-module */
 import { patch } from "@web/core/utils/patch";
 import { _t } from "@web/core/l10n/translation";
 import { OrderWidget } from "@pos_self_order/app/components/order_widget/order_widget";
@@ -8,9 +7,11 @@ patch(OrderWidget.prototype, {
         const buttonName = this.router.activeSlot === "product_list" ? _t("Order") : _t("Pay");
         const type = this.selfOrder.config.self_ordering_mode;
         const mode = this.selfOrder.config.self_ordering_pay_after;
-        const isOnlinePayment = this.selfOrder.pos_payment_methods.find((p) => p.is_online_payment);
+        const isOnlinePayment = this.selfOrder.models["pos.payment.method"].find(
+            (p) => p.is_online_payment
+        );
         const order = this.selfOrder.currentOrder;
-        const takeAway = order.take_away;
+        const takeAway = order.takeaway;
         const service = this.selfOrder.config.self_ordering_service_mode;
         const isNoLine = order.lines.length === 0;
 
@@ -18,7 +19,7 @@ patch(OrderWidget.prototype, {
             return super.buttonToShow;
         }
 
-        if (order.amount_total === 0 && !isNoLine && mode !== "each") {
+        if (order.amount_total === 0 && !isNoLine) {
             return { label: _t("Order"), disabled: false };
         }
 
@@ -31,7 +32,7 @@ patch(OrderWidget.prototype, {
                 return { label: "", disabled: true };
             }
 
-            if (!order.isSavedOnServer) {
+            if (Object.keys(order.changes).length > 0) {
                 return { label: _t("Order"), disabled: false };
             } else {
                 if (isOnlinePayment) {

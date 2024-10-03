@@ -3,17 +3,15 @@
 # 	* pos_viva_wallet
 # 
 # Translators:
-# Sergio Zanchetta <primes2h@gmail.com>, 2024
 # Wil Odoo, 2024
-# Marianna Ciofani, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-08-13 10:27+0000\n"
-"PO-Revision-Date: 2024-02-07 08:49+0000\n"
-"Last-Translator: Marianna Ciofani, 2024\n"
+"POT-Creation-Date: 2024-09-25 08:39+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Italian (https://app.transifex.com/odoo/teams/41243/it/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -27,9 +25,22 @@ msgid "API Key"
 msgstr "Chiave API"
 
 #. module: pos_viva_wallet
+#. odoo-python
+#: code:addons/pos_viva_wallet/models/pos_payment_method.py:0
+msgid "Can't create payment method. Please check the data and update it."
+msgstr ""
+"Impossibile creare il metodo di pagamento. Verifica i dati e aggiornali."
+
+#. module: pos_viva_wallet
+#. odoo-python
+#: code:addons/pos_viva_wallet/models/pos_payment_method.py:0
+msgid "Can't update payment method. Please check the data and update it."
+msgstr ""
+"Impossibile aggiornare il metodo di pagamento. Verifica i dati e aggiornali."
+
+#. module: pos_viva_wallet
 #. odoo-javascript
 #: code:addons/pos_viva_wallet/static/src/app/payment_viva_wallet.js:0
-#, python-format
 msgid "Cannot process transactions with negative amount."
 msgstr "Impossibile elaborare transazioni con importo negativo."
 
@@ -46,7 +57,6 @@ msgstr "Segreto client"
 #. module: pos_viva_wallet
 #. odoo-javascript
 #: code:addons/pos_viva_wallet/static/src/app/payment_viva_wallet.js:0
-#, python-format
 msgid ""
 "Could not connect to the Odoo server, please check your internet connection "
 "and try again."
@@ -57,7 +67,6 @@ msgstr ""
 #. module: pos_viva_wallet
 #. odoo-python
 #: code:addons/pos_viva_wallet/models/pos_payment_method.py:0
-#, python-format
 msgid "It is essential to provide API key for the use of viva wallet"
 msgstr "È essenziale fornire la chiave API per utilizzare Viva Wallet"
 
@@ -69,22 +78,18 @@ msgstr "ID commerciante"
 #. module: pos_viva_wallet
 #. odoo-javascript
 #: code:addons/pos_viva_wallet/static/src/app/payment_viva_wallet.js:0
-#, python-format
 msgid "Message from Viva Wallet: %s"
 msgstr "Messaggio da Viva Wallet: %s"
 
 #. module: pos_viva_wallet
 #. odoo-python
 #: code:addons/pos_viva_wallet/models/pos_payment_method.py:0
-#, python-format
 msgid "Not receive Bearer Token"
 msgstr "Token Bearer non ricevuto"
 
 #. module: pos_viva_wallet
 #. odoo-python
 #: code:addons/pos_viva_wallet/models/pos_payment_method.py:0
-#: code:addons/pos_viva_wallet/models/pos_payment_method.py:0
-#, python-format
 msgid "Only 'group_pos_user' are allowed to fetch token from Viva Wallet"
 msgstr ""
 "Solo gli utenti 'group_pos_user' hanno il permesso di recuperare il token da"
@@ -93,7 +98,6 @@ msgstr ""
 #. module: pos_viva_wallet
 #. odoo-python
 #: code:addons/pos_viva_wallet/models/pos_payment_method.py:0
-#, python-format
 msgid "Only 'group_pos_user' are allowed to get latest transaction status"
 msgstr ""
 "Solo gli utenti 'group_pos_user' hanno il permesso per ottenere lo stato "
@@ -103,11 +107,6 @@ msgstr ""
 #: model:ir.model,name:pos_viva_wallet.model_pos_payment_method
 msgid "Point of Sale Payment Methods"
 msgstr "Metodi di pagamento punto vendita"
-
-#. module: pos_viva_wallet
-#: model:ir.model,name:pos_viva_wallet.model_pos_session
-msgid "Point of Sale Session"
-msgstr "Sessione punto vendita"
 
 #. module: pos_viva_wallet
 #: model:ir.model.fields,help:pos_viva_wallet.field_pos_payment_method__viva_wallet_test_mode
@@ -127,8 +126,6 @@ msgstr "Modalità di prova"
 #. module: pos_viva_wallet
 #. odoo-python
 #: code:addons/pos_viva_wallet/models/pos_payment_method.py:0
-#: code:addons/pos_viva_wallet/models/pos_payment_method.py:0
-#, python-format
 msgid "There are some issues between us and Viva Wallet, try again later. %s"
 msgstr ""
 "Si sono verificati alcuni problemi tra noi e Viva Wallet, riprova più "
@@ -137,7 +134,6 @@ msgstr ""
 #. module: pos_viva_wallet
 #. odoo-python
 #: code:addons/pos_viva_wallet/models/pos_payment_method.py:0
-#, python-format
 msgid "There are some issues between us and Viva Wallet, try again later.%s)"
 msgstr ""
 "Si sono verificati alcuni problemi tra noi e Viva Wallet, riprova più "
@@ -174,7 +170,6 @@ msgstr "Token Bearer Viva Wallet"
 #. module: pos_viva_wallet
 #. odoo-javascript
 #: code:addons/pos_viva_wallet/static/src/app/payment_viva_wallet.js:0
-#, python-format
 msgid "Viva Wallet Error"
 msgstr "Errore Viva Wallet"
 
@@ -196,7 +191,6 @@ msgstr "Chiave di verifica Webhook Viva Wallet"
 #. module: pos_viva_wallet
 #. odoo-python
 #: code:addons/pos_viva_wallet/models/pos_payment_method.py:0
-#, python-format
 msgid "Your transaction with Viva Wallet failed. Please try again later."
 msgstr ""
 "La tua transazione con Viva Wallet non è riuscita. Prova di nuovo più tardi."
@@ -209,7 +203,6 @@ msgstr "[ID terminale di Viva Wallet], ad esempio: 16002169"
 #. module: pos_viva_wallet
 #. odoo-python
 #: code:addons/pos_viva_wallet/controllers/main.py:0
-#, python-format
 msgid "received a message for a pos payment provider not registered."
 msgstr ""
 "ha ricevuto un messaggio per un fornitore di pagamenti pos non registrato."
@@ -217,6 +210,5 @@ msgstr ""
 #. module: pos_viva_wallet
 #. odoo-python
 #: code:addons/pos_viva_wallet/controllers/main.py:0
-#, python-format
 msgid "received a message for a terminal not registered in Odoo: %s"
 msgstr "ha ricevuto un messaggio per un terminale non registrato in Odoo: %s"

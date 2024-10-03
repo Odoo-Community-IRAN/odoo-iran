@@ -4,7 +4,7 @@
         required many options: token, res_model, res_id, ...
     -->
     <t t-name="project.ChatterComposer">
-        <div t-if="props.allowComposer" class="o_portal_chatter_composer">
+        <div t-if="props.allowComposer" class="o_portal_chatter_composer pt-1">
             <t t-if="props.displayComposer">
                 <div t-if="state.displayError" class="alert alert-danger mb8 o_portal_chatter_composer_error" role="alert">
                     Oops! Something went wrong. Try to reload the page and log in.
@@ -18,7 +18,7 @@
                     />
                     <div class="flex-grow-1">
                         <div class="o_portal_chatter_composer_input">
-                            <div class="o_portal_chatter_composer_body mb32">
+                            <div class="o_portal_chatter_composer_body pb-3">
                                 <textarea
                                     class="o_input"
                                     placeholder="Write a message..."
@@ -32,7 +32,7 @@
                                     canDelete="true"
                                     delete.bind="deleteAttachment"
                                 />
-                                <div class="mt8">
+                                <div class="pt-2">
                                     <button name="send_message" t-on-click="sendMessage" class="btn btn-primary me-1" type="submit" t-att-disabled="state.loading">
                                         Send
                                     </button>

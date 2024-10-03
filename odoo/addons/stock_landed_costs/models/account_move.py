@@ -43,7 +43,7 @@ class AccountMove(models.Model):
         action = self.env["ir.actions.actions"]._for_xml_id("stock_landed_costs.action_stock_landed_cost")
         domain = [('id', 'in', self.landed_costs_ids.ids)]
         context = dict(self.env.context, default_vendor_bill_id=self.id)
-        views = [(self.env.ref('stock_landed_costs.view_stock_landed_cost_tree2').id, 'tree'), (False, 'form'), (False, 'kanban')]
+        views = [(self.env.ref('stock_landed_costs.view_stock_landed_cost_tree2').id, 'list'), (False, 'form'), (False, 'kanban')]
         return dict(action, domain=domain, context=context, views=views)
 
     def _post(self, soft=True):
@@ -55,7 +55,7 @@ class AccountMove(models.Model):
 class AccountMoveLine(models.Model):
     _inherit = 'account.move.line'
 
-    product_type = fields.Selection(related='product_id.detailed_type', readonly=True)
+    product_type = fields.Selection(related='product_id.type', readonly=True)
     is_landed_costs_line = fields.Boolean()
 
     @api.onchange('product_id')
@@ -74,5 +74,9 @@ class AccountMoveLine(models.Model):
         layers = super()._get_stock_valuation_layers(move)
         return layers.filtered(lambda svl: not svl.stock_landed_cost_id)
 
-    def _can_use_stock_accounts(self):
-        return super()._can_use_stock_accounts() or (self.product_id.type == 'service' and self.product_id.landed_cost_ok)
+    def _eligible_for_cogs(self):
+        return super()._eligible_for_cogs() or (
+            self.product_id.type == "service"
+            and self.product_id.landed_cost_ok
+            and self.product_id.valuation == "real_time"
+        )

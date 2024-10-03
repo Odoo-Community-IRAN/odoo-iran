@@ -2,21 +2,30 @@
 .o_list_renderer {
     --ListRenderer-table-padding-x: #{$table-cell-padding-x-sm};
     --ListRenderer-thead-padding-y: #{map-get($spacers, 4)};
-    --ListRenderer-thead-bg-color:  #{$o-webclient-background-color};
+    --ListRenderer-thead-bg-color: #{$o-webclient-background-color};
+    --ListRenderer-thead-bg-active-color: #{$o-gray-200};
     --ListRenderer-thead-border-end-color: #{$border-color};
     --ListRenderer-tfoot-bg-color: #{$o-list-footer-bg-color};
+    --sticky-header-zindex: 1;
+    --o-view-nocontent-zindex: calc(var(--sticky-header-zindex) + 1);
 
     margin-left: var(--ListRenderer-margin-x, unset);
     margin-right: var(--ListRenderer-margin-x, unset);
 
     // sticky header on desktop
-    @include media-breakpoint-up(md) {
-        height: 100%;
+    @include media-only(screen) {
+        @include media-breakpoint-up(md) {
+            height: 100%;
 
-        .o_list_table thead {
-            @include o-position-sticky(0);
-            z-index: 1;
+            .o_list_table thead {
+                @include o-position-sticky(0);
+                z-index: var(--sticky-header-zindex);
+            }
         }
+    }
+
+    @include media-only(print) {
+        width: 100% !important;
     }
 
     th, td {
@@ -27,6 +36,12 @@
     .o_list_view & {
         --ListRenderer-thead-padding-y: #{$table-cell-padding-y-sm};
         --ListRenderer-table-padding-x: #{$o-horizontal-padding};
+
+        @include media-only(print) {
+            --ListRenderer-table-padding-x: 0;
+
+            --Tag-font-size: #{$font-size-sm};
+        }
     }
 
     .o_list_table {
@@ -38,6 +53,22 @@
         border-collapse: collapse;
         font-variant-numeric: tabular-nums;
 
+        @include media-only(print) {
+            width: 100% !important;
+            border-collapse: separate;
+            border-spacing: 0;
+
+            &.o_list_table_grouped .o_group_header {
+                --table-bg: #{$gray-200};
+                color: color-contrast($gray-200);
+            }
+
+            &.o_list_table_ungrouped {
+                --table-striped-bg: #{$gray-100};
+                --table-striped-color: #{color-contrast($gray-100)};
+            }
+        }
+
         > thead, > tbody, > tfoot {
             > tr > :first-child {
                 padding-left: var(--ListRenderer-table-padding-x);
@@ -45,10 +76,6 @@
 
             > tr > :last-child {
                 padding-right: var(--ListRenderer-table-padding-x);
-            }
-
-            > tr > :empty {
-                padding: 0;
             }
         }
 
@@ -59,11 +86,43 @@
                 padding-top: var(--ListRenderer-thead-padding-y);
                 background-color: transparent;
                 color: $headings-color;
+
+                @include media-only(print) {
+                    font-weight: $font-weight-bold;
+                }
+
+                &.table-active {
+                    background: var(--ListRenderer-thead-bg-active-color);
+                    box-shadow: none;
+                }
             }
 
             .o_list_number_th {
                 /*rtl:ignore*/
                 text-align: right;
+            }
+
+            .o_column_sortable {
+
+                .o_list_sortable_caret {
+                    background: var(--ListRenderer-thead-bg-color);
+                    position: absolute;
+                    right: .2rem;
+                    padding: 0 .2rem;
+                }
+
+                &.table-active .o_list_sortable_caret {
+                    background: var(--ListRenderer-thead-bg-active-color);
+                }
+
+                .o_list_header_label_spacer {
+                    flex: 0 0 0;
+                }
+
+                &.table-active .o_list_header_label_spacer {
+                    flex: 1 0 0.4rem;
+                    max-width: 1.2rem;
+                }
             }
         }
 
@@ -148,6 +207,12 @@
             }
         }
 
+        .o_handle_cell {
+            @include media-only(print) {
+                display: none;
+            }
+        }
+
         .o_column_sortable:not(.o_handle_cell) {
             user-select: none;  // Prevent unwanted selection while sorting
         }
@@ -155,6 +220,10 @@
         .o_list_record_selector {
             width: 40px;  // Don't force to keep o_group_name width dynamic
             vertical-align: middle;
+
+            @include media-only(print) {
+                width: 1.5rem !important;
+            }
         }
 
         .o_list_record_remove, .o_handle_cell, .o_list_record_open_form_view {
@@ -323,6 +392,8 @@
             > .o_field_widget:not(.o_readonly_modifier):not(.o_invisible_modifier) {
                 width: 100%;
                 .o_input {
+                    --o-input-background-color: initial;
+
                     border: none;
                     padding: 0;
                     margin: 0;
@@ -342,7 +413,9 @@
                 }
                 &.o_field_monetary input {
                     width: 0; // override width: 100px and let flex makes this input grow
-                    margin: 0 4px;
+                }
+                &.o_field_monetary span.o_input {
+                    justify-content: flex-end;
                 }
                 .o_field_many2one_avatar {
                     display: flex;
@@ -403,39 +476,57 @@
 
     .o_data_row.o_selected_row > .o_data_cell.o_invalid_cell:not(.o_readonly_modifier) {
         border-bottom: 1px solid $danger;
-    }
 
-    /**
-    Because of border-collapse, border top and border bottom are 'merged'.
-
-    * cell border overlaps row border
-    * when there is a border collapse the first cell (e.g. A1) take over the following cell (e.g. B1 or A2)
-    ┌──┬──┐
-    │A1│B1│
-    ├──┼──┤
-    │A2│B2│
-    └──┴──┘
-
-    So we apply some rules to have the style wanted:
-    */
-    // 1. we set the global separator (gray line) of the table on the row (bottom) and not on the cell (bottom)
-    .o_data_row {
-        border-bottom-width: 1px;
-
-        &:not(.o_selected_row):not(.o_data_row_selected):focus-within > * {
-            $-focus-bg: mix($table-color, $table-bg, percentage($table-hover-bg-factor + 0.1));
-
-            --#{$variable-prefix}table-accent-bg: #{$-focus-bg};
+        &:not(:focus-within) {
+            background-color: $o-input-invalid-bg;
         }
     }
 
-    // 2. we remove the bottom border (added by BS5) on all cells (this force to show the top border of selected cell)
-    .o_data_row > .o_data_cell {
-        border-bottom-width: 0;
+    @include media-only(screen) {
+        /**
+        Because of border-collapse, border top and border bottom are 'merged'.
+
+        * cell border overlaps row border
+        * when there is a border collapse the first cell (e.g. A1) take over the following cell (e.g. B1 or A2)
+        ┌──┬──┐
+        │A1│B1│
+        ├──┼──┤
+        │A2│B2│
+        └──┴──┘
+
+        So we apply some rules to have the style wanted:
+        */
+        // 1. we set the global separator (gray line) of the table on the row (bottom) and not on the cell (bottom)
+        .o_data_row {
+            border-bottom-width: 1px;
+
+            &:not(.o_selected_row):not(.o_data_row_selected):focus-within > * {
+                $-focus-bg: rgba(var(--#{$variable-prefix}emphasis-color-rgb), #{$table-hover-bg-factor * 2});
+
+                --#{$variable-prefix}table-accent-bg: #{$-focus-bg};
+            }
+        }
+
+        // 2. we remove the bottom border (added by BS5) on all cells (this force to show the top border of selected cell)
+        .o_data_row > .o_data_cell {
+            border-bottom-width: 0;
+        }
+        // 3. we add only a bottom border to selected cells (this force to show the bottom border of the selected cell)
+        .o_data_row.o_data_row_selected > .o_data_cell {
+            border-bottom-width: 1px;
+        }
     }
-    // 3. we add only a bottom border to selected cells (this force to show the bottom border of the selected cell)
-    .o_data_row.o_data_row_selected > .o_data_cell {
-        border-bottom-width: 1px;
+
+    @include media-only(print) {
+        .o_data_cell {
+            [type="action"] {
+                display: none;
+            }
+
+            &.w-print-0.p-print-0 {
+                visibility: hidden;
+            }
+        }
     }
 
     .o_data_row.o_dragged {
@@ -477,9 +568,9 @@
 
     .o_data_row,
     .o_list_footer,
-    .o_group_header,
-    thead .o_list_record_selector {
+    .o_group_header {
         @include o-sample-data-disabled;
+        border-color: rgba(0, 0, 0, 0.02);
     }
 }
 

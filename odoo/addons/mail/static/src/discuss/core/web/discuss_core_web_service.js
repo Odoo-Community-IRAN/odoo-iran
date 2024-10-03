@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { reactive } from "@odoo/owl";
 
 import { _t } from "@web/core/l10n/translation";
@@ -15,45 +13,11 @@ export class DiscussCoreWeb {
         this.busService = services.bus_service;
         this.notificationService = services.notification;
         this.ui = services.ui;
-        this.chatWindowService = services["mail.chat_window"];
-        this.discussCoreCommonService = services["discuss.core.common"];
-        this.messagingService = services["mail.messaging"];
         this.store = services["mail.store"];
-        this.threadService = services["mail.thread"];
+        this.multiTab = services.multi_tab;
     }
 
     setup() {
-        this.messagingService.isReady.then((data) => {
-            this.store.discuss.channels.isOpen =
-                data.current_user_settings.is_discuss_sidebar_category_channel_open;
-            this.store.discuss.chats.isOpen =
-                data.current_user_settings.is_discuss_sidebar_category_chat_open;
-            this.busService.start();
-        });
-        this.env.bus.addEventListener(
-            "discuss.channel/new_message",
-            ({ detail: { channel, message } }) => {
-                if (this.ui.isSmall || message.isSelfAuthored) {
-                    return;
-                }
-                if (channel.correspondent?.eq(this.store.odoobot) && this.store.odoobotOnboarding) {
-                    // this cancels odoobot onboarding auto-opening of chat window
-                    this.store.odoobotOnboarding = false;
-                    return;
-                }
-                this.threadService.notifyMessageToUser(channel, message);
-            }
-        );
-        this.busService.subscribe("res.users.settings", (payload) => {
-            if (payload) {
-                this.store.discuss.chats.isOpen =
-                    payload.is_discuss_sidebar_category_chat_open ??
-                    this.store.discuss.chats.isOpen;
-                this.store.discuss.channels.isOpen =
-                    payload.is_discuss_sidebar_category_channel_open ??
-                    this.store.discuss.channels.isOpen;
-            }
-        });
         this.busService.subscribe("res.users/connection", async ({ partnerId, username }) => {
             // If the current user invited a new user, and the new user is
             // connecting for the first time while the current user is present
@@ -63,47 +27,37 @@ export class DiscussCoreWeb {
                 { user: username }
             );
             this.notificationService.add(notification, { type: "info" });
-            const chat = await this.threadService.getChat({ partnerId });
+            if (!this.multiTab.isOnMainTab()) {
+                return;
+            }
+            const chat = await this.store.getChat({ partnerId });
             if (chat && !this.ui.isSmall) {
-                this.store.ChatWindow.insert({ thread: chat });
+                this.store.chatHub.opened.add({ thread: chat });
             }
         });
-        this.busService.subscribe("discuss.Thread/fold_state", (data) => {
-            const thread = this.store.Thread.get(data);
+        this.busService.subscribe("discuss.Thread/fold_state", async (data) => {
+            const thread = await this.store.Thread.getOrFetch(data);
             if (data.fold_state && thread && data.foldStateCount > thread.foldStateCount) {
                 thread.foldStateCount = data.foldStateCount;
-                if (data.fold_state !== thread.state) {
-                    thread.state = data.fold_state;
-                    if (thread.state === "closed") {
-                        const chatWindow = this.store.discuss.chatWindows.find((chatWindow) =>
-                            chatWindow.thread?.eq(thread)
-                        );
-                        if (chatWindow) {
-                            this.chatWindowService.close(chatWindow, { notifyState: false });
-                        }
-                    } else {
-                        this.store.ChatWindow.insert({
-                            thread,
-                            folded: thread.state === "folded",
-                        });
-                    }
+                thread.state = data.fold_state;
+                if (thread.state === "closed") {
+                    const chatWindow = this.store.ChatWindow.get({ thread });
+                    chatWindow?.close({ notifyState: false });
                 }
             }
         });
+        this.env.bus.addEventListener("mail.message/delete", ({ detail: { message } }) => {
+            if (message.thread?.model === "discuss.channel") {
+                // initChannelsUnreadCounter becomes unreliable
+                this.store.channels.fetch();
+            }
+        });
+        this.busService.start();
     }
 }
 
 export const discussCoreWeb = {
-    dependencies: [
-        "bus_service",
-        "discuss.core.common",
-        "mail.chat_window",
-        "mail.messaging",
-        "mail.store",
-        "mail.thread",
-        "notification",
-        "ui",
-    ],
+    dependencies: ["bus_service", "mail.store", "notification", "ui", "multi_tab"],
     /**
      * @param {import("@web/env").OdooEnv} env
      * @param {Partial<import("services").Services>} services

@@ -5,9 +5,10 @@ from markupsafe import Markup
 from unittest.mock import patch
 
 from odoo.addons.mail.tests.common import mail_new_test_user, MailCommon
+from odoo.addons.mail.tools.discuss import Store
 from odoo.addons.test_mail.models.test_mail_models import MailTestSimple
 from odoo.exceptions import AccessError, UserError
-from odoo.tests.common import tagged, users
+from odoo.tests.common import tagged, users, HttpCase
 from odoo.tools import is_html_empty, mute_logger, formataddr
 
 
@@ -95,7 +96,7 @@ class TestMessageValues(MailCommon):
             record._message_update_content(tracking_message, '', [])
 
     @mute_logger('odoo.models.unlink')
-    def test_mail_message_format(self):
+    def test_mail_message_to_store(self):
         record1 = self.env['mail.test.simple'].create({'name': 'Test1'})
         record2 = self.env['mail.test.nothread'].create({'name': 'Test2'})
         messages = self.env['mail.message'].create([{
@@ -104,17 +105,17 @@ class TestMessageValues(MailCommon):
         } for record in [record1, record2]])
         for message, record in zip(messages, [record1, record2]):
             with self.subTest(record=record):
-                formatted = message.message_format()[0]
+                formatted = Store(message, for_current_user=True).get_result()["mail.message"][0]
                 self.assertEqual(formatted['record_name'], record.name)
                 record.write({'name': 'Just Test'})
-                formatted = message.message_format()[0]
+                formatted = Store(message, for_current_user=True).get_result()["mail.message"][0]
                 self.assertEqual(formatted['record_name'], 'Just Test')
 
     @mute_logger('odoo.models.unlink')
-    def test_mail_message_format_access(self):
+    def test_mail_message_to_store_access(self):
         """
         User that doesn't have access to a record should still be able to fetch
-        the record_name inside message_format.
+        the record_name inside message _to_store.
         """
         company_2 = self.env['res.company'].create({'name': 'Second Test Company'})
         record1 = self.env['mail.test.multi.company'].create({
@@ -124,11 +125,52 @@ class TestMessageValues(MailCommon):
         message = record1.message_post(body='', partner_ids=[self.user_employee.partner_id.id])
         # We need to flush and invalidate the ORM cache since the record_name
         # is already cached from the creation. Otherwise it will leak inside
-        # message_format.
+        # message _to_store.
         self.env.flush_all()
         self.env.invalidate_all()
-        res = message.with_user(self.user_employee).message_format()
-        self.assertEqual(res[0].get('record_name'), 'Test1')
+        res = Store(message.with_user(self.user_employee), for_current_user=True).get_result()
+        self.assertEqual(res["mail.message"][0].get("record_name"), "Test1")
+
+    def test_records_by_message(self):
+        record1 = self.env["mail.test.simple"].create({"name": "Test1"})
+        record2 = self.env["mail.test.simple"].create({"name": "Test1"})
+        record3 = self.env["mail.test.nothread"].create({"name": "Test2"})
+        messages = self.env["mail.message"].create(
+            [
+                {
+                    "model": record._name,
+                    "res_id": record.id,
+                }
+                for record in [record1, record2, record3]
+            ]
+        )
+        # methods called on batch of message
+        records_by_model_name = messages._records_by_model_name()
+        test_simple_records = records_by_model_name["mail.test.simple"]
+        self.assertEqual(test_simple_records, record1 + record2)
+        self.assertEqual(test_simple_records._prefetch_ids, tuple((record1 + record2).ids))
+        test_no_thread_records = records_by_model_name["mail.test.nothread"]
+        self.assertEqual(test_no_thread_records, record3)
+        self.assertEqual(test_no_thread_records._prefetch_ids, tuple(record3.ids))
+        record_by_message = messages._record_by_message()
+        m0_records = record_by_message[messages[0]]
+        self.assertEqual(m0_records, record1)
+        self.assertEqual(m0_records._prefetch_ids, tuple((record1 + record2).ids))
+        m1_records = record_by_message[messages[1]]
+        self.assertEqual(m1_records, record2)
+        self.assertEqual(m1_records._prefetch_ids, tuple((record1 + record2).ids))
+        m2_records = record_by_message[messages[2]]
+        self.assertEqual(m2_records, record3)
+        self.assertEqual(m2_records._prefetch_ids, tuple(record3.ids))
+        # methods called on individual message from a batch: prefetch from batch is kept
+        records_by_model_name = next(iter(messages))._records_by_model_name()
+        test_simple_records = records_by_model_name["mail.test.simple"]
+        self.assertEqual(test_simple_records, record1)
+        self.assertEqual(test_simple_records._prefetch_ids, tuple((record1 + record2).ids))
+        record_by_message = next(iter(messages))._record_by_message()
+        m0_records = record_by_message[messages[0]]
+        self.assertEqual(m0_records, record1)
+        self.assertEqual(m0_records._prefetch_ids, tuple((record1 + record2).ids))
 
     def test_mail_message_values_body_base64_image(self):
         msg = self.env['mail.message'].with_user(self.user_employee).create({
@@ -484,11 +526,11 @@ class TestMessageAccess(MailCommon):
             message_type='comment', subtype_xmlid='mail.mt_note')
         # portal user have no rights to read the message
         with self.assertRaises(AccessError):
-            message.with_user(self.user_portal).read(['subject, body'])
+            message.with_user(self.user_portal).read(['subject', 'body'])
 
-        with patch.object(MailTestSimple, 'check_access_rights', return_value=True):
+        with patch.object(MailTestSimple, '_check_access', return_value=None):
             with self.assertRaises(AccessError):
-                message.with_user(self.user_portal).read(['subject, body'])
+                message.with_user(self.user_portal).read(['subject', 'body'])
 
             # parent message is accessible to references notification mail values
             # for _notify method and portal user have no rights to send the message for this model
@@ -507,3 +549,51 @@ class TestMessageAccess(MailCommon):
 
         self.assertTrue(new_mail)
         self.assertEqual(new_msg.parent_id, message)
+
+
+@tagged("mail_message")
+class TestMessageLinks(MailCommon, HttpCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+
+        cls.user_employee_1 = mail_new_test_user(cls.env, login='tao1', groups='base.group_user', name='Tao Lee')
+        cls.public_channel = cls.env['discuss.channel'].channel_create(name='Public Channel1', group_id=None)
+        cls.private_group = cls.env['discuss.channel'].create_group(partners_to=cls.user_employee_1.partner_id.ids, name="Group")
+
+    @users('employee')
+    def test_message_link_by_employee(self):
+        record = self.env['mail.test.simple'].create({'name': 'Test1'})
+        thread_message = record.message_post(body='Thread Message', message_type='comment')
+        channel_message = self.public_channel.message_post(body='Public Channel Message', message_type='comment')
+        deleted_message = record.message_post(body='', message_type='comment')
+        private_message_id = self.private_group.with_user(self.user_employee_1).message_post(
+            body='Private Message',
+            message_type='comment',
+        ).id
+        self.authenticate('employee', 'employee')
+        with self.subTest(thread_message=thread_message):
+            expected_url = self.base_url() + f'/odoo/{thread_message.model}/{thread_message.res_id}?highlight_message_id={thread_message.id}'
+            res = self.url_open(f'/mail/message/{thread_message.id}')
+            self.assertEqual(res.url, expected_url)
+        with self.subTest(channel_message=channel_message):
+            expected_url = self.base_url() + f'/odoo/action-mail.action_discuss?active_id={channel_message.res_id}&highlight_message_id={channel_message.id}'
+            res = self.url_open(f'/mail/message/{channel_message.id}')
+            self.assertEqual(res.url, expected_url)
+        with self.subTest(deleted_message=deleted_message):
+            res = self.url_open(f'/mail/message/{deleted_message.id}')
+            self.assertEqual(res.status_code, 404)
+        with self.subTest(private_message_id=private_message_id):
+            res = self.url_open(f'/mail/message/{private_message_id}')
+            self.assertEqual(res.status_code, 401)
+
+    @users('employee')
+    def test_message_link_by_public(self):
+        message = self.public_channel.message_post(
+            body='Public Channel Message',
+            message_type='comment',
+            subtype_xmlid='mail.mt_comment'
+        )
+        res = self.url_open(f'/mail/message/{message.id}')
+        self.assertEqual(res.status_code, 200)

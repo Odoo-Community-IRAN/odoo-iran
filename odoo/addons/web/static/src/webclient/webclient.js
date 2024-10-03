@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { useOwnDebugContext } from "@web/core/debug/debug_context";
 import { DebugMenu } from "@web/core/debug/debug_menu";
 import { localization } from "@web/core/l10n/localization";
@@ -10,14 +8,22 @@ import { ActionContainer } from "./actions/action_container";
 import { NavBar } from "./navbar/navbar";
 
 import { Component, onMounted, onWillStart, useExternalListener, useState } from "@odoo/owl";
+import { router, routerBus } from "@web/core/browser/router";
+import { browser } from "@web/core/browser/browser";
 
 export class WebClient extends Component {
+    static template = "web.WebClient";
+    static props = {};
+    static components = {
+        ActionContainer,
+        NavBar,
+        MainComponentsContainer,
+    };
+
     setup() {
         this.menuService = useService("menu");
         this.actionService = useService("action");
         this.title = useService("title");
-        this.router = useService("router");
-        this.user = useService("user");
         useOwnDebugContext({ categories: ["default"] });
         if (this.env.debug) {
             registry.category("systray").add(
@@ -32,8 +38,7 @@ export class WebClient extends Component {
         this.state = useState({
             fullscreen: false,
         });
-        this.title.setParts({ zopenerp: "Odoo" }); // zopenerp is easy to grep
-        useBus(this.env.bus, "ROUTE_CHANGE", this.loadRouterState);
+        useBus(routerBus, "ROUTE_CHANGE", this.loadRouterState);
         useBus(this.env.bus, "ACTION_MANAGER:UI-UPDATED", ({ detail: mode }) => {
             if (mode !== "new") {
                 this.state.fullscreen = mode === "fullscreen";
@@ -50,9 +55,22 @@ export class WebClient extends Component {
     }
 
     async loadRouterState() {
+        // ** url-retrocompatibility **
+        // the menu_id in the url is only possible if we came from an old url
+        let menuId = Number(router.current.menu_id || 0);
+        const firstAction = router.current.actionStack?.[0]?.action;
+        if (!menuId && firstAction) {
+            menuId = this.menuService
+                .getAll()
+                .find((m) => m.actionID === firstAction || m.actionPath === firstAction)?.appID;
+        }
+        if (menuId) {
+            this.menuService.setCurrentMenu(menuId);
+        }
         let stateLoaded = await this.actionService.loadState();
-        let menuId = Number(this.router.current.hash.menu_id || 0);
 
+        // ** url-retrocompatibility **
+        // when there is only menu_id in url
         if (!stateLoaded && menuId) {
             // Determines the current actionId based on the current menu
             const menu = this.menuService.getAll().find((m) => menuId === m.id);
@@ -63,17 +81,30 @@ export class WebClient extends Component {
             }
         }
 
+        // Setting the menu based on the action after it was loaded (eg when the action in url is an xmlid)
         if (stateLoaded && !menuId) {
             // Determines the current menu based on the current action
             const currentController = this.actionService.currentController;
             const actionId = currentController && currentController.action.id;
-            const menu = this.menuService.getAll().find((m) => m.actionID === actionId);
-            menuId = menu && menu.appID;
+            menuId = this.menuService.getAll().find((m) => m.actionID === actionId)?.appID;
+            if (menuId) {
+                // Sets the menu according to the current action
+                this.menuService.setCurrentMenu(menuId);
+            }
         }
 
-        if (menuId) {
-            // Sets the menu according to the current action
-            this.menuService.setCurrentMenu(menuId);
+        // Scroll to anchor after the state is loaded
+        if (stateLoaded) {
+            if (browser.location.hash !== "") {
+                try {
+                    const el = document.querySelector(browser.location.hash);
+                    if (el !== null) {
+                        el.scrollIntoView(true);
+                    }
+                } catch {
+                    // do nothing if the hash is not a correct selector.
+                }
+            }
         }
 
         if (!stateLoaded) {
@@ -110,19 +141,12 @@ export class WebClient extends Component {
     }
 
     registerServiceWorker() {
-        if ("serviceWorker" in navigator) {
+        if (navigator.serviceWorker) {
             navigator.serviceWorker
-                .register("/web/service-worker.js", { scope: "/web" })
+                .register("/web/service-worker.js", { scope: "/odoo" })
                 .catch((error) => {
                     console.error("Service worker registration failed, error:", error);
                 });
         }
     }
 }
-WebClient.components = {
-    ActionContainer,
-    NavBar,
-    MainComponentsContainer,
-};
-WebClient.template = "web.WebClient";
-WebClient.props = {};

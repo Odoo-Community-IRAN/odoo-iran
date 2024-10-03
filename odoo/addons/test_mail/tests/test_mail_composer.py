@@ -2,6 +2,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import base64
+import json
 
 from ast import literal_eval
 from datetime import timedelta
@@ -15,9 +16,8 @@ from odoo.addons.mail.wizard.mail_compose_message import MailComposer
 from odoo.addons.test_mail.models.test_mail_models import MailTestTicket
 from odoo.addons.test_mail.tests.common import TestRecipients
 from odoo.fields import Datetime as FieldDatetime
-from odoo.exceptions import AccessError
-from odoo.tests import tagged
-from odoo.tests.common import users, Form
+from odoo.exceptions import AccessError, UserError
+from odoo.tests import Form, tagged, users
 from odoo.tools import email_normalize, mute_logger, formataddr
 
 
@@ -1219,34 +1219,23 @@ class TestComposerInternals(TestMailComposer):
         self.test_record.message_subscribe(partner_ids=portal_user.partner_id.ids)
 
         # patch check access rights for write access, required to post a message by default
-        with patch.object(MailTestTicket, 'check_access_rights', return_value=True):
-            self.env['mail.compose.message'].with_user(portal_user).with_context(
-                self._get_web_context(self.test_record)
-            ).create({
-                'subject': 'Subject',
-                'body': '<p>Body text</p>',
-                'partner_ids': []
-            })._action_send_mail()
-
-            self.assertEqual(self.test_record.message_ids[0].body, '<p>Body text</p>')
-            self.assertEqual(self.test_record.message_ids[0].author_id, portal_user.partner_id)
-
-            self.env['mail.compose.message'].with_user(portal_user).with_context({
-                'default_composition_mode': 'comment',
-                'default_parent_id': self.test_record.message_ids.ids[0],
-            }).create({
-                'subject': 'Subject',
-                'body': '<p>Body text 2</p>'
-            })._action_send_mail()
-
-            self.assertEqual(self.test_record.message_ids[0].body, '<p>Body text 2</p>')
-            self.assertEqual(self.test_record.message_ids[0].author_id, portal_user.partner_id)
+        with patch.object(MailTestTicket, '_check_access', return_value=None):
+            with self.assertRaises(AccessError):
+                # ensure portal can not send messages
+                self.env['mail.compose.message'].with_user(portal_user).with_context(
+                    self._get_web_context(self.test_record)
+                ).create({
+                    'subject': 'Subject',
+                    'body': '<p>Body text</p>',
+                    'partner_ids': []
+                })._action_send_mail()
 
     @users('employee')
     def test_mail_composer_save_template(self):
         self.env['mail.compose.message'].with_context(
             self._get_web_context(self.test_record, add_web=False)
         ).create({
+            'template_name': 'My Template',
             'subject': 'Template Subject',
             'body': '<p>Template Body</p>',
         }).create_mail_template()
@@ -1256,8 +1245,52 @@ class TestComposerInternals(TestMailComposer):
             ('model', '=', self.test_record._name),
             ('subject', '=', 'Template Subject')
         ], limit=1)
-        self.assertEqual(template.name, 'Template Subject')
+
+        self.assertEqual(template.name, 'My Template')
+        self.assertEqual(template.subject, 'Template Subject')
         self.assertEqual(template.body_html, '<p>Template Body</p>', 'email_template incorrect body_html')
+
+    @users('employee')
+    def test_mail_composer_schedule_message(self):
+        """ Test scheduling of a message from the composer"""
+
+        # cannot schedule a message in mass_mail mode
+        composer = self.env['mail.compose.message'].with_context(
+            self._get_web_context(self.test_record)
+            ).create({'body': 'Test', 'composition_mode': 'mass_mail'})
+        with self.assertRaises(UserError):
+            composer.action_schedule_message(FieldDatetime.to_string(self.reference_now + timedelta(hours=2)))
+
+        # schedule a message in mono-comment mode
+        attachment_data = self._generate_attachments_data(1, 'mail.compose.message', 0)[0]
+        composer = self.env['mail.compose.message'].with_context(
+            self._get_web_context(self.test_record)
+            ).create({
+                'body': '<p>Test Body</p>',
+                'subject': 'Test Subject',
+                'attachment_ids': [(0, 0, attachment_data)],
+                'partner_ids': [(4, self.test_record.customer_id.id)],
+            })
+        composer_attachment = composer.attachment_ids
+        with self.mock_datetime_and_now(self.reference_now):
+            composer.action_schedule_message(FieldDatetime.to_string(self.reference_now + timedelta(hours=2)))
+        # should have created a scheduled message with correct parameters
+        scheduled_message = self.env['mail.scheduled.message'].search([
+            ['model', '=', self.test_record._name],
+            ['res_id', '=', self.test_record.id],
+        ])
+        self.assertEqual(scheduled_message.body, '<p>Test Body</p>')
+        self.assertEqual(scheduled_message.subject, 'Test Subject')
+        self.assertEqual(scheduled_message.scheduled_date, self.reference_now + timedelta(hours=2))
+        self.assertEqual(scheduled_message.attachment_ids, composer_attachment)
+        self.assertEqual(scheduled_message.model, self.test_record._name)
+        self.assertEqual(scheduled_message.res_id, self.test_record.id)
+        self.assertEqual(scheduled_message.author_id, self.partner_employee)
+        self.assertEqual(scheduled_message.partner_ids, self.test_record.customer_id)
+        self.assertFalse(scheduled_message.is_note)
+        # attachment transfer
+        self.assertEqual(composer_attachment.res_model, scheduled_message._name)
+        self.assertEqual(composer_attachment.res_id, scheduled_message.id)
 
     @users('erp_manager')
     @mute_logger('odoo.addons.mail.models.mail_mail', 'odoo.models.unlink')
@@ -1324,6 +1357,38 @@ class TestComposerInternals(TestMailComposer):
                     )
                 finally:
                     new_partners.unlink()
+
+    @users('employee')
+    def test_mail_composer_wtpl_schedule_message(self):
+        """ Test scheduling message using a template. Should use the scheduled date of the
+        template if not date is passed."""
+        composer = self.env['mail.compose.message'].with_context(
+            self._get_web_context(self.test_record)
+            ).create({'template_id': self.template.id})
+
+        # scheduling the message
+        with self.mock_datetime_and_now(self.reference_now):
+            composer.action_schedule_message()
+
+        # should have created the scheduled message with the correct parameters
+        scheduled_message = self.env['mail.scheduled.message'].search([
+            ['model', '=', self.test_record._name],
+            ['res_id', '=', self.test_record.id],
+        ])
+        self.assertEqual(scheduled_message.body, '<p>TemplateBody TestRecord</p>')
+        self.assertEqual(scheduled_message.subject, 'TemplateSubject TestRecord')
+        self.assertEqual(scheduled_message.scheduled_date, self.test_record.create_date + timedelta(days=2))
+        self.assertEqual(scheduled_message.model, self.test_record._name)
+        self.assertEqual(scheduled_message.res_id, self.test_record.id)
+        self.assertEqual(scheduled_message.author_id, self.test_record.user_id.partner_id)
+        self.assertEqual(scheduled_message.partner_ids, self.test_record.customer_id)
+        self.assertFalse(scheduled_message.is_note)
+        notification_parameters = json.loads(scheduled_message.notification_parameters)
+        self.assertEqual(notification_parameters['email_from'], self.test_record.user_id.email_formatted)
+        self.assertEqual(notification_parameters['force_email_lang'], self.test_record.customer_id.lang)
+        self.assertEqual(notification_parameters['mail_server_id'], self.mail_server_domain.id)
+        self.assertEqual(notification_parameters['mail_auto_delete'], True)
+        self.assertEqual(notification_parameters['message_type'], 'comment')
 
 
 @tagged('mail_composer', 'multi_lang', 'multi_company')
@@ -2963,7 +3028,7 @@ class TestComposerResultsMass(TestMailComposer):
             composer = composer_form.save()
             self.assertTrue(composer.composition_batch)
             self.assertEqual(composer.composition_mode, 'mass_mail')
-            self.assertFalse(composer.res_ids)
+            self.assertEqual(sorted(literal_eval(composer.res_ids)), sorted(self.test_records.ids))
 
             with self.mock_mail_gateway(mail_unlink_sent=True):
                 composer._action_send_mail()

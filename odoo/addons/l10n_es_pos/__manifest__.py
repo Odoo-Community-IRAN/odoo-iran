@@ -2,11 +2,9 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 {
     'name': 'Spain - Point of Sale',
-    'countries': ['es'],
     'category': 'Accounting/Localizations/Point of Sale',
     'summary': """Spanish localization for Point of Sale""",
     'depends': ['point_of_sale', 'l10n_es'],
-    'auto_install': True,
     'license': 'LGPL-3',
     'data': [
         'views/res_config_settings_views.xml',
@@ -20,5 +18,4 @@
             'l10n_es_pos/static/tests/**/*',
         ],
     },
-    'post_init_hook': '_l10n_es_pos_post_init_hook',
 }

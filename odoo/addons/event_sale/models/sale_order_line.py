@@ -1,6 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo import api, fields, models
+from odoo import api, fields, models, _
+from odoo.exceptions import ValidationError
 
 
 class SaleOrderLine(models.Model):
@@ -11,10 +12,17 @@ class SaleOrderLine(models.Model):
         compute="_compute_event_id", store=True, readonly=False, precompute=True,
         help="Choose an event and it will automatically create a registration for this event.")
     event_ticket_id = fields.Many2one(
-        'event.event.ticket', string='Event Ticket',
+        'event.event.ticket', string='Ticket Type',
         compute="_compute_event_ticket_id", store=True, readonly=False, precompute=True,
         help="Choose an event ticket and it will automatically create a registration for this event ticket.")
     registration_ids = fields.One2many('event.registration', 'sale_order_line_id', string="Registrations")
+
+    @api.constrains('event_id', 'event_ticket_id', 'product_id')
+    def _check_event_registration_ticket(self):
+        for so_line in self:
+            if so_line.product_id.service_tracking == "event" and (not so_line.event_id or not so_line.event_ticket_id):
+                raise ValidationError(
+                    _("The sale order line with the product %(product_name)s needs an event and a ticket.", product_name=so_line.product_id.name))
 
     @api.depends('state', 'event_id')
     def _compute_product_uom_readonly(self):
@@ -28,7 +36,7 @@ class SaleOrderLine(models.Model):
         registrations linked to this line. """
         registrations_vals = []
         for so_line in self:
-            if not so_line.product_type == 'event':
+            if so_line.service_tracking != 'event':
                 continue
 
             for _count in range(int(so_line.product_uom_qty) - len(so_line.registration_ids)):
@@ -44,7 +52,7 @@ class SaleOrderLine(models.Model):
 
     @api.depends('product_id')
     def _compute_event_id(self):
-        event_lines = self.filtered(lambda line: line.product_id and line.product_id.detailed_type == 'event')
+        event_lines = self.filtered(lambda line: line.product_id and line.product_id.service_tracking == 'event')
         (self - event_lines).event_id = False
         for line in event_lines:
             if line.product_id not in line.event_id.event_ticket_ids.product_id:
@@ -91,8 +99,7 @@ class SaleOrderLine(models.Model):
         if self.event_ticket_id and self.event_id:
             event_ticket = self.event_ticket_id
             company = event_ticket.company_id or self.env.company
-            pricelist = self.order_id.pricelist_id
-            if pricelist.discount_policy == "with_discount":
+            if not self.pricelist_item_id._show_discount():
                 price = event_ticket.with_context(**self._get_pricelist_price_context()).price_reduce
             else:
                 price = event_ticket.price

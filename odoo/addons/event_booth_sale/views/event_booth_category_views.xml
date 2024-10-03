@@ -10,7 +10,12 @@
             <group name="main" position="inside">
                 <group string="Booth Details">
                     <field name="currency_id" invisible="1"/>
-                    <field name="product_id" context="{'default_detailed_type': 'event_booth', 'default_detailed_type': 'service'}"/>
+                    <field name="product_id"
+                        context="{
+                            'default_type': 'service',
+                            'default_service_tracking': 'event_booth',
+                        }"
+                    />
                     <field name="price" widget="monetary" options="{'currency_field': 'currency_id'}"/>
                 </group>
             </group>
@@ -18,7 +23,7 @@
     </record>
 
     <record id="event_booth_category_view_tree" model="ir.ui.view">
-        <field name="name">event.booth.category.view.tree.inherit.sale</field>
+        <field name="name">event.booth.category.view.list.inherit.sale</field>
         <field name="model">event.booth.category</field>
         <field name="inherit_id" ref="event_booth.event_booth_category_view_tree"/>
         <field name="priority">3</field>

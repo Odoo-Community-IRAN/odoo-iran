@@ -1,24 +1,43 @@
 /** @odoo-module */
 
-import { helpers, registries, UIPlugin } from "@odoo/o-spreadsheet";
-import { CurrencyDataSource } from "../currency_data_source";
+import { EvaluationError, helpers, registries } from "@odoo/o-spreadsheet";
+import { OdooUIPlugin } from "@spreadsheet/plugins";
+import { toServerDateString } from "@spreadsheet/helpers/helpers";
+import { _t } from "@web/core/l10n/translation";
 const { featurePluginRegistry } = registries;
 const { createCurrencyFormat } = helpers;
 
-const DATA_SOURCE_ID = "CURRENCIES";
-
 /**
- * @typedef {import("../currency_data_source").Currency} Currency
+ * @typedef Currency
+ * @property {string} name
+ * @property {string} code
+ * @property {string} symbol
+ * @property {number} decimalPlaces
+ * @property {"before" | "after"} position
  */
 
-class CurrencyPlugin extends UIPlugin {
+export class CurrencyPlugin extends OdooUIPlugin {
+    static getters = /** @type {const} */ ([
+        "getCurrencyRate",
+        "computeFormatFromCurrency",
+        "getCompanyCurrencyFormat",
+    ]);
+
     constructor(config) {
         super(config);
-        this.currentCompanyCurrencyFormat = config.defaultCurrencyFormat;
-        this.dataSources = config.custom.dataSources;
-        if (this.dataSources) {
-            this.dataSources.add(DATA_SOURCE_ID, CurrencyDataSource);
+        /** @type {string | undefined} */
+        this.currentCompanyCurrency = config.defaultCurrency;
+        /** @type {import("@spreadsheet/data_sources/server_data").ServerData} */
+        this._serverData = config.custom.odooDataProvider?.serverData;
+    }
+
+    get serverData() {
+        if (!this._serverData) {
+            throw new Error(
+                "'serverData' is not defined, please make sure a 'OdooDataProvider' instance is provided to the model."
+            );
         }
+        return this._serverData;
     }
 
     // -------------------------------------------------------------------------
@@ -29,13 +48,22 @@ class CurrencyPlugin extends UIPlugin {
      * Get the currency rate between the two given currencies
      * @param {string} from Currency from
      * @param {string} to Currency to
-     * @param {string} date
+     * @param {string | undefined} date
+     * @param {number | undefined} companyId
      * @returns {number|string}
      */
-    getCurrencyRate(from, to, date) {
-        return (
-            this.dataSources && this.dataSources.get(DATA_SOURCE_ID).getCurrencyRate(from, to, date)
-        );
+    getCurrencyRate(from, to, date, companyId) {
+        const data = this.serverData.batch.get("res.currency.rate", "get_rates_for_spreadsheet", {
+            from,
+            to,
+            date: date ? toServerDateString(date) : undefined,
+            company_id: companyId,
+        });
+        const rate = data !== undefined ? data.rate : undefined;
+        if (rate === false) {
+            throw new EvaluationError(_t("Currency rate unavailable."));
+        }
+        return rate;
     }
 
     /**
@@ -55,24 +83,23 @@ class CurrencyPlugin extends UIPlugin {
 
     /**
      * Returns the default display format of a the company currency
-     * @param {number|undefined} companyId
+     * @param {number} [companyId]
      * @returns {string | undefined}
      */
     getCompanyCurrencyFormat(companyId) {
-        if (!companyId && this.currentCompanyCurrencyFormat) {
-            return this.currentCompanyCurrencyFormat;
+        if (!companyId && this.currentCompanyCurrency) {
+            return this.computeFormatFromCurrency(this.currentCompanyCurrency);
         }
-        const currency =
-            this.dataSources &&
-            this.dataSources.get(DATA_SOURCE_ID).getCompanyCurrencyFormat(companyId);
+        const currency = this.serverData.get(
+            "res.currency",
+            "get_company_currency_for_spreadsheet",
+            [companyId]
+        );
+        if (currency === false) {
+            throw new EvaluationError(_t("Currency not available for this company."));
+        }
         return this.computeFormatFromCurrency(currency);
     }
 }
-
-CurrencyPlugin.getters = [
-    "getCurrencyRate",
-    "computeFormatFromCurrency",
-    "getCompanyCurrencyFormat",
-];
 
 featurePluginRegistry.add("odooCurrency", CurrencyPlugin);

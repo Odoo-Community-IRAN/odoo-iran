@@ -3,16 +3,16 @@
 # 	* website_payment
 # 
 # Translators:
-# Wil Odoo, 2023
-# Daye Jeong, 2023
+# Wil Odoo, 2024
+# Daye Jeong, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:56+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Daye Jeong, 2023\n"
+"POT-Creation-Date: 2024-09-26 08:56+0000\n"
+"PO-Revision-Date: 2024-09-25 09:42+0000\n"
+"Last-Translator: Daye Jeong, 2024\n"
 "Language-Team: Korean (https://app.transifex.com/odoo/teams/41243/ko/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -71,13 +71,29 @@ msgid "<option value=\"\">Country...</option>"
 msgstr "<option value=\"\">국가</option>"
 
 #. module: website_payment
-#: model_terms:ir.ui.view,arch_db:website_payment.donation_pay
-msgid ""
-"<strong>No suitable payment option could be found.</strong><br/>\n"
-"                                If you believe that it is an error, please contact the website administrator."
+#: model_terms:ir.ui.view,arch_db:website_payment.s_donation_button
+msgid "<span class=\"s_donation_currency pe-1\">$</span>"
 msgstr ""
-"<strong>알맞은 결제 옵션을 찾을 수 없습니다.</strong><br/>\n"
-"                               오류가 발생한 경우, 웹사이트 관리자에게 문의하시기 바랍니다."
+
+#. module: website_payment
+#: model_terms:ir.ui.view,arch_db:website_payment.s_donation_button
+msgid "<span class=\"s_donation_currency pe-1\">$</span>10"
+msgstr ""
+
+#. module: website_payment
+#: model_terms:ir.ui.view,arch_db:website_payment.s_donation_button
+msgid "<span class=\"s_donation_currency pe-1\">$</span>100"
+msgstr ""
+
+#. module: website_payment
+#: model_terms:ir.ui.view,arch_db:website_payment.s_donation_button
+msgid "<span class=\"s_donation_currency pe-1\">$</span>25"
+msgstr ""
+
+#. module: website_payment
+#: model_terms:ir.ui.view,arch_db:website_payment.s_donation_button
+msgid "<span class=\"s_donation_currency pe-1\">$</span>50"
+msgstr ""
 
 #. module: website_payment
 #: model_terms:ir.ui.view,arch_db:website_payment.donation_pay
@@ -87,7 +103,6 @@ msgstr "<strong>경고</strong> 통화 항목이 없거나 잘 못 되었습니�
 #. module: website_payment
 #. odoo-python
 #: code:addons/website_payment/models/payment_transaction.py:0
-#, python-format
 msgid "A donation has been made on your website"
 msgstr "웹사이트에서 후원이 진행되었습니다."
 
@@ -102,7 +117,6 @@ msgid "Activate Payments"
 msgstr "결제 활성화하기"
 
 #. module: website_payment
-#: model:ir.actions.server,name:website_payment.action_activate_stripe
 #: model_terms:ir.ui.view,arch_db:website_payment.res_config_settings_view_form
 msgid "Activate Stripe"
 msgstr "Stripe 활성화"
@@ -110,22 +124,19 @@ msgstr "Stripe 활성화"
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/snippets/s_donation/options.js:0
-#, python-format
 msgid "Add a description here"
 msgstr "여기에 설명 추가하기"
 
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/snippets/s_donation/options.js:0
-#, python-format
 msgid "Add new pre-filled option"
 msgstr "새 자동 채우기 옵션 추가"
 
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/snippets/s_donation/options.xml:0
-#: code:addons/website_payment/static/src/snippets/s_donation/options.xml:0
-#, python-format
+#: model_terms:ir.ui.view,arch_db:website_payment.s_donation_button
 msgid "Amount"
 msgstr "금액"
 
@@ -147,7 +158,6 @@ msgstr "한 달 동안 아기 돌봄 서비스."
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/snippets/s_donation/options.xml:0
-#, python-format
 msgid "Choose Your Amount"
 msgstr "금액을 선택하세요"
 
@@ -159,15 +169,12 @@ msgstr "환경 설정"
 #. module: website_payment
 #. odoo-python
 #: code:addons/website_payment/models/res_config_settings.py:0
-#, python-format
 msgid "Configure %s"
 msgstr "설정 %s"
 
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/js/payment_form.js:0
-#: model:ir.model,name:website_payment.model_res_country
-#, python-format
 msgid "Country"
 msgstr "국가"
 
@@ -183,17 +190,15 @@ msgstr ""
 #. module: website_payment
 #. odoo-python
 #: code:addons/website_payment/controllers/portal.py:0
-#, python-format
 msgid "Country is required."
 msgstr "국가는 필수 입력 사항입니다."
 
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/snippets/s_donation/options.xml:0
-#: code:addons/website_payment/static/src/snippets/s_donation/options.xml:0
 #: model_terms:ir.ui.view,arch_db:website_payment.donation_input
+#: model_terms:ir.ui.view,arch_db:website_payment.s_donation_button
 #: model_terms:ir.ui.view,arch_db:website_payment.s_donation_options
-#, python-format
 msgid "Custom Amount"
 msgstr "사용자 지정 금액"
 
@@ -220,7 +225,6 @@ msgstr "표시 옵션"
 #. module: website_payment
 #. odoo-python
 #: code:addons/website_payment/controllers/portal.py:0
-#, python-format
 msgid "Donate"
 msgstr "기부"
 
@@ -244,14 +248,12 @@ msgstr "기부하기 버튼"
 #. module: website_payment
 #. odoo-python
 #: code:addons/website_payment/controllers/portal.py:0
-#, python-format
 msgid "Donation amount must be at least %.2f."
 msgstr "최소 후원 금액은 %.2f 입니다."
 
 #. module: website_payment
 #. odoo-python
 #: code:addons/website_payment/models/payment_transaction.py:0
-#, python-format
 msgid "Donation confirmation"
 msgstr "후원 확인"
 
@@ -263,7 +265,6 @@ msgstr "후원 알림"
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/js/payment_form.js:0
-#, python-format
 msgid "Email"
 msgstr "이메일"
 
@@ -279,21 +280,18 @@ msgstr ""
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/js/payment_form.js:0
-#, python-format
 msgid "Email is invalid"
 msgstr "이메일이 유효하지 않습니다"
 
 #. module: website_payment
 #. odoo-python
 #: code:addons/website_payment/controllers/portal.py:0
-#, python-format
 msgid "Email is required."
 msgstr "이메일은 필수 입력 사항입니다."
 
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/js/payment_form.js:0
-#, python-format
 msgid "Field '%s' is mandatory"
 msgstr "'%s' 필드는 필수 입력 사항입니다."
 
@@ -314,7 +312,6 @@ msgstr "후원 여부"
 
 #. module: website_payment
 #: model:ir.model.fields,field_description:website_payment.field_res_config_settings__is_stripe_supported_country
-#: model:ir.model.fields,field_description:website_payment.field_res_country__is_stripe_supported_country
 msgid "Is Stripe Supported Country"
 msgstr "Stripe 지원 국가"
 
@@ -341,7 +338,6 @@ msgstr "최소"
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/js/payment_form.js:0
-#, python-format
 msgid "Name"
 msgstr "이름"
 
@@ -357,7 +353,6 @@ msgstr ""
 #. module: website_payment
 #. odoo-python
 #: code:addons/website_payment/controllers/portal.py:0
-#, python-format
 msgid "Name is required."
 msgstr "이름은 필수 입력 사항입니다."
 
@@ -400,14 +395,12 @@ msgstr "지불 거래"
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/js/payment_form.js:0
-#, python-format
 msgid "Payment processing failed"
 msgstr "결제 프로세스 실패"
 
 #. module: website_payment
 #. odoo-python
 #: code:addons/website_payment/models/payment_transaction.py:0
-#, python-format
 msgid "Payment received from donation with following details:"
 msgstr "다음과 같은 상세 정보의 후원금을 받았습니다:"
 
@@ -424,7 +417,6 @@ msgstr "페이팔 전용"
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/snippets/s_donation/000.js:0
-#, python-format
 msgid "Please select or enter an amount"
 msgstr "금액을 선택하거나 입력해주세요"
 
@@ -461,7 +453,6 @@ msgstr "크든 작든, 여러분의 성금은 매우 중요합니다."
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/js/payment_form.js:0
-#, python-format
 msgid "Some information is missing to process your payment."
 msgstr "결제를 처리하는 데 필요한 일부 정보가 누락되었습니다."
 
@@ -493,9 +484,8 @@ msgstr "후원에 감사드립니다"
 #. module: website_payment
 #. odoo-javascript
 #: code:addons/website_payment/static/src/snippets/s_donation/000.js:0
-#, python-format
-msgid "The minimum donation amount is %s%s%s"
-msgstr "최소 후원 금액은 %s%s%s 입니다."
+msgid "The minimum donation amount is %(amount)s"
+msgstr "최소 기부 금액은 %(amount)s입니다."
 
 #. module: website_payment
 #: model_terms:ir.ui.view,arch_db:website_payment.donation_pay

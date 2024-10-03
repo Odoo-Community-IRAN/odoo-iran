@@ -12,7 +12,7 @@
         </xpath>
     </template>
 
-    <template id="portal_my_home_invoice" name="Show Invoices &amp; Bills" inherit_id="portal.portal_my_home" customize_show="True" priority="30">
+    <template id="portal_my_home_invoice" name="Invoices / Bills" inherit_id="portal.portal_my_home" customize_show="True" priority="30">
         <xpath expr="//div[hasclass('o_portal_docs')]" position="before">
             <t t-set="portal_client_category_enable" t-value="True"/>
             <t t-set="portal_vendor_category_enable" t-value="True"/>
@@ -53,12 +53,13 @@
                     <th>Invoice #</th>
                     <th>Invoice Date</th>
                     <th class='d-none d-md-table-cell'>Due Date</th>
+                    <th class="text-end pe-3">Amount Due</th>
                     <th>Status</th>
-                    <th class="text-end">Amount Due</th>
                 </tr>
             </thead>
             <tbody>
-                <t t-foreach="invoices" t-as="invoice">
+                <t t-foreach="invoices" t-as="invoice_data">
+                    <t t-set="invoice" t-value="invoice_data['invoice']"/>
                     <tr>
                         <td>
                             <a t-att-href="invoice.get_portal_url()" t-att-title="invoice.name">
@@ -67,13 +68,22 @@
                             </a>
                         </td>
                         <td><span t-field="invoice.invoice_date"/></td>
-                        <td class='d-none d-md-table-cell'><span t-field="invoice.invoice_date_due"/></td>
+                        <td class='d-none d-md-table-cell'
+                            t-att-class="'text-danger' if invoice.invoice_date_due &lt; datetime.date.today() and invoice.payment_state in ['not_paid', 'partial'] else ''">
+                            <span t-field="invoice.invoice_date_due"/>
+                        </td>
+                        <td class="text-end pe-3"><span t-out="-invoice.amount_residual if invoice.move_type == 'out_refund' else invoice.amount_residual" t-options='{"widget": "monetary", "display_currency": invoice.currency_id}'/></td>
                         <td name="invoice_status">
                             <t t-if="invoice.state == 'posted'" name="invoice_status_posted">
-                                <span t-if="invoice.payment_state in ('paid', 'in_payment')"
+                                <span t-if="invoice.currency_id.is_zero(invoice.amount_residual)"
                                       class="badge rounded-pill text-bg-success">
                                     <i class="fa fa-fw fa-check" aria-label="Paid" title="Paid" role="img"/>
                                     <span class="d-none d-md-inline"> Paid</span>
+                                </span>
+                                <span t-elif="invoice.payment_state == 'in_payment' and not invoice.currency_id.is_zero(invoice.amount_residual)"
+                                      class="badge rounded-pill text-bg-info">
+                                    <i class="fa fa-fw fa-check" aria-label="processing_payment" title="Processing Payment" role="img"/>
+                                    <span class="d-none d-md-inline"> Processing Payment</span>
                                 </span>
                                 <span t-elif="invoice.payment_state == 'reversed'"
                                       class="badge rounded-pill text-bg-success">
@@ -92,7 +102,6 @@
                                 </span>
                             </t>
                         </td>
-                        <td class="text-end"><span t-out="-invoice.amount_residual if invoice.move_type == 'out_refund' else invoice.amount_residual" t-options='{"widget": "monetary", "display_currency": invoice.currency_id}'/></td>
                     </tr>
                 </t>
             </tbody>
@@ -104,29 +113,59 @@
         <xpath expr="//div[hasclass('o_portal_sidebar')]" position="inside">
             <t t-set="o_portal_fullwidth_alert" groups="sales_team.group_sale_salesman,account.group_account_invoice,account.group_account_readonly">
                 <t t-call="portal.portal_back_in_edit_mode">
-                    <t t-set="backend_url" t-value="'/web#model=%s&amp;id=%s&amp;action=%s&amp;view_type=form' % (invoice._name, invoice.id, invoice.env.ref('account.action_move_out_invoice_type').id)"/>
+                    <t t-set="backend_url" t-value="'/odoo/action-account.action_move_out_invoice_type/%s' % invoice.id"/>
                 </t>
             </t>
 
             <div class="row o_portal_invoice_sidebar">
                 <!-- Sidebar -->
                 <t t-call="portal.portal_record_sidebar">
-                    <t t-set="classes" t-value="'col-lg-3 col-xl-4 d-print-none me-lg-auto'"/>
+                    <t t-set="classes" t-value="'col-lg-4 col-xxl-3 d-print-none'"/>
                     <t t-set="title">
-                        <h2>
-                            <span t-if="invoice.amount_residual > 0" t-field="invoice.amount_residual"/>
-                            <span t-else="1" t-field="invoice.amount_total"/>
+                        <h2 class="mb-0 text-break mx-auto">
+                            <span t-field="invoice.amount_total"/>
                         </h2>
-                        <div class="small" t-if="invoice.payment_state not in ('paid', 'in_payment', 'reversed') and invoice.move_type == 'out_invoice'"><i class="fa fa-clock-o"/><span class="o_portal_sidebar_timeago ml4" t-att-datetime="invoice.invoice_date_due"/></div>
+                        <div class="my-1 w-100" t-if="payment_state in ('not_paid', 'partial')">
+                            <div class="alert alert-success px-2 py-1 text-center mb-2" t-if="payment_state == 'partial'">
+                                Already Paid: <span t-out="amount_paid" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                            </div>
+                            <div t-if="payment_state == 'partial'" class="alert alert-warning px-2 py-1 text-center mb-2">
+                                Left to Pay:
+                                <span t-out="amount_due" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                <div t-if="installment_state and is_last_installment" class="w-100 mt-2">
+                                    <i class="fa fa-clock-o"/>
+                                    <span class="o_portal_sidebar_timeago" t-att-datetime="due_date"/>
+                                </div>
+                            </div>
+                            <div t-if="installment_state == 'epd' and epd_discount_amount_currency" class="alert alert-warning px-2 py-1 text-center mb-2">
+                                <t t-out="epd_discount_msg"/>
+                            </div>
+                        </div>
+                        <t t-if="installment_state in ('next', 'overdue') and not is_last_installment and amount_due != 0.0 and payment_state != 'in_payment'">
+                            <h5 name="installment_title" class="w-100 text-center mb-0">
+                                <t t-if="installment_state == 'next'">Next Installment</t>
+                                <t t-elif="installment_state == 'overdue'">Overdue</t>
+                            </h5>
+                            <h4
+                                name="installment_amount"
+                                class="mb-0 text-break w-100 text-center"
+                                t-out="next_amount_to_pay"
+                                t-options="{'widget': 'monetary', 'display_currency': currency}"
+                            />
+                        </t>
+                        <div class="small w-100 text-center" t-if="payment_state in ('not_paid', 'partial') and not (is_last_installment and installment_state)">
+                            <i class="fa fa-clock-o"/>
+                            <span class="o_portal_sidebar_timeago ml4" t-att-datetime="next_due_date"/>
+                        </div>
                     </t>
 
                     <t t-set="entries">
-                        <div class="d-flex flex-column gap-4">
-                            <div class="flex-basis-100 flex-basis-sm-50 flex-basis-lg-100 order-1 order-lg-0">
-                                <div class="o_download_pdf d-flex gap-1 flex-lg-column flex-xl-row">
-                                    <div class="flex-grow-1">
-                                        <a class="btn btn-secondary d-block o_download_btn" t-att-href="invoice.get_portal_url(report_type='pdf', download=True)" title="Download"><i class="fa fa-download"/> Download</a>
-                                    </div>
+                        <div class="d-flex flex-column gap-4 mt-3">
+                            <div class="d-flex flex-column gap-2">
+                                <div class="o_download_pdf d-flex flex-lg-column flex-xl-row flex-wrap gap-2">
+                                    <a class="btn btn-light o_download_btn flex-grow-1" t-att-href="invoice.get_portal_url(report_type='pdf', download=True)" title="Download" role="button">
+                                        <i class="fa fa-download"/> Download
+                                    </a>
                                 </div>
                             </div>
                             <div t-if="invoice.invoice_user_id" class="flex-grow-1">
@@ -140,33 +179,27 @@
                                         </t>
                                     </small>
                                 </h6>
-                                <div class="o_portal_contact_details d-flex flex-column gap-2">
-                                    <div class="d-flex justify-content-start align-items-center gap-2">
-                                        <img class="o_avatar o_portal_contact_img rounded" t-att-src="image_data_uri(invoice.invoice_user_id.avatar_128)" alt="Contact"/>
-                                        <div>
-                                            <h6 class="mb-0" t-out="invoice.invoice_user_id.name"/>
-                                            <a href="#discussion" class="d-flex align-items-center gap-2 small fw-bold">
-                                            Send message
-                                            </a>
-                                        </div>
-                                    </div>
+                                <t t-call="portal.portal_my_contact">
+                                    <t t-set="_contactAvatar" t-value="image_data_uri(invoice.invoice_user_id.avatar_128)"/>
+                                    <t t-set="_contactName" t-value="invoice.invoice_user_id.name"/>
+                                    <t t-set="_contactLink" t-value="True"/>
                                     <div t-field="invoice.invoice_user_id" t-options='{"widget": "contact", "fields": ["city", "phone"]}'/>
-                                </div>
+                                </t>
                             </div>
                         </div>
                     </t>
                 </t>
 
                 <!-- Page Content -->
-                <div id="invoice_content" class="o_portal_content col-12 col-lg-9 col-xl-8">
+                <div id="invoice_content" class="o_portal_content col-12 col-lg-8 col-xxl-9">
                     <t t-if="error or warning" t-call="account.portal_invoice_error"/>
                     <t t-if="success and (not error and not warning)" t-call="account.portal_invoice_success"/>
 
-                    <div class="o_portal_html_view shadow p-3">
+                    <div class="o_portal_html_view position-relative bg-white shadow p-3 overflow-hidden">
                         <div class="o_portal_html_loader text-center">
                             <i class="fa fa-circle-o-notch fa-spin fa-2x fa-fw text-black-50"></i>
                         </div>
-                        <iframe id="invoice_html" class="mt8 mb8" width="100%" height="100%" frameborder="0" scrolling="no" t-att-src="invoice.get_portal_url(report_type='html')"/>
+                        <iframe id="invoice_html" class="position-relative my-2" width="100%" height="100%" frameborder="0" scrolling="no" t-att-src="invoice.get_portal_url(report_type='html')"/>
                     </div>
                     <!-- chatter -->
                     <div id="invoice_communication" class="mt-4">

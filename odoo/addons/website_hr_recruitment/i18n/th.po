@@ -3,17 +3,15 @@
 # 	* website_hr_recruitment
 # 
 # Translators:
-# Rasareeyar Lappiam, 2024
 # Wil Odoo, 2024
-# Wichanon Jamwutthipreecha, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-03-04 09:08+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Wichanon Jamwutthipreecha, 2024\n"
+"POT-Creation-Date: 2024-09-25 08:39+0000\n"
+"PO-Revision-Date: 2024-09-25 09:42+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Thai (https://app.transifex.com/odoo/teams/41243/th/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -23,8 +21,28 @@ msgstr ""
 
 #. module: website_hr_recruitment
 #. odoo-python
+#: code:addons/website_hr_recruitment/models/hr_job.py:0
+msgid ""
+"\n"
+"            <span class=\"text-muted small\">Time to Answer</span>\n"
+"            <h6>2 open days</h6>\n"
+"            <span class=\"text-muted small\">Process</span>\n"
+"            <h6>1 Phone Call</h6>\n"
+"            <h6>1 Onsite Interview</h6>\n"
+"            <span class=\"text-muted small\">Days to get an Offer</span>\n"
+"            <h6>4 Days after Interview</h6>\n"
+"        "
+msgstr ""
+
+#. module: website_hr_recruitment
+#. odoo-python
+#: code:addons/website_hr_recruitment/controllers/main.py:0
+msgid " In case of issue, contact %(contact_infos)s"
+msgstr ""
+
+#. module: website_hr_recruitment
+#. odoo-python
 #: code:addons/website_hr_recruitment/models/hr_applicant.py:0
-#, python-format
 msgid "%s's Application"
 msgstr "%sของการสมัคร"
 
@@ -155,11 +173,6 @@ msgstr ""
 "                                                <span class=\"s_website_form_mark\"> *</span>"
 
 #. module: website_hr_recruitment
-#: model_terms:ir.ui.view,arch_db:website_hr_recruitment.hr_job_website_inherit
-msgid "<span class=\"text-bg-success\">Published</span>"
-msgstr "<span class=\"text-bg-success\">เผยแพร่แล้ว</span>"
-
-#. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.apply
 msgid "<span class=\"text-muted small\">Department</span>"
 msgstr "<span class=\"text-muted small\">แผนก</span>"
@@ -172,7 +185,7 @@ msgstr "<span class=\"text-muted small\">ประเภทการจ้าง
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.apply
 msgid "<span class=\"text-muted small\">Job</span>"
-msgstr "<span class=\"text-muted small\">งาน</span>"
+msgstr "<span class=\"text-muted small\">ตำแหน่งงาน</span>"
 
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.apply
@@ -186,6 +199,18 @@ msgid ""
 "profile</span>"
 msgstr ""
 "<span class=\"text-muted small\">ระบุไฟล์เรซูเม่หรือโปรไฟล์ LinkedIn</span>"
+
+#. module: website_hr_recruitment
+#. odoo-javascript
+#: code:addons/website_hr_recruitment/static/src/fields/boolean_toggle_labeled_field.js:0
+msgid "A clickable label for the toggle. Contains text for the false state."
+msgstr ""
+
+#. module: website_hr_recruitment
+#. odoo-javascript
+#: code:addons/website_hr_recruitment/static/src/fields/boolean_toggle_labeled_field.js:0
+msgid "A clickable label for the toggle. Contains text for the true state."
+msgstr ""
 
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.default_website_description
@@ -238,14 +263,26 @@ msgid "All Types"
 msgstr "ทุกประเภท"
 
 #. module: website_hr_recruitment
+#. odoo-python
+#: code:addons/website_hr_recruitment/controllers/main.py:0
+msgid ""
+"An application already exists for %(value)s. Duplicates might be rejected. "
+"%(recruiter_contact)s"
+msgstr ""
+
+#. module: website_hr_recruitment
 #: model:ir.model,name:website_hr_recruitment.model_hr_applicant
 msgid "Applicant"
 msgstr "ผู้สมัคร"
 
 #. module: website_hr_recruitment
+#: model_terms:ir.ui.view,arch_db:website_hr_recruitment.hr_job_form_inherit
+msgid "Application Info"
+msgstr ""
+
+#. module: website_hr_recruitment
 #. odoo-javascript
 #: code:addons/website_hr_recruitment/static/src/js/website_hr_recruitment_editor.js:0
-#, python-format
 msgid "Applied Job"
 msgstr "สมัครงานแล้ว"
 
@@ -288,6 +325,12 @@ msgid "Autonomy"
 msgstr "มีอิสระ"
 
 #. module: website_hr_recruitment
+#. odoo-javascript
+#: code:addons/website_hr_recruitment/static/src/fields/boolean_toggle_labeled_field.js:0
+msgid "Autosave"
+msgstr "บันทึกอัตโนมัติ"
+
+#. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.default_website_description
 msgid "Bachelor Degree or Higher"
 msgstr "ปริญญาตรีหรือสูงกว่า"
@@ -311,6 +354,12 @@ msgstr "ยินดีด้วย!"
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.job_right_side_bar
 msgid "Contact us"
 msgstr "ติดต่อเรา"
+
+#. module: website_hr_recruitment
+#. odoo-javascript
+#: code:addons/website_hr_recruitment/static/src/js/widgets/copy_link_menuitem.js:0
+msgid "Copied"
+msgstr "ทำสำเนาแล้ว"
 
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.snippet_options
@@ -338,7 +387,6 @@ msgstr "ความสัมพันธ์กับลูกค้า"
 #. odoo-javascript
 #: code:addons/website_hr_recruitment/static/src/js/website_hr_recruitment_editor.js:0
 #: model:ir.model,name:website_hr_recruitment.model_hr_department
-#, python-format
 msgid "Department"
 msgstr "แผนก"
 
@@ -366,16 +414,11 @@ msgstr "แสดงชื่อ"
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.default_website_description
 msgid ""
 "Each employee has a chance to see the impact of his work.\n"
-"                You can make a real contribution to the success of the company.\n"
-"                <br/>\n"
-"                Several activities are often organized all over the year, such as weekly\n"
-"                sports sessions, team building events, monthly drink, and much more"
+"                    You can make a real contribution to the success of the company.\n"
+"                    <br/>\n"
+"                    Several activities are often organized all over the year, such as weekly\n"
+"                    sports sessions, team building events, monthly drink, and much more"
 msgstr ""
-"พนักงานแต่ละคนมีโอกาสที่จะเห็นผลกระทบจากการทำงานของเขา\n"
-"                คุณสามารถมีส่วนร่วมอย่างแท้จริงต่อความสำเร็จของบริษัท\n"
-"                <br/>\n"
-"                มักมีการจัดกิจกรรมต่างๆ ตลอดทั้งปี เช่น รายสัปดาห์\n"
-"                เซสชันกีฬา กิจกรรมสร้างทีม เครื่องดื่มประจำเดือน และอื่นๆ อีกมากมาย"
 
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.default_website_description
@@ -430,7 +473,7 @@ msgstr "มีความคิดสร้างสรรค์สูงแล
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.thankyou_ir_ui_view
 msgid "Home"
-msgstr "โฮม"
+msgstr "หน้าแรก"
 
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.thankyou_ir_ui_view
@@ -457,13 +500,19 @@ msgid "I'm feeling lucky"
 msgstr "ฉันรู้สึกโชคดี"
 
 #. module: website_hr_recruitment
+#. odoo-javascript
+#: code:addons/website_hr_recruitment/static/src/fields/boolean_toggle_labeled_field.js:0
+msgid ""
+"If checked, the record will be saved immediately when the field is modified."
+msgstr "หากทำเครื่องหมาย บันทึกจะถูกบันทึกทันทีเมื่อมีการแก้ไขฟิลด์"
+
+#. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.index
 msgid "Insert a Job Description..."
 msgstr "ใส่รายละเอียดงาน..."
 
 #. module: website_hr_recruitment
 #: model:ir.model.fields,field_description:website_hr_recruitment.field_hr_job__is_published
-#: model_terms:ir.ui.view,arch_db:website_hr_recruitment.view_hr_job_form_website_published_button
 msgid "Is Published"
 msgstr "เผยแพร่"
 
@@ -490,7 +539,6 @@ msgstr "ตำแหน่งงาน"
 #. module: website_hr_recruitment
 #. odoo-python
 #: code:addons/website_hr_recruitment/controllers/main.py:0
-#, python-format
 msgid "Job Title"
 msgstr "ชื่อตำแหน่งงาน"
 
@@ -503,9 +551,9 @@ msgstr "ไม่พบงาน"
 #. odoo-python
 #: code:addons/website_hr_recruitment/models/website.py:0
 #: model:ir.ui.menu,name:website_hr_recruitment.menu_job_pages
+#: model:website.menu,name:website_hr_recruitment.website_menu_jobs
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.apply
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.jobs_searchbar_input_snippet_options
-#, python-format
 msgid "Jobs"
 msgstr "งาน"
 
@@ -513,6 +561,12 @@ msgstr "งาน"
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.snippet_options
 msgid "Jobs Page"
 msgstr "หน้างาน"
+
+#. module: website_hr_recruitment
+#. odoo-javascript
+#: code:addons/website_hr_recruitment/static/src/fields/boolean_toggle_labeled_field.js:0
+msgid "Label"
+msgstr "ป้าย"
 
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.default_website_description
@@ -527,7 +581,6 @@ msgstr "LinkedIn"
 #. module: website_hr_recruitment
 #. odoo-javascript
 #: code:addons/website_hr_recruitment/static/src/js/website_hr_recruitment_editor.js:0
-#, python-format
 msgid "LinkedIn Profile"
 msgstr "โปรไฟล์ LinkedIn"
 
@@ -576,11 +629,6 @@ msgstr ""
 "และความเป็นอิสระ"
 
 #. module: website_hr_recruitment
-#: model_terms:ir.ui.view,arch_db:website_hr_recruitment.hr_job_website_inherit
-msgid "Not published"
-msgstr "ไม่เผยแพร่"
-
-#. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.snippet_options
 msgid "Offices Filter"
 msgstr "ตัวกรองสำนักงาน"
@@ -588,7 +636,7 @@ msgstr "ตัวกรองสำนักงาน"
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.apply
 msgid "Optional introduction, or any question you might have about the job…"
-msgstr "การแนะนำเพิ่มเติม หรือคำถามใดๆ ที่คุณอาจมีเกี่ยวกับตำแหน่งงาน..."
+msgstr "การแนะนำเพิ่มเติม หรือคำถามใดๆ ที่คุณอาจมีเกี่ยวกับงาน..."
 
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.job_filter_by_departments
@@ -611,17 +659,6 @@ msgid "Perfect written English"
 msgstr "การเขียนภาษาอังกฤษที่สมบูรณ์แบบ"
 
 #. module: website_hr_recruitment
-#: model_terms:ir.ui.view,arch_db:website_hr_recruitment.default_description
-msgid ""
-"Perform assigned responsibilities, collaborate with team members, and adhere to company policies.\n"
-"        Strong communication, problem-solving, and work ethic required.\n"
-"        Adaptability, initiative, and willingness to learn are valued."
-msgstr ""
-"ปฏิบัติตามความรับผิดชอบที่ได้รับมอบหมาย ทำงานร่วมกับสมาชิกในทีม และปฏิบัติตามนโยบายของบริษัท\n"
-"        ต้องมีการสื่อสารที่ดี การแก้ปัญหา และมีจรรยาบรรณในการทำงาน\n"
-"        ความสามารถในการปรับตัว ความคิดริเริ่ม และความเต็มใจที่จะเรียนรู้เป็นสิ่งที่มีคุณค่า"
-
-#. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.default_website_description
 msgid "Perks"
 msgstr "ผลประโยชน์เพิ่มเติม"
@@ -634,7 +671,6 @@ msgstr "วิวัฒนาการส่วนบุคคล"
 #. module: website_hr_recruitment
 #. odoo-javascript
 #: code:addons/website_hr_recruitment/static/src/js/website_hr_recruitment_editor.js:0
-#, python-format
 msgid "Phone Number"
 msgstr "หมายเลขโทรศัพท์"
 
@@ -647,7 +683,7 @@ msgstr "เล่นกีฬาอะไรก็ได้กับเพื่
 #: model:ir.model.fields,field_description:website_hr_recruitment.field_hr_job__job_details
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.hr_job_form_inherit
 msgid "Process Details"
-msgstr "รายละเอียดขั้นตอน"
+msgstr "Process Details"
 
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.thankyou_ir_ui_view
@@ -677,6 +713,7 @@ msgid "Real responsibilities and challenges in a fast evolving company"
 msgstr "ความรับผิดชอบและความท้าทายที่แท้จริงในบริษัทที่มีการพัฒนาอย่างรวดเร็ว"
 
 #. module: website_hr_recruitment
+#: model_terms:ir.ui.view,arch_db:website_hr_recruitment.apply
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.job_filter_by_countries
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.job_filter_by_offices
 msgid "Remote"
@@ -689,8 +726,8 @@ msgstr "ความรับผิดชอบ"
 
 #. module: website_hr_recruitment
 #: model:ir.model.fields,help:website_hr_recruitment.field_hr_job__website_id
-msgid "Restrict publishing to this website."
-msgstr "จำกัดการเผยแพร่ในเว็บไซต์นี้"
+msgid "Restrict to a specific website."
+msgstr "จำกัดเฉพาะเว็บไซต์ใดเว็บไซต์หนึ่ง"
 
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.job_pages_kanban_view
@@ -719,8 +756,13 @@ msgstr "ตั้งค่าว่าในสมัครจะถูกเผ
 
 #. module: website_hr_recruitment
 #. odoo-javascript
+#: code:addons/website_hr_recruitment/static/src/js/widgets/copy_link_menuitem.js:0
+msgid "Share Job"
+msgstr ""
+
+#. module: website_hr_recruitment
+#. odoo-javascript
 #: code:addons/website_hr_recruitment/static/src/js/website_hr_recruitment_editor.js:0
-#, python-format
 msgid "Short Introduction"
 msgstr "บทนำโดยย่อ"
 
@@ -755,18 +797,22 @@ msgid "The full URL to access the document through the website."
 msgstr "URL แบบเต็มเพื่อเข้าถึงเอกสารผ่านเว็บไซต์"
 
 #. module: website_hr_recruitment
+#. odoo-javascript
+#: code:addons/website_hr_recruitment/static/src/js/widgets/copy_link_menuitem.js:0
+msgid "The job link has been copied to the clipboard."
+msgstr ""
+
+#. module: website_hr_recruitment
 #. odoo-python
 #: code:addons/website_hr_recruitment/models/hr_applicant.py:0
-#, python-format
 msgid "The job offer has been closed."
 msgstr "ปิดการเสนองานแล้ว"
 
 #. module: website_hr_recruitment
 #. odoo-javascript
 #: code:addons/website_hr_recruitment/static/src/js/website_hr_applicant_form.js:0
-#, python-format
-msgid "The value entered doesn't seems like a linkedin profile."
-msgstr "ค่าที่ป้อนไม่เหมือนกับโปรไฟล์ LinkedIn"
+msgid "The profile that you gave us doesn't seems like a linkedin profile"
+msgstr ""
 
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.index
@@ -778,24 +824,25 @@ msgstr ""
 "                                            แต่โปรด<span class=\"fw-bold\">ติดต่อเรา</span>เพื่อขอใบสมัครได้ทันที"
 
 #. module: website_hr_recruitment
+#. odoo-javascript
+#: code:addons/website_hr_recruitment/static/src/fields/boolean_toggle_labeled_field.js:0
+msgid "ToggleLabeled"
+msgstr ""
+
+#. module: website_hr_recruitment
+#: model:ir.model.fields,field_description:website_hr_recruitment.field_hr_recruitment_source__url
+msgid "Tracker URL"
+msgstr ""
+
+#. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.default_website_description
 msgid "Trainings"
 msgstr "การฝึกอบรม"
 
 #. module: website_hr_recruitment
-#: model_terms:ir.ui.view,arch_db:website_hr_recruitment.job_right_side_bar
-msgid "Twitter"
-msgstr "Twitter"
-
-#. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.job_filter_by_employment_type
 msgid "Unspecified type"
 msgstr "ประเภทไม่ระบุ"
-
-#. module: website_hr_recruitment
-#: model:ir.model.fields,field_description:website_hr_recruitment.field_hr_recruitment_source__url
-msgid "Url Parameters"
-msgstr "พารามิเตอร์ URL"
 
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.default_website_description
@@ -815,6 +862,22 @@ msgid ""
 msgstr ""
 "เราเป็นทีมที่มีความกระตือรือร้นซึ่งมีเป้าหมายเพื่อปรับปรุงชีวิตของทุกคนผ่านผลิตภัณฑ์ที่จะพลิกโฉมวงการ\n"
 "                              เราสร้างผลิตภัณฑ์ที่ยอดเยี่ยมเพื่อแก้ปัญหาธุรกิจของคุณ"
+
+#. module: website_hr_recruitment
+#. odoo-python
+#: code:addons/website_hr_recruitment/controllers/main.py:0
+msgid ""
+"We found a recent application with a similar name, email, phone number. You "
+"can continue if it's not a mistake."
+msgstr ""
+
+#. module: website_hr_recruitment
+#. odoo-python
+#: code:addons/website_hr_recruitment/controllers/main.py:0
+msgid ""
+"We've found a previous closed application in our system within the last 6 "
+"months. Please consider before applying in order not to duplicate efforts."
+msgstr ""
 
 #. module: website_hr_recruitment
 #: model:ir.model,name:website_hr_recruitment.model_website
@@ -868,32 +931,6 @@ msgid "What's great in the job?"
 msgstr "งานนี้มีอะไรดี?"
 
 #. module: website_hr_recruitment
-#. odoo-javascript
-#: code:addons/website_hr_recruitment/static/src/js/website_hr_applicant_form.js:0
-#, python-format
-msgid ""
-"You already applied to another position recently. You can continue if it's "
-"not a mistake."
-msgstr ""
-"คุณได้สมัครงานตำแหน่งอื่นแล้ว คุณสามารถดำเนินการต่อได้ถ้าไม่มีข้อผิดพลาด"
-
-#. module: website_hr_recruitment
-#. odoo-javascript
-#: code:addons/website_hr_recruitment/static/src/js/website_hr_applicant_form.js:0
-#, python-format
-msgid "You already applied to this job position recently."
-msgstr "คุณได้สมัครงานตำแหน่งงานนี้แล้วเมื่อเร็วๆนี้"
-
-#. module: website_hr_recruitment
-#: model_terms:ir.ui.view,arch_db:website_hr_recruitment.view_hr_job_form_inherit_website
-msgid ""
-"You can write here a short description of your Job Description that will be "
-"displayed on the main Jobs' list page."
-msgstr ""
-"คุณสามารถเขียนคำอธิบายสั้นๆ เกี่ยวกับลักษณะงานของคุณได้ที่นี่ "
-"ซึ่งจะปรากฏในหน้ารายการงานหลัก"
-
-#. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.thankyou_ir_ui_view
 msgid "Your <b>contact</b> information is:"
 msgstr "ข้อมูลการติดต่อของคุณคือ:"
@@ -901,14 +938,12 @@ msgstr "ข้อมูลการติดต่อของคุณคือ
 #. module: website_hr_recruitment
 #. odoo-javascript
 #: code:addons/website_hr_recruitment/static/src/js/website_hr_recruitment_editor.js:0
-#, python-format
 msgid "Your Email"
 msgstr "อีเมลของคุณ"
 
 #. module: website_hr_recruitment
 #. odoo-javascript
 #: code:addons/website_hr_recruitment/static/src/js/website_hr_recruitment_editor.js:0
-#, python-format
 msgid "Your Name"
 msgstr "ชื่อของคุณ"
 
@@ -927,9 +962,16 @@ msgid "breadcrumb"
 msgstr "เกล็ดขนมปัง"
 
 #. module: website_hr_recruitment
+#: model_terms:ir.ui.view,arch_db:website_hr_recruitment.view_hr_job_form_inherit_website
+msgid ""
+"e.g. Summarize the position in one or two lines that will be displayed on "
+"the Jobs list page..."
+msgstr ""
+
+#. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.apply
-msgid "e.g. https://www.linkedin.com/in/fpodoo/"
-msgstr "เช่น https://www.linkedin.com/in/fpodoo/"
+msgid "e.g. https://www.linkedin.com/in/fpodoo"
+msgstr ""
 
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.job_right_side_bar
@@ -937,14 +979,14 @@ msgid "info@yourcompany.example.com"
 msgstr "info@yourcompany.example.com"
 
 #. module: website_hr_recruitment
+#: model:ir.model.fields,field_description:website_hr_recruitment.field_hr_job__full_url
+msgid "job URL"
+msgstr ""
+
+#. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.index
 msgid "open positions"
 msgstr "เปิดรับตำแหน่ง ๆ "
-
-#. module: website_hr_recruitment
-#: model_terms:ir.ui.view,arch_db:website_hr_recruitment.hr_recruitment_source_kanban_inherit_website
-msgid "share it"
-msgstr "แชร์เลย"
 
 #. module: website_hr_recruitment
 #: model_terms:ir.ui.view,arch_db:website_hr_recruitment.index

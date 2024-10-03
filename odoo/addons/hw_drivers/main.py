@@ -31,12 +31,13 @@ iot_devices = {}
 
 
 class Manager(Thread):
+    server_url = None
+
     def send_alldevices(self, iot_client=None):
         """
-        This method send IoT Box and devices informations to Odoo database
+        This method send IoT Box and devices information to Odoo database
         """
-        server = helpers.get_odoo_server_url()
-        if server:
+        if self.server_url:
             subject = helpers.get_conf('subject')
             if subject:
                 domain = helpers.get_ip().replace('.', '-') + subject.strip('*')
@@ -57,6 +58,7 @@ class Manager(Thread):
                     'type': iot_devices[device].device_type,
                     'manufacturer': iot_devices[device].device_manufacturer,
                     'connection': iot_devices[device].device_connection,
+                    'subtype': iot_devices[device].device_subtype if iot_devices[device].device_type == 'printer' else '',
                 }
             devices_list_to_send = {
                 key: value for key, value in devices_list.items() if key != 'distant_display'
@@ -73,7 +75,7 @@ class Manager(Thread):
             try:
                 resp = http.request(
                     'POST',
-                    server + "/iot/setup",
+                    self.server_url + "/iot/setup",
                     body=json.dumps(data).encode('utf8'),
                     headers={
                         'Content-type': 'application/json',
@@ -93,12 +95,11 @@ class Manager(Thread):
         """
         Thread that will load interfaces and drivers and contact the odoo server with the updates
         """
-        helpers.migrate_old_config_files_to_new_config_file()
-        server_url = helpers.get_odoo_server_url()
-
+        self.server_url = helpers.get_odoo_server_url()
         helpers.start_nginx_server()
+
         _logger.info("IoT Box Image version: %s", helpers.get_version(detailed_version=True))
-        if platform.system() == 'Linux' and server_url:
+        if platform.system() == 'Linux' and self.server_url:
             helpers.check_git_branch()
             helpers.generate_password()
         is_certificate_ok, certificate_details = helpers.get_certificate_status()
@@ -106,7 +107,7 @@ class Manager(Thread):
             _logger.warning("An error happened when trying to get the HTTPS certificate: %s",
                             certificate_details)
 
-        iot_client = server_url and WebsocketClient(server_url)
+        iot_client = self.server_url and WebsocketClient(self.server_url)
         # We first add the IoT Box to the connected DB because IoT handlers cannot be downloaded if
         # the identifier of the Box is not found in the DB. So add the Box to the DB.
         self.send_alldevices(iot_client)
@@ -125,10 +126,10 @@ class Manager(Thread):
         # Set scheduled actions
         schedule and schedule.every().day.at("00:00").do(helpers.get_certificate_status)
 
-        #Setup the websocket connection
-        if server_url:
+        # Set up the websocket connection
+        if self.server_url and iot_client.iot_channel:
             iot_client.start()
-        # Check every 3 secondes if the list of connected devices has changed and send the updated
+        # Check every 3 seconds if the list of connected devices has changed and send the updated
         # list to the connected DB.
         self.previous_iot_devices = []
         while 1:

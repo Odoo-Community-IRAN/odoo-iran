@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { useVisible } from "@mail/utils/common/hooks";
 import { Component, useState } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
@@ -17,10 +15,11 @@ export class RecipientList extends Component {
     static props = ["thread", "close?"];
 
     setup() {
-        this.threadService = useState(useService("mail.thread"));
+        super.setup();
+        this.store = useState(useService("mail.store"));
         this.loadMoreState = useVisible("load-more", () => {
             if (this.loadMoreState.isVisible) {
-                this.threadService.loadMoreRecipients(this.props.thread);
+                this.props.thread.loadMoreRecipients();
             }
         });
     }

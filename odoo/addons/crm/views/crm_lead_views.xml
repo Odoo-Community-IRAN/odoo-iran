@@ -11,7 +11,7 @@
                             invisible="not active or probability == 100 or type == 'lead'"/>
                         <button name="%(crm.crm_lead_lost_action)d" string="Lost" data-hotkey="l" title="Mark as lost"
                             type="action" invisible="type == 'lead' or not active and probability &lt; 100"/>
-                        <button name="%(crm.action_crm_lead2opportunity_partner)d" string="Convert to Opportunity" type="action" help="Convert to Opportunity"
+                        <button name="%(crm.action_crm_lead2opportunity_partner)d" string="Convert to Opportunity" type="action"
                             class="oe_highlight" invisible="type == 'opportunity' or not active" data-hotkey="v"/>
                         <button name="toggle_active" string="Restore" type="object" data-hotkey="x"
                             invisible="probability &gt; 0 or active"/>
@@ -128,7 +128,7 @@
                             <group name="opportunity_partner" invisible="type == 'lead'">
                                 <field name="partner_id"
                                     widget="res_partner_many2one"
-                                    string="Customer"
+                                    string="Contact"
                                     context="{'res_partner_search_mode': type == 'opportunity' and 'customer' or False,
                                         'default_name': contact_name or partner_name,
                                         'default_street': street,
@@ -331,11 +331,7 @@
                             </page>
                         </notebook>
                     </sheet>
-                    <div class="oe_chatter">
-                        <field name="message_follower_ids"/>
-                        <field name="activity_ids"/>
-                        <field name="message_ids" options="{'post_refresh': 'recipients'}"/>
-                    </div>
+                    <chatter reload_on_post="True"/>
                 </form>
             </field>
         </record>
@@ -346,16 +342,16 @@
         <record id="act_crm_opportunity_calendar_event_new" model="ir.actions.act_window">
             <field name="name">Meetings</field>
             <field name="res_model">calendar.event</field>
-            <field name="view_mode">tree,form,calendar</field>
+            <field name="view_mode">list,form,calendar</field>
             <field name="context">{'default_duration': 4.0, 'default_opportunity_id': active_id}</field>
         </record>
 
         <record id="crm_case_tree_view_leads" model="ir.ui.view">
-            <field name="name">crm.lead.tree.lead</field>
+            <field name="name">crm.lead.list.lead</field>
             <field name="model">crm.lead</field>
             <field name="priority">10</field>
             <field name="arch" type="xml">
-                <tree string="Leads" sample="1" multi_edit="1">
+                <list string="Leads" sample="1" multi_edit="1">
                     <field name="company_id" column_invisible="True"/>
                     <field name="user_company_ids" column_invisible="True"/>
                     <field name="date_deadline" column_invisible="True"/>
@@ -383,7 +379,7 @@
                     <field name="message_needaction" column_invisible="True"/>
                     <field name="tag_ids" optional="hide" widget="many2many_tags" options="{'color_field': 'color'}"/>
                     <field name="priority" optional="hide"/>
-                </tree>
+                </list>
             </field>
         </record>
 
@@ -393,38 +389,19 @@
             <field name="priority" eval="100"/>
             <field name="arch" type="xml">
                 <kanban class="o_kanban_mobile" archivable="false" js_class="crm_kanban" sample="1">
-                    <field name="name"/>
-                    <field name="contact_name"/>
-                    <field name="priority"/>
-                    <field name="tag_ids"/>
-                    <field name="user_id"/>
-                    <field name="activity_ids"/>
-                    <field name="activity_state"/>
                     <progressbar field="activity_state" colors='{"planned": "success", "today": "warning", "overdue": "danger"}'/>
                     <templates>
-                        <t t-name="kanban-box">
-                            <div t-attf-class="oe_kanban_content oe_kanban_global_click">
-                                <div>
-                                    <strong class="o_kanban_record_title"><span><field name="name"/></span></strong>
+                        <t t-name="card">
+                            <field name="name" class="fw-bold fs-5"/>
+                            <field name="contact_name"/>
+                            <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"/>
+                            <footer class="pt-1 mt-0">
+                                <div class="d-flex mt-auto">
+                                    <field name="priority" widget="priority" class="me-2"/>
+                                    <field name="activity_ids" widget="kanban_activity"/>
                                 </div>
-                                <div>
-                                    <span class="o_kanban_record_subtitle"><field name="contact_name"/></span>
-                                </div>
-                                <div>
-                                  <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"/>
-                                </div>
-                                <div class="o_kanban_record_bottom">
-                                    <div class="oe_kanban_bottom_left">
-                                        <field name="priority" widget="priority"/>
-                                        <div class="o_kanban_inline_block">
-                                            <field name="activity_ids" widget="kanban_activity"/>
-                                        </div>
-                                    </div>
-                                    <div class="oe_kanban_bottom_right">
-                                        <field name="user_id" widget="many2one_avatar_user" domain="[('share', '=', False)]"/>
-                                    </div>
-                                </div>
-                            </div>
+                                <field name="user_id" widget="many2one_avatar_user" domain="[('share', '=', False)]" class="ms-auto"/>
+                            </footer>
                         </t>
                     </templates>
                 </kanban>
@@ -455,7 +432,7 @@
                     <group>
                         <field name="partner_id" widget="res_partner_many2one"
                             class="o_field_highlight"
-                            string='Organization / Contact'
+                            string='Contact'
                             context="{
                             'res_partner_search_mode': type == 'opportunity' and 'customer' or False,
                             'default_name': contact_name or partner_name,
@@ -539,78 +516,46 @@
             <field name="model">crm.lead</field>
             <field name="priority" eval="1"/>
             <field name="arch" type="xml">
-                <kanban default_group_by="stage_id" class="o_kanban_small_column o_opportunity_kanban" on_create="quick_create" quick_create_view="crm.quick_create_opportunity_form"
+                <kanban  highlight_color="color" default_group_by="stage_id" class="o_kanban_small_column o_opportunity_kanban" on_create="quick_create" quick_create_view="crm.quick_create_opportunity_form"
                     archivable="false" sample="1" js_class="crm_kanban">
-                    <field name="stage_id" options='{"group_by_tooltip": {"requirements": "Description"}}'/>
                     <field name="probability"/>
-                    <field name="color"/>
-                    <field name="priority"/>
-                    <field name="expected_revenue"/>
-                    <field name="kanban_state"/>
-                    <field name="activity_date_deadline"/>
-                    <field name="user_id"/>
-                    <field name="partner_id"/>
-                    <field name="activity_summary"/>
                     <field name="active"/>
                     <field name="company_currency"/>
-                    <field name="activity_state" />
-                    <field name="activity_ids" />
                     <field name="recurring_revenue_monthly"/>
                     <field name="team_id"/>
                     <progressbar field="activity_state" colors='{"planned": "success", "today": "warning", "overdue": "danger"}'
                         sum_field="expected_revenue" recurring_revenue_sum_field="recurring_revenue_monthly"
                         help="This bar allows to filter the opportunities based on scheduled activities."/>
                     <templates>
-                        <t t-name="kanban-menu">
-                            <t t-if="widget.editable"><a role="menuitem" type="edit" class="dropdown-item">Edit</a></t>
+                        <t t-name="menu">
+                            <t t-if="widget.editable"><a role="menuitem" type="open" class="dropdown-item">Edit</a></t>
                             <t t-if="widget.deletable"><a role="menuitem" type="delete" class="dropdown-item">Delete</a></t>
-                            <ul class="oe_kanban_colorpicker" data-field="color"/>
+                            <field name="color" widget="kanban_color_picker"/>
                         </t>
-                        <t t-name="kanban-box">
+                        <t t-name="card">
                             <t t-set="lost_ribbon" t-value="!record.active.raw_value and record.probability and record.probability.raw_value == 0"/>
-                            <div t-attf-class="#{!selection_mode ? kanban_color(record.color.raw_value) : ''} #{lost_ribbon ? 'oe_kanban_card_ribbon' : ''} oe_kanban_global_click oe_kanban_card d-flex flex-column">
-                                <div class="ribbon ribbon-top-right"
-                                    invisible="probability &gt; 0 or active">
-                                    <span class="text-bg-danger">Lost</span>
-                                </div>
-
-                                <div class="oe_kanban_content flex-grow-1">
-                                    <div class="oe_kanban_details">
-                                        <strong class="o_kanban_record_title"><field name="name"/></strong>
-                                    </div>
-                                    <div class="o_kanban_record_subtitle">
-                                        <t t-if="record.expected_revenue.raw_value">
-                                            <field name="expected_revenue" widget="monetary" options="{'currency_field': 'company_currency'}"/>
-                                            <span t-if="record.recurring_revenue and record.recurring_revenue.raw_value" groups="crm.group_use_recurring_revenues"> + </span>
-                                        </t>
-                                        <t t-if="record.recurring_revenue and record.recurring_revenue.raw_value">
-                                            <field class="me-1" name="recurring_revenue" widget="monetary" options="{'currency_field': 'company_currency'}" groups="crm.group_use_recurring_revenues"/>
-                                            <field name="recurring_plan" groups="crm.group_use_recurring_revenues"/>
-                                        </t>
-                                    </div>
-                                    <div>
-                                        <span class="o_text_overflow" t-if="record.partner_id.value" t-esc="record.partner_id.value"></span>
-                                    </div>
-                                    <div>
-                                        <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"/>
-                                    </div>
-                                    <div>
-                                        <field name="lead_properties" widget="properties"/>
-                                    </div>
-                                </div>
-                                <div class="oe_kanban_footer">
-                                    <div class="o_kanban_record_bottom">
-                                        <div class="oe_kanban_bottom_left">
-                                            <field name="priority" widget="priority" groups="base.group_user"/>
-                                            <field name="activity_ids" widget="kanban_activity"/>
-                                        </div>
-                                        <div class="oe_kanban_bottom_right">
-                                            <field name="user_id" widget="many2one_avatar_user" domain="[('share', '=', False)]"/>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="clearfix"/>
+                            <widget name="web_ribbon" title="lost" bg_color="text-bg-danger" invisible="probability &gt; 0 or active"/>
+                            <field class="fw-bold fs-5" name="name"/>
+                            <div>
+                                <t t-if="record.expected_revenue.raw_value">
+                                    <field name="expected_revenue" widget="monetary" options="{'currency_field': 'company_currency'}"/>
+                                    <span t-if="record.recurring_revenue and record.recurring_revenue.raw_value" groups="crm.group_use_recurring_revenues"> + </span>
+                                </t>
+                                <t t-if="record.recurring_revenue and record.recurring_revenue.raw_value">
+                                    <field class="me-1" name="recurring_revenue" widget="monetary" options="{'currency_field': 'company_currency'}" groups="crm.group_use_recurring_revenues"/>
+                                    <field name="recurring_plan" groups="crm.group_use_recurring_revenues"/>
+                                </t>
                             </div>
+                            <field name="partner_id" class="text-truncate" />
+                            <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"/>
+                            <field name="lead_properties" widget="properties"/>
+                            <footer class="pt-1">
+                                <div class="d-flex mt-auto align-items-center">
+                                    <field name="priority" widget="priority" groups="base.group_user" class="me-2"/>
+                                    <field name="activity_ids" widget="kanban_activity"/>
+                                </div>
+                                <field name="user_id" widget="many2one_avatar_user" domain="[('share', '=', False)]" class="ms-auto"/>
+                            </footer>
                         </t>
                     </templates>
                 </kanban>
@@ -645,22 +590,12 @@
                 <xpath expr="//t[@t-set='lost_ribbon']" position="after">
                     <t t-set="won_ribbon" t-value="record.active.raw_value and record.probability and record.probability.raw_value == 100"/>
                 </xpath>
-                <xpath expr="//div[contains(@t-attf-class, 'oe_kanban_card')]" position="attributes">
-                    <attribute name="t-attf-class">
-                        #{!selection_mode ? kanban_color(record.color.raw_value) : ''}
-                        #{lost_ribbon || won_ribbon ? 'oe_kanban_card_ribbon' : ''}
-                        oe_kanban_global_click oe_kanban_card d-flex flex-column
-                    </attribute>
+                <xpath expr="//widget" position="replace">
+                    <widget t-if="won_ribbon" name="web_ribbon" title="Won" bg_color="text-bg-success" invisible="(probability &gt; 0 or active) and (probability &lt; 100 or not active)"/>
+                    <widget t-if="lost_ribbon" name="web_ribbon" title="Lost" bg_color="text-bg-danger" invisible="(probability &gt; 0 or active) and (probability &lt; 100 or not active)"/>
                 </xpath>
-                <xpath expr="//div[hasclass('ribbon')]" position="replace">
-                    <div class="ribbon ribbon-top-right"
-                        invisible="(probability &gt; 0 or active) and (probability &lt; 100 or not active)">
-                        <span t-if="won_ribbon" class="text-bg-success">Won</span>
-                        <span t-elif="lost_ribbon" class="text-bg-danger">Lost</span>
-                    </div>
-                </xpath>
-                <xpath expr="//div[hasclass('o_kanban_record_subtitle')]" position="replace">
-                    <div class="o_kanban_record_subtitle">
+                <xpath expr="//div" position="replace">
+                    <div>
                         <t t-if="record.prorated_revenue.raw_value">
                             <field name="prorated_revenue" widget="monetary" options="{'currency_field': 'company_currency'}"/>
                             <span t-if="record.recurring_revenue and record.recurring_revenue.raw_value" groups="crm.group_use_recurring_revenues"> + </span>
@@ -705,7 +640,7 @@
                     <filter string="Lost" name="lost"
                             domain="['&amp;', ('probability', '=', 0), ('active', '=', False)]"/>
                     <separator/>
-                    <filter string="Creation Date" name="filter_creation_date" date="create_date" default_period="this_month"/>
+                    <filter string="Creation Date" name="filter_creation_date" date="create_date" default_period="month"/>
                     <filter name="filter_date_closed" date="date_closed"/>
                     <separator/>
                     <separator/>
@@ -745,9 +680,9 @@
             <field name="res_model">mail.compose.message</field>
             <field name="view_mode">form</field>
             <field name="target">new</field>
-            <field name="context" eval="{
+            <field name="context">{
     'default_composition_mode': 'comment',
-                }"/>
+                }</field>
             <field name="binding_model_id" ref="model_crm_lead"/>
             <field name="binding_view_types">form</field>
         </record>
@@ -757,9 +692,9 @@
             <field name="res_model">mail.compose.message</field>
             <field name="view_mode">form</field>
             <field name="target">new</field>
-            <field name="context" eval="{
+            <field name="context">{
     'default_composition_mode': 'mass_mail',
-                }"/>
+                }</field>
             <field name="binding_model_id" ref="model_crm_lead"/>
             <field name="binding_view_types">list</field>
         </record>
@@ -769,11 +704,11 @@
         -->
 
         <record id="crm_case_tree_view_oppor" model="ir.ui.view">
-            <field name="name">crm.lead.tree.opportunity</field>
+            <field name="name">crm.lead.list.opportunity</field>
             <field name="model">crm.lead</field>
             <field name="priority">1</field>
             <field name="arch" type="xml">
-                <tree string="Opportunities" sample="1" multi_edit="1">
+                <list string="Opportunities" sample="1" multi_edit="1">
                     <header>
                         <button name="%(crm.action_lead_mass_mail)d" type="action" string="Email" />
                     </header>
@@ -798,7 +733,6 @@
                     <field name="activity_ids" optional="hide" widget="list_activity"/>
                     <field name="activity_user_id" optional="hide" string="Activity by" widget="many2one_avatar_user"/>
                     <field name="my_activity_date_deadline" optional="hide" string="My Deadline" widget="remaining_days" options="{'allow_order': '1'}"/>
-                    <field name="activity_calendar_event_id" column_invisible="True"/>
                     <field name="campaign_id" optional="hide"/>
                     <field name="medium_id" optional="hide"/>
                     <field name="source_id" optional="hide"/>
@@ -820,21 +754,23 @@
                     <field name="lead_properties"/>
                     <button name="%(crm.action_lead_mail_compose)d" type="action" string="Email" icon="fa-envelope"/>
                     <button name="action_reschedule_meeting" class="text-warning" type="object" string="Reschedule"
-                        icon="fa-calendar" invisible="not my_activity_date_deadline or not activity_calendar_event_id"/>
+                        icon="fa-calendar" invisible="not my_activity_date_deadline or not activity_calendar_event_id"
+                        groups="base.group_user"/>
                     <button name="action_snooze" class="text-warning" type="object" string="Snooze 7d"
-                        icon="fa-bell-slash" invisible="not my_activity_date_deadline or activity_calendar_event_id"/>
-                </tree>
+                        icon="fa-bell-slash" invisible="not my_activity_date_deadline or activity_calendar_event_id"
+                        groups="base.group_user"/>
+                </list>
             </field>
         </record>
 
         <record id="crm_lead_view_tree_forecast" model="ir.ui.view">
-            <field name="name">crm.lead.view.tree.forecast</field>
+            <field name="name">crm.lead.view.list.forecast</field>
             <field name="model">crm.lead</field>
             <field name="inherit_id" ref="crm.crm_case_tree_view_oppor"/>
             <field name="mode">primary</field>
             <field name="priority">32</field>
             <field name="arch" type="xml">
-                <xpath expr="//tree" position="attributes">
+                <xpath expr="//list" position="attributes">
                     <attribute name="js_class">forecast_list</attribute>
                 </xpath>
                 <xpath expr="//field[@name='expected_revenue']" position="attributes">
@@ -853,7 +789,7 @@
             <field name="priority">20</field>
             <field name="inherit_id" ref="crm.crm_case_tree_view_oppor"/>
             <field name="arch" type="xml">
-                <xpath expr="//tree" position="attributes">
+                <xpath expr="//list" position="attributes">
                     <attribute name="default_order">my_activity_date_deadline</attribute>
                 </xpath>
                 <field name="user_id" position="attributes">
@@ -1019,8 +955,9 @@
                     <filter string="Creation Date" name="creation_date" date="create_date"/>
                     <filter string="Closed Date" name="close_date" date="date_closed"/>
                     <separator/>
-                    <filter string="Won" name="won" domain="['&amp;', ('active', '=', True), ('stage_id.is_won', '=', True)]"/>
-                    <filter string="Lost" name="lost" domain="['&amp;', ('active', '=', False), ('probability', '=', 0)]"/>
+                    <filter string="Won" name="filter_won" domain="['&amp;', ('active', '=', True), ('stage_id.is_won', '=', True)]"/>
+                    <filter string="Ongoing" name="filter_ongoing" domain="['&amp;', ('active', '=', True), ('stage_id.is_won', '=', False)]"/>
+                    <filter string="Lost" name="filter_lost" domain="['&amp;', ('active', '=', False), ('probability', '=', 0)]"/>
                     <separator/>
                     <filter invisible="1" string="Overdue Opportunities" name="overdue_opp" domain="['&amp;', ('date_closed', '=', False), ('date_deadline', '&lt;', context_today().strftime('%Y-%m-%d'))]"/>
                     <filter invisible="1" string="Late Activities" name="activities_overdue"
@@ -1031,7 +968,6 @@
                     <filter invisible="1" string="Future Activities" name="activities_upcoming_all"
                         domain="[('my_activity_date_deadline', '&gt;', context_today().strftime('%Y-%m-%d'))]"/>
                     <separator/>
-                    <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
                     <group expand="0" string="Group By" colspan="16">
                         <filter string="Salesperson" name="salesperson" context="{'group_by':'user_id'}"/>
                         <filter string="Sales Team" name="saleschannel" context="{'group_by':'team_id'}"/>
@@ -1080,7 +1016,7 @@
         <record model="ir.actions.act_window" id="crm_lead_all_leads">
             <field name="name">Leads</field>
             <field name="res_model">crm.lead</field>
-            <field name="view_mode">tree,kanban,graph,pivot,calendar,form,activity</field>
+            <field name="view_mode">list,kanban,graph,pivot,calendar,form,activity</field>
             <field name="domain">['|', ('type','=','lead'), ('type','=',False)]</field>
             <field name="search_view_id" ref="crm.view_crm_case_leads_filter"/>
             <field name="context">{
@@ -1100,7 +1036,7 @@
 
         <record id="crm_lead_all_leads_view_tree" model="ir.actions.act_window.view">
             <field name="sequence" eval="1"/>
-            <field name="view_mode">tree</field>
+            <field name="view_mode">list</field>
             <field name="view_id" ref="crm_case_tree_view_leads"/>
             <field name="act_window_id" ref="crm_lead_all_leads"/>
         </record>
@@ -1137,7 +1073,7 @@
         <record id="crm_lead_action_my_activities" model="ir.actions.act_window">
             <field name="name">My Activities</field>
             <field name="res_model">crm.lead</field>
-            <field name="view_mode">tree,kanban,graph,pivot,calendar,form,activity</field>
+            <field name="view_mode">list,kanban,graph,pivot,calendar,form,activity</field>
             <field name="view_id" ref="crm_lead_view_list_activities"/>
             <!-- Ensure that only records with at least one activity, "done" (archived) or not, are fetched. -->
             <field name="domain">[("activity_ids.active", "in", [True, False])]</field>
@@ -1156,7 +1092,7 @@
 
         <record id="crm_lead_action_my_activities_view_tree" model="ir.actions.act_window.view">
             <field name="sequence">1</field>
-            <field name="view_mode">tree</field>
+            <field name="view_mode">list</field>
             <field name="view_id" ref="crm.crm_lead_view_list_activities"/>
             <field name="act_window_id" ref="crm_lead_action_my_activities"/>
         </record>
@@ -1165,7 +1101,7 @@
         <record model="ir.actions.act_window" id="crm_lead_opportunities">
             <field name="name">Opportunities</field>
             <field name="res_model">crm.lead</field>
-            <field name="view_mode">kanban,tree,graph,pivot,form,calendar,activity</field>
+            <field name="view_mode">kanban,list,graph,pivot,form,calendar,activity</field>
             <field name="domain">[('type','=','opportunity')]</field>
             <field name="context">{
                     'default_type': 'opportunity',
@@ -1183,7 +1119,7 @@
 
         <record id="crm_lead_opportunities_view_tree" model="ir.actions.act_window.view">
             <field name="sequence" eval="1"/>
-            <field name="view_mode">tree</field>
+            <field name="view_mode">list</field>
             <field name="view_id" ref="crm.crm_case_tree_view_oppor"/>
             <field name="act_window_id" ref="crm_lead_opportunities"/>
         </record>
@@ -1212,7 +1148,7 @@
         <record model="ir.actions.act_window" id="crm_lead_action_pipeline">
             <field name="name">Pipeline</field>
             <field name="res_model">crm.lead</field>
-            <field name="view_mode">kanban,tree,graph,pivot,form,calendar,activity</field>
+            <field name="view_mode">kanban,list,graph,pivot,form,calendar,activity</field>
             <field name="domain">[('type','=','opportunity')]</field>
             <field name="context">{
                     'default_type': 'opportunity',
@@ -1230,7 +1166,7 @@
 
         <record id="crm_lead_action_pipeline_view_tree" model="ir.actions.act_window.view">
             <field name="sequence" eval="1"/>
-            <field name="view_mode">tree</field>
+            <field name="view_mode">list</field>
             <field name="view_id" ref="crm.crm_case_tree_view_oppor"/>
             <field name="act_window_id" ref="crm_lead_action_pipeline"/>
         </record>
@@ -1259,7 +1195,7 @@
         <record id="crm_lead_action_forecast" model="ir.actions.act_window">
             <field name="name">Forecast</field>
             <field name="res_model">crm.lead</field>
-            <field name="view_mode">kanban,graph,pivot,tree,form</field>
+            <field name="view_mode">kanban,graph,pivot,list,form</field>
             <field name="domain">[('type', '=', 'opportunity')]</field>
             <field name="context">{
                 'default_type': 'opportunity',
@@ -1301,7 +1237,7 @@
 
         <record id="crm_lead_action_forecast_view_tree" model="ir.actions.act_window.view">
             <field name="sequence" eval="3"/>
-            <field name="view_mode">tree</field>
+            <field name="view_mode">list</field>
             <field name="view_id" ref="crm_lead_view_tree_forecast"/>
             <field name="act_window_id" ref="crm_lead_action_forecast"/>
         </record>

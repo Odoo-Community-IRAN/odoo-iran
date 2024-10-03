@@ -9,21 +9,6 @@ from odoo.tools.sql import column_exists, create_column
 INV_LINES_PER_STUB = 9
 
 
-class AccountPaymentRegister(models.TransientModel):
-    _inherit = "account.payment.register"
-
-    @api.depends('payment_type', 'journal_id', 'partner_id')
-    def _compute_payment_method_line_id(self):
-        super()._compute_payment_method_line_id()
-        for record in self:
-            preferred = record.partner_id.with_company(record.company_id).property_payment_method_id
-            method_line = record.journal_id.outbound_payment_method_line_ids.filtered(
-                lambda l: l.payment_method_id == preferred
-            )
-            if record.payment_type == 'outbound' and method_line:
-                record.payment_method_line_id = method_line[0]
-
-
 class AccountPayment(models.Model):
     _inherit = "account.payment"
 
@@ -128,24 +113,26 @@ class AccountPayment(models.Model):
                 sequence = payment.journal_id.check_sequence_id.sudo()
                 sequence.padding = len(payment.check_number)
 
-    @api.depends('payment_type', 'journal_id', 'partner_id')
-    def _compute_payment_method_line_id(self):
-        super()._compute_payment_method_line_id()
-        for record in self:
-            preferred = record.partner_id.with_company(record.company_id).property_payment_method_id
-            method_line = record.journal_id.outbound_payment_method_line_ids\
-                .filtered(lambda l: l.payment_method_id == preferred)
-            if record.payment_type == 'outbound' and method_line:
-                record.payment_method_line_id = method_line[0]
-
     def _get_aml_default_display_name_list(self):
         # Extends 'account'
-        values = super()._get_aml_default_display_name_list()
-        if self.check_number:
-            date_index = [i for i, value in enumerate(values) if value[0] == 'date'][0]
-            values.insert(date_index - 1, ('check_number', self.check_number))
-            values.insert(date_index - 1, ('sep', ' - '))
-        return values
+        self.ensure_one()
+
+        if not self.check_number:
+            return super()._get_aml_default_display_name_list()
+
+        result = [
+            ('label', _("Checks")),
+            ('sep', ' - '),
+            ('check_number', self.check_number),
+        ]
+
+        if self.memo:
+            result += [
+                ('sep', ': '),
+                ('memo', self.memo),
+            ]
+
+        return result
 
     def action_post(self):
         payment_method_check = self.env.ref('account_check_printing.account_payment_method_check')
@@ -157,23 +144,22 @@ class AccountPayment(models.Model):
     def print_checks(self):
         """ Check that the recordset is valid, set the payments state to sent and call print_checks() """
         # Since this method can be called via a client_action_multi, we need to make sure the received records are what we expect
-        self = self.filtered(lambda r: r.payment_method_line_id.code == 'check_printing' and r.state != 'reconciled')
+        valid_payments = self.filtered(lambda r: r.payment_method_line_id.code == 'check_printing' and r.state != 'paid')
 
-        if len(self) == 0:
+        if len(valid_payments) == 0:
             raise UserError(_("Payments to print as a checks must have 'Check' selected as payment method and "
                               "not have already been reconciled"))
-        if any(payment.journal_id != self[0].journal_id for payment in self):
+        if any(payment.journal_id != valid_payments[0].journal_id for payment in valid_payments):
             raise UserError(_("In order to print multiple checks at once, they must belong to the same bank journal."))
 
-        if not self[0].journal_id.check_manual_sequencing:
+        if not valid_payments[0].journal_id.check_manual_sequencing:
             # The wizard asks for the number printed on the first pre-printed check
             # so payments are attributed the number of the check the'll be printed on.
             self.env.cr.execute("""
                   SELECT payment.id
                     FROM account_payment payment
-                    JOIN account_move move ON movE.id = payment.move_id
-                   WHERE journal_id = %(journal_id)s
-                   AND payment.check_number IS NOT NULL
+                   WHERE payment.journal_id = %(journal_id)s
+                     AND payment.check_number IS NOT NULL
                 ORDER BY payment.check_number::BIGINT DESC
                    LIMIT 1
             """, {
@@ -190,23 +176,20 @@ class AccountPayment(models.Model):
                 'view_mode': 'form',
                 'target': 'new',
                 'context': {
-                    'payment_ids': self.ids,
+                    'payment_ids': valid_payments.ids,
                     'default_next_check_number': next_check_number,
                 }
             }
         else:
-            self.filtered(lambda r: r.state == 'draft').action_post()
-            return self.do_print_checks()
-
-    def action_unmark_sent(self):
-        self.write({'is_move_sent': False})
+            valid_payments.filtered(lambda r: r.state == 'draft').action_post()
+            return valid_payments.do_print_checks()
 
     def action_void_check(self):
         self.action_draft()
         self.action_cancel()
 
     def do_print_checks(self):
-        check_layout = self.company_id.account_check_printing_layout
+        check_layout = self.journal_id.bank_check_printing_layout or self.company_id.account_check_printing_layout
         redirect_action = self.env.ref('account.action_account_config')
         if not check_layout or check_layout == 'disabled':
             msg = _("You have to choose a check layout. For this, go in Invoicing/Accounting Settings, search for 'Checks layout' and set one.")
@@ -215,7 +198,7 @@ class AccountPayment(models.Model):
         if not report_action:
             msg = _("Something went wrong with Check Layout, please select another layout in Invoicing/Accounting Settings and try again.")
             raise RedirectWarning(msg, redirect_action.id, _('Go to the configuration panel'))
-        self.write({'is_move_sent': True})
+        self.write({'is_sent': 'True'})
         return report_action.report_action(self)
 
     #######################
@@ -236,7 +219,7 @@ class AccountPayment(models.Model):
             'state': self.state,
             'amount': formatLang(self.env, self.amount, currency_obj=self.currency_id) if i == 0 else 'VOID',
             'amount_in_word': self._check_fill_line(self.check_amount_in_words) if i == 0 else 'VOID',
-            'memo': self.ref,
+            'memo': self.memo,
             'stub_cropped': not multi_stub and len(self.move_id._get_reconciled_invoices()) > INV_LINES_PER_STUB,
             # If the payment does not reference an invoice, there is no stub line to display
             'stub_lines': p,
@@ -282,7 +265,7 @@ class AccountPayment(models.Model):
             }
 
         # Decode the reconciliation to keep only invoices.
-        term_lines = self.line_ids.filtered(lambda line: line.account_id.account_type in ('asset_receivable', 'liability_payable'))
+        term_lines = self.move_id.line_ids.filtered(lambda line: line.account_id.account_type in ('asset_receivable', 'liability_payable'))
         invoices = (term_lines.matched_debit_ids.debit_move_id.move_id + term_lines.matched_credit_ids.credit_move_id.move_id)\
             .filtered(lambda x: x.is_outbound() or x.move_type == 'in_receipt')
         invoices = invoices.sorted(lambda x: x.invoice_date_due or x.date)

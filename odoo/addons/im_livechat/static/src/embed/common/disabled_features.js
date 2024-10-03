@@ -1,29 +1,14 @@
-/* @odoo-module */
-
 import { threadActionsRegistry } from "@mail/core/common/thread_actions";
 import { Thread } from "@mail/core/common/thread_model";
-import { ThreadService } from "@mail/core/common/thread_service";
 
 import { patch } from "@web/core/utils/patch";
-import { SESSION_STATE } from "./livechat_service";
 
 patch(Thread.prototype, {
     get hasMemberList() {
         return false;
     },
     get hasAttachmentPanel() {
-        return this.type !== "livechat" && super.hasAttachmentPanel;
-    },
-});
-
-patch(ThreadService.prototype, {
-    async fetchNewMessages(thread) {
-        if (
-            thread.type !== "livechat" ||
-            (this.livechatService.state === SESSION_STATE.PERSISTED && !thread.isNewlyCreated)
-        ) {
-            return super.fetchNewMessages(...arguments);
-        }
+        return this.channel_type !== "livechat" && super.hasAttachmentPanel;
     },
 });
 

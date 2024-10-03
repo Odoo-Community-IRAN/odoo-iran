@@ -9,7 +9,8 @@ import pytz
 from dateutil.parser import parse
 from markupsafe import Markup
 
-from odoo import api, fields, models, registry, _
+from odoo import api, fields, models, _
+from odoo.modules.registry import Registry
 from odoo.tools import ormcache_context, email_normalize
 from odoo.osv import expression
 
@@ -36,7 +37,7 @@ def after_commit(func):
 
         @self.env.cr.postcommit.add
         def called_after():
-            db_registry = registry(dbname)
+            db_registry = Registry(dbname)
             with db_registry.cursor() as cr:
                 env = api.Environment(cr, uid, context)
                 try:
@@ -157,19 +158,17 @@ class GoogleSync(models.AbstractModel):
         self.unlink()
 
     @api.model
-    def _sync_google2odoo(self, google_events: GoogleEvent, default_reminders=()):
+    def _sync_google2odoo(self, google_events: GoogleEvent, write_dates=None, default_reminders=()):
         """Synchronize Google recurrences in Odoo. Creates new recurrences, updates
         existing ones.
 
         :param google_recurrences: Google recurrences to synchronize in Odoo
+        :param write_dates: A dictionary mapping Odoo record IDs to their write dates.
         :return: synchronized odoo recurrences
         """
+        write_dates = dict(write_dates or {})
         existing = google_events.exists(self.env)
         new = google_events - existing - google_events.cancelled()
-        write_dates = self._context.get('write_dates', {})
-        # Pop 'write_dates' from the context (frozendict) after using it for resetting the old value in the call stack.
-        context = dict(self.env.context, dont_notify=True)
-        context.pop('write_dates', None)
 
         odoo_values = [
             dict(self._odoo_values(e, default_reminders), need_sync=False)
@@ -177,7 +176,7 @@ class GoogleSync(models.AbstractModel):
         ]
         new_odoo = self.with_context(dont_notify=True)._create_from_google(new, odoo_values)
         cancelled = existing.cancelled()
-        cancelled_odoo = self.browse(cancelled.odoo_ids(self.env)).exists()
+        cancelled_odoo = self.browse(cancelled.odoo_ids(self.env))
 
         # Check if it is a recurring event that has been rescheduled.
         # We have to check if an event already exists in Odoo.
@@ -207,7 +206,7 @@ class GoogleSync(models.AbstractModel):
             # Migration from 13.4 does not fill write_date. Therefore, we force the update from Google.
             if not odoo_record_write_date or updated >= pytz.utc.localize(odoo_record_write_date):
                 vals = dict(self._odoo_values(gevent, default_reminders), need_sync=False)
-                odoo_record.with_context(context)._write_from_google(gevent, vals)
+                odoo_record.with_context(dont_notify=True)._write_from_google(gevent, vals)
                 synced_records |= odoo_record
 
         return synced_records
@@ -285,14 +284,19 @@ class GoogleSync(models.AbstractModel):
                     self.exists().with_context(dont_notify=True).need_sync = False
 
     def _get_post_sync_values(self, request_values, google_values):
-        """ Method to be override: select the information that will be written in the event after insertion. """
-        self.ensure_one()
-        return {'google_id': google_values['id'], 'need_sync': False}
+        """ Return the values to be written in the event right after its insertion in Google side. """
+        writeable_values = {
+            'google_id': request_values['id'],
+            'need_sync': False,
+        }
+        return writeable_values
 
-    def write_insertion_values(self, request_values, google_values):
-        """ Callback method: get post synchronization values and write them in the event. """
-        writeable_values = self._get_post_sync_values(request_values, google_values)
-        self.with_context(dont_notify=True).write(writeable_values)
+    def _need_video_call(self):
+        """ Implement this method to return True if the event needs a video call
+        :return: bool
+        """
+        self.ensure_one()
+        return True
 
     @after_commit
     def _google_insert(self, google_service: GoogleCalendarService, values, timeout=TIMEOUT):
@@ -303,14 +307,8 @@ class GoogleSync(models.AbstractModel):
                 try:
                     send_updates = self._context.get('send_updates', True)
                     google_service.google_service = google_service.google_service.with_context(send_updates=send_updates)
-                    # Use callback method in stable branches to be called after insertion, updating the event right after insertion.
-                    # This approach was needed because the insert function returns only the id information and discards event info from Google.
-                    google_id = google_service.insert(values, token=token, timeout=timeout, callback_method=self.write_insertion_values)
-                    if not self.google_id:
-                        self.with_context(dont_notify=True).write({
-                            'google_id': google_id,
-                            'need_sync': False,
-                        })
+                    google_values = google_service.insert(values, token=token, timeout=timeout, need_video_call=self._need_video_call())
+                    self.with_context(dont_notify=True).write(self._get_post_sync_values(values, google_values))
                 except HTTPError as e:
                     if e.response.status_code in (400, 403):
                         self._google_error_handling(e)

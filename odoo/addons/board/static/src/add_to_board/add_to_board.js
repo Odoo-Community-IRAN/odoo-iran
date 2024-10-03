@@ -2,6 +2,7 @@
 
 import { _t } from "@web/core/l10n/translation";
 import { Dropdown } from "@web/core/dropdown/dropdown";
+import { rpc } from "@web/core/network/rpc";
 import { registry } from "@web/core/registry";
 import { useAutofocus, useService } from "@web/core/utils/hooks";
 import { Component, useState } from "@odoo/owl";
@@ -22,9 +23,12 @@ const cogMenuRegistry = registry.category("cogMenu");
  * @extends Component
  */
 export class AddToBoard extends Component {
+    static template = "board.AddToBoard";
+    static components = { Dropdown };
+    static props = {};
+
     setup() {
         this.notification = useService("notification");
-        this.rpc = useService("rpc");
         this.state = useState({ name: this.env.config.getDisplayName() });
 
         useAutofocus();
@@ -53,7 +57,7 @@ export class AddToBoard extends Component {
             contextToSave.comparison = comparison;
         }
 
-        const result = await this.rpc("/board/add_to_dashboard", {
+        const result = await rpc("/board/add_to_dashboard", {
             action_id: this.env.config.actionId || false,
             context_to_save: contextToSave,
             domain,
@@ -91,9 +95,6 @@ export class AddToBoard extends Component {
         }
     }
 }
-
-AddToBoard.template = "board.AddToBoard";
-AddToBoard.components = { Dropdown };
 
 export const addToBoardItem = {
     Component: AddToBoard,

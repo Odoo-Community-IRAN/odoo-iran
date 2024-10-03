@@ -11,6 +11,7 @@ import time
 import netifaces as ni
 import traceback
 
+
 escpos = printer = None
 try:
     from .. escpos import *

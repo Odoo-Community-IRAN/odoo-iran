@@ -24,9 +24,9 @@ class PaymentTransaction(models.Model):
                 return pos_order.pos_reference
         return super()._compute_reference_prefix(provider_code, separator, **values)
 
-    def _reconcile_after_done(self):
+    def _post_process(self):
         """ Override of payment to process POS online payments automatically. """
-        super()._reconcile_after_done()
+        super()._post_process()
         self._process_pos_online_payment()
 
     def _process_pos_online_payment(self):
@@ -62,7 +62,11 @@ class PaymentTransaction(models.Model):
                 })
                 if pos_order.state == 'draft' and pos_order._is_pos_order_paid():
                     pos_order._process_saved_order(False)
-                pos_order._send_online_payments_notification_via_bus()
+                # The bus communication is only protected by the name of the channel.
+                # Therefore, no sensitive information is sent through it, only a
+                # notification to invite the local browser to do a safe RPC to
+                # the server to check the new state of the order.
+                pos_order.config_id._notify('ONLINE_PAYMENTS_NOTIFICATION', {'id': pos_order.id})
 
     def action_view_pos_order(self):
         """ Return the action for the view of the pos order linked to the transaction.

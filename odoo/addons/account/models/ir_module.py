@@ -2,7 +2,7 @@ from importlib import import_module
 from inspect import getmembers, ismodule, isclass, isfunction
 
 from odoo import api, models, fields
-from odoo.tools import get_flag
+from odoo.tools.misc import get_flag
 
 
 def templ(env, code, name=None, country='', **kwargs):
@@ -72,8 +72,8 @@ class IrModule(models.Model):
             self.env.registry._auto_install_template = try_loading
         return res
 
-    def _load_module_terms(self, modules, langs, overwrite=False):
-        super()._load_module_terms(modules, langs, overwrite)
+    def _load_module_terms(self, modules, langs, overwrite=False, imported_module=False):
+        super()._load_module_terms(modules, langs, overwrite=overwrite, imported_module=imported_module)
         if 'account' in modules:
             def load_account_translations(env):
                 env['account.chart.template']._load_translations(langs=langs)

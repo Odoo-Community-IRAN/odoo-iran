@@ -12,7 +12,7 @@ from odoo.addons.crm.tests.common import TestCrmCommon, INCOMING_EMAIL
 from odoo.addons.mail.tests.mail_tracking_duration_mixin_case import MailTrackingDurationMixinCase
 from odoo.addons.phone_validation.tools.phone_validation import phone_format
 from odoo.exceptions import UserError
-from odoo.tests.common import Form, tagged, users
+from odoo.tests import Form, tagged, users
 from odoo.tools import mute_logger
 
 
@@ -359,11 +359,13 @@ class TestCRMLead(TestCrmCommon):
         self.assertEqual(lead.email_from, partner_email)
         self.assertEqual(lead.phone, '+1 202 555 6666')
 
-        # resetting lead values also resets partner
+        # resetting lead values should not reset partner: voiding lead info (because
+        # of some reasons) should not prevent from using the contact in other records
         lead.email_from, lead.phone = False, False
-        self.assertFalse(partner.email)
-        self.assertFalse(partner.email_normalized)
-        self.assertFalse(partner.phone)
+        self.assertFalse(lead.email_from)
+        self.assertFalse(lead.phone)
+        self.assertEqual(partner.email, partner_email)
+        self.assertEqual(partner.phone, '+1 202 555 6666')
 
     @users('user_sales_manager')
     def test_crm_lead_partner_sync_email_phone(self):
@@ -458,15 +460,16 @@ class TestCRMLead(TestCrmCommon):
             self.assertEqual(lead.mobile, new_mobile_formatted)
             self.assertEqual(partner.mobile, partner_mobile)
 
-            # LEAD/PARTNER SYNC: reseting lead values also resets partner for email
-            # and phone, but not for mobile
+            # LEAD/PARTNER SYNC: resetting lead values should not reset partner
+            # # voiding lead info (because of some reasons) should not prevent
+            # # from using the contact in other records
             lead_form.email_from, lead_form.phone, lead.mobile = False, False, False
-            self.assertTrue(lead_form.partner_email_update)
-            self.assertTrue(lead_form.partner_phone_update)
+            self.assertFalse(lead_form.partner_email_update)
+            self.assertFalse(lead_form.partner_phone_update)
             lead_form.save()
-            self.assertFalse(partner.email)
-            self.assertFalse(partner.email_normalized)
-            self.assertFalse(partner.phone)
+            self.assertEqual(partner.email, new_email)
+            self.assertEqual(partner.email_normalized, new_email_normalized)
+            self.assertEqual(partner.phone, new_phone_formatted)
             self.assertFalse(lead.phone)
             self.assertFalse(lead.mobile)
             self.assertFalse(lead.phone_sanitized)
@@ -768,18 +771,22 @@ class TestCRMLead(TestCrmCommon):
 
         user_team_leads, team_leads, user_team_opport, team_opport = self.env['crm.team'].create([{
             'name': 'UserTeamLeads',
+            'company_id': self.env.company.id,
             'use_leads': True,
             'member_ids': [(6, 0, [self.env.user.id])],
         }, {
             'name': 'TeamLeads',
+            'company_id': self.env.company.id,
             'use_leads': True,
             'member_ids': [],
         }, {
             'name': 'UserTeamOpportunities',
+            'company_id': self.env.company.id,
             'use_leads': False,
             'member_ids': [(6, 0, [self.env.user.id])],
         }, {
             'name': 'TeamOpportunities',
+            'company_id': self.env.company.id,
             'use_leads': False,
             'member_ids': [],
         }])
@@ -841,7 +848,6 @@ class TestCRMLead(TestCrmCommon):
 
         new_lead._handle_partner_assignment(create_missing=True)
         self.assertEqual(new_lead.partner_id.email, 'unknown.sender@test.example.com')
-        self.assertEqual(new_lead.partner_id.team_id, self.sales_team_1)
 
     @users('user_sales_manager')
     def test_phone_mobile_search(self):

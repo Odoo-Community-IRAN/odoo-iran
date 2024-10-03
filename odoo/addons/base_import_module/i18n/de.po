@@ -3,16 +3,15 @@
 # 	* base_import_module
 # 
 # Translators:
-# Michael Hofer, 2023
 # Larissa Manderfeld, 2024
 # Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-08-13 10:27+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
+"POT-Creation-Date: 2024-09-26 08:55+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
 "Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: German (https://app.transifex.com/odoo/teams/41243/de/)\n"
 "MIME-Version: 1.0\n"
@@ -24,7 +23,6 @@ msgstr ""
 #. module: base_import_module
 #. odoo-python
 #: code:addons/base_import_module/models/ir_module.py:0
-#, python-format
 msgid ""
 "\n"
 "You may need the Enterprise version to install the data module. Please visit https://www.odoo.com/pricing-plan for more information.\n"
@@ -44,7 +42,6 @@ msgstr "Aktivieren"
 #. odoo-python
 #: code:addons/base_import_module/models/ir_module.py:0
 #: model_terms:ir.ui.view,arch_db:base_import_module.view_module_filter_apps_inherit
-#, python-format
 msgid "Apps"
 msgstr "Apps"
 
@@ -61,7 +58,15 @@ msgstr "Schließen"
 #. module: base_import_module
 #. odoo-python
 #: code:addons/base_import_module/models/ir_module.py:0
-#, python-format
+msgid ""
+"Connection to %(url)s failed, the module %(module)s cannot be downloaded."
+msgstr ""
+"Verbindung mit %(url)s fehlgeschlagen, das Modul %(module)s kann nicht "
+"heruntergeladen werden."
+
+#. module: base_import_module
+#. odoo-python
+#: code:addons/base_import_module/models/ir_module.py:0
 msgid "Connection to %s failed The list of industry modules cannot be fetched"
 msgstr ""
 "Verbindung mit %s fehlgeschlagen. Die Liste der Industrie-Module kann nicht "
@@ -69,17 +74,7 @@ msgstr ""
 
 #. module: base_import_module
 #. odoo-python
-#: code:addons/base_import_module/models/ir_module.py:0
-#, python-format
-msgid "Connection to %s failed, the module %s cannot be downloaded."
-msgstr ""
-"Verbindung mit %s fehlgeschlagen, das Modul %s kann nicht heruntergeladen "
-"werden."
-
-#. module: base_import_module
-#. odoo-python
 #: code:addons/base_import_module/controllers/main.py:0
-#, python-format
 msgid "Could not select database '%s'"
 msgstr "Datenbank „%s“ konnte nicht ausgewählt werden"
 
@@ -110,7 +105,6 @@ msgstr "Anzeigename"
 #. module: base_import_module
 #. odoo-python
 #: code:addons/base_import_module/models/ir_module.py:0
-#, python-format
 msgid ""
 "Error while importing module '%(module)s'.\n"
 "\n"
@@ -125,8 +119,6 @@ msgstr ""
 #. module: base_import_module
 #. odoo-python
 #: code:addons/base_import_module/models/ir_module.py:0
-#: code:addons/base_import_module/models/ir_module.py:0
-#, python-format
 msgid "File '%s' exceed maximum allowed file size"
 msgstr "Die Datei „%s“ überschreitet die maximal erlaubte Dateigröße"
 
@@ -188,7 +180,6 @@ msgstr "Installieren"
 #. module: base_import_module
 #. odoo-python
 #: code:addons/base_import_module/models/ir_module.py:0
-#, python-format
 msgid "Install an Industry"
 msgstr "Eine Branche installieren"
 
@@ -223,6 +214,11 @@ msgid "Module Type"
 msgstr "Modultyp"
 
 #. module: base_import_module
+#: model:ir.model,name:base_import_module.model_base_module_uninstall
+msgid "Module Uninstall"
+msgstr "Modul deinstallieren"
+
+#. module: base_import_module
 #: model_terms:ir.ui.view,arch_db:base_import_module.view_base_module_import
 msgid "Module file (.zip)"
 msgstr "Modul-Datei (.zip)"
@@ -235,7 +231,6 @@ msgstr "Modulabhängigkeiten"
 #. module: base_import_module
 #. odoo-python
 #: code:addons/base_import_module/models/ir_module.py:0
-#, python-format
 msgid "No file sent."
 msgstr "Keine Datei gesendet."
 
@@ -254,21 +249,18 @@ msgstr "Offizielle Apps"
 #. module: base_import_module
 #. odoo-python
 #: code:addons/base_import_module/models/ir_module.py:0
-#, python-format
 msgid "Only administrators can install data modules."
 msgstr "Nur Administratoren können Datenmodule installieren."
 
 #. module: base_import_module
 #. odoo-python
 #: code:addons/base_import_module/controllers/main.py:0
-#, python-format
 msgid "Only administrators can upload a module"
 msgstr "Nur Administratoren können ein Modul hochladen"
 
 #. module: base_import_module
 #. odoo-python
 #: code:addons/base_import_module/models/ir_module.py:0
-#, python-format
 msgid "Only zip files are supported."
 msgstr "Nur zip Dateien-werden unterstützt"
 
@@ -280,28 +272,24 @@ msgstr "Status"
 #. module: base_import_module
 #. odoo-python
 #: code:addons/base_import_module/models/ir_module.py:0
-#, python-format
 msgid "Studio customizations require Studio"
 msgstr "Studio-Anpassungen erfordern Studio"
 
 #. module: base_import_module
 #. odoo-python
 #: code:addons/base_import_module/models/ir_module.py:0
-#, python-format
 msgid "Studio customizations require the Odoo Studio app."
 msgstr "Für Studio-Anpassungen ist die Odoo-Studio-App erforderlich."
 
 #. module: base_import_module
 #. odoo-python
 #: code:addons/base_import_module/models/ir_module.py:0
-#, python-format
 msgid "The following modules will also be installed:\n"
 msgstr "Die folgenden Module werden ebenfalls installiert:\n"
 
 #. module: base_import_module
 #. odoo-python
 #: code:addons/base_import_module/models/ir_module.py:0
-#, python-format
 msgid ""
 "The installation of the data module would fail as the following dependencies"
 " can't be found in the addons-path:\n"
@@ -312,7 +300,6 @@ msgstr ""
 #. module: base_import_module
 #. odoo-python
 #: code:addons/base_import_module/models/ir_module.py:0
-#, python-format
 msgid ""
 "The list of industry applications cannot be fetched. Please try again later"
 msgstr ""
@@ -322,7 +309,6 @@ msgstr ""
 #. module: base_import_module
 #. odoo-python
 #: code:addons/base_import_module/models/ir_module.py:0
-#, python-format
 msgid "The module %s cannot be downloaded"
 msgstr "Das Modul %s kann nicht heruntergeladen werden"
 

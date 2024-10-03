@@ -3,14 +3,17 @@
 
 import logging
 import pytz
+import textwrap
 
 from datetime import timedelta
+from dateutil.relativedelta import relativedelta
 
 from odoo import _, api, Command, fields, models, tools
 from odoo.addons.base.models.res_partner import _tz_get
 from odoo.exceptions import UserError, ValidationError
 from odoo.osv import expression
-from odoo.tools import format_datetime, is_html_empty
+from odoo.tools import format_date, format_datetime, format_time, frozendict
+from odoo.tools.mail import is_html_empty, html_to_inner_content
 from odoo.tools.misc import formatLang
 from odoo.tools.translate import html_translate
 
@@ -30,26 +33,30 @@ class EventType(models.Model):
 
     def _default_event_mail_type_ids(self):
         return [(0, 0,
-                 {'notification_type': 'mail',
-                  'interval_nbr': 0,
+                 {'interval_nbr': 0,
                   'interval_unit': 'now',
                   'interval_type': 'after_sub',
                   'template_ref': 'mail.template, %i' % self.env.ref('event.event_subscription').id,
                  }),
                 (0, 0,
-                 {'notification_type': 'mail',
-                  'interval_nbr': 1,
+                 {'interval_nbr': 1,
                   'interval_unit': 'hours',
                   'interval_type': 'before_event',
                   'template_ref': 'mail.template, %i' % self.env.ref('event.event_reminder').id,
                  }),
                 (0, 0,
-                 {'notification_type': 'mail',
-                  'interval_nbr': 3,
+                 {'interval_nbr': 3,
                   'interval_unit': 'days',
                   'interval_type': 'before_event',
                   'template_ref': 'mail.template, %i' % self.env.ref('event.event_reminder').id,
                  })]
+
+    def _default_question_ids(self):
+        return [
+            (0, 0, {'title': _('Name'), 'question_type': 'name', 'is_mandatory_answer': True}),
+            (0, 0, {'title': _('Email'), 'question_type': 'email', 'is_mandatory_answer': True}),
+            (0, 0, {'title': _('Phone'), 'question_type': 'phone'}),
+        ]
 
     name = fields.Char('Event Template', required=True, translate=True)
     note = fields.Html(string='Note')
@@ -72,6 +79,9 @@ class EventType(models.Model):
     # ticket reports
     ticket_instructions = fields.Html('Ticket Instructions', translate=True,
         help="This information will be printed on your tickets.")
+    question_ids = fields.One2many(
+        'event.question', 'event_type_id', default=_default_question_ids,
+        string='Questions', copy=True)
 
     @api.depends('has_seats_limitation')
     def _compute_seats_max(self):
@@ -98,6 +108,9 @@ class EventEvent(models.Model):
             result['date_end'] = result['date_begin'] + timedelta(days=1)
         return result
 
+    def get_kiosk_url(self):
+        return self.get_base_url() + "/odoo/registration-desk"
+
     def _get_default_stage_id(self):
         return self.env['event.stage'].search([], limit=1)
 
@@ -112,6 +125,9 @@ class EventEvent(models.Model):
     @api.model
     def _lang_get(self):
         return self.env['res.lang'].get_installed()
+
+    def _default_question_ids(self):
+        return self.env['event.type']._default_question_ids()
 
     name = fields.Char(string='Event', translate=True, required=True)
     note = fields.Html(string='Note', store=True, compute="_compute_note", readonly=False)
@@ -129,7 +145,9 @@ class EventEvent(models.Model):
         'res.partner', string='Organizer', tracking=True,
         default=lambda self: self.env.company.partner_id,
         check_company=True)
-    event_type_id = fields.Many2one('event.type', string='Template', ondelete='set null')
+    event_type_id = fields.Many2one(
+        'event.type', string='Template', ondelete='set null',
+        help="Choose a template to auto-fill tickets, communications, descriptions and other fields.")
     event_mail_ids = fields.One2many(
         'event.mail', 'event_id', string='Mail Schedule', copy=True,
         compute='_compute_event_mail_ids', readonly=False, store=True)
@@ -145,7 +163,7 @@ class EventEvent(models.Model):
         store=True, tracking=True)
     stage_id = fields.Many2one(
         'event.stage', ondelete='restrict', default=_get_default_stage_id,
-        group_expand='_read_group_stage_ids', tracking=True, copy=False)
+        group_expand='_read_group_expand_full', tracking=True, copy=False)
     legend_blocked = fields.Char(related='stage_id.legend_blocked', string='Kanban Blocked Explanation', readonly=True)
     legend_done = fields.Char(related='stage_id.legend_done', string='Kanban Valid Explanation', readonly=True)
     legend_normal = fields.Char(related='stage_id.legend_normal', string='Kanban Ongoing Explanation', readonly=True)
@@ -221,17 +239,63 @@ class EventEvent(models.Model):
         selection=[
             ('A4_french_fold', 'A4 foldable'),
             ('A6', 'A6'),
-            ('four_per_sheet', '4 per sheet')
+            ('four_per_sheet', '4 per sheet'),
+            ('96x82', '96x82mm (Badge Printer)'),
+            ('96x134', '96x134mm (Badge Printer)')
         ], default='A6', required=True)
     badge_image = fields.Image('Badge Background', max_width=1024, max_height=1024)
     ticket_instructions = fields.Html('Ticket Instructions', translate=True,
         compute='_compute_ticket_instructions', store=True, readonly=False,
         help="This information will be printed on your tickets.")
+    # questions
+    question_ids = fields.One2many(
+        'event.question', 'event_id', 'Questions', copy=True,
+        compute='_compute_question_ids', readonly=False, store=True)
+    general_question_ids = fields.One2many('event.question', 'event_id', 'General Questions',
+                                           domain=[('once_per_order', '=', True)])
+    specific_question_ids = fields.One2many('event.question', 'event_id', 'Specific Questions',
+                                            domain=[('once_per_order', '=', False)])
 
     def _compute_use_barcode(self):
         use_barcode = self.env['ir.config_parameter'].sudo().get_param('event.use_event_barcode') == 'True'
         for record in self:
             record.use_barcode = use_barcode
+
+    @api.depends('event_type_id')
+    def _compute_question_ids(self):
+        """ Update event questions from its event type. Depends are set only on
+        event_type_id itself to emulate an onchange. Changing event type content
+        itself should not trigger this method.
+
+        When synchronizing questions:
+
+          * lines with no registered answers are removed;
+          * type lines are added;
+        """
+        if self._origin.question_ids:
+            # lines to keep: those with already given answers
+            questions_tokeep_ids = self.env['event.registration.answer'].search(
+                [('question_id', 'in', self._origin.question_ids.ids)]
+            ).question_id.ids
+        else:
+            questions_tokeep_ids = []
+        for event in self:
+            if not event.event_type_id and not event.question_ids:
+                event.question_ids = self._default_question_ids()
+                continue
+
+            if questions_tokeep_ids:
+                questions_toremove = event._origin.question_ids.filtered(
+                    lambda question: question.id not in questions_tokeep_ids)
+                command = [(3, question.id) for question in questions_toremove]
+            else:
+                command = [(5, 0)]
+            event.question_ids = command
+
+            # copy questions so changes in the event don't affect the event type
+            event.question_ids += event.event_type_id.question_ids.copy({
+                'event_type_id': False,
+            })
 
     @api.depends('stage_id', 'kanban_state')
     def _compute_kanban_state_label(self):
@@ -477,11 +541,11 @@ class EventEvent(models.Model):
 
             # lines to add: those which do not have the exact copy available in lines to keep
             if event.event_type_id.event_type_mail_ids:
-                mails_to_keep_vals = {mail._prepare_event_mail_values() for mail in event.event_mail_ids - mails_to_remove}
+                mails_to_keep_vals = {frozendict(mail._prepare_event_mail_values()) for mail in event.event_mail_ids - mails_to_remove}
                 for mail in event.event_type_id.event_type_mail_ids:
-                    mail_values = mail._prepare_event_mail_values()
+                    mail_values = frozendict(mail._prepare_event_mail_values())
                     if mail_values not in mails_to_keep_vals:
-                        command.append(Command.create(mail_values._asdict()))
+                        command.append(Command.create(mail_values))
             if command:
                 event.event_mail_ids = command
 
@@ -570,10 +634,6 @@ class EventEvent(models.Model):
             if event.date_end < event.date_begin:
                 raise ValidationError(_('The closing date cannot be earlier than the beginning date.'))
 
-    @api.model
-    def _read_group_stage_ids(self, stages, domain, order):
-        return self.env['event.stage'].search([])
-
     @api.model_create_multi
     def create(self, vals_list):
         events = super(EventEvent, self).create(vals_list)
@@ -612,11 +672,9 @@ class EventEvent(models.Model):
                 name = event.name
             event.display_name = name
 
-    @api.returns('self', lambda value: value.id)
-    def copy(self, default=None):
-        self.ensure_one()
-        default = dict(default or {}, name=_("%s (copy)", self.name))
-        return super(EventEvent, self).copy(default)
+    def copy_data(self, default=None):
+        vals_list = super().copy_data(default=default)
+        return [dict(vals, name=self.env._("%s (copy)", event.name)) for event, vals in zip(self, vals_list)]
 
     @api.model
     def _get_mail_message_access(self, res_ids, operation, model_name=None):
@@ -645,10 +703,39 @@ class EventEvent(models.Model):
         if first_ended_stage:
             self.write({'stage_id': first_ended_stage.id})
 
-    def mail_attendees(self, template_id, force_send=False, filter_func=lambda self: self.state != 'cancel'):
+    def mail_attendees(self, template_id, force_send=False, filter_func=lambda self: self.state not in ('cancel', 'draft')):
         for event in self:
             for attendee in event.registration_ids.filtered(filter_func):
                 self.env['mail.template'].browse(template_id).send_mail(attendee.id, force_send=force_send)
+
+    def _get_date_range_str(self, lang_code=False):
+        self.ensure_one()
+        today_tz = pytz.utc.localize(fields.Datetime.now()).astimezone(pytz.timezone(self.date_tz))
+        event_date_tz = pytz.utc.localize(self.date_begin).astimezone(pytz.timezone(self.date_tz))
+        diff = (event_date_tz.date() - today_tz.date())
+        if diff.days <= 0:
+            return _('today')
+        if diff.days == 1:
+            return _('tomorrow')
+        if (diff.days < 7):
+            return _('in %d days', diff.days)
+        if (diff.days < 14):
+            return _('next week')
+        if event_date_tz.month == (today_tz + relativedelta(months=+1)).month:
+            return _('next month')
+        return _('on %(date)s', date=format_date(self.env, self.date_begin, lang_code=lang_code, date_format='medium'))
+
+    def _get_external_description(self):
+        """
+        Description of the event shortened to maximum 1900 characters to
+        leave some space for addition by sub-modules, such as the even link.
+        Meant to be used for external content (ics/icalc/Gcal).
+
+        Reference Docs for URL limit -: https://stackoverflow.com/questions/417142/what-is-the-maximum-length-of-a-url-in-different-browsers
+        """
+        self.ensure_one()
+        description = html_to_inner_content(self.description)
+        return textwrap.shorten(description, 1900)
 
     def _get_ics_file(self):
         """ Returns iCalendar file for the event invitation.
@@ -666,6 +753,7 @@ class EventEvent(models.Model):
             cal_event.add('dtstart').value = event.date_begin.astimezone(pytz.timezone(event.date_tz))
             cal_event.add('dtend').value = event.date_end.astimezone(pytz.timezone(event.date_tz))
             cal_event.add('summary').value = event.name
+            cal_event.add('description').value = event._get_external_description()
             if event.address_id:
                 cal_event.add('location').value = event.address_inline
 
@@ -688,3 +776,27 @@ class EventEvent(models.Model):
         ])
         if ended_events:
             ended_events.action_set_done()
+
+    def _get_event_timeframe_string(self):
+        self.ensure_one()
+        start_datetime = format_datetime(self.env, self.date_begin, self.date_tz, "short")
+        if self.is_one_day:
+            end_datetime = format_time(self.env, self.date_end, self.date_tz, "short")
+        else:
+            end_datetime = format_datetime(self.env, self.date_end, self.date_tz, "short")
+        return _("%(start_date)s to %(end_date)s", start_date=start_datetime, end_date=end_datetime)
+
+    def _get_event_print_details(self):
+        self.ensure_one()
+        return {
+            'name': self.name,
+            'badge_image': self.badge_image,
+            'timeframe': self._get_event_timeframe_string(),
+            'address': self.address_id.name if self.address_id else None,
+            'logo': self.company_id.logo,
+            'sponsor_text': self._get_printing_sponsor_text()
+        }
+
+    def _get_printing_sponsor_text(self):
+        sponsor_text = self.env['ir.config_parameter'].sudo().get_param('event.badge_printing_sponsor_text')
+        return sponsor_text or "Powered by Odoo"

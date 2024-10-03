@@ -31,7 +31,6 @@ have real delivered quantities in sales orders.
         'report/timesheets_analysis_views.xml',
         'report/report_timesheet_templates.xml',
         'report/project_report_view.xml',
-        'wizard/project_create_sale_order_views.xml',
         'wizard/project_create_invoice_views.xml',
         'wizard/sale_make_invoice_advance_views.xml',
     ],
@@ -48,7 +47,12 @@ have real delivered quantities in sales orders.
             'sale_timesheet/static/src/components/**/*',
         ],
         'web.assets_tests': [
+            'sale_timesheet/static/tests/tours/**/*',
+            'web/static/lib/hoot-dom/**/*',
+        ],
+        'web.assets_unit_tests': [
             'sale_timesheet/static/tests/**/*',
+            ('remove', 'sale_timesheet/static/tests/tours/**/*'),
         ],
     },
     'license': 'LGPL-3',

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 from odoo.tests import tagged
-from odoo.tests.common import Form
 from odoo.exceptions import ValidationError, UserError
 from odoo import fields, Command
 
@@ -11,30 +10,20 @@ import base64
 class TestAccountBankStatementLine(AccountTestInvoicingCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref=None):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
 
+        cls.currency_1 = cls.company_data['currency']
         # We need a third currency as you could have a company's currency != journal's currency !=
-        cls.currency_data_2 = cls.setup_multi_currency_data(default_values={
-            'name': 'Dark Chocolate Coin',
-            'symbol': '🍫',
-            'currency_unit_label': 'Dark Choco',
-            'currency_subunit_label': 'Dark Cacao Powder',
-        }, rate2016=6.0, rate2017=4.0)
-        cls.currency_data_3 = cls.setup_multi_currency_data(default_values={
-            'name': 'Black Chocolate Coin',
-            'symbol': '🍫',
-            'currency_unit_label': 'Black Choco',
-            'currency_subunit_label': 'Black Cacao Powder',
-        }, rate2016=12.0, rate2017=8.0)
+        cls.currency_2 = cls.setup_other_currency('EUR')
+        cls.currency_3 = cls.setup_other_currency('CAD', rates=[('2016-01-01', 6.0), ('2017-01-01', 4.0)])
+        cls.currency_4 = cls.setup_other_currency('GBP', rates=[('2016-01-01', 12.0), ('2017-01-01', 8.0)])
+
+        cls.company_data_2 = cls.setup_other_company()
 
         cls.bank_journal_1 = cls.company_data['default_journal_bank']
         cls.bank_journal_2 = cls.bank_journal_1.copy()
         cls.bank_journal_3 = cls.bank_journal_2.copy()
-        cls.currency_1 = cls.company_data['currency']
-        cls.currency_2 = cls.currency_data['currency']
-        cls.currency_3 = cls.currency_data_2['currency']
-        cls.currency_4 = cls.currency_data_3['currency']
 
         cls.statement = cls.env['account.bank.statement'].create({
             'name': 'test_statement',
@@ -191,7 +180,7 @@ class TestAccountBankStatementLine(AccountTestInvoicingCommon):
         }])
 
         # Check the account.bank.statement.line is still correct after editing the account.move.
-        statement_line.move_id.write({'line_ids': [
+        statement_line.move_id.with_context(skip_readonly_check=True).write({'line_ids': [
             (1, liquidity_lines.id, {
                 'debit': expected_liquidity_values.get('debit', 0.0),
                 'credit': expected_liquidity_values.get('credit', 0.0),

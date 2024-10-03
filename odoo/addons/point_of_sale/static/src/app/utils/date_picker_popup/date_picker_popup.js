@@ -1,14 +1,18 @@
-/** @odoo-module */
-
-import { AbstractAwaitablePopup } from "@point_of_sale/app/popup/abstract_awaitable_popup";
+import { Dialog } from "@web/core/dialog/dialog";
 import { _t } from "@web/core/l10n/translation";
-import { onMounted, useRef, useState } from "@odoo/owl";
+import { Component, onMounted, useRef, useState } from "@odoo/owl";
 
-export class DatePickerPopup extends AbstractAwaitablePopup {
+export class DatePickerPopup extends Component {
     static template = "point_of_sale.DatePickerPopup";
+    static components = { Dialog };
+    static props = {
+        title: { type: String, optional: true },
+        confirmLabel: { type: String, optional: true },
+        getPayload: Function,
+        close: Function,
+    };
     static defaultProps = {
-        confirmText: _t("Confirm"),
-        cancelText: _t("Discard"),
+        confirmLabel: _t("Confirm"),
         title: _t("DatePicker"),
     };
 
@@ -18,8 +22,11 @@ export class DatePickerPopup extends AbstractAwaitablePopup {
         this.inputRef = useRef("input");
         onMounted(() => this.inputRef.el.focus());
     }
-    getPayload() {
-        return this.state.shippingDate < this._today() ? this._today() : this.state.shippingDate;
+    confirm() {
+        this.props.getPayload(
+            this.state.shippingDate < this._today() ? this._today() : this.state.shippingDate
+        );
+        this.props.close();
     }
     _today() {
         return new Date().toISOString().split("T")[0];

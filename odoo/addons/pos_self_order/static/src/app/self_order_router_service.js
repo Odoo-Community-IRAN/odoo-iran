@@ -1,5 +1,3 @@
-/** @odoo-module */
-
 import { registry } from "@web/core/registry";
 import { Reactive } from "@web/core/utils/reactive";
 import { browser } from "@web/core/browser/browser";
@@ -26,6 +24,11 @@ export class SelfOrderRouter extends Reactive {
         const url = new URL(browser.location.href);
         url.searchParams.set("table_identifier", table.identifier);
         history.replaceState({}, "", url);
+    }
+
+    getTableIdentifier() {
+        const url = new URL(browser.location.href);
+        return url.searchParams.get("table_identifier");
     }
 
     back() {

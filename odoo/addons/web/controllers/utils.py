@@ -1,11 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-import copy
-import hashlib
-import io
+import collections
 import logging
-import re
-from collections import OrderedDict, defaultdict
 
 import babel.messages.pofile
 import werkzeug
@@ -13,10 +9,9 @@ import werkzeug.exceptions
 import werkzeug.utils
 import werkzeug.wrappers
 import werkzeug.wsgi
-from lxml import etree
 from werkzeug.urls import iri_to_uri
 
-from odoo.tools.translate import JAVASCRIPT_TRANSLATION_COMMENT, WEB_TRANSLATION_COMMENT
+from odoo.tools.translate import JAVASCRIPT_TRANSLATION_COMMENT
 from odoo.tools.misc import file_open
 from odoo import http
 from odoo.http import request
@@ -27,8 +22,8 @@ _logger = logging.getLogger(__name__)
 
 def clean_action(action, env):
     action_type = action.setdefault('type', 'ir.actions.act_window_close')
-    if action_type == 'ir.actions.act_window':
-        action = fix_view_modes(action)
+    if action_type == 'ir.actions.act_window' and not action.get('views'):
+        generate_views(action)
 
     # When returning an action, keep only relevant fields/properties
     readable_fields = env[action['type']]._get_readable_fields()
@@ -106,43 +101,7 @@ def ensure_db(redirect='/web/database/selector', db=None):
         werkzeug.exceptions.abort(request.redirect(request.httprequest.url, 302))
 
 
-def fix_view_modes(action):
-    """ For historical reasons, Odoo has weird dealings in relation to
-    view_mode and the view_type attribute (on window actions):
-
-    * one of the view modes is ``tree``, which stands for both list views
-      and tree views
-    * the choice is made by checking ``view_type``, which is either
-      ``form`` for a list view or ``tree`` for an actual tree view
-
-    This methods simply folds the view_type into view_mode by adding a
-    new view mode ``list`` which is the result of the ``tree`` view_mode
-    in conjunction with the ``form`` view_type.
-
-    TODO: this should go into the doc, some kind of "peculiarities" section
-
-    :param dict action: an action descriptor
-    :returns: nothing, the action is modified in place
-    """
-    if not action.get('views'):
-        generate_views(action)
-
-    if action.pop('view_type', 'form') != 'form':
-        return action
-
-    if 'view_mode' in action:
-        action['view_mode'] = ','.join(
-            mode if mode != 'tree' else 'list'
-            for mode in action['view_mode'].split(','))
-    action['views'] = [
-        [id, mode if mode != 'tree' else 'list']
-        for id, mode in action['views']
-    ]
-
-    return action
-
-
-# I think generate_views,fix_view_modes should go into js ActionManager
+# I think generate_views should go into js ActionManager
 def generate_views(action):
     """
     While the server generates a sequence called "views" computing dependencies
@@ -181,12 +140,100 @@ def generate_views(action):
     action['views'] = [(view_id, view_modes[0])]
 
 
+def get_action(env, path_part):
+    """
+    Get a ir.actions.actions() given an action typically found in a
+    "/odoo"-like url.
+
+    The action can take one of the following forms:
+    * "action-" followed by a record id
+    * "action-" followed by a xmlid
+    * "m-" followed by a model name (act_window's res_model)
+    * a dotted model name (act_window's res_model)
+    * a path (ir.action's path)
+    """
+    Actions = env['ir.actions.actions']
+
+    if path_part.startswith('action-'):
+        someid = path_part.removeprefix('action-')
+        if someid.isdigit():  # record id
+            action = Actions.sudo().browse(int(someid)).exists()
+        elif '.' in someid:   # xml id
+            action = env.ref(someid, False)
+            if not action or not action._name.startswith('ir.actions'):
+                action = Actions
+        else:
+            action = Actions
+    elif path_part.startswith('m-') or '.' in path_part:
+        model = path_part.removeprefix('m-')
+        if model in env and not env[model]._abstract:
+            action = env['ir.actions.act_window'].sudo().search([
+                ('res_model', '=', model)], limit=1)
+            if not action:
+                action = env['ir.actions.act_window'].new(
+                    env[model].get_formview_action()
+                )
+        else:
+            action = Actions
+    else:
+        action = Actions.sudo().search([('path', '=', path_part)])
+
+    if action and action._name == 'ir.actions.actions':
+        action_type = action.read(['type'])[0]['type']
+        action = env[action_type].browse(action.id)
+
+    return action
+
+
+def get_action_triples(env, path, *, start_pos=0):
+    """
+    Extract the triples (active_id, action, record_id) from a "/odoo"-like path.
+
+    >>> env = ...
+    >>> list(get_action_triples(env, "/all-tasks/5/project.project/1/tasks"))
+    [
+        # active_id, action,                     record_id
+        ( None,      ir.actions.act_window(...), 5         ), # all-tasks
+        ( 5,         ir.actions.act_window(...), 1         ), # project.project
+        ( 1,         ir.actions.act_window(...), None      ), # tasks
+    ]
+    """
+    parts = collections.deque(path.strip('/').split('/'))
+    active_id = None
+    record_id = None
+
+    while parts:
+        if not parts:
+            e = "expected action at word {} but found nothing"
+            raise ValueError(e.format(path.count('/') + start_pos))
+        action_name = parts.popleft()
+        action = get_action(env, action_name)
+        if not action:
+            e = f"expected action at word {{}} but found “{action_name}”"
+            raise ValueError(e.format(path.count('/') - len(parts) + start_pos))
+
+        record_id = None
+        if parts:
+            if parts[0] == 'new':
+                parts.popleft()
+                record_id = None
+            elif parts[0].isdigit():
+                record_id = int(parts.popleft())
+
+        yield (active_id, action, record_id)
+
+        if len(parts) > 1 and parts[0].isdigit():  # new active id
+            active_id = int(parts.popleft())
+        elif record_id:
+            active_id = record_id
+
+
 def _get_login_redirect_url(uid, redirect=None):
     """ Decide if user requires a specific post-login redirect, e.g. for 2FA, or if they are
     fully logged and can proceed to the requested URL
     """
     if request.session.uid:  # fully logged
-        return redirect or ('/web' if is_user_internal(request.session.uid)
+        return redirect or ('/odoo' if is_user_internal(request.session.uid)
                             else '/web/login_successful')
 
     # partial session (MFA)
@@ -212,7 +259,6 @@ def _local_web_translations(trans_file):
     except Exception:
         return
     for x in po:
-        if x.id and x.string and (JAVASCRIPT_TRANSLATION_COMMENT in x.auto_comments
-                                  or WEB_TRANSLATION_COMMENT in x.auto_comments):
+        if x.id and x.string and JAVASCRIPT_TRANSLATION_COMMENT in x.auto_comments:
             messages.append({'id': x.id, 'string': x.string})
     return messages

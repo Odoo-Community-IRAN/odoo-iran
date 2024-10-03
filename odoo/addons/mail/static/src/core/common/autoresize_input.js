@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { Component, useRef, useState, onWillUpdateProps, onMounted } from "@odoo/owl";
 
 import { useAutoresize } from "@web/core/utils/autoresize";
@@ -23,6 +21,7 @@ export class AutoresizeInput extends Component {
     };
 
     setup() {
+        super.setup();
         this.state = useState({
             value: this.props.value,
         });

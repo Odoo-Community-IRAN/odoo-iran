@@ -110,9 +110,9 @@ QUnit.module("Analytic", (hooks) => {
             views: {
                 "account.analytic.account,false,search": `<search/>`,
                 "account.analytic.account,analytic.view_account_analytic_account_list_select,list": `
-                    <tree>
+                    <list>
                         <field name="name"/>
-                    </tree>
+                    </list>
                 `,
             }
         };
@@ -226,11 +226,11 @@ QUnit.module("Analytic", (hooks) => {
             resModel: "aml",
             serverData,
             arch: `
-                <tree multi_edit="1">
+                <list multi_edit="1">
                     <field name="label"/>
                     <field name="analytic_distribution" widget="analytic_distribution" options="{'force_applicability': 'optional'}"/>
                     <field name="amount"/>
-                </tree>`,
+                </list>`,
             mockRPC(route, { kwargs, method, model }) {
                 if (method === "get_relevant_plans" && model === "account.analytic.plan") {
                     assert.equal(kwargs.applicability, "optional");
@@ -251,6 +251,7 @@ QUnit.module("Analytic", (hooks) => {
         const amlrows = target.querySelectorAll(".o_data_row");
         await click(amlrows[0].querySelector(".o_list_record_selector input"));
         await click(amlrows[1].querySelector(".o_list_record_selector input"));
+        await nextTick();
         await click(badge1, ".o_tag_badge_text");
         await nextTick();
         assert.containsN(target, ".analytic_distribution_popup", 1, "popup should be visible");
@@ -271,7 +272,7 @@ QUnit.module("Analytic", (hooks) => {
         await click(popup, ".fa-close");
         await click(target.querySelector(".modal-dialog .btn-primary"));
         await nextTick();
-        assert.containsN(target, ".badge", 4, "should contain 2 rows of 2 tags each");
+        assert.containsN(target, ".o_data_row .badge", 4, "should contain 2 rows of 2 tags each");
         assert.strictEqual(target.querySelector("tr:nth-of-type(2) .badge:nth-of-type(2) .o_tag_badge_text").textContent, "30.3% Belgium | 69.7% Berlin",
             "should have rendered tag '30.3% Belgium | 69.7% Berlin'"
         );
@@ -287,11 +288,11 @@ QUnit.module("Analytic", (hooks) => {
                 <form>
                     <sheet>
                         <field name="line_ids">
-                            <tree editable="bottom">
+                            <list editable="bottom">
                                 <field name="label"/>
                                 <field name="analytic_distribution" widget="analytic_distribution"/>
                                 <field name="amount"/>
-                            </tree>
+                            </list>
                         </field>
                     </sheet>
                 </form>`,

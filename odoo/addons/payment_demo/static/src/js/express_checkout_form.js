@@ -3,7 +3,7 @@
 import {_t} from '@web/core/l10n/translation';
 import publicWidget from '@web/legacy/js/public/public_widget';
 import { ConfirmationDialog } from '@web/core/confirmation_dialog/confirmation_dialog';
-import { jsonrpc } from '@web/core/network/rpc_service';
+import { rpc } from '@web/core/network/rpc';
 import { debounce } from '@web/core/utils/timing';
 
 import { paymentExpressCheckoutForm } from '@payment/js/express_checkout_form';
@@ -22,7 +22,6 @@ paymentExpressCheckoutForm.include({
     start: async function () {
         await this._super(...arguments);
         document.querySelector('[name="o_payment_submit_button"]')?.removeAttribute('disabled');
-        this.rpc = this.bindService('rpc');
         this._initiateExpressPayment = debounce(this._initiateExpressPayment, 500, true);
     },
 
@@ -43,12 +42,12 @@ paymentExpressCheckoutForm.include({
             '[name="o_payment_express_checkout_form"]'
         ).dataset.shippingInfoRequired;
         const providerId = ev.target.parentElement.dataset.providerId;
-        let expressShippingAddress = {};
+        let expressDeliveryAddress = {};
         if (shippingInformationRequired){
             const shippingInfo = document.querySelector(
                 `#o_payment_demo_shipping_info_${providerId}`
             );
-            expressShippingAddress =  {
+            expressDeliveryAddress = {
                 'name': shippingInfo.querySelector('#o_payment_demo_shipping_name').value,
                 'email': shippingInfo.querySelector('#o_payment_demo_shipping_email').value,
                 'street': shippingInfo.querySelector('#o_payment_demo_shipping_address').value,
@@ -58,13 +57,13 @@ paymentExpressCheckoutForm.include({
                 'country': shippingInfo.querySelector('#o_payment_demo_shipping_country').value,
             };
             // Call the shipping address update route to fetch the shipping options.
-            const availableCarriers = await this.rpc(
+            const availableCarriers = await rpc(
                 this.paymentContext['shippingAddressUpdateRoute'],
-                {partial_shipping_address: expressShippingAddress},
+                {partial_delivery_address: expressDeliveryAddress},
             );
             if (availableCarriers.length > 0) {
                 const id = parseInt(availableCarriers[0].id);
-                await this.rpc('/shop/update_carrier', {carrier_id: id});
+                await rpc('/shop/set_delivery_method', {dm_id: id});
             } else {
                 this.call('dialog', 'add', ConfirmationDialog, {
                     title: _t("Validation Error"),
@@ -73,12 +72,12 @@ paymentExpressCheckoutForm.include({
                 return;
             }
         }
-        await jsonrpc(
+        await rpc(
             document.querySelector(
                 '[name="o_payment_express_checkout_form"]'
             ).dataset['expressCheckoutRoute'],
             {
-                'shipping_address': expressShippingAddress,
+                'shipping_address': expressDeliveryAddress,
                 'billing_address': {
                     'name': 'Demo User',
                     'email': 'demo@test.com',
@@ -90,7 +89,7 @@ paymentExpressCheckoutForm.include({
                 },
             }
         );
-        const processingValues = await jsonrpc(
+        const processingValues = await rpc(
             this.paymentContext['transactionRoute'],
             this._prepareTransactionRouteParams(providerId),
         )

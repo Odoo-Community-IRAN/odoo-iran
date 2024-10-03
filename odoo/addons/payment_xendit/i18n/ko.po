@@ -3,16 +3,18 @@
 # 	* payment_xendit
 # 
 # Translators:
-# Wil Odoo, 2024
 # Sarah Park, 2024
+# Tiffany Chang, 2024
+# Wil Odoo, 2024
+# Daye Jeong, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-01-29 10:46+0000\n"
-"PO-Revision-Date: 2024-01-23 08:23+0000\n"
-"Last-Translator: Sarah Park, 2024\n"
+"POT-Creation-Date: 2024-09-26 08:56+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Daye Jeong, 2024\n"
 "Language-Team: Korean (https://app.transifex.com/odoo/teams/41243/ko/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -23,11 +25,30 @@ msgstr ""
 #. module: payment_xendit
 #. odoo-python
 #: code:addons/payment_xendit/models/payment_transaction.py:0
-#, python-format
 msgid ""
-"An error occurred during the processing of your payment (status %s). Please "
-"try again."
-msgstr "결제를 처리하는 중 오류가 발생했습니다. (상태 %s) 다시 시도해 주세요."
+"An error occurred during the processing of your payment (%s). Please try "
+"again."
+msgstr "결제를 처리하는 동안 오류가 발생했습니다 (%s). 다시 시도해 주세요."
+
+#. module: payment_xendit
+#: model_terms:ir.ui.view,arch_db:payment_xendit.inline_form
+msgid "Card Code"
+msgstr "카드 코드"
+
+#. module: payment_xendit
+#: model_terms:ir.ui.view,arch_db:payment_xendit.inline_form
+msgid "Card Holder First Name"
+msgstr ""
+
+#. module: payment_xendit
+#: model_terms:ir.ui.view,arch_db:payment_xendit.inline_form
+msgid "Card Holder Last Name"
+msgstr ""
+
+#. module: payment_xendit
+#: model_terms:ir.ui.view,arch_db:payment_xendit.inline_form
+msgid "Card Number"
+msgstr "카드 번호"
 
 #. module: payment_xendit
 #: model:ir.model.fields,field_description:payment_xendit.field_payment_provider__code
@@ -37,14 +58,50 @@ msgstr "코드"
 #. module: payment_xendit
 #. odoo-python
 #: code:addons/payment_xendit/models/payment_provider.py:0
-#, python-format
 msgid "Could not establish the connection to the API."
 msgstr "API 연결을 설정할 수 없습니다."
 
 #. module: payment_xendit
+#: model_terms:ir.ui.view,arch_db:payment_xendit.inline_form
+msgid "Email"
+msgstr "이메일"
+
+#. module: payment_xendit
+#: model_terms:ir.ui.view,arch_db:payment_xendit.inline_form
+msgid "Expiration"
+msgstr "만료일"
+
+#. module: payment_xendit
+#. odoo-javascript
+#: code:addons/payment_xendit/static/src/js/payment_form.js:0
+msgid "Invalid CVN"
+msgstr "잘못된 CVN"
+
+#. module: payment_xendit
+#. odoo-javascript
+#: code:addons/payment_xendit/static/src/js/payment_form.js:0
+msgid "Invalid Card Number"
+msgstr "유효하지 않은 카드 번호"
+
+#. module: payment_xendit
+#. odoo-javascript
+#: code:addons/payment_xendit/static/src/js/payment_form.js:0
+msgid "Invalid Date"
+msgstr "유효하지 않은 날짜"
+
+#. module: payment_xendit
+#: model_terms:ir.ui.view,arch_db:payment_xendit.inline_form
+msgid "John"
+msgstr ""
+
+#. module: payment_xendit
+#: model_terms:ir.ui.view,arch_db:payment_xendit.inline_form
+msgid "MM"
+msgstr "월"
+
+#. module: payment_xendit
 #. odoo-python
 #: code:addons/payment_xendit/models/payment_transaction.py:0
-#, python-format
 msgid "No transaction found matching reference %s."
 msgstr "%s 참조와 일치하는 거래 항목이 없습니다."
 
@@ -59,9 +116,24 @@ msgid "Payment Transaction"
 msgstr "지불 거래"
 
 #. module: payment_xendit
+#. odoo-javascript
+#: code:addons/payment_xendit/static/src/js/payment_form.js:0
+msgid "Payment processing failed"
+msgstr "결제 프로세스 실패"
+
+#. module: payment_xendit
+#: model_terms:ir.ui.view,arch_db:payment_xendit.inline_form
+msgid "Phone Number"
+msgstr "전화번호"
+
+#. module: payment_xendit
+#: model_terms:ir.ui.view,arch_db:payment_xendit.payment_provider_form_xendit
+msgid "Public Key"
+msgstr "일반 키"
+
+#. module: payment_xendit
 #. odoo-python
 #: code:addons/payment_xendit/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with missing reference."
 msgstr "참조가 누락된 데이터가 수신되었습니다."
 
@@ -71,9 +143,13 @@ msgid "Secret Key"
 msgstr "비밀 키"
 
 #. module: payment_xendit
+#: model_terms:ir.ui.view,arch_db:payment_xendit.inline_form
+msgid "Smith"
+msgstr ""
+
+#. module: payment_xendit
 #. odoo-python
 #: code:addons/payment_xendit/models/payment_provider.py:0
-#, python-format
 msgid ""
 "The communication with the API failed. Xendit gave us the following "
 "information: '%s'"
@@ -83,6 +159,12 @@ msgstr "API와의 통신에 실패했습니다. Xendit에서 다음 정보를 �
 #: model:ir.model.fields,help:payment_xendit.field_payment_provider__code
 msgid "The technical code of this payment provider."
 msgstr "이 결제대행업체의 기술 코드입니다."
+
+#. module: payment_xendit
+#. odoo-python
+#: code:addons/payment_xendit/models/payment_transaction.py:0
+msgid "The transaction is not linked to a token."
+msgstr "거래가 토큰에 연결되어 있지 않습니다."
 
 #. module: payment_xendit
 #: model_terms:ir.ui.view,arch_db:payment_xendit.payment_provider_form_xendit
@@ -95,6 +177,11 @@ msgid "Xendit"
 msgstr "Xendit"
 
 #. module: payment_xendit
+#: model:ir.model.fields,field_description:payment_xendit.field_payment_provider__xendit_public_key
+msgid "Xendit Public Key"
+msgstr "Xendit 공개 키"
+
+#. module: payment_xendit
 #: model:ir.model.fields,field_description:payment_xendit.field_payment_provider__xendit_secret_key
 msgid "Xendit Secret Key"
 msgstr "Xendit 보안 키"
@@ -103,3 +190,13 @@ msgstr "Xendit 보안 키"
 #: model:ir.model.fields,field_description:payment_xendit.field_payment_provider__xendit_webhook_token
 msgid "Xendit Webhook Token"
 msgstr "Xendit 웹훅 토큰"
+
+#. module: payment_xendit
+#: model_terms:ir.ui.view,arch_db:payment_xendit.inline_form
+msgid "YYYY"
+msgstr "YYYY"
+
+#. module: payment_xendit
+#: model_terms:ir.ui.view,arch_db:payment_xendit.inline_form
+msgid "john.smith@example.com"
+msgstr "john.smith@example.com"

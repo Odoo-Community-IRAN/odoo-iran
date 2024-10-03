@@ -8,6 +8,7 @@ import logging
 import os
 import unicodedata
 
+from contextlib import nullcontext
 try:
     from werkzeug.utils import send_file
 except ImportError:
@@ -15,7 +16,7 @@ except ImportError:
 
 import odoo
 import odoo.modules.registry
-from odoo import SUPERUSER_ID, _, http
+from odoo import SUPERUSER_ID, _, http, api
 from odoo.addons.base.models.assetsbundle import ANY_UNIQUE
 from odoo.exceptions import AccessError, UserError
 from odoo.http import request, Response
@@ -58,19 +59,21 @@ class Binary(http.Controller):
             ))
         raise http.request.not_found()
 
-    @http.route(['/web/content',
+    @http.route([
+        '/web/content',
         '/web/content/<string:xmlid>',
         '/web/content/<string:xmlid>/<string:filename>',
         '/web/content/<int:id>',
         '/web/content/<int:id>/<string:filename>',
         '/web/content/<string:model>/<int:id>/<string:field>',
-        '/web/content/<string:model>/<int:id>/<string:field>/<string:filename>'], type='http', auth="public")
+        '/web/content/<string:model>/<int:id>/<string:field>/<string:filename>',
+    ], type='http', auth='public', readonly=True)
     # pylint: disable=redefined-builtin,invalid-name
     def content_common(self, xmlid=None, model='ir.attachment', id=None, field='raw',
                        filename=None, filename_field='name', mimetype=None, unique=False,
                        download=False, access_token=None, nocache=False):
         with replace_exceptions(UserError, by=request.not_found()):
-            record = request.env['ir.binary']._find_record(xmlid, model, id and int(id), access_token)
+            record = request.env['ir.binary']._find_record(xmlid, model, id and int(id), access_token, field=field)
             stream = request.env['ir.binary']._get_stream_from(record, field, filename, filename_field, mimetype)
             if request.httprequest.args.get('access_token'):
                 stream.public = True
@@ -85,8 +88,9 @@ class Binary(http.Controller):
         return stream.get_response(**send_file_kwargs)
 
     @http.route([
-        '/web/assets/<string:unique>/<string:filename>'], type='http', auth="public")
+        '/web/assets/<string:unique>/<string:filename>'], type='http', auth="public", readonly=True)
     def content_assets(self, filename=None, unique=ANY_UNIQUE, nocache=False, assets_params=None):
+        env = request.env  # readonly
         assets_params = assets_params or {}
         assert isinstance(assets_params, dict)
         debug_assets = unique == 'debug'
@@ -94,7 +98,7 @@ class Binary(http.Controller):
             unique = ANY_UNIQUE
         attachment = None
         if unique != 'debug':
-            url = request.env['ir.asset']._get_asset_bundle_url(filename, unique, assets_params)
+            url = env['ir.asset']._get_asset_bundle_url(filename, unique, assets_params)
             assert not '%' in url
             domain = [
                 ('public', '=', True),
@@ -104,38 +108,46 @@ class Binary(http.Controller):
                 ('res_id', '=', 0),
                 ('create_uid', '=', SUPERUSER_ID),
             ]
-            attachment = request.env['ir.attachment'].sudo().search(domain, limit=1)
+            attachment = env['ir.attachment'].sudo().search(domain, limit=1)
         if not attachment:
             # try to generate one
-            try:
-                if filename.endswith('.map'):
-                    _logger.error(".map should have been generated through debug assets, (version %s most likely outdated)", unique)
-                    raise request.not_found()
-                bundle_name, rtl, asset_type = request.env['ir.asset']._parse_bundle_name(filename, debug_assets)
-                css = asset_type == 'css'
-                js = asset_type == 'js'
-                bundle = request.env['ir.qweb']._get_asset_bundle(
-                    bundle_name,
-                    css=css,
-                    js=js,
-                    debug_assets=debug_assets,
-                    rtl=rtl,
-                    assets_params=assets_params,
-                )
-                # check if the version matches. If not, redirect to the last version
-                if not debug_assets and unique != ANY_UNIQUE and unique != bundle.get_version(asset_type):
-                    return request.redirect(bundle.get_link(asset_type))
-                if css and bundle.stylesheets:
-                    attachment = bundle.css()
-                elif js and bundle.javascripts:
-                    attachment = bundle.js()
-            except ValueError as e:
-                _logger.warning("Parsing asset bundle %s has failed: %s", filename, e)
-                raise request.not_found() from e
+            if env.cr.readonly:
+                env.cr.rollback()  # reset state to detect newly generated assets
+                cursor_manager = env.registry.cursor(readonly=False)
+            else:
+                # if we don't have a replica, the cursor is not readonly, use the same one to avoid a rollback
+                cursor_manager = nullcontext(env.cr)
+            with cursor_manager as rw_cr:
+                rw_env = api.Environment(rw_cr, env.user.id, {})
+                try:
+                    if filename.endswith('.map'):
+                        _logger.error(".map should have been generated through debug assets, (version %s most likely outdated)", unique)
+                        raise request.not_found()
+                    bundle_name, rtl, asset_type = rw_env['ir.asset']._parse_bundle_name(filename, debug_assets)
+                    css = asset_type == 'css'
+                    js = asset_type == 'js'
+                    bundle = rw_env['ir.qweb']._get_asset_bundle(
+                        bundle_name,
+                        css=css,
+                        js=js,
+                        debug_assets=debug_assets,
+                        rtl=rtl,
+                        assets_params=assets_params,
+                    )
+                    # check if the version matches. If not, redirect to the last version
+                    if not debug_assets and unique != ANY_UNIQUE and unique != bundle.get_version(asset_type):
+                        return request.redirect(bundle.get_link(asset_type))
+                    if css and bundle.stylesheets:
+                        attachment = env['ir.attachment'].sudo().browse(bundle.css().id)
+                    elif js and bundle.javascripts:
+                        attachment = env['ir.attachment'].sudo().browse(bundle.js().id)
+                except ValueError as e:
+                    _logger.warning("Parsing asset bundle %s has failed: %s", filename, e)
+                    raise request.not_found() from e
         if not attachment:
             raise request.not_found()
-        stream = request.env['ir.binary']._get_stream_from(attachment, 'raw', filename)
-        send_file_kwargs = {'as_attachment': False}
+        stream = env['ir.binary']._get_stream_from(attachment, 'raw', filename)
+        send_file_kwargs = {'as_attachment': False, 'content_security_policy': None}
         if unique and unique != 'debug':
             send_file_kwargs['immutable'] = True
             send_file_kwargs['max_age'] = http.STATIC_CACHE_LONG
@@ -144,7 +156,8 @@ class Binary(http.Controller):
 
         return stream.get_response(**send_file_kwargs)
 
-    @http.route(['/web/image',
+    @http.route([
+        '/web/image',
         '/web/image/<string:xmlid>',
         '/web/image/<string:xmlid>/<string:filename>',
         '/web/image/<string:xmlid>/<int:width>x<int:height>',
@@ -160,14 +173,15 @@ class Binary(http.Controller):
         '/web/image/<int:id>-<string:unique>',
         '/web/image/<int:id>-<string:unique>/<string:filename>',
         '/web/image/<int:id>-<string:unique>/<int:width>x<int:height>',
-        '/web/image/<int:id>-<string:unique>/<int:width>x<int:height>/<string:filename>'], type='http', auth="public")
+        '/web/image/<int:id>-<string:unique>/<int:width>x<int:height>/<string:filename>',
+    ], type='http', auth='public', readonly=True)
     # pylint: disable=redefined-builtin,invalid-name
     def content_image(self, xmlid=None, model='ir.attachment', id=None, field='raw',
                       filename_field='name', filename=None, mimetype=None, unique=False,
                       download=False, width=0, height=0, crop=False, access_token=None,
                       nocache=False):
         try:
-            record = request.env['ir.binary']._find_record(xmlid, model, id and int(id), access_token)
+            record = request.env['ir.binary']._find_record(xmlid, model, id and int(id), access_token, field=field)
             stream = request.env['ir.binary']._get_image_stream_from(
                 record, field, filename=filename, filename_field=filename_field,
                 mimetype=mimetype, width=int(width), height=int(height), crop=crop,
@@ -249,46 +263,49 @@ class Binary(http.Controller):
             response = http.Stream.from_path(file_path('web/static/img/logo.png')).get_response()
         else:
             try:
-                # create an empty registry
-                registry = odoo.modules.registry.Registry(dbname)
-                with registry.cursor() as cr:
-                    company = int(kw['company']) if kw and kw.get('company') else False
-                    if company:
-                        cr.execute("""SELECT logo_web, write_date
-                                        FROM res_company
-                                       WHERE id = %s
-                                   """, (company,))
-                    else:
-                        cr.execute("""SELECT c.logo_web, c.write_date
-                                        FROM res_users u
-                                   LEFT JOIN res_company c
-                                          ON c.id = u.company_id
-                                       WHERE u.id = %s
-                                   """, (uid,))
-                    row = cr.fetchone()
-                    if row and row[0]:
-                        image_base64 = base64.b64decode(row[0])
-                        image_data = io.BytesIO(image_base64)
-                        mimetype = guess_mimetype(image_base64, default='image/png')
-                        imgext = '.' + mimetype.split('/')[1]
-                        if imgext == '.svg+xml':
-                            imgext = '.svg'
-                        response = send_file(
-                            image_data,
-                            request.httprequest.environ,
-                            download_name=imgname + imgext,
-                            mimetype=mimetype,
-                            last_modified=row[1],
-                            response_class=Response,
-                        )
-                    else:
-                        response = http.Stream.from_path(file_path('web/static/img/nologo.png')).get_response()
+                company = int(kw['company']) if kw and kw.get('company') else False
+                if company:
+                    request.env.cr.execute("""
+                        SELECT logo_web, write_date
+                          FROM res_company
+                         WHERE id = %s
+                    """, (company,))
+                else:
+                    request.env.cr.execute("""
+                        SELECT c.logo_web, c.write_date
+                          FROM res_users u
+                     LEFT JOIN res_company c
+                            ON c.id = u.company_id
+                         WHERE u.id = %s
+                    """, (uid,))
+                row = request.env.cr.fetchone()
+                if row and row[0]:
+                    image_base64 = base64.b64decode(row[0])
+                    image_data = io.BytesIO(image_base64)
+                    mimetype = guess_mimetype(image_base64, default='image/png')
+                    imgext = '.' + mimetype.split('/')[1]
+                    if imgext == '.svg+xml':
+                        imgext = '.svg'
+                    response = send_file(
+                        image_data,
+                        request.httprequest.environ,
+                        download_name=imgname + imgext,
+                        mimetype=mimetype,
+                        last_modified=row[1],
+                        response_class=Response,
+                    )
+                else:
+                    response = http.Stream.from_path(file_path('web/static/img/nologo.png')).get_response()
             except Exception:
+                _logger.warning("While retrieving the company logo, using the Odoo logo instead", exc_info=True)
                 response = http.Stream.from_path(file_path(f'web/static/img/{imgname}{imgext}')).get_response()
 
         return response
 
-    @http.route(['/web/sign/get_fonts', '/web/sign/get_fonts/<string:fontname>'], type='json', auth='public')
+    @http.route([
+        '/web/sign/get_fonts',
+        '/web/sign/get_fonts/<string:fontname>',
+    ], type='json', auth='none')
     def get_fonts(self, fontname=None):
         """This route will return a list of base64 encoded fonts.
 

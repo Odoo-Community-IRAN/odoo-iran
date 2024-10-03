@@ -1,5 +1,3 @@
-/** @odoo-module */
-
 import { registry } from "@web/core/registry";
 
 registry.category("web_tour.tours").add("im_livechat_history_back_and_forth_tour", {
@@ -7,26 +5,27 @@ registry.category("web_tour.tours").add("im_livechat_history_back_and_forth_tour
     steps: () => [
         {
             trigger: "body",
-            // Open Command Palette
-            run() {
-                this.$anchor[0].dispatchEvent(
-                    new KeyboardEvent("keydown", { key: "K", ctrlKey: true, bubbles: true })
-                );
-            },
+            run: "press ctrl+k",
         },
         {
             trigger: ".o_command_palette_search input",
-            run: "text /",
+            run: "fill /",
         },
         {
             trigger: ".o_command_palette_search input",
-            run: "text Live Chat",
+            run: "fill Live Chat",
         },
         {
             trigger: ".o_command:contains(Sessions History)",
+            run: "click",
+        },
+        {
+            trigger: "button.o_switch_view.o_list",
+            run: "click",
         },
         {
             trigger: ".o_data_cell:contains(Visitor operator)",
+            run: "click",
         },
         {
             trigger: ".o-mail-DiscussSidebar-item:contains(Visitor).o-active",
@@ -42,6 +41,7 @@ registry.category("web_tour.tours").add("im_livechat_history_back_and_forth_tour
         },
         {
             trigger: ".o-mail-DiscussSidebar-item:contains(Visitor).o-active",
+            run: "click",
         },
         {
             trigger: ".o-mail-DiscussSidebar-item:contains(Visitor).o-active",
@@ -51,8 +51,6 @@ registry.category("web_tour.tours").add("im_livechat_history_back_and_forth_tour
         },
         {
             trigger: ".o_data_cell:contains(Visitor operator)",
-            run() {},
-            isCheck: true,
         },
     ],
 });

@@ -48,7 +48,14 @@ class ProductTemplateAttributeLine(models.Model):
 
     @api.onchange('attribute_id')
     def _onchange_attribute_id(self):
-        self.value_ids = self.value_ids.filtered(lambda pav: pav.attribute_id == self.attribute_id)
+        if self.attribute_id.create_variant == 'no_variant':
+            self.value_ids = self.env['product.attribute.value'].search([
+                ('attribute_id', '=', self.attribute_id.id),
+            ])
+        else:
+            self.value_ids = self.value_ids.filtered(
+                lambda pav: pav.attribute_id == self.attribute_id
+            )
 
     @api.constrains('active', 'value_ids', 'attribute_id')
     def _check_valid_values(self):
@@ -257,7 +264,7 @@ class ProductTemplateAttributeLine(models.Model):
             'type': 'ir.actions.act_window',
             'name': _("Product Variant Values"),
             'res_model': 'product.template.attribute.value',
-            'view_mode': 'tree,form',
+            'view_mode': 'list,form',
             'domain': [('id', 'in', self.product_template_value_ids.ids)],
             'views': [
                 (self.env.ref('product.product_template_attribute_value_view_tree').id, 'list'),
@@ -265,5 +272,6 @@ class ProductTemplateAttributeLine(models.Model):
             ],
             'context': {
                 'search_default_active': 1,
+                'product_invisible': True,
             },
         }

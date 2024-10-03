@@ -153,7 +153,7 @@ class DeliveryCarrier(models.Model):
             return packages
 
         # Create all packages.
-        for package in picking.package_ids:
+        for package in picking.move_line_ids.result_package_id:
             move_lines = picking.move_line_ids.filtered(lambda ml: ml.result_package_id == package)
             commodities = self._get_commodities_from_stock_move_lines(move_lines)
             package_total_cost = 0.0
@@ -199,7 +199,7 @@ class DeliveryCarrier(models.Model):
     def _get_commodities_from_order(self, order):
         commodities = []
 
-        for line in order.order_line.filtered(lambda line: not line.is_delivery and not line.display_type and line.product_id.type in ['product', 'consu']):
+        for line in order.order_line.filtered(lambda line: not line.is_delivery and not line.display_type and line.product_id.type == 'consu'):
             unit_quantity = line.product_uom._compute_quantity(line.product_uom_qty, line.product_id.uom_id)
             rounded_qty = max(1, float_round(unit_quantity, precision_digits=0))
             country_of_origin = line.product_id.country_of_origin.code or order.warehouse_id.partner_id.country_id.code
@@ -215,7 +215,7 @@ class DeliveryCarrier(models.Model):
     def _get_commodities_from_stock_move_lines(self, move_lines):
         commodities = []
 
-        product_lines = move_lines.filtered(lambda line: line.product_id.type in ['product', 'consu'])
+        product_lines = move_lines.filtered(lambda line: line.product_id.type == 'consu')
         for product, lines in groupby(product_lines, lambda x: x.product_id):
             unit_quantity = sum(
                 line.product_uom_id._compute_quantity(
@@ -244,6 +244,8 @@ class DeliveryCarrier(models.Model):
         return res
 
     def fixed_get_tracking_link(self, picking):
+        if self.tracking_url and picking.carrier_tracking_ref:
+            return self.tracking_url.lower().replace("<shipmenttrackingnumber>", picking.carrier_tracking_ref)
         return False
 
     def fixed_cancel_shipment(self, pickings):
@@ -264,6 +266,8 @@ class DeliveryCarrier(models.Model):
         return res
 
     def base_on_rule_get_tracking_link(self, picking):
+        if self.tracking_url and picking.carrier_tracking_ref:
+            return self.tracking_url.lower().replace("<shipmenttrackingnumber>", picking.carrier_tracking_ref)
         return False
 
     def base_on_rule_cancel_shipment(self, pickings):

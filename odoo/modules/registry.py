@@ -4,33 +4,39 @@
 """ Models registries.
 
 """
-from collections import defaultdict, deque
-from collections.abc import Mapping
-from contextlib import closing, contextmanager
-from functools import partial
-from operator import attrgetter
+from __future__ import annotations
 
 import inspect
 import logging
 import os
 import threading
 import time
+import typing
 import warnings
+from collections import defaultdict, deque
+from collections.abc import Mapping
+from contextlib import closing, contextmanager, nullcontext
+from functools import partial
+from operator import attrgetter
 
 import psycopg2
 
 import odoo
 from odoo.modules.db import FunctionStatus
-from odoo.osv.expression import get_unaccent_wrapper
 from .. import SUPERUSER_ID
 from odoo.sql_db import TestCursor
 from odoo.tools import (
-    config, existing_tables, lazy_classproperty,
-    lazy_property, sql, Collector, OrderedSet, SQL,
-    format_frame
+    config, lazy_classproperty,
+    lazy_property, sql, OrderedSet, SQL,
+    remove_accents,
 )
 from odoo.tools.func import locked
 from odoo.tools.lru import LRU
+from odoo.tools.misc import Collector, format_frame
+
+if typing.TYPE_CHECKING:
+    from odoo.models import BaseModel
+
 
 _logger = logging.getLogger(__name__)
 _schema = logging.getLogger('odoo.schema')
@@ -43,6 +49,7 @@ _REGISTRY_CACHES = {
     'routing': 1024,  # 2 entries per website
     'routing.rewrites': 8192,  # url_rewrite entries
     'templates.cached_values': 2048, # arbitrary
+    'groups': 1,  # contains all res.groups
 }
 
 # cache invalidation dependencies, as follows:
@@ -52,7 +59,16 @@ _CACHES_BY_KEY = {
     'assets': ('assets', 'templates.cached_values'),
     'templates': ('templates', 'templates.cached_values'),
     'routing': ('routing', 'routing.rewrites', 'templates.cached_values'),
+    'groups': ('groups', 'templates', 'templates.cached_values'),  # The processing of groups is saved in the view
 }
+
+
+def _unaccent(x):
+    if isinstance(x, SQL):
+        return SQL("unaccent(%s)", x)
+    if isinstance(x, psycopg2.sql.Composable):
+        return psycopg2.sql.SQL('unaccent({})').format(x)
+    return f'unaccent({x})'
 
 class Registry(Mapping):
     """ Model registry for a particular database.
@@ -82,6 +98,7 @@ class Registry(Mapping):
 
     def __new__(cls, db_name):
         """ Return the registry for the given database name."""
+        assert db_name, "Missing database name"
         with cls._lock:
             try:
                 return cls.registries[db_name]
@@ -116,7 +133,7 @@ class Registry(Mapping):
                 odoo.modules.reset_modules_state(db_name)
                 raise
         except Exception:
-            _logger.exception('Failed to load registry')
+            _logger.error('Failed to load registry')
             del cls.registries[db_name]     # pylint: disable=unsupported-delete-operation
             raise
 
@@ -128,16 +145,21 @@ class Registry(Mapping):
         registry._init = False
         registry.ready = True
         registry.registry_invalidated = bool(update_module)
+        registry.signal_changes()
 
         _logger.info("Registry loaded in %.3fs", time.time() - t0)
         return registry
 
     def init(self, db_name):
-        self.models = {}    # model name/model instance mapping
+        self.models: dict[str, type[BaseModel]] = {}    # model name/model instance mapping
         self._sql_constraints = set()
         self._init = True
         self._database_translated_fields = ()  # names of translated fields in database
-        self._assertion_report = odoo.tests.result.OdooTestResult()
+        if config['test_enable'] or config['test_file']:
+            from odoo.tests.result import OdooTestResult  # noqa: PLC0415
+            self._assertion_report = OdooTestResult()
+        else:
+            self._assertion_report = None
         self._fields_by_model = None
         self._ordinary_tables = None
         self._constraint_queue = deque()
@@ -149,7 +171,10 @@ class Registry(Mapping):
         self.loaded_xmlids = set()
 
         self.db_name = db_name
-        self._db = odoo.sql_db.db_connect(db_name)
+        self._db = odoo.sql_db.db_connect(db_name, readonly=False)
+        self._db_readonly = None
+        if config['db_replica_host'] is not False or config['test_enable']:  # by default, only use readonly pool if we have a db_replica_host defined. Allows to have an empty replica host for testing
+            self._db_readonly = odoo.sql_db.db_connect(db_name, readonly=True)
 
         # cursor for test mode; None means "normal" mode
         self.test_cr = None
@@ -163,6 +188,9 @@ class Registry(Mapping):
         self.field_depends = Collector()
         self.field_depends_context = Collector()
         self.field_inverses = Collector()
+
+        # company dependent
+        self.many2one_company_dependents = Collector()  # {model_name: (field1, field2, ...)}
 
         # cache of methods get_field_trigger_tree() and is_modifying_relations()
         self._field_trigger_trees = {}
@@ -182,6 +210,9 @@ class Registry(Mapping):
         with closing(self.cursor()) as cr:
             self.has_unaccent = odoo.modules.db.has_unaccent(cr)
             self.has_trigram = odoo.modules.db.has_trigram(cr)
+
+        self.unaccent = _unaccent if self.has_unaccent else lambda x: x
+        self.unaccent_python = remove_accents if self.has_unaccent else lambda x: x
 
     @classmethod
     @locked
@@ -208,7 +239,7 @@ class Registry(Mapping):
         """ Return an iterator over all model names. """
         return iter(self.models)
 
-    def __getitem__(self, model_name):
+    def __getitem__(self, model_name: str) -> type[BaseModel]:
         """ Return the model with the given name or raise KeyError if it doesn't exist."""
         return self.models[model_name]
 
@@ -313,6 +344,7 @@ class Registry(Mapping):
         self.field_depends.clear()
         self.field_depends_context.clear()
         self.field_inverses.clear()
+        self.many2one_company_dependents.clear()
 
         # do the actual setup
         for model in models:
@@ -602,7 +634,7 @@ class Registry(Mapping):
         """ Create or drop column indexes for the given models. """
 
         expected = [
-            (sql.make_index_name(Model._table, field.name), Model._table, field, getattr(field, 'unaccent', False))
+            (sql.make_index_name(Model._table, field.name), Model._table, field)
             for model_name in model_names
             for Model in [self.models[model_name]]
             if Model._auto and not Model._abstract
@@ -617,7 +649,7 @@ class Registry(Mapping):
                    [tuple(row[0] for row in expected)])
         existing = dict(cr.fetchall())
 
-        for indexname, tablename, field, unaccent in expected:
+        for indexname, tablename, field in expected:
             index = field.index
             assert index in ('btree', 'btree_not_null', 'trigram', True, False, None)
             if index and indexname not in existing and \
@@ -627,19 +659,24 @@ class Registry(Mapping):
                     if field.translate:
                         column_expression = f'''(jsonb_path_query_array({column_expression}, '$.*')::text)'''
                     # add `unaccent` to the trigram index only because the
-                    # trigram indexes are mainly used for (i/=)like search and
+                    # trigram indexes are mainly used for (=)ilike search and
                     # unaccent is added only in these cases when searching
-                    if unaccent and self.has_unaccent:
-                        if self.has_unaccent == FunctionStatus.INDEXABLE:
-                            column_expression = get_unaccent_wrapper(cr)(column_expression)
-                        else:
-                            warnings.warn(
-                                "PostgreSQL function 'unaccent' is present but not immutable, "
-                                "therefore trigram indexes may not be effective.",
-                            )
+                    if self.has_unaccent == FunctionStatus.INDEXABLE:
+                        column_expression = self.unaccent(column_expression)
+                    elif self.has_unaccent:
+                        warnings.warn(
+                            "PostgreSQL function 'unaccent' is present but not immutable, "
+                            "therefore trigram indexes may not be effective.",
+                        )
                     expression = f'{column_expression} gin_trgm_ops'
                     method = 'gin'
                     where = ''
+                elif index == 'btree_not_null' and field.company_dependent:
+                    # company dependent condition will use extra
+                    # `AND col IS NOT NULL` to use the index.
+                    expression = f'({column_expression} IS NOT NULL)'
+                    method = 'btree'
+                    where = f'{column_expression} IS NOT NULL'
                 else:  # index in ['btree', 'btree_not_null'， True]
                     expression = f'{column_expression}'
                     method = 'btree'
@@ -710,7 +747,7 @@ class Registry(Mapping):
             for name, model in env.registry.items()
             if not model._abstract and model._table_query is None
         }
-        missing_tables = set(table2model).difference(existing_tables(cr, table2model))
+        missing_tables = set(table2model).difference(sql.existing_tables(cr, table2model))
 
         if missing_tables:
             missing = {table2model[table] for table in missing_tables}
@@ -721,7 +758,7 @@ class Registry(Mapping):
                 env[name].init()
             env.flush_all()
             # check again, and log errors if tables are still missing
-            missing_tables = set(table2model).difference(existing_tables(cr, table2model))
+            missing_tables = set(table2model).difference(sql.existing_tables(cr, table2model))
             for table in missing_tables:
                 _logger.error("Model %s has no table.", table2model[table])
 
@@ -831,14 +868,14 @@ class Registry(Mapping):
         cache_sequences = dict(zip(_CACHES_BY_KEY, cache_sequences_values))
         return registry_sequence, cache_sequences
 
-    def check_signaling(self):
+    def check_signaling(self, cr=None):
         """ Check whether the registry has changed, and performs all necessary
         operations to update the registry. Return an up-to-date registry.
         """
         if self.in_test_mode():
             return self
 
-        with closing(self.cursor()) as cr:
+        with nullcontext(cr) if cr is not None else closing(self.cursor()) as cr:
             db_registry_sequence, db_cache_sequences = self.get_sequences(cr)
             changes = ''
             # Check if the model registry must be reloaded
@@ -869,20 +906,19 @@ class Registry(Mapping):
 
     def signal_changes(self):
         """ Notifies other processes if registry or cache has been invalidated. """
-        if self.in_test_mode():
-            if self.registry_invalidated:
-                self.registry_sequence += 1
-            for cache_name in self.cache_invalidated or ():
-                self.cache_sequences[cache_name] += 1
-            self.registry_invalidated = False
-            self.cache_invalidated.clear()
+        if not self.ready:
+            _logger.warning('Calling signal_changes when registry is not ready is not suported')
             return
 
         if self.registry_invalidated:
             _logger.info("Registry changed, signaling through the database")
             with closing(self.cursor()) as cr:
                 cr.execute("select nextval('base_registry_signaling')")
-                self.registry_sequence = cr.fetchone()[0]
+                # If another process concurrently updates the registry,
+                # self.registry_sequence will actually be out-of-date,
+                # and the next call to check_signaling() will detect that and trigger a registry reload.
+                # otherwise, self.registry_sequence should be equal to cr.fetchone()[0]
+                self.registry_sequence += 1
 
         # no need to notify cache invalidation in case of registry invalidation,
         # because reloading the registry implies starting with an empty cache
@@ -891,7 +927,11 @@ class Registry(Mapping):
             with closing(self.cursor()) as cr:
                 for cache_name in self.cache_invalidated:
                     cr.execute("select nextval(%s)", [f'base_cache_signaling_{cache_name}'])
-                    self.cache_sequences[cache_name] = cr.fetchone()[0]
+                    # If another process concurrently updates the cache,
+                    # self.cache_sequences[cache_name] will actually be out-of-date,
+                    # and the next call to check_signaling() will detect that and trigger cache invalidation.
+                    # otherwise, self.cache_sequences[cache_name] should be equal to cr.fetchone()[0]
+                    self.cache_sequences[cache_name] += 1
 
         self.registry_invalidated = False
         self.cache_invalidated.clear()
@@ -922,10 +962,11 @@ class Registry(Mapping):
         """ Test whether the registry is in 'test' mode. """
         return self.test_cr is not None
 
-    def enter_test_mode(self, cr):
+    def enter_test_mode(self, cr, test_readonly_enabled=True):
         """ Enter the 'test' mode, where one cursor serves several requests. """
         assert self.test_cr is None
         self.test_cr = cr
+        self.test_readonly_enabled = test_readonly_enabled
         self.test_lock = threading.RLock()
         assert Registry._saved_lock is None
         Registry._saved_lock = Registry._lock
@@ -935,19 +976,26 @@ class Registry(Mapping):
         """ Leave the test mode. """
         assert self.test_cr is not None
         self.test_cr = None
-        self.test_lock = None
+        del self.test_readonly_enabled
+        del self.test_lock
         assert Registry._saved_lock is not None
         Registry._lock = Registry._saved_lock
         Registry._saved_lock = None
 
-    def cursor(self):
+    def cursor(self, /, readonly=False):
         """ Return a new cursor for the database. The cursor itself may be used
             as a context manager to commit/rollback and close automatically.
         """
         if self.test_cr is not None:
             # in test mode we use a proxy object that uses 'self.test_cr' underneath
-            return TestCursor(self.test_cr, self.test_lock)
-        return self._db.cursor()
+            if readonly and not self.test_readonly_enabled:
+                _logger.info('Explicitly ignoring readonly flag when generating a cursor')
+            return TestCursor(self.test_cr, self.test_lock, readonly and self.test_readonly_enabled)
+
+        connection = self._db
+        if readonly and self._db_readonly is not None:
+            connection = self._db_readonly
+        return connection.cursor()
 
 
 class DummyRLock(object):

@@ -1,46 +1,46 @@
 /** @odoo-module */
 
-import wTourUtils from '@website/js/tours/tour_utils';
+import * as wTourUtils from '@website/js/tours/tour_utils';
 import { _t } from "@web/core/l10n/translation";
 
 const snippets = [
     {
-        id: 's_cover',
-        name: 'Cover',
+        id: 's_banner',
+        name: 'Banner',
+        groupName: "Intro",
     },
     {
-        id: 's_masonry_block',
-        name: 'Masonry',
+        id: 's_key_images',
+        name: 'Key Images',
+        groupName: "Columns",
     },
     {
-        id: 's_image_text',
-        name: 'Image - Text',
+        id: 's_title',
+        name: 'Title',
+        groupName: "Text",
     },
     {
-        id: 's_picture',
-        name: 'Picture',
+        id: 's_accordion_image',
+        name: 'Accordion Image',
+        groupName: "Content",
     },
     {
-        id: 's_product_list',
-        name: 'Items',
-    },
-    {
-        id: 's_call_to_action',
-        name: 'Call to Action',
+        id: 's_cta_box',
+        name: 'CTA Box',
+        groupName: "Content",
     },
 ];
 
 wTourUtils.registerThemeHomepageTour("bookstore_tour", () => [
-    wTourUtils.assertCssVariable('--color-palettes-name', '"generic-8"'),
-    wTourUtils.dragNDrop(snippets[0]),
-    wTourUtils.clickOnText(snippets[0], 'h1'),
+    wTourUtils.assertCssVariable('--color-palettes-name', '"default-26"'),
+    ...wTourUtils.insertSnippet(snippets[0]),
+    ...wTourUtils.clickOnText(snippets[0], 'h1'),
     wTourUtils.goBackToBlocks(),
-    wTourUtils.dragNDrop(snippets[1]),
-    wTourUtils.dragNDrop(snippets[2]),
-    wTourUtils.dragNDrop(snippets[3]),
-    wTourUtils.dragNDrop(snippets[4]),
-    wTourUtils.clickOnSnippet(snippets[4]),
+    ...wTourUtils.insertSnippet(snippets[1]),
+    ...wTourUtils.insertSnippet(snippets[2]),
+    ...wTourUtils.insertSnippet(snippets[3]),
+    ...wTourUtils.insertSnippet(snippets[4]),
+    ...wTourUtils.clickOnSnippet(snippets[4]),
     wTourUtils.changeOption('ContainerWidth', 'we-button-group.o_we_user_value_widget', _t('width')),
     wTourUtils.goBackToBlocks(),
-    wTourUtils.dragNDrop(snippets[5]),
 ]);

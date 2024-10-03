@@ -26,7 +26,7 @@ class ProductCatalogMixin(models.AbstractModel):
             'context': {**self.env.context, **additional_context},
         }
 
-    def _default_order_line_values(self):
+    def _default_order_line_values(self, child_field=False):
         return {
             'quantity': 0,
             'readOnly': self._is_readonly() if self else False,
@@ -40,9 +40,9 @@ class ProductCatalogMixin(models.AbstractModel):
         :returns: A list of tuples that represents a domain.
         :rtype: list
         """
-        return [('company_id', 'in', [self.company_id.id, False])]
+        return [('company_id', 'in', [self.company_id.id, False]), ('type', '!=', 'combo')]
 
-    def _get_product_catalog_record_lines(self, product_ids):
+    def _get_product_catalog_record_lines(self, product_ids, child_field=False, **kwargs):
         """ Returns the record's lines grouped by product.
         Must be overrided by each model using this mixin.
 
@@ -71,12 +71,9 @@ class ProductCatalogMixin(models.AbstractModel):
                 'readOnly': bool (optional)
             }
         """
-        res = {}
-        for product in products:
-            res[product.id] = {'productType': product.type}
-        return res
+        return {product.id: {'productType': product.type} for product in products}
 
-    def _get_product_catalog_order_line_info(self, product_ids, **kwargs):
+    def _get_product_catalog_order_line_info(self, product_ids, child_field=False, **kwargs):
         """ Returns products information to be shown in the catalog.
         :param list product_ids: The products currently displayed in the product catalog, as a list
                                  of `product.product` ids.
@@ -92,11 +89,11 @@ class ProductCatalogMixin(models.AbstractModel):
             }
         """
         order_line_info = {}
-        default_data = self._default_order_line_values()
+        default_data = self._default_order_line_values(child_field)
 
-        for product, record_lines in self._get_product_catalog_record_lines(product_ids).items():
+        for product, record_lines in self._get_product_catalog_record_lines(product_ids, child_field=child_field, **kwargs).items():
             order_line_info[product.id] = {
-               **record_lines._get_product_catalog_lines_data(**kwargs),
+               **record_lines._get_product_catalog_lines_data(parent_record=self, **kwargs),
                'productType': product.type,
             }
             product_ids.remove(product.id)

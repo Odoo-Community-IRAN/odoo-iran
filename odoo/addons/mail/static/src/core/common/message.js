@@ -1,23 +1,24 @@
-/* @odoo-module */
-
 import { AttachmentList } from "@mail/core/common/attachment_list";
 import { Composer } from "@mail/core/common/composer";
 import { ImStatus } from "@mail/core/common/im_status";
 import { LinkPreviewList } from "@mail/core/common/link_preview_list";
-import { MessageConfirmDialog } from "@mail/core/common/message_confirm_dialog";
 import { MessageInReply } from "@mail/core/common/message_in_reply";
 import { MessageNotificationPopover } from "@mail/core/common/message_notification_popover";
 import { MessageReactionMenu } from "@mail/core/common/message_reaction_menu";
 import { MessageReactions } from "@mail/core/common/message_reactions";
 import { MessageSeenIndicator } from "@mail/core/common/message_seen_indicator";
 import { RelativeTime } from "@mail/core/common/relative_time";
-import { convertBrToLineBreak, htmlToTextContentInline } from "@mail/utils/common/format";
+import { htmlToTextContentInline } from "@mail/utils/common/format";
 import { isEventHandled, markEventHandled } from "@web/core/utils/misc";
 
 import {
     Component,
     markup,
     onMounted,
+    onPatched,
+    onWillDestroy,
+    onWillUpdateProps,
+    toRaw,
     useChildSubEnv,
     useEffect,
     useRef,
@@ -25,15 +26,20 @@ import {
 } from "@odoo/owl";
 
 import { ActionSwiper } from "@web/core/action_swiper/action_swiper";
-import { hasTouch } from "@web/core/browser/feature_detection";
+import { hasTouch, isMobileOS } from "@web/core/browser/feature_detection";
 import { Dropdown } from "@web/core/dropdown/dropdown";
+import { useDropdownState } from "@web/core/dropdown/dropdown_hooks";
 import { DropdownItem } from "@web/core/dropdown/dropdown_item";
 import { _t } from "@web/core/l10n/translation";
 import { usePopover } from "@web/core/popover/popover_hook";
 import { useService } from "@web/core/utils/hooks";
 import { url } from "@web/core/utils/urls";
-import { useMessageActions } from "./message_actions";
+import { messageActionsRegistry, useMessageActions } from "./message_actions";
 import { cookie } from "@web/core/browser/cookie";
+import { rpc } from "@web/core/network/rpc";
+import { escape } from "@web/core/utils/strings";
+import { MessageActionMenuMobile } from "./message_action_menu_mobile";
+import { discussComponentRegistry } from "./discuss_component_registry";
 
 /**
  * @typedef {Object} Props
@@ -73,13 +79,15 @@ export class Message extends Component {
         showDates: true,
     };
     static props = [
+        "asCard?",
+        "registerMessageRef?",
         "hasActions?",
         "isInChatWindow?",
-        "highlighted?",
         "onParentMessageClick?",
         "message",
         "messageEdition?",
         "messageToReplyTo?",
+        "previousMessage?",
         "squashed?",
         "thread?",
         "messageSearch?",
@@ -90,6 +98,8 @@ export class Message extends Component {
     static template = "mail.Message";
 
     setup() {
+        super.setup();
+        this.escape = escape;
         this.popover = usePopover(this.constructor.components.Popover, { position: "top" });
         this.state = useState({
             isEditing: false,
@@ -98,23 +108,26 @@ export class Message extends Component {
             expandOptions: false,
             emailHeaderOpen: false,
             showTranslation: false,
+            actionMenuMobileOpen: false,
         });
         /** @type {ShadowRoot} */
         this.shadowRoot;
         this.root = useRef("root");
+        onWillUpdateProps((nextProps) => {
+            this.props.registerMessageRef?.(this.props.message, null);
+        });
+        onMounted(() => this.props.registerMessageRef?.(this.props.message, this.root));
+        onPatched(() => this.props.registerMessageRef?.(this.props.message, this.root));
+        onWillDestroy(() => this.props.registerMessageRef?.(this.props.message, null));
         this.hasTouch = hasTouch;
         this.messageBody = useRef("body");
         this.messageActions = useMessageActions();
         this.store = useState(useService("mail.store"));
         this.shadowBody = useRef("shadowBody");
-        this.rpc = useService("rpc");
-        this.threadService = useState(useService("mail.thread"));
-        this.messageService = useState(useService("mail.message"));
-        this.attachmentService = useService("mail.attachment");
-        this.user = useService("user");
         this.dialog = useService("dialog");
         this.ui = useState(useService("ui"));
         this.openReactionMenu = this.openReactionMenu.bind(this);
+        this.optionsDropdown = useDropdownState();
         useChildSubEnv({
             message: this.props.message,
             alignedRight: this.isAlignedRight,
@@ -122,18 +135,10 @@ export class Message extends Component {
         useEffect(
             (editingMessage) => {
                 if (this.props.message.eq(editingMessage)) {
-                    this.enterEditMode();
+                    messageActionsRegistry.get("edit").onClick(this);
                 }
             },
             () => [this.props.messageEdition?.editingMessage]
-        );
-        useEffect(
-            (highlighted) => {
-                if (highlighted) {
-                    this.root.el.scrollIntoView({ behavior: "smooth", block: "center" });
-                }
-            },
-            () => [this.props.highlighted]
         );
         onMounted(() => {
             if (this.messageBody.el) {
@@ -166,15 +171,15 @@ export class Message extends Component {
         useEffect(
             () => {
                 if (this.shadowBody.el) {
-                    const body = document.createElement("span");
-                    body.innerHTML = this.state.showTranslation
+                    const bodyEl = document.createElement("span");
+                    bodyEl.innerHTML = this.state.showTranslation
                         ? this.message.translationValue
                         : this.props.messageSearch?.highlight(this.message.body) ??
                           this.message.body;
-                    this.prepareMessageBody(body);
-                    this.shadowRoot.appendChild(body);
+                    this.prepareMessageBody(bodyEl);
+                    this.shadowRoot.appendChild(bodyEl);
                     return () => {
-                        this.shadowRoot.removeChild(body);
+                        this.shadowRoot.removeChild(bodyEl);
                     };
                 }
             },
@@ -190,21 +195,26 @@ export class Message extends Component {
     get attClass() {
         return {
             [this.props.className]: true,
-            "o-highlighted bg-view shadow-lg": this.props.highlighted,
+            "o-card p-2 mt-2": this.props.asCard,
+            "pt-1": !this.props.asCard,
             "o-selfAuthored": this.message.isSelfAuthored && !this.env.messageCard,
             "o-selected": this.props.messageToReplyTo?.isSelected(
                 this.props.thread,
                 this.props.message
             ),
-            "o-squashed pb-1": this.props.squashed,
-            "py-1": !this.props.squashed,
-            "mt-2": !this.props.squashed && this.props.thread && !this.env.messageCard,
-            "px-3": !this.props.isInChatWindow && !this.env.messageCard,
+            "o-squashed": this.props.squashed,
+            "mt-1":
+                !this.props.squashed &&
+                this.props.thread &&
+                !this.env.messageCard &&
+                !this.props.asCard,
             "px-2": this.props.isInChatWindow,
             "opacity-50": this.props.messageToReplyTo?.isNotSelected(
                 this.props.thread,
                 this.props.message
             ),
+            "o-actionMenuMobileOpen": this.state.actionMenuMobileOpen,
+            "o-editing": this.state.isEditing,
         };
     }
 
@@ -215,15 +225,27 @@ export class Message extends Component {
         };
     }
 
+    get authorName() {
+        if (this.message.author) {
+            return this.message.author.name;
+        }
+        return this.message.email_from;
+    }
+
     get authorAvatarUrl() {
         if (
-            this.message.type &&
-            this.message.type.includes("email") &&
+            this.message.message_type &&
+            this.message.message_type.includes("email") &&
             !["partner", "guest"].includes(this.message.author?.type)
         ) {
             return url("/mail/static/src/img/email_icon.png");
         }
-        return this.threadService.avatarUrl(this.message.author, this.props.message.originThread);
+
+        if (this.message.author) {
+            return this.message.author.avatarUrl;
+        }
+
+        return this.store.DEFAULT_AVATAR;
     }
 
     get expandText() {
@@ -234,8 +256,13 @@ export class Message extends Component {
         return this.props.message;
     }
 
+    /** Max amount of quick actions, including "..." */
     get quickActionCount() {
-        return this.env.inChatter ? 2 : 3;
+        return this.env.inChatter ? 3 : this.env.inChatWindow ? 2 : 4;
+    }
+
+    get showSeenIndicator() {
+        return this.props.message.isSelfAuthored && this.props.thread?.hasSeenFeature;
     }
 
     get showSubtypeDescription() {
@@ -247,51 +274,19 @@ export class Message extends Component {
     }
 
     get messageTypeText() {
-        if (this.props.message.type === "notification") {
+        if (this.props.message.message_type === "notification") {
             return _t("System notification");
         }
-        if (this.props.message.type === "auto_comment") {
+        if (this.props.message.message_type === "auto_comment") {
             return _t("Automated message");
         }
-        if (!this.props.message.is_discussion && this.props.message.type !== "user_notification") {
+        if (
+            !this.props.message.is_discussion &&
+            this.props.message.message_type !== "user_notification"
+        ) {
             return _t("Note");
         }
         return _t("Message");
-    }
-
-    /**
-     * @returns {boolean}
-     */
-    get canAddReaction() {
-        return Boolean(!this.message.is_transient && this.message.res_id);
-    }
-
-    get deletable() {
-        return this.editable;
-    }
-
-    get editable() {
-        if (!this.props.hasActions) {
-            return false;
-        }
-        return this.message.editable;
-    }
-
-    get canReplyTo() {
-        return this.props.messageToReplyTo;
-    }
-
-    /**
-     * @returns {boolean}
-     */
-    get canToggleStar() {
-        return Boolean(!this.message.is_transient && this.message.res_id && this.store.user);
-    }
-
-    get showUnfollow() {
-        return Boolean(
-            this.message.originThread?.selfFollower && this.props.thread?.model === "mail.box"
-        );
     }
 
     get isActive() {
@@ -299,7 +294,7 @@ export class Message extends Component {
             this.state.isHovered ||
             this.state.isClicked ||
             this.emojiPicker?.isOpen ||
-            this.state.expandOptions
+            this.optionsDropdown.isOpen
         );
     }
 
@@ -307,26 +302,19 @@ export class Message extends Component {
         return Boolean(this.env.inChatWindow && this.props.message.isSelfAuthored);
     }
 
+    get isMobileOS() {
+        return isMobileOS();
+    }
+
     get isPersistentMessageFromAnotherThread() {
-        return !this.isOriginThread && !this.message.is_transient;
+        return !this.isOriginThread && !this.message.is_transient && this.message.thread;
     }
 
     get isOriginThread() {
         if (!this.props.thread) {
             return false;
         }
-        return this.props.thread.eq(this.message.originThread);
-    }
-
-    get isInInbox() {
-        if (!this.props.thread) {
-            return false;
-        }
-        return this.props.thread.id === "inbox";
-    }
-
-    get translatable() {
-        return this.store.hasMessageTranslationFeature && this.env.inChatter;
+        return this.props.thread.eq(this.message.thread);
     }
 
     get translatedFromText() {
@@ -356,40 +344,14 @@ export class Message extends Component {
         if (this.message.isSelfAuthored) {
             return false;
         }
-        if (this.props.thread.type === "chat") {
+        if (this.props.thread.channel_type === "chat") {
             return false;
         }
         return true;
     }
 
-    onClickDelete() {
-        this.env.services.dialog.add(MessageConfirmDialog, {
-            message: this.message,
-            messageComponent: Message,
-            prompt: _t("Are you sure you want to delete this message?"),
-            onConfirm: () => this.messageService.delete(this.message),
-        });
-    }
-
-    onClickReplyTo(ev) {
-        this.props.messageToReplyTo.toggle(this.props.thread, this.props.message);
-    }
-
     async onClickAttachmentUnlink(attachment) {
-        await this.attachmentService.delete(attachment);
-    }
-
-    onClickMarkAsUnread() {
-        const previousMessageId =
-            this.message.originThread.getPreviousMessage(this.message)?.id ?? false;
-        if (this.props.thread.seen_message_id === previousMessageId) {
-            return;
-        }
-        return this.rpc("/discuss/channel/set_last_seen_message", {
-            channel_id: this.message.originThread.id,
-            last_message_id: previousMessageId,
-            allow_older: true,
-        });
+        await toRaw(attachment).remove();
     }
 
     /**
@@ -418,78 +380,107 @@ export class Message extends Component {
         }
     }
 
-    onClickEdit() {
-        this.enterEditMode();
+    /**
+     * @param {MouseEvent} ev
+     */
+    async onClickNotificationMessage(ev) {
+        this.store.handleClickOnLink(ev, this.props.thread);
+        const { oeType, oeId } = ev.target.dataset;
+        if (oeType === "highlight") {
+            await this.env.messageHighlight?.highlightMessage(
+                this.store.Message.insert({
+                    id: Number(oeId),
+                    res_id: this.props.thread.id,
+                    model: this.props.thread.model,
+                }),
+                this.props.thread
+            );
+        }
     }
 
-    /**
-     * @param {HTMLElement} element
-     */
-    prepareMessageBody(element) {}
+    /** @param {HTMLElement} bodyEl */
+    prepareMessageBody(bodyEl) {}
 
-    enterEditMode() {
-        const body = document.createElement("span");
-        body.innerHTML = this.props.message.body;
-        const mentionedChannelElements = body.querySelectorAll(".o_channel_redirect");
-        const mentionedChannels = Array.from(mentionedChannelElements).map((el) =>
-            this.store.Thread.insert({
-                id: el.dataset.oeId,
-                model: el.dataset.oeModel,
-            })
-        );
-        const messageContent = convertBrToLineBreak(this.props.message.body);
-        this.props.message.composer = {
-            mentionedChannels,
-            mentionedPartners: this.props.message.recipients,
-            textInputContent: messageContent,
-            selection: {
-                start: messageContent.length,
-                end: messageContent.length,
-                direction: "none",
-            },
+    getAuthorAttClass() {
+        return { "opacity-50": this.message.isPending };
+    }
+
+    getAvatarContainerAttClass() {
+        return {
+            "opacity-50": this.message.isPending,
+            "o-inChatWindow": this.env.inChatWindow,
         };
-        this.state.isEditing = true;
     }
 
     exitEditMode() {
+        const message = toRaw(this.props.message);
         this.props.messageEdition?.exitEditMode();
-        this.message.composer = undefined;
+        message.composer = undefined;
         this.state.isEditing = false;
     }
 
     onClickNotification(ev) {
-        if (this.message.failureNotifications.length > 0) {
+        const message = toRaw(this.message);
+        if (message.failureNotifications.length > 0) {
             this.onClickFailure(ev);
         } else {
-            this.popover.open(ev.target, { message: this.message });
+            this.popover.open(ev.target, { message });
         }
     }
 
     onClickFailure(ev) {
+        const message = toRaw(this.message);
         markEventHandled(ev, "Message.ClickFailure");
         this.env.services.action.doAction("mail.mail_resend_message_action", {
             additionalContext: {
-                mail_message_to_resend: this.message.id,
+                mail_message_to_resend: message.id,
             },
         });
     }
 
-    openReactionMenu() {
-        this.dialog.add(MessageReactionMenu, {
-            message: this.props.message,
-        });
+    /** @param {MouseEvent} [ev] */
+    openMobileActions(ev) {
+        if (!isMobileOS()) {
+            return;
+        }
+        ev?.stopPropagation();
+        this.state.actionMenuMobileOpen = true;
+        this.dialog.add(
+            MessageActionMenuMobile,
+            {
+                message: this.props.message,
+                thread: this.props.thread,
+                isFirstMessage: this.props.isFirstMessage,
+                messageToReplyTo: this.props.messageToReplyTo,
+                openReactionMenu: () => this.openReactionMenu(),
+                state: this.state,
+            },
+            { context: this, onClose: () => (this.state.actionMenuMobileOpen = false) }
+        );
+    }
+
+    openReactionMenu(reaction) {
+        const message = toRaw(this.props.message);
+        this.dialog.add(
+            MessageReactionMenu,
+            { message, initialReaction: reaction },
+            { context: this }
+        );
     }
 
     async onClickToggleTranslation() {
-        if (!this.message.translationValue) {
-            const { error, lang_name, body } = await this.rpc("/mail/message/translate", {
-                message_id: this.message.id,
+        const message = toRaw(this.message);
+        if (!message.translationValue) {
+            const { error, lang_name, body } = await rpc("/mail/message/translate", {
+                message_id: message.id,
             });
-            this.message.translationValue = body && markup(body);
-            this.message.translationSource = lang_name;
-            this.message.translationErrors = error;
+            message.translationValue = body && markup(body);
+            message.translationSource = lang_name;
+            message.translationErrors = error;
         }
         this.state.showTranslation =
-            !this.state.showTranslation && Boolean(this.message.translationValue);
+            !this.state.showTranslation && Boolean(message.translationValue);
     }
 }
+
+discussComponentRegistry.add("Message", Message);

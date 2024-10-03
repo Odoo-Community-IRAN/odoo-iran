@@ -6,6 +6,7 @@ import { ExpenseDocumentUpload, ExpenseDocumentDropZone } from '../mixins/docume
 
 import { registry } from '@web/core/registry';
 import { useService } from '@web/core/utils/hooks';
+import { user } from "@web/core/user";
 import { listView } from "@web/views/list/list_view";
 
 import { ListController } from "@web/views/list/list_controller";
@@ -13,17 +14,17 @@ import { ListRenderer } from "@web/views/list/list_renderer";
 import { onWillStart } from "@odoo/owl";
 
 export class ExpenseListController extends ExpenseDocumentUpload(ListController) {
+    static template = `hr_expense.ListView`;
+
     setup() {
         super.setup();
         this.orm = useService('orm');
         this.actionService = useService('action');
-        this.rpc = useService("rpc");
-        this.user = useService("user");
         this.isExpenseSheet = this.model.config.resModel === "hr.expense.sheet";
 
         onWillStart(async () => {
-            this.userIsExpenseTeamApprover = await this.user.hasGroup("hr_expense.group_hr_expense_team_approver");
-            this.userIsAccountInvoicing = await this.user.hasGroup("account.group_account_invoice");
+            this.userIsExpenseTeamApprover = await user.hasGroup("hr_expense.group_hr_expense_team_approver");
+            this.userIsAccountInvoicing = await user.hasGroup("account.group_account_invoice");
         });
     }
 
@@ -71,13 +72,16 @@ export class ExpenseListController extends ExpenseDocumentUpload(ListController)
     }
 }
 
-export class ExpenseListRenderer extends ExpenseDocumentDropZone(ExpenseMobileQRCode(ListRenderer)) {}
-ExpenseListRenderer.template = 'hr_expense.ListRenderer';
+export class ExpenseListRenderer extends ExpenseDocumentDropZone(
+    ExpenseMobileQRCode(ListRenderer)
+) {
+    static template = "hr_expense.ListRenderer";
+}
 
-export class ExpenseDashboardListRenderer extends ExpenseListRenderer {}
-
-ExpenseDashboardListRenderer.components = { ...ExpenseDashboardListRenderer.components, ExpenseDashboard};
-ExpenseDashboardListRenderer.template = 'hr_expense.DashboardListRenderer';
+export class ExpenseDashboardListRenderer extends ExpenseListRenderer {
+    static components = { ...ExpenseDashboardListRenderer.components, ExpenseDashboard };
+    static template = "hr_expense.DashboardListRenderer";
+}
 
 registry.category('views').add('hr_expense_tree', {
     ...listView,

@@ -2,6 +2,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import base64
+from collections import defaultdict
 import hashlib
 import hmac
 import io
@@ -23,6 +24,7 @@ from odoo.addons.base_import.models.base_import import ImportValidationError
 from odoo.exceptions import UserError, ValidationError
 from odoo.osv import expression
 from odoo.tools.float_utils import float_round
+from odoo.tools.image import ImageProcess
 
 _logger = logging.getLogger(__name__)
 
@@ -132,7 +134,7 @@ class MassMailing(models.Model):
         string='Status',
         default='draft', required=True,
         copy=False, tracking=True,
-        group_expand='_group_expand_states')
+        group_expand=True)
     color = fields.Integer(string='Color Index')
     user_id = fields.Many2one(
         'res.users', string='Responsible',
@@ -224,6 +226,7 @@ class MassMailing(models.Model):
     replied_ratio = fields.Float(compute="_compute_statistics", string='Replied Ratio')
     bounced_ratio = fields.Float(compute="_compute_statistics", string='Bounced Ratio')
     clicks_ratio = fields.Float(compute="_compute_clicks_ratio", string="Number of Clicks")
+    link_trackers_count = fields.Integer(compute="_compute_link_trackers_count", string="Link Trackers Count")
     next_departure = fields.Datetime(compute="_compute_next_departure", string='Scheduled date')
     # UX
     next_departure_is_past = fields.Boolean(compute="_compute_next_departure")
@@ -277,7 +280,7 @@ class MassMailing(models.Model):
 
     def _compute_total(self):
         for mass_mailing in self:
-            total = self.env[mass_mailing.mailing_model_real].search_count(mass_mailing._parse_mailing_domain())
+            total = self.env[mass_mailing.mailing_model_real].search_count(mass_mailing._get_recipients_domain())
             if total and mass_mailing.ab_testing_enabled and mass_mailing.ab_testing_pc < 100:
                 total = max(int(total / 100.0 * mass_mailing.ab_testing_pc), 1)
             mass_mailing.total = total
@@ -288,7 +291,7 @@ class MassMailing(models.Model):
             FROM mailing_trace AS stats
             LEFT OUTER JOIN link_tracker_click AS clicks ON clicks.mailing_trace_id = stats.id
             WHERE stats.mass_mailing_id IN %s
-            AND stats.trace_status != 'cancel'
+            AND stats.trace_status not in ('bounce', 'cancel', 'error')
             GROUP BY stats.mass_mailing_id
         """, [tuple(self.ids) or (None,)])
         mass_mailing_data = self.env.cr.dictfetchall()
@@ -304,43 +307,40 @@ class MassMailing(models.Model):
             'opened_ratio', 'replied_ratio', 'bounced_ratio',
         ):
             self[key] = False
-        if not self.ids:
-            return
-        # ensure traces are sent to db
-        self.env['mailing.trace'].flush_model()
-        self.env['mailing.mailing'].flush_model()
-        self.env.cr.execute("""
-            SELECT
-                m.id as mailing_id,
-                COUNT(s.id) AS expected,
-                COUNT(s.sent_datetime) AS sent,
-                COUNT(s.trace_status) FILTER (WHERE s.trace_status = 'outgoing') AS scheduled,
-                COUNT(s.trace_status) FILTER (WHERE s.trace_status = 'cancel') AS canceled,
-                COUNT(s.trace_status) FILTER (WHERE s.trace_status = 'process') AS process,
-                COUNT(s.trace_status) FILTER (WHERE s.trace_status = 'pending') AS pending,
-                COUNT(s.trace_status) FILTER (WHERE s.trace_status in ('sent', 'open', 'reply')) AS delivered,
-                COUNT(s.trace_status) FILTER (WHERE s.trace_status in ('open', 'reply')) AS opened,
-                COUNT(s.links_click_datetime) AS clicked,
-                COUNT(s.trace_status) FILTER (WHERE s.trace_status = 'reply') AS replied,
-                COUNT(s.trace_status) FILTER (WHERE s.trace_status = 'bounce') AS bounced,
-                COUNT(s.trace_status) FILTER (WHERE s.trace_status = 'error') AS failed
-            FROM
-                mailing_trace s
-            RIGHT JOIN
-                mailing_mailing m
-                ON (m.id = s.mass_mailing_id)
-            WHERE
-                m.id IN %s
-            GROUP BY
-                m.id
-        """, (tuple(self.ids), ))
-        for row in self.env.cr.dictfetchall():
-            total = (row['expected'] - row['canceled']) or 1
-            row['received_ratio'] = float_round(100.0 * row['delivered'] / total, precision_digits=2)
-            row['opened_ratio'] = float_round(100.0 * row['opened'] / total, precision_digits=2)
-            row['replied_ratio'] = float_round(100.0 * row['replied'] / total, precision_digits=2)
-            row['bounced_ratio'] = float_round(100.0 * row['bounced'] / total, precision_digits=2)
-            self.browse(row.pop('mailing_id')).update(row)
+
+        result = self.env["mailing.trace"].sudo()._read_group(
+            [("mass_mailing_id", "in", self.ids)],
+            ['mass_mailing_id', 'trace_status'],
+            ['__count', 'links_click_datetime:count', 'sent_datetime:count'])
+
+        result_per_mailing = defaultdict(lambda: defaultdict(int))
+        for mailing, trace_status, count, links_click_datetime, sent_datetime in result:
+            result_per_mailing[mailing][trace_status] = count
+            result_per_mailing[mailing]['links_click_datetime'] += links_click_datetime
+            result_per_mailing[mailing]['sent_datetime'] += sent_datetime
+
+        for mailing in self:
+            line = result_per_mailing[mailing]
+            values = {
+                'scheduled': line['outgoing'],
+                'expected': sum(v for k, v in line.items() if k not in ('links_click_datetime', 'sent_datetime')),
+                'canceled': line['cancel'],
+                'pending': line['pending'],
+                'delivered': line['sent'] + line['open'] + line['reply'],
+                'opened': line['open'] + line['reply'],
+                'replied': line['reply'],
+                'bounced': line['bounce'],
+                'failed': line['error'],
+                'clicked': line['links_click_datetime'],
+                'sent': line['sent_datetime'],
+            }
+            total = (values['expected'] - values['canceled']) or 1
+            total_no_error = (values['expected'] - values['canceled'] - values['bounced'] - values['failed']) or 1
+            values['received_ratio'] = float_round(100.0 * values['delivered'] / total, precision_digits=2)
+            values['opened_ratio'] = float_round(100.0 * values['opened'] / total_no_error, precision_digits=2)
+            values['replied_ratio'] = float_round(100.0 * values['replied'] / total_no_error, precision_digits=2)
+            values['bounced_ratio'] = float_round(100.0 * values['bounced'] / total, precision_digits=2)
+            mailing.update(values)
 
     @api.depends('schedule_date', 'state')
     def _compute_next_departure(self):
@@ -365,6 +365,16 @@ class MassMailing(models.Model):
         past.next_departure_is_past = True
         (self - past).next_departure_is_past = False
 
+    def _compute_link_trackers_count(self):
+        result = self.env["link.tracker"].sudo()._read_group(
+            domain=[("mass_mailing_id", "in", self.ids)],
+            groupby=["mass_mailing_id"],
+            aggregates=["id:count"],
+        )
+        self.link_trackers_count = 0
+        for mailing, count in result:
+            mailing.link_trackers_count = count
+
     @api.depends('email_from', 'mail_server_id')
     def _compute_warning_message(self):
         for mailing in self:
@@ -381,7 +391,7 @@ class MassMailing(models.Model):
     def _compute_medium_id(self):
         for mailing in self:
             if mailing.mailing_type == 'mail' and not mailing.medium_id:
-                mailing.medium_id = self.env.ref('utm.utm_medium_email').id
+                mailing.medium_id = self.env['utm.medium']._fetch_or_create_utm_medium('email').id
 
     @api.depends('mailing_model_id')
     def _compute_reply_to_mode(self):
@@ -552,18 +562,15 @@ class MassMailing(models.Model):
             record.attachment_ids.write({'res_model': record._name, 'res_id': record.id})
         return self
 
-    @api.returns('self', lambda value: value.id)
-    def copy(self, default=None):
-        self.ensure_one()
-        default = dict(default or {}, contact_list_ids=self.contact_list_ids.ids)
-        if self.mail_server_id and not self.mail_server_id.active:
-            default['mail_server_id'] = self._get_default_mail_server_id()
-        if self.ab_testing_enabled:
-            default['ab_testing_schedule_datetime'] = self.ab_testing_schedule_datetime
-        return super(MassMailing, self).copy(default=default)
-
-    def _group_expand_states(self, states, domain, order):
-        return [key for key, val in self._fields['state'].selection]
+    def copy_data(self, default=None):
+        vals_list = super().copy_data(default)
+        for mailing, vals in zip(self, vals_list):
+            vals['contact_list_ids'] = mailing.contact_list_ids.ids
+            if mailing.mail_server_id and not mailing.mail_server_id.active:
+                vals['mail_server_id'] = self._get_default_mail_server_id()
+            if mailing.ab_testing_enabled:
+                vals['ab_testing_schedule_datetime'] = mailing.ab_testing_schedule_datetime
+        return vals_list
 
     # ------------------------------------------------------
     # ACTIONS
@@ -607,21 +614,14 @@ class MassMailing(models.Model):
 
     def action_duplicate(self):
         self.ensure_one()
-        mass_mailing_copy = self.copy()
-        if mass_mailing_copy:
-            context = dict(self.env.context)
-            action = {
+        if mass_mailing_copy := self.copy():
+            return {
                 'type': 'ir.actions.act_window',
                 'view_mode': 'form',
                 'res_model': 'mailing.mailing',
                 'res_id': mass_mailing_copy.id,
-                'context': context,
+                'context': dict(self.env.context),
             }
-            if self.mailing_type == 'mail':
-                action['views'] = [
-                    (self.env.ref('mass_mailing.mailing_mailing_view_form_full_width').id, 'form'),
-                ]
-            return action
         return False
 
     def action_test(self):
@@ -671,6 +671,24 @@ class MassMailing(models.Model):
         failed_mails.unlink()
         self.action_put_in_queue()
 
+    def action_view_link_trackers(self):
+        model_name = self.env['ir.model']._get('link.tracker').display_name
+        recipient = self.env['ir.model']._get(self.mailing_model_real).display_name
+        helper_header = _("No Link Tracker for that mailing!")
+        helper_message = _("Link Trackers will measure how many times each link is clicked as well as "
+                           "the proportion of %s who clicked at least once in your mailing.", recipient)
+        return {
+            'name': model_name,
+            'type': 'ir.actions.act_window',
+            'view_mode': 'list,form',
+            'res_model': 'link.tracker',
+            'domain': [('mass_mailing_id', '=', self.id)],
+            'help': Markup('<p class="o_view_nocontent_smiling_face">%s</p><p>%s</p>') % (
+                helper_header, helper_message,
+            ),
+            'context': dict(self._context, create=False)
+        }
+
     def action_view_traces_scheduled(self):
         return self._action_view_traces_filtered('scheduled')
 
@@ -693,28 +711,13 @@ class MassMailing(models.Model):
         filter_key = 'search_default_filter_%s' % (view_filter)
         action['context'][filter_key] = True
         action['views'] = [
-            (self.env.ref('mass_mailing.mailing_trace_view_tree_mail').id, 'tree'),
+            (self.env.ref('mass_mailing.mailing_trace_view_tree_mail').id, 'list'),
             (self.env.ref('mass_mailing.mailing_trace_view_form').id, 'form')
         ]
         return action
 
     def action_view_clicked(self):
-        model_name = self.env['ir.model']._get('link.tracker').display_name
-        recipient = self.env['ir.model']._get(self.mailing_model_real).display_name
-        helper_header = _("No %s clicked your mailing yet!", recipient)
-        helper_message = _("Link Trackers will measure how many times each link is clicked as well as "
-                           "the proportion of %s who clicked at least once in your mailing.", recipient)
-        return {
-            'name': model_name,
-            'type': 'ir.actions.act_window',
-            'view_mode': 'tree',
-            'res_model': 'link.tracker',
-            'domain': [('mass_mailing_id', '=', self.id)],
-            'help': Markup('<p class="o_view_nocontent_smiling_face">%s</p><p>%s</p>') % (
-                helper_header, helper_message,
-            ),
-            'context': dict(self._context, create=False)
-        }
+        return self._action_view_documents_filtered('clicked')
 
     def action_view_opened(self):
         return self._action_view_documents_filtered('open')
@@ -729,36 +732,49 @@ class MassMailing(models.Model):
         return self._action_view_documents_filtered('delivered')
 
     def _action_view_documents_filtered(self, view_filter):
+        def _fetch_trace_res_ids(trace_domain):
+            trace_domain = expression.AND([
+                trace_domain,
+                [('mass_mailing_id', '=', self.id)],
+            ])
+            result = self.env['mailing.trace'].search_read(domain=trace_domain, fields=['res_id'])
+            return [line['res_id'] for line in result]
+
         model_name = self.env['ir.model']._get(self.mailing_model_real).display_name
         helper_header = None
         helper_message = None
         if view_filter == 'reply':
-            found_traces = self.mailing_trace_ids.filtered(lambda trace: trace.trace_status == view_filter)
+            res_ids = _fetch_trace_res_ids([('trace_status', '=', 'reply')])
             helper_header = _("No %s replied to your mailing yet!", model_name)
             helper_message = _("To track how many replies this mailing gets, make sure "
                                "its reply-to address belongs to this database.")
         elif view_filter == 'bounce':
-            found_traces = self.mailing_trace_ids.filtered(lambda trace: trace.trace_status == view_filter)
+            res_ids = _fetch_trace_res_ids([('trace_status', '=', 'bounce')])
             helper_header = _("No %s address bounced yet!", model_name)
             helper_message = _("Bounce happens when a mailing cannot be delivered (fake address, "
                                "server issues, ...). Check each record to see what went wrong.")
+        elif view_filter == 'clicked':
+            res_ids = _fetch_trace_res_ids([('links_click_ids', '!=', False)])
+            helper_header = _("No %s clicked your mailing yet!", model_name)
+            helper_message = _(
+                "Come back once your mailing has been sent to track who clicked on the embedded links.")
         elif view_filter == 'open':
-            found_traces = self.mailing_trace_ids.filtered(lambda trace: trace.trace_status in ('open', 'reply'))
+            res_ids = _fetch_trace_res_ids([('trace_status', 'in', ('open', 'reply'))])
             helper_header = _("No %s opened your mailing yet!", model_name)
             helper_message = _("Come back once your mailing has been sent to track who opened your mailing.")
         elif view_filter == 'delivered':
-            found_traces = self.mailing_trace_ids.filtered(lambda trace: trace.trace_status in ('sent', 'open', 'reply'))
+            res_ids = _fetch_trace_res_ids([('trace_status', 'in', ('sent', 'open', 'reply'))])
             helper_header = _("No %s received your mailing yet!", model_name)
             helper_message = _("Wait until your mailing has been sent to check how many recipients you managed to reach.")
         elif view_filter == 'sent':
-            found_traces = self.mailing_trace_ids.filtered(lambda trace: trace.sent_datetime)
+            res_ids = _fetch_trace_res_ids([('sent_datetime', '!=', False)])
         else:
-            found_traces = self.env['mailing.trace']
-        res_ids = found_traces.mapped('res_id')
+            res_ids = []
+
         action = {
             'name': model_name,
             'type': 'ir.actions.act_window',
-            'view_mode': 'tree',
+            'view_mode': 'list,form',
             'res_model': self.mailing_model_real,
             'domain': [('id', 'in', res_ids)],
             'context': dict(self._context, create=False),
@@ -820,22 +836,17 @@ class MassMailing(models.Model):
         self.ensure_one()
         if not self.campaign_id:
             raise ValueError(_("No mailing campaign has been found"))
-        action = {
+        return {
             'name': _('A/B Tests'),
             'type': 'ir.actions.act_window',
-            'view_mode': 'tree,kanban,form,calendar,graph',
+            'view_mode': 'list,kanban,form,calendar,graph',
             'res_model': 'mailing.mailing',
-            'domain': [('campaign_id', '=', self.campaign_id.id), ('ab_testing_enabled', '=', True), ('mailing_type', '=', self.mailing_type)],
+            'domain': expression.AND([
+                [('campaign_id', '=', self.campaign_id.id)],
+                [('ab_testing_enabled', '=', True)],
+                [('mailing_type', '=', self.mailing_type)]
+            ]),
         }
-        if self.mailing_type == 'mail':
-            action['views'] = [
-                (False, 'tree'),
-                (False, 'kanban'),
-                (self.env.ref('mass_mailing.mailing_mailing_view_form_full_width').id, 'form'),
-                (False, 'calendar'),
-                (False, 'graph'),
-            ]
-        return action
 
     def action_send_winner_mailing(self):
         """Send the winner mailing based on the winner selection field.
@@ -868,16 +879,12 @@ class MassMailing(models.Model):
             raise ValueError(_("A/B test option has not been enabled"))
         final_mailing = self.copy({
             'ab_testing_pc': 100,
-            'name': _(" %(subject)s (final)", subject=self.name) # Add suffix on name to show it's the final mailing
+            'name': _(" %(subject)s (final)", subject=self.name)  # Add suffix on name to show it's the final mailing
         })
         self.campaign_id.ab_testing_winner_mailing_id = final_mailing
         final_mailing.action_launch()
         action = self.env['ir.actions.act_window']._for_xml_id('mass_mailing.action_ab_testing_open_winner_mailing')
         action['res_id'] = final_mailing.id
-        if self.mailing_type == 'mail':
-            action['views'] = [
-                (self.env.ref('mass_mailing.mailing_mailing_view_form_full_width').id, 'form'),
-            ]
         return action
 
     def _get_ab_testing_description_values(self):
@@ -989,7 +996,7 @@ class MassMailing(models.Model):
         }
 
     def _get_recipients(self):
-        mailing_domain = self._parse_mailing_domain()
+        mailing_domain = self._get_recipients_domain()
         res_ids = self.env[self.mailing_model_real].search(mailing_domain).ids
 
         # randomly choose a fragment
@@ -1007,6 +1014,10 @@ class MassMailing(models.Model):
                 topick = len(remaining)
             res_ids = random.sample(sorted(remaining), topick)
         return res_ids
+
+    def _get_recipients_domain(self):
+        """Overridable getter used to get the domain of the recipients at the time of sending."""
+        return self._parse_mailing_domain()
 
     def _get_remaining_recipients(self):
         res_ids = self._get_recipients()
@@ -1062,6 +1073,9 @@ class MassMailing(models.Model):
         return url
 
     def action_send_mail(self, res_ids=None):
+        return self._action_send_mail(res_ids)
+
+    def _action_send_mail(self, res_ids=None):
         author_id = self.env.user.partner_id.id
 
         for mailing in self:
@@ -1126,21 +1140,22 @@ class MassMailing(models.Model):
             if mass_mailing.medium_id:
                 vals['medium_id'] = mass_mailing.medium_id.id
 
-            res[mass_mailing.id] = mass_mailing._shorten_links(html, vals, blacklist=['/unsubscribe_from_list', '/view'])
+            res[mass_mailing.id] = mass_mailing._shorten_links(html, vals, blacklist=['/unsubscribe_from_list', '/view', '/cards/'])
 
         return res
 
     @api.model
     def _process_mass_mailing_queue(self):
         mass_mailings = self.search([('state', 'in', ('in_queue', 'sending')), '|', ('schedule_date', '<', fields.Datetime.now()), ('schedule_date', '=', False)])
-        for mass_mailing in mass_mailings:
+        count_total = len(mass_mailings)
+        for count_done, mass_mailing in enumerate(mass_mailings, start=1):
             context_user = mass_mailing.user_id or mass_mailing.write_uid or self.env.user
             mass_mailing = mass_mailing.with_context(
                 **self.env['res.users'].with_user(context_user).context_get()
             )
             if len(mass_mailing._get_remaining_recipients()) > 0:
                 mass_mailing.state = 'sending'
-                mass_mailing.action_send_mail()
+                mass_mailing._action_send_mail()
             else:
                 mass_mailing.write({
                     'state': 'done',
@@ -1148,6 +1163,7 @@ class MassMailing(models.Model):
                     # send the KPI mail only if it's the first sending
                     'kpi_mail_required': not mass_mailing.sent_date,
                 })
+            self.env['ir.cron']._notify_progress(done=count_done, remaining=count_total - count_done)
 
         if self.env['ir.config_parameter'].sudo().get_param('mass_mailing.mass_mailing_reports'):
             mailings = self.env['mailing.mailing'].search([
@@ -1275,7 +1291,7 @@ class MassMailing(models.Model):
                        mailing_name=self.subject
                        ),
             'top_button_label': _('More Info'),
-            'top_button_url': url_join(web_base_url, f'/web#id={self.id}&model=mailing.mailing&view_type=form'),
+            'top_button_url': url_join(web_base_url, f'/odoo/mailing.mailing/{self.id}'),
             'kpi_data': [
                 kpi,
                 {
@@ -1357,7 +1373,7 @@ class MassMailing(models.Model):
                                 # responsive cropping behavior).
                                 pass
                             else:
-                                image_processor = tools.ImageProcess(image)
+                                image_processor = ImageProcess(image)
                                 image = image_processor.crop_resize(target_width, target_height, 0, 0)
                                 conversion_info.append((base64.b64encode(image.source), node, url, int(node.attrib.get('data-original-id') or "0")))
 
@@ -1498,6 +1514,7 @@ class MassMailing(models.Model):
         :param str email: recipient email, used to unsubscribe / blacklist;
         """
         self.ensure_one()
+        assert isinstance(email, str)
         secret = self.env["ir.config_parameter"].sudo().get_param("database.secret")
-        token = (self.env.cr.dbname, self.id, int(document_id), tools.ustr(email))
+        token = (self.env.cr.dbname, self.id, int(document_id), email)
         return hmac.new(secret.encode('utf-8'), repr(token).encode('utf-8'), hashlib.sha512).hexdigest()

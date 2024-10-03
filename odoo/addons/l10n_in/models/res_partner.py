@@ -31,7 +31,8 @@ class ResPartner(models.Model):
 
     @api.depends('l10n_in_pan')
     def _compute_display_pan_warning(self):
-        self.display_pan_warning = self.vat and self.l10n_in_pan and self.l10n_in_pan != self.vat[2:12]
+        for partner in self:
+            partner.display_pan_warning = partner.vat and partner.l10n_in_pan and partner.l10n_in_pan != partner.vat[2:12]
 
     @api.onchange('company_type')
     def onchange_company_type(self):
@@ -72,3 +73,28 @@ class ResPartner(models.Model):
         if vat == TEST_GST_NUMBER:
             return True
         return super().check_vat_in(vat)
+
+    @api.model
+    def _l10n_in_get_partner_vals_by_vat(self, vat):
+        partner_details = self.read_by_vat(vat)
+        partner_data = partner_details[0] if partner_details else {}
+        if partner_data:
+            partner_gid = partner_data.get('partner_gid')
+            if partner_gid:
+                partner_data = self.enrich_company(company_domain=None, partner_gid=partner_gid, vat=partner_data.get('vat'))
+                partner_data = self._iap_replace_logo(partner_data)
+            return {
+                'name': partner_data.get('name'),
+                'company_type': 'company',
+                'partner_gid': partner_gid,
+                'vat': partner_data.get('vat'),
+                'l10n_in_gst_treatment': 'regular',
+                'image_1920': partner_data.get('image_1920'),
+                'street': partner_data.get('street'),
+                'street2': partner_data.get('street2'),
+                'city': partner_data.get('city'),
+                'state_id': partner_data.get('state_id', {}).get('id', False),
+                'country_id': partner_data.get('country_id', {}).get('id', False),
+                'zip': partner_data.get('zip'),
+            }
+        return {}

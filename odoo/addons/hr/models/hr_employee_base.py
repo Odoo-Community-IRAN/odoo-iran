@@ -1,7 +1,4 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
-
-from ast import literal_eval
 
 from pytz import timezone, UTC, utc
 from datetime import timedelta, datetime
@@ -34,36 +31,48 @@ class HrEmployeeBase(models.AbstractModel):
         readonly=False,
         check_company=True)
     work_phone = fields.Char('Work Phone', compute="_compute_phones", store=True, readonly=False)
+    phone = fields.Char(related="user_id.phone")
     mobile_phone = fields.Char('Work Mobile', compute="_compute_work_contact_details", store=True, inverse='_inverse_work_contact_details')
     work_email = fields.Char('Work Email', compute="_compute_work_contact_details", store=True, inverse='_inverse_work_contact_details')
+    email = fields.Char(related="user_id.email")
     work_contact_id = fields.Many2one('res.partner', 'Work Contact', copy=False)
     work_location_id = fields.Many2one('hr.work.location', 'Work Location', domain="[('address_id', '=', address_id)]")
-    user_id = fields.Many2one('res.users')
+    work_location_name = fields.Char("Work Location Name", compute="_compute_work_location_name_type")
+    work_location_type = fields.Selection([
+        ("home", "Home"),
+        ("office", "Office"),
+        ("other", "Other")], compute="_compute_work_location_name_type")
+    user_id = fields.Many2one('res.users', help="")
+    share = fields.Boolean(related='user_id.share')
     resource_id = fields.Many2one('resource.resource')
     resource_calendar_id = fields.Many2one('resource.calendar', check_company=True)
+    is_flexible = fields.Boolean(compute='_compute_is_flexible', store=True)
+    is_fully_flexible = fields.Boolean(compute='_compute_is_flexible', store=True)
     parent_id = fields.Many2one('hr.employee', 'Manager', compute="_compute_parent_id", store=True, readonly=False,
         domain="['|', ('company_id', '=', False), ('company_id', 'in', allowed_company_ids)]")
     coach_id = fields.Many2one(
         'hr.employee', 'Coach', compute='_compute_coach', store=True, readonly=False,
-        check_company=True,
+        domain="['|', ('company_id', '=', False), ('company_id', 'in', allowed_company_ids)]",
         help='Select the "Employee" who is the coach of this employee.\n'
              'The "Coach" has no specific rights or responsibilities by default.')
     tz = fields.Selection(
         string='Timezone', related='resource_id.tz', readonly=False,
-        help="This field is used in order to define in which timezone the resources will work.")
+        help="This field is used in order to define in which timezone the employee will work.")
     hr_presence_state = fields.Selection([
         ('present', 'Present'),
         ('absent', 'Absent'),
-        ('to_define', 'To Define')], compute='_compute_presence_state', default='to_define')
+        ('archive', 'Archived'),
+        ('out_of_working_hour', 'Out of Working hours')], compute='_compute_presence_state', default='out_of_working_hour')
     last_activity = fields.Date(compute="_compute_last_activity")
     last_activity_time = fields.Char(compute="_compute_last_activity")
     hr_icon_display = fields.Selection([
         ('presence_present', 'Present'),
-        ('presence_absent_active', 'Present but not active'),
+        ('presence_out_of_working_hour', 'Out of Working hours'),
         ('presence_absent', 'Absent'),
-        ('presence_to_define', 'To define'),
+        ('presence_archive', 'Archived'),
         ('presence_undetermined', 'Undetermined')], compute='_compute_presence_icon')
     show_hr_icon_display = fields.Boolean(compute='_compute_presence_icon')
+    im_status = fields.Char(related="user_id.im_status")
     newly_hired = fields.Boolean('Newly Hired', compute='_compute_newly_hired', search='_search_newly_hired')
 
     @api.model
@@ -90,6 +99,11 @@ class HrEmployeeBase(models.AbstractModel):
         op = 'in' if value and operator == '=' or not value and operator != '=' else 'not in'
         return [('id', op, new_hires.ids)]
 
+    @api.depends("work_location_id.name", "work_location_id.location_type")
+    def _compute_work_location_name_type(self):
+        for employee in self:
+            employee.work_location_name = employee.work_location_id.name or None
+            employee.work_location_type = employee.work_location_id.location_type or 'other'
 
     def _get_valid_employee_for_user(self):
         user = self.env.user
@@ -141,16 +155,17 @@ class HrEmployeeBase(models.AbstractModel):
         presence criterions. e.g. hr_attendance, hr_holidays
         """
         # Check on login
-        check_login = literal_eval(self.env['ir.config_parameter'].sudo().get_param('hr.hr_presence_control_login', 'False'))
-        employee_to_check_working = self.filtered(lambda e: e.user_id.im_status == 'offline')
+        employee_to_check_working = self.filtered(lambda e: 'offline' in str(e.user_id.im_status))
         working_now_list = employee_to_check_working._get_employee_working_now()
         for employee in self:
-            state = 'to_define'
-            if check_login:
-                if employee.user_id.im_status in ['online', 'leave_online']:
+            state = 'out_of_working_hour'
+            if employee.company_id.hr_presence_control_login:
+                if 'online' in str(employee.user_id.im_status):
                     state = 'present'
-                elif employee.user_id.im_status in ['offline', 'leave_offline'] and employee.id not in working_now_list:
+                elif 'offline' in str(employee.user_id.im_status) and employee.id in working_now_list:
                     state = 'absent'
+            if not employee.active:
+                state = 'archive'
             employee.hr_presence_state = state
 
     @api.depends('user_id')
@@ -246,27 +261,15 @@ class HrEmployeeBase(models.AbstractModel):
         This method compute the state defining the display icon in the kanban view.
         It can be overriden to add other possibilities, like time off or attendances recordings.
         """
-        working_now_list = self.filtered(lambda e: e.hr_presence_state == 'present')._get_employee_working_now()
         for employee in self:
-            show_icon = True
-            if employee.hr_presence_state == 'present':
-                if employee.id in working_now_list:
-                    icon = 'presence_present'
-                else:
-                    icon = 'presence_absent_active'
-            elif employee.hr_presence_state == 'absent':
-                # employee is not in the working_now_list and he has a user_id
-                icon = 'presence_absent'
-            else:
-                # without attendance, default employee state is 'to_define' without confirmed presence/absence
-                # we need to check why they are not there
-                # Display an orange icon on internal users.
-                icon = 'presence_to_define'
-                if not employee.user_id:
-                    # We don't want non-user employee to have icon.
-                    show_icon = False
-            employee.hr_icon_display = icon
-            employee.show_hr_icon_display = show_icon
+            employee.hr_icon_display = 'presence_' + employee.hr_presence_state
+            employee.show_hr_icon_display = bool(employee.user_id)
+
+    @api.depends('resource_calendar_id')
+    def _compute_is_flexible(self):
+        for employee in self:
+            employee.is_fully_flexible = not employee.resource_calendar_id
+            employee.is_flexible = employee.is_fully_flexible or employee.resource_calendar_id.flexible_hours
 
     @api.model
     def _get_employee_working_now(self):
@@ -290,3 +293,16 @@ class HrEmployeeBase(models.AbstractModel):
                     # The employees should be working now according to their work schedule
                     working_now += res_employee_ids.ids
         return working_now
+
+    def _get_calendar_periods(self, start, stop):
+        """
+        :param datetime start: the start of the period
+        :param datetime stop: the stop of the period
+        This method can be overridden in other modules where it's possible to have different resource calendars for an
+        employee depending on the date.
+        """
+        calendar_periods_by_employee = {}
+        for employee in self:
+            calendar = employee.resource_calendar_id or employee.company_id.resource_calendar_id
+            calendar_periods_by_employee[employee] = [(start, stop, calendar)]
+        return calendar_periods_by_employee

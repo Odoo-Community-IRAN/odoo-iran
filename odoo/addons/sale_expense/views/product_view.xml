@@ -15,7 +15,7 @@
                     </div>
                 </group>
             </xpath>
-            <xpath expr="//field[@name='standard_price']" position="before">
+            <xpath expr="//label[@for='standard_price']" position="before">
                 <field name="list_price" invisible="expense_policy != 'sales_price'"/>
             </xpath>
             <xpath expr="//field[@name='supplier_taxes_id']" position="after">
@@ -38,8 +38,11 @@
     </record>
 
     <record id="hr_expense.hr_expense_product" model="ir.actions.act_window">
-        <field name="context">{"default_can_be_expensed": 1, 'default_detailed_type': 'service',
-            'default_expense_policy' : 'cost'}</field>
+        <field name="context">{
+            'default_can_be_expensed': 1,
+            'default_type': 'service',
+            'default_expense_policy' : 'cost',
+        }</field>
     </record>
 
 </odoo>

@@ -4,9 +4,9 @@ import hashlib
 import json
 
 import odoo
-from odoo import api, models
+from odoo import api, models, fields
 from odoo.http import request, DEFAULT_MAX_CONTENT_LENGTH
-from odoo.tools import ormcache, ustr
+from odoo.tools import ormcache, config
 from odoo.tools.misc import str2bool
 
 
@@ -38,6 +38,12 @@ class Http(models.AbstractModel):
         # We don't use regexp and ustr voluntarily
         # timeit has been done to check the optimum method
         return any(bot in user_agent for bot in cls.bots)
+
+    @classmethod
+    def _sanitize_cookies(cls, cookies):
+        super()._sanitize_cookies(cookies)
+        if cids := cookies.get('cids'):
+            cookies['cids'] = '-'.join(cids.split(','))
 
     @classmethod
     def _handle_debug(cls):
@@ -86,7 +92,7 @@ class Http(models.AbstractModel):
         mods = odoo.conf.server_wide_modules or []
         if request.db:
             mods = list(request.registry._init_modules) + mods
-        is_internal_user = user.has_group('base.group_user')
+        is_internal_user = user._is_internal()
         session_info = {
             "uid": session_uid,
             "is_system": user._is_system() if session_uid else False,
@@ -101,6 +107,7 @@ class Http(models.AbstractModel):
             "support_url": "https://www.odoo.com/buy",
             "name": user.name,
             "username": user.login,
+            "partner_write_date": fields.Datetime.to_string(user.partner_id.write_date),
             "partner_display_name": user.partner_id.display_name,
             "partner_id": user.partner_id.id if session_uid and user.partner_id else None,
             "web.base.url": IrConfigSudo.get_param('web.base.url', default=''),
@@ -119,6 +126,8 @@ class Http(models.AbstractModel):
             'bundle_params': {
                 'lang': request.session.context['lang'],
             },
+            'test_mode': bool(config['test_enable'] or config['test_file']),
+            'view_info': self.env['ir.ui.view'].get_view_info(),
         }
         if request.session.debug:
             session_info['bundle_params']['debug'] = request.session.debug
@@ -129,7 +138,7 @@ class Http(models.AbstractModel):
             # with access to the backend ('internal'-type users)
             menus = self.env['ir.ui.menu'].load_menus(request.session.debug)
             ordered_menus = {str(k): v for k, v in menus.items()}
-            menu_json_utf8 = json.dumps(ordered_menus, default=ustr, sort_keys=True).encode()
+            menu_json_utf8 = json.dumps(ordered_menus, sort_keys=True).encode()
             session_info['cache_hashes'].update({
                 "load_menus": hashlib.sha512(menu_json_utf8).hexdigest()[:64], # sha512/256
             })
@@ -173,7 +182,7 @@ class Http(models.AbstractModel):
             'is_system': user._is_system() if session_uid else False,
             'is_public': user._is_public(),
             'is_website_user': user._is_public() if session_uid else False,
-            'user_id': user.id if session_uid else False,
+            'uid': session_uid,
             'is_frontend': True,
             'profile_session': request.session.profile_session,
             'profile_collectors': request.session.profile_collectors,
@@ -183,6 +192,7 @@ class Http(models.AbstractModel):
             'bundle_params': {
                 'lang': request.session.context['lang'],
             },
+            'test_mode': bool(config['test_enable'] or config['test_file']),
         }
         if request.session.debug:
             session_info['bundle_params']['debug'] = request.session.debug

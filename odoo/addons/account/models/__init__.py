@@ -1,18 +1,19 @@
-# -*- coding: utf-8 -*-
-
 from . import sequence_mixin
 from . import partner
-from . import ir_http
 from . import res_partner_bank
 from . import account_account_tag
 from . import account_account
+from . import account_code_mapping
+from . import account_root
 from . import account_journal
+from . import account_lock_exception
 from . import account_tax
 from . import account_reconcile_model
 from . import account_payment_term
 from . import account_move
 from . import account_move_line
 from . import account_move_line_tax_details
+from . import account_move_send
 from . import account_partial_reconcile
 from . import account_full_reconcile
 from . import account_payment
@@ -36,9 +37,13 @@ from . import res_users
 from . import ir_attachment
 from . import ir_actions_report
 from . import ir_module
+from . import ir_ui_menu
+from . import mail_message
+from . import mail_template
+from . import mail_tracking_value
+from . import merge_partner_automatic
 from . import res_currency
 from . import account_report
-from . import onboarding_onboarding
 from . import onboarding_onboarding_step
 from . import template_generic_coa
 from . import uom_uom

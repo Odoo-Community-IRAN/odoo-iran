@@ -1,17 +1,20 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import warnings
-from datetime import datetime, timedelta
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+from operator import itemgetter
 from werkzeug.urls import url_encode
 
 from odoo import http, _
-from odoo.addons.http_routing.models.ir_http import slug
+from odoo.addons.website.controllers.form import WebsiteForm
 from odoo.osv.expression import AND
 from odoo.http import request
+from odoo.tools import email_normalize
 from odoo.tools.misc import groupby
 
 
-class WebsiteHrRecruitment(http.Controller):
+class WebsiteHrRecruitment(WebsiteForm):
     _jobs_per_page = 12
 
     def sitemap_jobs(env, rule, qs):
@@ -216,11 +219,11 @@ class WebsiteHrRecruitment(http.Controller):
         job = request.env['hr.job'].with_context(rendering_bundle=True).create({
             'name': _('Job Title'),
         })
-        return f"/jobs/{slug(job)}"
+        return f"/jobs/{request.env['ir.http']._slug(job)}"
 
     @http.route('''/jobs/detail/<model("hr.job"):job>''', type='http', auth="public", website=True, sitemap=True)
     def jobs_detail(self, job, **kwargs):
-        redirect_url = f"/jobs/{slug(job)}"
+        redirect_url = f"/jobs/{request.env['ir.http']._slug(job)}"
         return request.redirect(redirect_url, code=301)
 
     @http.route('''/jobs/<model("hr.job"):job>''', type='http', auth="public", website=True, sitemap=True)
@@ -284,12 +287,94 @@ class WebsiteHrRecruitment(http.Controller):
         )
 
     @http.route('/website_hr_recruitment/check_recent_application', type='json', auth="public", website=True)
-    def check_recent_application(self, email, job_id):
-        date_limit = datetime.now() - timedelta(days=90)
-        domain = [('email_from', '=ilike', email),
-                  ('create_date', '>=', date_limit),
-                  ('job_id.website_id', 'in', [http.request.website.id, False])]
-        recent_applications = http.request.env['hr.applicant'].sudo().search(domain)
-        response = {'applied_same_job': any(a.job_id.id == int(job_id) for a in recent_applications),
-                    'applied_other_job': bool(recent_applications)}
-        return response
+    def check_recent_application(self, field, value, job_id):
+        def refused_applicants_condition(applicant):
+            return not applicant.active \
+                and applicant.job_id.id == int(job_id) \
+                and applicant.create_date >= (datetime.now() - relativedelta(months=6))
+
+        field_domain = {
+            'name': [('partner_name', '=ilike', value)],
+            'email': [('email_normalized', '=', email_normalize(value))],
+            'phone': [('partner_phone', '=', value)],
+            'linkedin': [('linkedin_profile', '=ilike', value)],
+        }.get(field, [])
+
+        applications_by_status = http.request.env['hr.applicant'].sudo().search(AND([
+            field_domain,
+            [
+                ('job_id.website_id', 'in', [http.request.website.id, False]),
+                '|',
+                    ('application_status', '=', 'ongoing'),
+                    '&',
+                        ('application_status', '=', 'refused'),
+                        ('active', '=', False),
+            ]
+        ]), order='create_date DESC').grouped('application_status')
+        refused_applicants = applications_by_status.get('refused', http.request.env['hr.applicant'])
+        if any(applicant for applicant in refused_applicants if refused_applicants_condition(applicant)):
+            return {
+                'message':  _(
+                    'We\'ve found a previous closed application in our system within the last 6 months.'
+                    ' Please consider before applying in order not to duplicate efforts.'
+                )
+            }
+
+        if 'ongoing' not in applications_by_status:
+            return {'message': None}
+
+        ongoing_application = applications_by_status.get('ongoing')[0]
+        if ongoing_application.job_id.id == int(job_id):
+            recruiter_contact = "" if not ongoing_application.user_id else _(
+                ' In case of issue, contact %(contact_infos)s',
+                contact_infos=", ".join(
+                    [value for value in itemgetter('name', 'email', 'phone')(ongoing_application.user_id) if value]
+                ))
+            return {
+                'message':  _(
+                    'An application already exists for %(value)s.'
+                    ' Duplicates might be rejected. %(recruiter_contact)s',
+                    value=value,
+                    recruiter_contact=recruiter_contact
+                )
+            }
+
+        return {
+            'message':  _(
+                'We found a recent application with a similar name, email, phone number.'
+                ' You can continue if it\'s not a mistake.'
+            )
+        }
+
+    def _should_log_authenticate_message(self, record):
+        if record._name == "hr.applicant" and not request.session.uid:
+            return False
+        return super()._should_log_authenticate_message(record)
+
+    def insert_record(self, request, model, values, custom, meta=None):
+        record_id = super().insert_record(request, model, values, custom, meta=meta)
+        model_name = model.sudo().model
+        default_field = model.website_form_default_field_id
+        if model_name == 'hr.applicant' and default_field:
+            # remove custom and authenticate message (warnings) from the description
+            applicant = request.env[model_name].sudo().browse(record_id)
+            applicant[default_field.name] = values.get(default_field.name, '')
+        return record_id
+
+    def extract_data(self, model, values):
+        data = super().extract_data(model, values)
+        if model.model == 'hr.applicant':
+            candidate = False
+            if values.get('email_from') and values.get('partner_phone'):
+                candidate = request.env['hr.candidate'].sudo().search([
+                    ('email_from', '=', values['email_from']),
+                    ('partner_phone', '=', values['partner_phone']),
+                ], limit=1)
+            if not candidate:
+                candidate = request.env['hr.candidate'].sudo().create({
+                    'partner_name': values['partner_name'],
+                    'email_from': values.get('email_from'),
+                    'partner_phone': values.get('partner_phone'),
+                })
+            data['record']['candidate_id'] = candidate.id
+        return data

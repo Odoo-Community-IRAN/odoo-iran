@@ -1,9 +1,8 @@
 import time
-from freezegun import freeze_time
 
 from odoo import Command
 from odoo.exceptions import UserError
-from odoo.tests import tagged
+from odoo.tests import tagged, freeze_time
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 
 
@@ -12,8 +11,8 @@ from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 class TestAccountUpdateTaxTagsWizard(AccountTestInvoicingCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref=None):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
 
         be_country_id = cls.env.ref('base.be').id
         cls.partner_agrolait = cls.env['res.partner'].create({
@@ -198,7 +197,8 @@ class TestAccountUpdateTaxTagsWizard(AccountTestInvoicingCommon):
         move_1 = self._create_invoice(taxes=self.tax_1)
         self._change_tax_tag(self.tax_1, 'invoice_tax_tag_changed_for_company_1', invoice=True, base=False)
         be_country_id = self.env.ref('base.be').id
-        company_2 = self.company_data_2['company']
+
+        company_2 = self.setup_other_company()['company']
         company_2.write({'country_id': be_country_id})
         self.env.user.company_id = company_2
         tax_2 = self._create_tax(

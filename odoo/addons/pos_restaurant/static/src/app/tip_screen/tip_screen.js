@@ -1,22 +1,19 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
-import { parseFloat } from "@web/views/fields/parsers";
 import { registry } from "@web/core/registry";
-import { ErrorPopup } from "@point_of_sale/app/errors/popups/error_popup";
-import { ConfirmPopup } from "@point_of_sale/app/utils/confirm_popup/confirm_popup";
+import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { usePos } from "@point_of_sale/app/store/pos_hook";
 import { useService } from "@web/core/utils/hooks";
 import { Component, useRef, onMounted } from "@odoo/owl";
 import { TipReceipt } from "@pos_restaurant/app/tip_receipt/tip_receipt";
+import { ask } from "@point_of_sale/app/store/make_awaitable_dialog";
 
 export class TipScreen extends Component {
     static template = "pos_restaurant.TipScreen";
+    static props = {};
     setup() {
         this.pos = usePos();
         this.posReceiptContainer = useRef("pos-receipt-container");
-        this.popup = useService("popup");
-        this.orm = useService("orm");
+        this.dialog = useService("dialog");
         this.printer = useService("printer");
         this.state = this.currentOrder.uiState.TipScreen;
         this._totalAmount = this.currentOrder.get_total_with_tax();
@@ -26,9 +23,7 @@ export class TipScreen extends Component {
         });
     }
     get overallAmountStr() {
-        const tipAmount = this.env.utils.isValidFloat(this.state.inputTipAmount)
-            ? parseFloat(this.state.inputTipAmount)
-            : 0;
+        const tipAmount = this.env.utils.parseValidFloat(this.state.inputTipAmount);
         const original = this.env.utils.formatCurrency(this.totalAmount);
         const tip = this.env.utils.formatCurrency(tipAmount);
         const overall = this.env.utils.formatCurrency(this.totalAmount + tipAmount);
@@ -48,14 +43,12 @@ export class TipScreen extends Component {
         ];
     }
     async validateTip() {
-        const amount = this.env.utils.isValidFloat(this.state.inputTipAmount)
-            ? parseFloat(this.state.inputTipAmount)
-            : 0;
+        const amount = this.env.utils.parseValidFloat(this.state.inputTipAmount);
         const order = this.pos.get_order();
-        const serverId = this.pos.validated_orders_name_server_id_map[order.name];
+        const serverId = typeof order.id === "number" && order.id;
 
         if (!serverId) {
-            this.popup.add(ErrorPopup, {
+            this.dialog.add(AlertDialog, {
                 title: _t("Unsynced order"),
                 body: _t(
                     "This order is not yet synced to server. Make sure it is synced then try again."
@@ -65,13 +58,13 @@ export class TipScreen extends Component {
         }
 
         if (!amount) {
-            await this.orm.call("pos.order", "set_no_tip", [serverId]);
+            await this.pos.data.write("pos.order", [serverId], { is_tipped: true, tip_amount: 0 });
             this.goNextScreen();
             return;
         }
 
         if (amount > 0.25 * this.totalAmount) {
-            const { confirmed } = await this.popup.add(ConfirmPopup, {
+            const confirmed = await ask(this.dialog, {
                 title: "Are you sure?",
                 body: `${this.env.utils.formatCurrency(
                     amount
@@ -82,24 +75,28 @@ export class TipScreen extends Component {
             }
         }
 
-        // set the tip by temporarily allowing order modification
-        order.finalized = false;
-        order.set_tip(amount);
-        order.finalized = true;
+        order.state = "draft";
+        await this.pos.set_tip(amount);
+        order.state = "paid";
 
-        const paymentline = this.pos.get_order().get_paymentlines()[0];
-        if (paymentline.payment_method.payment_terminal) {
+        const paymentline = this.pos.get_order().payment_ids[0];
+        if (paymentline.payment_method_id.payment_terminal) {
             paymentline.amount += amount;
-            await paymentline.payment_method.payment_terminal.send_payment_adjust(paymentline.cid);
+            await paymentline.payment_method_id.payment_terminal.send_payment_adjust(
+                paymentline.uuid
+            );
         }
 
-        // set_tip calls add_product which sets the new line as the selected_orderline
-        const tip_line = order.selected_orderline;
-        await this.orm.call("pos.order", "set_tip", [serverId, tip_line.export_as_JSON()]);
+        const serializedTipLine = order.get_selected_orderline().serialize({ orm: true });
+        order.get_selected_orderline().delete();
+        const serverTipLine = await this.pos.data.create("pos.order.line", [serializedTipLine]);
+        await this.pos.data.write("pos.order", [serverId], {
+            is_tipped: true,
+            tip_amount: serverTipLine[0].price_subtotal_incl,
+        });
         this.goNextScreen();
     }
     goNextScreen() {
-        this.pos.removeOrder(this.currentOrder);
         if (!this.pos.config.module_pos_restaurant) {
             this.pos.add_new_order();
         }
@@ -112,15 +109,15 @@ export class TipScreen extends Component {
     async printTipReceipt() {
         const order = this.currentOrder;
         const receipts = [
-            order.selected_paymentline.ticket,
-            order.selected_paymentline.cashier_receipt,
+            order.get_selected_paymentline().ticket,
+            order.get_selected_paymentline().cashier_receipt,
         ];
         for (let i = 0; i < receipts.length; i++) {
             await this.printer.print(
                 TipReceipt,
                 {
                     headerData: this.pos.getReceiptHeaderData(order),
-                    data: receipts[i],
+                    data: receipts[i] || {},
                     total: this.env.utils.formatCurrency(this.totalAmount),
                 },
                 { webPrintFallback: false }

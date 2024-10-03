@@ -1,9 +1,14 @@
-/** @odoo-module **/
-
 import { Component, useEffect, useRef, useState } from "@odoo/owl";
 import { useBus } from "@web/core/utils/hooks";
 
 export class FormStatusIndicator extends Component {
+    static template = "web.FormStatusIndicator";
+    static props = {
+        model: Object,
+        save: Function,
+        discard: Function,
+    };
+
     setup() {
         this.state = useState({
             fieldIsDirty: false,
@@ -50,9 +55,3 @@ export class FormStatusIndicator extends Component {
         await this.props.save();
     }
 }
-FormStatusIndicator.template = "web.FormStatusIndicator";
-FormStatusIndicator.props = {
-    model: Object,
-    save: Function,
-    discard: Function,
-};

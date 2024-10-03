@@ -1,5 +1,10 @@
-.o-mail-AttachmentCard-unlink.o-inComposer {
-    transform: translateX(100%);
+@media (hover: hover) {
+    .o-mail-AttachmentCard-unlink.o-inComposer {
+        transform: translateX(100%);
+    }
+    .o-mail-AttachmentCard-aside:hover .o-mail-AttachmentCard-unlink.o-inComposer {
+        transform: translateX(0);
+    }
 }
 
 .o-mail-AttachmentCard-aside {
@@ -12,10 +17,6 @@
     }
 }
 
-.o-mail-AttachmentCard-aside:hover .o-mail-AttachmentCard-unlink.o-inComposer {
-    transform: translateX(0);
-}
-
 .o-mail-AttachmentList-in-composer {
     max-height: 300px;
 
@@ -25,8 +26,9 @@
 }
 
 .o-mail-AttachmentImage {
-    min-width: 20px;
-    min-height: 20px;
+    min-width: 75px;
+    min-height: 75px;
+    background-color: $gray-200;
 
     img {
         object-fit: contain;

@@ -6,7 +6,7 @@ import { formView } from "@web/views/form/form_view";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { ViewButton } from "@web/views/view_button/view_button";
-import { useSubEnv, useEnv } from "@odoo/owl";
+import { useSubEnv, onMounted, useEnv } from "@odoo/owl";
 
 /*
 * Common code for theme installation/update handler.
@@ -51,12 +51,21 @@ export function useLoaderOnClick() {
 }
 
 class ThemePreviewFormController extends FormController {
+    static components = { ...FormController.components, ViewButton };
+    static template = "website.ThemePreviewFormController";
     /**
      * @override
      */
     setup() {
         super.setup();
         useLoaderOnClick();
+
+        // TODO adapt theme previews then remove this
+        onMounted(() => {
+            setTimeout(() => {
+                document.querySelector('button[name="button_choose_theme"]')?.click();
+            }, 0);
+        });
     }
     /**
      * @override
@@ -71,10 +80,9 @@ class ThemePreviewFormController extends FormController {
         this.env.config.historyBack();
     }
 }
-ThemePreviewFormController.components = { ...FormController.components, ViewButton };
-ThemePreviewFormController.template = 'website.ThemePreviewFormController';
 
 class ThemePreviewFormControlPanel extends ControlPanel {
+    static template = "website.ThemePreviewForm.ControlPanel";
     /**
      * Triggers an event on the main bus.
      * @see {FieldIframePreview} for the event handler.
@@ -88,8 +96,13 @@ class ThemePreviewFormControlPanel extends ControlPanel {
     onDesktopClick() {
         this.env.bus.trigger('THEME_PREVIEW:SWITCH_MODE', {mode: 'desktop'});
     }
+    /**
+     * Handler called when user click on Go Back button.
+     */
+    back() {
+        this.env.config.historyBack();
+    }
 }
-ThemePreviewFormControlPanel.template = 'website.ThemePreviewForm.ControlPanel';
 
 const ThemePreviewFormView = {
     ...formView,

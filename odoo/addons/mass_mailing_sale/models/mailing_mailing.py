@@ -53,7 +53,7 @@ class MassMailing(models.Model):
             'name': _("Sales Analysis"),
             'res_model': 'sale.report',
             'type': 'ir.actions.act_window',
-            'view_mode': 'tree,pivot,graph,form',
+            'view_mode': 'list,pivot,graph,form',
         }
 
     def action_redirect_to_invoiced(self):
@@ -79,7 +79,7 @@ class MassMailing(models.Model):
             'name': _("Invoices Analysis"),
             'res_model': 'account.invoice.report',
             'type': 'ir.actions.act_window',
-            'view_mode': 'tree,pivot,graph,form',
+            'view_mode': 'list,pivot,graph,form',
         }
 
     def _prepare_statistics_email_values(self):
@@ -90,7 +90,7 @@ class MassMailing(models.Model):
 
         self_with_company = self.with_company(self.user_id.company_id)
         currency = self.user_id.company_id.currency_id
-        formated_amount = tools.format_decimalized_amount(self_with_company.sale_invoiced_amount, currency)
+        formated_amount = tools.misc.format_decimalized_amount(self_with_company.sale_invoiced_amount, currency)
 
         values['kpi_data'][1]['kpi_col2'] = {
             'value': self.sale_quotation_count,

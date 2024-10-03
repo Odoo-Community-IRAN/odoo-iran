@@ -24,28 +24,28 @@ class TestEdiEwaybillJson(TestEdiJson):
             "transMode": "1",
             "vehicleNo": "GJ11AA1234",
             "vehicleType": "R",
-            "docNo": "INV/2019/00001",
+            "docNo": "INV/18-19/0002",
             "docDate": "01/01/2019",
-            "fromGstin": "36AABCT1332L011",
-            "fromTrdName": "company_1_data",
-            "fromAddr1": "Block no. 401",
-            "fromAddr2": "Street 2",
-            "fromPlace": "City 1",
-            "fromPincode": 500001,
-            "fromStateCode": 36,
-            "actFromStateCode": 36,
-            "toGstin": "36BBBFF5679L8ZR",
-            "toTrdName": "partner_a",
-            "toAddr1": "Block no. 401",
-            "toAddr2": "Street 2",
-            "toPlace": "City 2",
-            "toPincode": 500001,
-            "actToStateCode": 36,
-            "toStateCode": 36,
+            "fromGstin": "24AAGCC7144L6ZE",
+            "fromTrdName": "Default Company",
+            "fromAddr1": "Khodiyar Chowk",
+            "fromAddr2": "Sala Number 3",
+            "fromPlace": "Amreli",
+            "fromPincode": 365220,
+            "fromStateCode": 24,
+            "actFromStateCode": 24,
+            "toGstin": "24ABCPM8965E1ZE",
+            "toTrdName": "Partner Intra State",
+            "toAddr1": "Karansinhji Rd",
+            "toAddr2": "Karanpara",
+            "toPlace": "Rajkot",
+            "toPincode": 360001,
+            "actToStateCode": 24,
+            "toStateCode": 24,
             "itemList": [
             {
               "productName": "product_a",
-              "hsnCode": "01111",
+              "hsnCode": "111111",
               "productDesc": "product_a",
               "quantity": 1.0,
               "qtyUnit": "UNT",
@@ -55,7 +55,7 @@ class TestEdiEwaybillJson(TestEdiJson):
             },
             {
               "productName": "product_with_cess",
-              "hsnCode": "02222",
+              "hsnCode": "333333",
               "productDesc": "product_with_cess",
               "quantity": 1.0,
               "qtyUnit": "UNT",
@@ -66,22 +66,22 @@ class TestEdiEwaybillJson(TestEdiJson):
             }
             ],
             "totalValue": 1800.0,
-            "cgstValue": 76.5,
-            "sgstValue": 76.5,
+            "cgstValue": 79.3,
+            "sgstValue": 79.3,
             "igstValue": 0.0,
             "cessValue": 45.0,
             "cessNonAdvolValue": 1.59,
             "otherValue": 0.0,
-            "totInvValue": 1999.59
+            "totInvValue": 2005.19
         }
         self.assertDictEqual(json_value, expected, "Indian EDI send json value is not matched")
 
         #=================================== Full discount test =====================================
         json_value = self.env["account.edi.format"]._l10n_in_edi_ewaybill_generate_json(self.invoice_full_discount)
         expected.update({
-            "docNo": "INV/2019/00002",
+            "docNo": "INV/18-19/0003",
             "itemList": [{
-                "productName": "product_a", "hsnCode": "01111", "productDesc": "product_a", "quantity": 1.0,
+                "productName": "product_a", "hsnCode": "111111", "productDesc": "product_a", "quantity": 1.0,
                 "qtyUnit": "UNT", "taxableAmount": 0.0, "cgstRate": 0.0, "sgstRate": 0.0
             }],
             "totalValue": 0.0,
@@ -98,9 +98,9 @@ class TestEdiEwaybillJson(TestEdiJson):
         #=================================== Zero quantity test =============================================
         json_value = self.env["account.edi.format"]._l10n_in_edi_ewaybill_generate_json(self.invoice_zero_qty)
         expected.update({
-            "docNo": "INV/2019/00003",
+            "docNo": "INV/18-19/0004",
             "itemList": [{
-                "productName": "product_a", "hsnCode": "01111", "productDesc": "product_a", "quantity": 0.0,
+                "productName": "product_a", "hsnCode": "111111", "productDesc": "product_a", "quantity": 0.0,
                 "qtyUnit": "UNT", "taxableAmount": 0.0, "cgstRate": 0.0, "sgstRate": 0.0
             }],
             "totalValue": 0.0,

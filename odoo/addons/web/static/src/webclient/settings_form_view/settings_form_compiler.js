@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { append, createElement } from "@web/core/utils/xml";
 import { FormCompiler } from "@web/views/form/form_compiler";
 import { toStringExpression } from "@web/views/utils";
@@ -25,6 +23,7 @@ export class SettingsFormCompiler extends FormCompiler {
 
         //props
         params.modules = [];
+        params.anchors = [];
 
         const res = super.compileForm(...arguments);
         res.classList.remove("o_form_nosheet");
@@ -35,6 +34,9 @@ export class SettingsFormCompiler extends FormCompiler {
         while (res.firstChild) {
             append(settingsPage, res.firstChild);
         }
+
+        settingsPage.setAttribute("anchors", JSON.stringify(params.anchors));
+
         append(res, settingsPage);
 
         return res;
@@ -72,6 +74,11 @@ export class SettingsFormCompiler extends FormCompiler {
             append(settingsApp, this.compileNode(child, params));
         }
 
+        params.anchors.push(
+            ...[...settingsApp.querySelectorAll("SearchableSetting")]
+                .filter((s) => s.id)
+                .map((s) => ({ app: module.key, settingId: s.id.replaceAll("`", "") }))
+        );
         return settingsApp;
     }
 

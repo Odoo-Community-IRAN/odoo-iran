@@ -58,7 +58,7 @@
                     <separator string="Child transactions" invisible="not child_transaction_ids"/>
                     <field name="child_transaction_ids" invisible="not child_transaction_ids"/>
                     <group string="Message" invisible="not state_message">
-                        <field name="state_message" colspan="2" nolabel="1"/>
+                        <field name="state_message" nolabel="1"/>
                     </group>
                 </sheet>
             </form>
@@ -69,7 +69,7 @@
         <field name="name">payment.transaction.list</field>
         <field name="model">payment.transaction</field>
         <field name="arch" type="xml">
-            <tree string="Payment Transactions" create="false">
+            <list string="Payment Transactions" create="false">
                 <field name="reference"/>
                 <field name="create_date"/>
                 <field name="payment_method_id"/>
@@ -81,7 +81,7 @@
                 <field name="amount"/>
                 <field name="state"/>
                 <field name="company_id" groups="base.group_multi_company" optional="show"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -90,24 +90,14 @@
         <field name="model">payment.transaction</field>
         <field name="arch" type="xml">
             <kanban class="o_kanban_mobile" create="false">
+                <field name="currency_id"/>
                 <templates>
-                    <t t-name="kanban-box">
-                        <div t-attf-class="oe_kanban_content oe_kanban_global_click">
-                            <div class="row">
-                                <div class="col-6">
-                                    <strong><field name="reference"/></strong>
-                                </div>
-                                <div class="col-6">
-                                    <span><field name="partner_name"/></span>
-                                </div>
-                                <div class="col-6">
-                                    <span class="float-end">
-                                        <field name="amount"/>
-                                        <field name="currency_id" invisible="1"/>
-                                    </span>
-                                </div>
-                            </div>
+                    <t t-name="card">
+                        <div class="d-flex">
+                            <field name="reference" class="fw-bolder"/>
+                            <field name="amount" class="ms-auto"/>
                         </div>
+                        <field name="partner_name"/>
                     </t>
                 </templates>
             </kanban>
@@ -136,7 +126,7 @@
     <record id="action_payment_transaction" model="ir.actions.act_window">
         <field name="name">Payment Transactions</field>
         <field name="res_model">payment.transaction</field>
-        <field name="view_mode">tree,kanban,form</field>
+        <field name="view_mode">list,kanban,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_neutral_face">
                 There are no transactions to show
@@ -147,7 +137,7 @@
     <record id="action_payment_transaction_linked_to_token" model="ir.actions.act_window">
         <field name="name">Payment Transactions Linked To Token</field>
         <field name="res_model">payment.transaction</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
         <field name="domain">[('token_id','=', active_id)]</field>
         <field name="context">{'create': False}</field>
     </record>

@@ -34,6 +34,7 @@
                     <filter string="Archived" name="inactive" domain="[('active','=',False)]"/>
                     <group expand='0' string='Group by...'>
                         <filter string='Route' name="groupby_route" context="{'group_by': 'route_id'}"/>
+                        <filter string='Destination Location' name="groupby_location_dest" context="{'group_by': 'location_dest_id'}"/>
                         <filter string='Warehouse' name="groupby_warehouse" context="{'group_by': 'warehouse_id'}" groups="stock.group_stock_multi_warehouses"/>
                    </group>
                 </search>
@@ -42,16 +43,17 @@
 
         <!-- <Rules> -->
         <record id="view_stock_rule_tree" model="ir.ui.view">
-            <field name="name">stock.rule.tree</field>
+            <field name="name">stock.rule.list</field>
             <field name="model">stock.rule</field>
             <field name="arch" type="xml">
-                <tree string="Rules">
+                <list string="Rules">
                     <field name="action"/>
                     <field name="location_src_id" options="{'no_create': True}"/>
                     <field name="location_dest_id" options="{'no_create': True}"/>
                     <field name="route_id"/>
                     <field name="company_id" groups="base.group_multi_company"/>
-                </tree>
+                    <field name="name" optional="hide"/>
+                </list>
             </field>
         </record>
 
@@ -75,6 +77,7 @@
                                 <field name="picking_type_id"/>
                                 <field name="location_src_id" options="{'no_create': True}" required="action in ['pull', 'push', 'pull_push']"/>
                                 <field name="location_dest_id" options="{'no_create': True}"/>
+                                <field name="location_dest_from_rule" invisible="action not in ['pull', 'pull_push']" groups="base.group_no_one"/>
                                 <field name="auto" invisible="action not in ['push', 'pull_push']"/>
                                 <field name="procure_method" invisible="action not in ['pull', 'pull_push']"/>
                             </group>
@@ -95,11 +98,11 @@
                                 <field name="company_id" options="{'no_create': True}" required="action == 'push'" groups="base.group_multi_company"/>
                                 <field name="sequence" string="Sequence" groups="base.group_no_one"/>
                             </group>
-                            <group name="propagation_group" string="Propagation" invisible="action == 'push'" groups="base.group_no_one">
+                            <group name="propagation_group" string="Propagation">
                                 <field name="group_propagation_option"/>
                                 <field name="group_id" invisible="group_propagation_option != 'fixed'" required="group_propagation_option == 'fixed'"/>
-                                <field name="propagate_cancel"/>
-                                <field name="propagate_warehouse_id"/>
+                                <field name="propagate_cancel" invisible="action == 'push'"/>
+                                <field name="propagate_warehouse_id" invisible="action == 'push'"/>
                             </group>
                             <group string="Options" invisible="action not in ['pull', 'push', 'pull_push']">
                                 <field name="partner_address_id" invisible="action == 'push'"/>
@@ -107,6 +110,7 @@
                                 <div><field name="delay" class="oe_inline"/> days</div>
                             </group>
                         </group>
+                        <field name="push_domain" invisible="action not in ['push', 'pull_push']" widget="domain" options="{'model': 'stock.move'}"/>
                     </sheet>
                 </form>
             </field>
@@ -133,11 +137,14 @@
         <record id="action_rules_form" model="ir.actions.act_window">
             <field name="name">Rules</field>
             <field name="res_model">stock.rule</field>
-            <field name="view_mode">tree,form</field>
+            <field name="view_mode">list,form</field>
         </record>
 
         <menuitem action="action_rules_form" id="menu_action_rules_form"
-        parent="menu_warehouse_config" sequence="4" groups="stock.group_adv_location"/>
+        parent="menu_warehouse_config" sequence="5" groups="stock.group_adv_location"/>
 
+        <menuitem id="stock.menu_procurement_compute"
+        parent="menu_stock_warehouse_mgmt" sequence="135" groups="base.group_no_one"
+        action="ir_cron_scheduler_action_ir_actions_server"/>
     </data>
 </odoo>

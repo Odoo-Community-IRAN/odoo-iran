@@ -67,7 +67,7 @@ QUnit.module(
                 resModel: "note",
                 arch:
                     "<form>" +
-                    '<field name="body" widget="html" style="height: 100px"/>' +
+                    '<field name="body" widget="html_legacy" style="height: 100px"/>' +
                     "</form>",
                 resId: 1,
             });
@@ -91,9 +91,10 @@ QUnit.module(
             // Click on Insert button
             editor.document.querySelector(".o_dialog footer button.btn-primary").click();
             await nextTick();
+            editor.clean();
             assert.strictEqual(
                 editable.innerHTML,
-                `<p>\ufeff<a href="#" target="_blank" class="o_link_in_selection">\ufeff#\ufeff</a>\ufeff<br></p>`
+                `<p><a href="#" target="_blank">#</a><br></p>`
             );
         });
 
@@ -110,9 +111,10 @@ QUnit.module(
             // Click on Insert button
             editor.document.querySelector(".o_dialog footer button.btn-primary").click();
             await nextTick();
+            editor.clean();
             assert.strictEqual(
                 editable.innerHTML,
-                `<p>\ufeff<a href="#" target="_blank" class="o_link_in_selection">\ufeff#\ufeff</a>\ufeff<br></p>`
+                `<p><a href="#" target="_blank">#</a><br></p>`
             );
         });
 
@@ -133,9 +135,10 @@ QUnit.module(
                 // Click on Insert button
                 editor.document.querySelector(".o_dialog footer button.btn-primary").click();
                 await nextTick();
+                editor.clean();
                 assert.strictEqual(
                     editable.innerHTML,
-                    `<p>H\ufeff<a href="#" target="_blank" class="o_link_in_selection">\ufeffel\ufeff</a>\ufefflo</p>`
+                    `<p>H<a href="#" target="_blank">el</a>lo</p>`
                 );
             }
         );
@@ -185,9 +188,10 @@ QUnit.module(
             // Click on Insert button
             editor.document.querySelector(".o_dialog footer button.btn-primary").click();
             await nextTick();
+            editor.clean();
             assert.strictEqual(
                 editable.innerHTML,
-                `<p>\ufeff<a href="#" target="_blank" class="o_link_in_selection">\ufeffHello\ufeff</a>\ufeff</p>`
+                `<p><a href="#" target="_blank">Hello</a></p>`
             );
         });
 
@@ -205,9 +209,10 @@ QUnit.module(
             // Click on Insert button
             editor.document.querySelector(".o_dialog footer button.btn-primary").click();
             await nextTick();
+            editor.clean();
             assert.strictEqual(
                 editable.innerHTML,
-                `<p>H\ufeff<a href="#" target="_blank" class="o_link_in_selection">\ufeffel\ufeff</a>\ufefflo</p>`
+                `<p>H<a href="#" target="_blank">el</a>lo</p>`
             );
         });
 
@@ -227,9 +232,10 @@ QUnit.module(
             // Click on Insert button
             editor.document.querySelector(".o_dialog footer button.btn-primary").click();
             await nextTick();
+            editor.clean();
             assert.strictEqual(
                 editable.innerHTML,
-                `<p>\ufeff<a href="#" target="_blank" class="o_link_in_selection">\ufeff#\ufeff</a>\ufeff<br></p>`
+                `<p><a href="#" target="_blank">#</a><br></p>`
             );
         });
 
@@ -256,9 +262,10 @@ QUnit.module(
             // Click on Insert button
             editor.document.querySelector(".o_dialog footer button.btn-primary").click();
             await nextTick();
+            editor.clean();
             assert.strictEqual(
                 editable.innerHTML,
-                `<p>a \ufeff<a href="#" target="_blank" class="o_link_in_selection">\ufefflink\ufeff</a>\ufeff&nbsp;&nbsp;b</p>`
+                `<p>a <a href="#" target="_blank">link</a>&nbsp;&nbsp;b</p>`
             );
         });
 
@@ -279,12 +286,11 @@ QUnit.module(
                 // Click on Insert button
                 editor.document.querySelector(".o_dialog footer button.btn-primary").click();
                 await nextTick();
-                editor.document.getSelection().collapseToEnd();
                 insertText(editor, "D");
                 editor.clean();
                 assert.strictEqual(
                     editable.innerHTML,
-                    `<p>a<a href="#" target="_blank">#D</a>b</p>`
+                    `<p>a<a href="#" target="_blank">#</a>Db</p>`
                 );
             }
         );
@@ -307,13 +313,12 @@ QUnit.module(
                 // Click on Insert button
                 editor.document.querySelector(".o_dialog footer button.btn-primary").click();
                 await nextTick();
-                editor.document.getSelection().collapseToEnd();
                 insertText(editor, "E");
                 insertText(editor, "D");
                 editor.clean();
                 assert.strictEqual(
                     editable.innerHTML,
-                    `<p>a<a href="#" target="_blank">#ED</a>b</p>`
+                    `<p>a<a href="#" target="_blank">#</a>EDb</p>`
                 );
             }
         );
@@ -337,13 +342,12 @@ QUnit.module(
                 // Click on Insert button
                 editor.document.querySelector(".o_dialog footer button.btn-primary").click();
                 await nextTick();
-                editor.document.getSelection().collapseToEnd();
                 insertText(editor, "E");
                 await insertParagraphBreak(editor);
                 editor.clean();
                 assert.strictEqual(
                     editable.innerHTML,
-                    `<p>ab<a href="#" target="_blank">linkE</a></p><p><br></p>`
+                    `<p>ab<a href="#" target="_blank">link</a>E</p><p><br></p>`
                 );
             }
         );
@@ -368,14 +372,13 @@ QUnit.module(
                 // Click on Insert button
                 editor.document.querySelector(".o_dialog footer button.btn-primary").click();
                 await nextTick();
-                editor.document.getSelection().collapseToEnd();
                 insertText(editor, "E");
                 await insertParagraphBreak(editor);
                 insertText(editor, "D");
                 editor.clean();
                 assert.strictEqual(
                     editable.innerHTML,
-                    `<p>a<a href="#" target="_blank">linkE</a></p><p>Db</p>`
+                    `<p>a<a href="#" target="_blank">link</a>E</p><p>Db</p>`
                 );
             }
         );
@@ -400,13 +403,12 @@ QUnit.module(
                 // Click on Insert button
                 editor.document.querySelector(".o_dialog footer button.btn-primary").click();
                 await nextTick();
-                editor.document.getSelection().collapseToEnd();
                 insertText(editor, "E");
                 triggerEvent(node, "input", { inputType: "insertLineBreak" });
                 editor.clean();
                 assert.strictEqual(
                     editable.innerHTML,
-                    `<p>a<a href="#" target="_blank">linkE</a><br>b</p>`
+                    `<p>a<a href="#" target="_blank">link</a>E<br>b</p>`
                 );
             }
         );
@@ -431,14 +433,13 @@ QUnit.module(
                 // Click on Insert button
                 editor.document.querySelector(".o_dialog footer button.btn-primary").click();
                 await nextTick();
-                editor.document.getSelection().collapseToEnd();
                 insertText(editor, "E");
                 triggerEvent(node, "input", { inputType: "insertLineBreak" });
                 insertText(editor, "D");
                 editor.clean();
                 assert.strictEqual(
                     editable.innerHTML,
-                    `<p>a<a href="#" target="_blank">linkE</a><br>Db</p>`
+                    `<p>a<a href="#" target="_blank">link</a>E<br>Db</p>`
                 );
             }
         );

@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { browser } from "@web/core/browser/browser";
 import { isVisible } from "@web/core/utils/ui";
 import { Mutex } from "@web/core/utils/concurrency";
@@ -11,6 +9,10 @@ import { Mutex } from "@web/core/utils/concurrency";
  * - Current step index won't be incremented.
  * @property {string | (el: Element, step: MacroStep) => undefined | string} [action]
  * @property {*} [*] - any payload to the step.
+ *
+ * @typedef MacroDescriptor
+ * @property {() => Element | undefined} trigger
+ * @property {() => {}} action
  */
 
 export const ACTION_HELPERS = {
@@ -168,33 +170,7 @@ export class MacroEngine {
         this.target = params.target || document.body;
         this.defaultCheckDelay = params.defaultCheckDelay ?? 750;
         this.macros = new Set();
-        this.observerOptions = {
-            attributes: true,
-            childList: true,
-            subtree: true,
-            characterData: true,
-        };
-        this.observer = new MutationObserver(this.delayedCheck.bind(this));
-        this.iframeObserver = new MutationObserver(() => {
-            const iframeEl = document.querySelector("iframe.o_iframe");
-            if (iframeEl) {
-                iframeEl.addEventListener("load", () => {
-                    if (iframeEl.contentDocument) {
-                        this.observer.observe(iframeEl.contentDocument, this.observerOptions);
-                    }
-                });
-                // If the iframe was added without a src, its load event was immediately fired and
-                // will not fire again unless another src is set. Unfortunately, the case of this
-                // happening and the iframe content being altered programmaticaly may happen.
-                // (E.g. at the moment this was written, the mass mailing editor iframe is added
-                // without src and its content rewritten immediately afterwards).
-                if (!iframeEl.src) {
-                    if (iframeEl.contentDocument) {
-                        this.observer.observe(iframeEl.contentDocument, this.observerOptions);
-                    }
-                }
-            }
-        });
+        this.macroMutationObserver = new MacroMutationObserver(() => this.delayedCheck());
     }
 
     async activate(descr, exclusive = false) {
@@ -217,8 +193,7 @@ export class MacroEngine {
     start() {
         if (!this.isRunning) {
             this.isRunning = true;
-            this.observer.observe(this.target, this.observerOptions);
-            this.iframeObserver.observe(this.target, { childList: true, subtree: true });
+            this.macroMutationObserver.observe(this.target);
         }
         this.delayedCheck();
     }
@@ -228,8 +203,7 @@ export class MacroEngine {
             this.isRunning = false;
             browser.clearTimeout(this.timeout);
             this.timeout = null;
-            this.observer.disconnect();
-            this.iframeObserver.disconnect();
+            this.macroMutationObserver.disconnect();
         }
     }
 
@@ -263,5 +237,82 @@ export class MacroEngine {
         if (this.macros.size === 0) {
             this.stop();
         }
+    }
+}
+
+export class MacroMutationObserver {
+    observerOptions = {
+        attributes: true,
+        childList: true,
+        subtree: true,
+        characterData: true,
+    };
+    constructor(callback) {
+        this.callback = callback;
+        this.observer = new MutationObserver((mutationList, observer) => {
+            callback();
+            mutationList.forEach((mutationRecord) =>
+                Array.from(mutationRecord.addedNodes).forEach((node) => {
+                    let iframes = [];
+                    if (String(node.tagName).toLowerCase() === "iframe") {
+                        iframes = [node];
+                    } else if (node instanceof HTMLElement) {
+                        iframes = Array.from(node.querySelectorAll("iframe"));
+                    }
+                    iframes.forEach((iframeEl) =>
+                        this.observeIframe(iframeEl, observer, () => callback())
+                    );
+                    this.findAllShadowRoots(node).forEach((shadowRoot) =>
+                        observer.observe(shadowRoot, this.observerOptions)
+                    );
+                })
+            );
+        });
+    }
+    disconnect() {
+        this.observer.disconnect();
+    }
+    findAllShadowRoots(node, shadowRoots = []) {
+        if (node.shadowRoot) {
+            shadowRoots.push(node.shadowRoot);
+            this.findAllShadowRoots(node.shadowRoot, shadowRoots);
+        }
+        node.childNodes.forEach((child) => {
+            this.findAllShadowRoots(child, shadowRoots);
+        });
+        return shadowRoots;
+    }
+    observe(target) {
+        this.observer.observe(target, this.observerOptions);
+        //When iframes already exist at "this.target" initialization
+        target
+            .querySelectorAll("iframe")
+            .forEach((el) => this.observeIframe(el, this.observer, () => this.callback()));
+        //When shadowDom already exist at "this.target" initialization
+        this.findAllShadowRoots(target).forEach((shadowRoot) => {
+            this.observer.observe(shadowRoot, this.observerOptions);
+        });
+    }
+    observeIframe(iframeEl, observer, callback) {
+        const observerOptions = {
+            attributes: true,
+            childList: true,
+            subtree: true,
+            characterData: true,
+        };
+        const observeIframeContent = () => {
+            if (iframeEl.contentDocument) {
+                iframeEl.contentDocument.addEventListener("load", (event) => {
+                    callback();
+                    observer.observe(event.target, observerOptions);
+                });
+                if (!iframeEl.src || iframeEl.contentDocument.readyState === "complete") {
+                    callback();
+                    observer.observe(iframeEl.contentDocument, observerOptions);
+                }
+            }
+        };
+        observeIframeContent();
+        iframeEl.addEventListener("load", observeIframeContent);
     }
 }

@@ -1,19 +1,19 @@
-.o_kanban_dashboard.o_account_kanban .o_kanban_renderer {
+.o_account_kanban .o_kanban_renderer {
+    --KanbanRecord-padding-v: #{$o-kanban-dashboard-vpadding};
+    --KanbanRecord-padding-h: #{$o-kanban-dashboard-hpadding};
+
     .o_kanban_record {
 
+        &:not(.o_kanban_ghost) {
+            min-height: 150px;
+        }
+
         @include media-breakpoint-up(sm) {
-            .oe_kanban_action_button {
+            button.oe_kanban_action {
                 margin-bottom: 5px;
             }
         }
 
-        .o_kanban_card_settings {
-            padding-top: $o-horizontal-padding/2;
-            padding-bottom: $o-horizontal-padding/2;
-
-            border-top: 1px solid;
-            border-color: $o-brand-lightsecondary;
-        }
         .o_dashboard_star {
             font-size: 12px;
 
@@ -38,8 +38,17 @@
     }
 
     &.o_kanban_ungrouped {
-        .o_kanban_record {
-            width: 450px;
+        @include media-breakpoint-down(lg) {
+            --KanbanRecord-width: 100vw;
+        }
+        @include media-breakpoint-up(lg) {
+            --KanbanRecord-width: 47vw;
+        }
+        &:has(> .o_kanban_record:nth-child(12)) {
+            // 3 cards per row for large screens if there are more than 5 cards (+ 6 ghost cards)
+            @include media-breakpoint-up(xxl, $o-extra-grid-breakpoints) {
+                --KanbanRecord-width: 31vw;
+            }
         }
     }
 
@@ -56,7 +65,7 @@
     margin: 16px -16px;
 
     canvas {
-        height: 75px;
+        height: 150px;
     }
 
 }

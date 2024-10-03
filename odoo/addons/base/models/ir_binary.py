@@ -21,7 +21,7 @@ class IrBinary(models.AbstractModel):
 
     def _find_record(
             self, xmlid=None, res_model='ir.attachment', res_id=None,
-            access_token=None,
+            access_token=None, field=None
     ):
         """
         Find and return a record either using an xmlid either a model+id
@@ -46,15 +46,14 @@ class IrBinary(models.AbstractModel):
         if not record:
             raise MissingError(f"No record found for xmlid={xmlid}, res_model={res_model}, id={res_id}")
 
-        record = self._find_record_check_access(record, access_token)
+        record = self._find_record_check_access(record, access_token, field)
         return record
 
-    def _find_record_check_access(self, record, access_token):
+    def _find_record_check_access(self, record, access_token, field):
         if record._name == 'ir.attachment':
             return record.validate_access(access_token)
 
-        record.check_access_rights('read')
-        record.check_access_rule('read')
+        record.check_access('read')
         return record
 
     def _record_to_stream(self, record, field_name):
@@ -70,7 +69,7 @@ class IrBinary(models.AbstractModel):
         :rtype: odoo.http.Stream
         """
         if record._name == 'ir.attachment' and field_name in ('raw', 'datas', 'db_datas'):
-            return Stream.from_attachment(record)
+            return record._to_http_stream()
 
         record.check_field_access_rights('read', [field_name])
         field_def = record._fields[field_name]
@@ -87,7 +86,7 @@ class IrBinary(models.AbstractModel):
             limit=1)
         if not field_attachment:
             raise MissingError("The related attachment does not exist.")
-        return Stream.from_attachment(field_attachment)
+        return field_attachment._to_http_stream()
 
     def _get_stream_from(
         self, record, field_name='raw', filename=None, filename_field='name',

@@ -1,7 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo import api, fields, models
-from odoo.tools import str2bool
+from odoo.tools import format_date, str2bool
 
 from odoo.addons.payment import utils as payment_utils
 
@@ -17,6 +17,9 @@ class AccountMove(models.Model):
         string="Authorized Transactions", comodel_name='payment.transaction',
         compute='_compute_authorized_transaction_ids', readonly=True, copy=False,
         compute_sudo=True)
+    transaction_count = fields.Integer(
+        string="Transaction Count", compute='_compute_transaction_count'
+    )
     amount_paid = fields.Monetary(
         string="Amount paid",
         compute='_compute_amount_paid'
@@ -28,6 +31,11 @@ class AccountMove(models.Model):
             invoice.authorized_transaction_ids = invoice.transaction_ids.filtered(
                 lambda tx: tx.state == 'authorized'
             )
+
+    @api.depends('transaction_ids')
+    def _compute_transaction_count(self):
+        for invoice in self:
+            invoice.transaction_count = len(invoice.transaction_ids)
 
     @api.depends('transaction_ids')
     def _compute_amount_paid(self):
@@ -54,7 +62,8 @@ class AccountMove(models.Model):
         return enabled_feature and bool(
             (self.amount_residual or not transactions)
             and self.state == 'posted'
-            and self.payment_state in ('not_paid', 'partial')
+            and self.payment_state in ('not_paid', 'in_payment', 'partial')
+            and not self.currency_id.is_zero(self.amount_residual)
             and self.amount_total
             and self.move_type == 'out_invoice'
             and not pending_transactions
@@ -92,10 +101,34 @@ class AccountMove(models.Model):
         return action
 
     def _get_default_payment_link_values(self):
-        self.ensure_one()
+        next_payment_values = self._get_invoice_next_payment_values()
+        amount_max = next_payment_values['amount_due']
+        additional_info = {}
+        open_installments = []
+        if next_payment_values['installment_state'] in ('next', 'overdue'):
+            open_installments = []
+            for installment in next_payment_values['not_reconciled_installments']:
+                data = {
+                    'type': installment['type'],
+                    'number': installment['number'],
+                    'amount': installment['amount_residual_currency_unsigned'],
+                    'date_maturity': format_date(self.env, installment['date_maturity']),
+                }
+                open_installments.append(data)
+
+        elif next_payment_values['installment_state'] == 'epd':
+            amount_max = next_payment_values['next_amount_to_pay']  # with epd, next_amount_to_pay is the invoice amount residual
+            additional_info.update({
+                'has_eligible_epd': True,
+                'discount_date': next_payment_values['discount_date']
+            })
+
         return {
-            'amount': self.amount_residual,
             'currency_id': self.currency_id.id,
             'partner_id': self.partner_id.id,
-            'amount_max': self.amount_residual,
+            'open_installments': open_installments,
+            'installment_state': next_payment_values['installment_state'],
+            'amount': next_payment_values['next_amount_to_pay'],
+            'amount_max': amount_max,
+            **additional_info
         }

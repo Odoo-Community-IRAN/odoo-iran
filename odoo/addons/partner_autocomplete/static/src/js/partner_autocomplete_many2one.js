@@ -19,8 +19,7 @@ export class PartnerMany2XAutocomplete extends Many2XAutocomplete {
 
     get sources() {
         const sources = super.sources;
-        if (!this.props.canCreate)
-        {
+        if (!this.props.canCreate) {
             return sources;
         }
         return sources.concat(
@@ -73,17 +72,20 @@ PartnerMany2XAutocomplete.props = {
 }
 
 export class PartnerAutoCompleteMany2one extends Many2OneField {
+    static components = {
+        ...Many2OneField.components,
+        Many2XAutocomplete: PartnerMany2XAutocomplete,
+    };
+    static props = {
+        ...Many2OneField.props,
+        canCreate: this.props.canCreate,
+    };
     get Many2XAutocompleteProps() {
         return {
             ...super.Many2XAutocompleteProps,
             canCreate: this.props.canCreate,
         };
     }
-}
-
-PartnerAutoCompleteMany2one.components = {
-    ...Many2OneField.components,
-    Many2XAutocomplete: PartnerMany2XAutocomplete,
 }
 
 export const partnerAutoCompleteMany2one = {

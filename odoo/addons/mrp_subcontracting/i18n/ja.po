@@ -3,23 +3,33 @@
 # 	* mrp_subcontracting
 # 
 # Translators:
-# Ryoko Tsuda <ryoko@quartile.co>, 2023
 # Wil Odoo, 2024
-# Junko Augias, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-08-13 10:27+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Junko Augias, 2024\n"
+"POT-Creation-Date: 2024-09-26 08:55+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Japanese (https://app.transifex.com/odoo/teams/41243/ja/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: \n"
 "Language: ja\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
+
+#. module: mrp_subcontracting
+#. odoo-python
+#: code:addons/mrp_subcontracting/models/stock_warehouse.py:0
+msgid "%(name)s Sequence Resupply Subcontractor"
+msgstr ""
+
+#. module: mrp_subcontracting
+#. odoo-python
+#: code:addons/mrp_subcontracting/models/stock_warehouse.py:0
+msgid "%(name)s Sequence subcontracting"
+msgstr ""
 
 #. module: mrp_subcontracting
 #: model_terms:ir.ui.view,arch_db:mrp_subcontracting.subcontracting_portal
@@ -29,7 +39,6 @@ msgstr "/my/productions"
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/controllers/portal.py:0
-#, python-format
 msgid "All"
 msgstr "全て"
 
@@ -58,11 +67,6 @@ msgstr "取引先が外注先の一つである部品表"
 #: model:ir.model.fields,field_description:mrp_subcontracting.field_mrp_production__bom_product_ids
 msgid "Bom Product"
 msgstr "部品表プロダクト"
-
-#. module: mrp_subcontracting
-#: model_terms:ir.ui.view,arch_db:mrp_subcontracting.mrp_subcontracting_product_template_search_view
-msgid "Can be Subcontracted"
-msgstr "外注可"
 
 #. module: mrp_subcontracting
 #: model:ir.model,name:mrp_subcontracting.model_change_production_qty
@@ -144,7 +148,6 @@ msgstr "アクション記録構成品を表示"
 #. odoo-python
 #: code:addons/mrp_subcontracting/controllers/portal.py:0
 #: model_terms:ir.ui.view,arch_db:mrp_subcontracting.subcontracting_portal_production_form_view
-#, python-format
 msgid "Done"
 msgstr "完了"
 
@@ -171,7 +174,6 @@ msgstr "非表示"
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/models/stock_location.py:0
-#, python-format
 msgid ""
 "In order to manage stock accurately, subcontracting locations must be type "
 "Internal, linked to the appropriate company."
@@ -205,13 +207,6 @@ msgid ""
 msgstr "部品表に使用され、外注先ポータルビューのプロダクト表をフィルタするのに使用されるプロダクト表"
 
 #. module: mrp_subcontracting
-#. odoo-python
-#: code:addons/mrp_subcontracting/models/stock_picking.py:0
-#, python-format
-msgid "Locations to update"
-msgstr "未更新ロケーション"
-
-#. module: mrp_subcontracting
 #: model:ir.model.fields,field_description:mrp_subcontracting.field_res_partner__production_ids
 #: model:ir.model.fields,field_description:mrp_subcontracting.field_res_users__production_ids
 msgid "MRP Productions for which the Partner is the subcontractor"
@@ -220,7 +215,6 @@ msgstr "取引先が外注先であるMRP製造"
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/models/stock_move_line.py:0
-#, python-format
 msgid ""
 "Make sure you validate or adapt the related resupply picking to your "
 "subcontractor in order to avoid inconsistencies in your stock."
@@ -230,6 +224,11 @@ msgstr "在庫の不一致を避けるために、関連する補充のピッキ
 #: model:ir.model.fields.selection,name:mrp_subcontracting.selection__stock_picking__display_action_record_components__mandatory
 msgid "Mandatory"
 msgstr "必須"
+
+#. module: mrp_subcontracting
+#: model:ir.model,name:mrp_subcontracting.model_mrp_production
+msgid "Manufacturing Order"
+msgstr "製造オーダ"
 
 #. module: mrp_subcontracting
 #: model_terms:ir.ui.view,arch_db:mrp_subcontracting.portal_my_home_productions
@@ -245,28 +244,24 @@ msgstr "製造リファレンス"
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/controllers/portal.py:0
-#, python-format
 msgid "Name"
 msgstr "名称"
 
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/controllers/portal.py:0
-#, python-format
 msgid "Newest"
 msgstr "最新"
 
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/models/stock_picking.py:0
-#, python-format
 msgid "Nothing to record"
 msgstr "記録対象なし"
 
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/models/stock_quant.py:0
-#, python-format
 msgid "Operation not supported"
 msgstr "操作はサポートされていません"
 
@@ -278,7 +273,7 @@ msgstr "オペレーション"
 #. module: mrp_subcontracting
 #: model:ir.model.fields,field_description:mrp_subcontracting.field_stock_picking__move_line_ids_without_package
 msgid "Operations without package"
-msgstr "梱包なしの操作"
+msgstr "パッケージなしの操作"
 
 #. module: mrp_subcontracting
 #: model_terms:ir.ui.view,arch_db:mrp_subcontracting.portal_my_productions
@@ -288,7 +283,6 @@ msgstr "オーダ"
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/models/stock_move.py:0
-#, python-format
 msgid ""
 "Portal users cannot create a stock move with a state 'Done' or change the "
 "current state to 'Done'."
@@ -300,19 +294,14 @@ msgid "Product Moves (Stock Move Line)"
 msgstr "プロダクトの移動(在庫移動ライン)"
 
 #. module: mrp_subcontracting
-#: model:ir.model,name:mrp_subcontracting.model_product_replenish
-msgid "Product Replenish"
-msgstr "プロダクト補充"
+#: model:ir.model,name:mrp_subcontracting.model_stock_replenish_mixin
+msgid "Product Replenish Mixin"
+msgstr "プロダクト補充Mixin"
 
 #. module: mrp_subcontracting
 #: model:ir.model,name:mrp_subcontracting.model_product_product
 msgid "Product Variant"
 msgstr "プロダクトバリアント"
-
-#. module: mrp_subcontracting
-#: model:ir.model,name:mrp_subcontracting.model_mrp_production
-msgid "Production Order"
-msgstr "製造オーダ"
 
 #. module: mrp_subcontracting
 #: model_terms:ir.ui.view,arch_db:mrp_subcontracting.portal_my_home_menu_production
@@ -328,14 +317,12 @@ msgstr "保管ロット"
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/models/stock_move.py:0
-#, python-format
 msgid "Raw Materials for %s"
 msgstr "%s用原材料"
 
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/controllers/portal.py:0
-#, python-format
 msgid "Ready"
 msgstr "準備完了"
 
@@ -357,26 +344,21 @@ msgstr "外注加工品に構成品を登録"
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/models/stock_warehouse.py:0
-#, python-format
 msgid "Replenish on Order (MTO)"
 msgstr "オーダ基準補充(MTO)"
 
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/models/stock_warehouse.py:0
-#: code:addons/mrp_subcontracting/models/stock_warehouse.py:0
 #: model:ir.model.fields,field_description:mrp_subcontracting.field_stock_warehouse__subcontracting_route_id
-#, python-format
 msgid "Resupply Subcontractor"
 msgstr "外注先在庫補充"
 
 #. module: mrp_subcontracting
 #. odoo-python
+#: code:addons/mrp_subcontracting/models/stock_replenish_mixin.py:0
 #: code:addons/mrp_subcontracting/models/stock_warehouse.py:0
-#: code:addons/mrp_subcontracting/models/stock_warehouse.py:0
-#: code:addons/mrp_subcontracting/wizard/product_replenish.py:0
 #: model:stock.route,name:mrp_subcontracting.route_resupply_subcontractor_mto
-#, python-format
 msgid "Resupply Subcontractor on Order"
 msgstr "オーダ基準外注先在庫補充"
 
@@ -391,23 +373,14 @@ msgid "Return Picking"
 msgstr "ピッキングの戻し"
 
 #. module: mrp_subcontracting
+#: model:ir.model,name:mrp_subcontracting.model_stock_return_picking_line
+msgid "Return Picking Line"
+msgstr "ピッキングラインを返す"
+
+#. module: mrp_subcontracting
 #: model_terms:ir.ui.view,arch_db:mrp_subcontracting.portal_my_productions
 msgid "Scheduled Date"
 msgstr "計画日"
-
-#. module: mrp_subcontracting
-#. odoo-python
-#: code:addons/mrp_subcontracting/models/stock_warehouse.py:0
-#, python-format
-msgid "Sequence Resupply Subcontractor"
-msgstr "外注先在庫補充付番"
-
-#. module: mrp_subcontracting
-#. odoo-python
-#: code:addons/mrp_subcontracting/models/stock_warehouse.py:0
-#, python-format
-msgid "Sequence subcontracting"
-msgstr "外注付番"
 
 #. module: mrp_subcontracting
 #: model:ir.model.fields,field_description:mrp_subcontracting.field_stock_move__show_subcontracting_details_visible
@@ -443,14 +416,8 @@ msgstr "在庫規則"
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/models/stock_move.py:0
-#, python-format
 msgid "Subcontract"
 msgstr "外注"
-
-#. module: mrp_subcontracting
-#: model:ir.model.fields,field_description:mrp_subcontracting.field_stock_return_picking__subcontract_location_id
-msgid "Subcontract Location"
-msgstr "外注ロケーション"
 
 #. module: mrp_subcontracting
 #: model:ir.model.fields,field_description:mrp_subcontracting.field_product_supplierinfo__is_subcontractor
@@ -460,7 +427,6 @@ msgstr "外注"
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/models/mrp_production.py:0
-#, python-format
 msgid "Subcontracted manufacturing orders cannot be merged."
 msgstr "外注製造オーダはマージできません。"
 
@@ -469,7 +435,6 @@ msgstr "外注製造オーダはマージできません。"
 #: code:addons/mrp_subcontracting/models/stock_warehouse.py:0
 #: model:ir.model.fields.selection,name:mrp_subcontracting.selection__mrp_bom__type__subcontract
 #: model_terms:ir.ui.view,arch_db:mrp_subcontracting.stock_picking_form_view
-#, python-format
 msgid "Subcontracting"
 msgstr "外注"
 
@@ -477,7 +442,6 @@ msgstr "外注"
 #. odoo-python
 #: code:addons/mrp_subcontracting/models/res_company.py:0
 #: model:ir.model.fields,field_description:mrp_subcontracting.field_res_company__subcontracting_location_id
-#, python-format
 msgid "Subcontracting Location"
 msgstr "外注ロケーション"
 
@@ -514,14 +478,12 @@ msgstr "外注補充オペレーションタイプ"
 #. module: mrp_subcontracting
 #. odoo-javascript
 #: code:addons/mrp_subcontracting/static/src/components/bom_overview_special_line/mrp_bom_overview_special_line.xml:0
-#, python-format
 msgid "Subcontracting:"
 msgstr "外注："
 
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/report/mrp_report_bom_structure.py:0
-#, python-format
 msgid "Subcontracting: %s"
 msgstr "外注：%s"
 
@@ -548,7 +510,7 @@ msgstr "外注先"
 #. module: mrp_subcontracting
 #: model:ir.model,name:mrp_subcontracting.model_product_supplierinfo
 msgid "Supplier Pricelist"
-msgstr "サプライヤ価格リスト"
+msgstr "仕入先価格表"
 
 #. module: mrp_subcontracting
 #: model:ir.model.fields,field_description:mrp_subcontracting.field_stock_move__is_subcontract
@@ -571,7 +533,6 @@ msgstr "現在、アカウントにプロダクトはありません。"
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/models/stock_picking.py:0
-#, python-format
 msgid ""
 "There shouldn't be multiple productions to record for the same subcontracted"
 " move."
@@ -580,7 +541,6 @@ msgstr "同じ外注移動用に記録される複数の製造が存在しては
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/models/mrp_production.py:0
-#, python-format
 msgid "This MO isn't related to a subcontracted move"
 msgstr "この製造オーダは外注移動に関連していません。"
 
@@ -593,7 +553,7 @@ msgstr "消費済合計"
 #: model:ir.model,name:mrp_subcontracting.model_stock_picking
 #: model:ir.model.fields,field_description:mrp_subcontracting.field_mrp_production__incoming_picking
 msgid "Transfer"
-msgstr "移動"
+msgstr "転送"
 
 #. module: mrp_subcontracting
 #: model:ir.model.fields,help:mrp_subcontracting.field_mrp_production__subcontractor_id
@@ -615,7 +575,6 @@ msgstr "警告/厳密で消費され、より多くの構成品が製造オー�
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/models/mrp_bom.py:0
-#, python-format
 msgid ""
 "You can not set a Bill of Material with operations or by-product line as "
 "subcontracting."
@@ -624,42 +583,30 @@ msgstr "工程や副産品明細のある部品表を外注として設定する
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/models/stock_location.py:0
-#, python-format
 msgid "You cannot alter the company's subcontracting location"
 msgstr "会社の外注ロケーションを変更することはできません。"
 
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/models/mrp_production.py:0
-#, python-format
 msgid "You cannot write on fields %s in mrp.production."
 msgstr "%s mrp.production内のフィールドに入力することはできません。"
 
 #. module: mrp_subcontracting
 #. odoo-python
-#: code:addons/mrp_subcontracting/models/stock_picking.py:0
-#, python-format
-msgid "You might want to update the locations of this transfer's operations"
-msgstr "この転送のオペレーション場所を更新した方が良いかもしれません。"
-
-#. module: mrp_subcontracting
-#. odoo-python
 #: code:addons/mrp_subcontracting/models/mrp_production.py:0
-#, python-format
 msgid "You must enter a serial number for %s"
 msgstr "%s用のシリアル番号を入力する必要があります。"
 
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/models/mrp_production.py:0
-#, python-format
 msgid "You must enter a serial number for each line of %s"
 msgstr " %sの各明細用にシリアル番号を入力する必要があります。"
 
 #. module: mrp_subcontracting
 #. odoo-python
 #: code:addons/mrp_subcontracting/models/mrp_production.py:0
-#, python-format
 msgid ""
 "You must indicate a non-zero amount consumed for at least one of your "
 "components"

@@ -142,16 +142,17 @@ class OAuthController(http.Controller):
             action = state.get('a')
             menu = state.get('m')
             redirect = werkzeug.urls.url_unquote_plus(state['r']) if state.get('r') else False
-            url = '/web'
+            url = '/odoo'
             if redirect:
                 url = redirect
             elif action:
-                url = '/web#action=%s' % action
+                url = '/odoo/action-%s' % action
             elif menu:
-                url = '/web#menu_id=%s' % menu
+                url = '/odoo?menu_id=%s' % menu
 
-            pre_uid = request.session.authenticate(dbname, login, key)
-            resp = request.redirect(_get_login_redirect_url(pre_uid, url), 303)
+            credential = {'login': login, 'password': key, 'type': 'password'}
+            auth_info = request.session.authenticate(dbname, credential)
+            resp = request.redirect(_get_login_redirect_url(auth_info['uid'], url), 303)
             resp.autocorrect_location_header = False
 
             # Since /web is hardcoded, verify user has right to land on it

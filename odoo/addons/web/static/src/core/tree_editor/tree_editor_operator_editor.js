@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
 import {
     formatValue,
@@ -36,8 +34,29 @@ const OPERATOR_DESCRIPTIONS = {
     set: _t("is set"),
     not_set: _t("is not set"),
 
+    starts_with: _t("starts with"),
+    ends_with: _t("ends with"),
+
     // virtual operator (equivalent to a couple (>=,<=))
     between: _t("is between"),
+    within: _t("is within"),
+
+    any: (fieldDefType) => {
+        switch (fieldDefType) {
+            case "many2one":
+                return _t("matches");
+            default:
+                return _t("match");
+        }
+    },
+    "not any": (fieldDefType) => {
+        switch (fieldDefType) {
+            case "many2one":
+                return _t("matches none of");
+            default:
+                return _t("match none of");
+        }
+    },
 };
 
 function toKey(operator, negate = false) {
@@ -56,13 +75,24 @@ function toOperator(key) {
     return [toValue(parseExpr(expr)), negate];
 }
 
-export function getOperatorLabel(operator, negate = false) {
+function getOperatorDescription(operator, fieldDefType) {
+    const description = OPERATOR_DESCRIPTIONS[operator];
+    if (
+        typeof description === "function" &&
+        description.constructor?.name !== "LazyTranslatedString"
+    ) {
+        return description(fieldDefType);
+    }
+    return description;
+}
+
+export function getOperatorLabel(operator, fieldDefType, negate = false) {
     let label;
     if (typeof operator === "string" && operator in OPERATOR_DESCRIPTIONS) {
         if (negate && operator in TERM_OPERATORS_NEGATION) {
-            return OPERATOR_DESCRIPTIONS[TERM_OPERATORS_NEGATION[operator]];
+            return getOperatorDescription(TERM_OPERATORS_NEGATION[operator], fieldDefType);
         }
-        label = OPERATOR_DESCRIPTIONS[operator];
+        label = getOperatorDescription(operator, fieldDefType);
     } else {
         label = formatValue(operator);
     }
@@ -72,19 +102,19 @@ export function getOperatorLabel(operator, negate = false) {
     return label;
 }
 
-function getOperatorInfo(operator, negate = false) {
+function getOperatorInfo(operator, fieldDefType, negate = false) {
     const key = toKey(operator, negate);
-    const label = getOperatorLabel(operator, negate);
+    const label = getOperatorLabel(operator, fieldDefType, negate);
     return [key, label];
 }
 
-export function getOperatorEditorInfo(operators) {
+export function getOperatorEditorInfo(operators, fieldDef) {
     const defaultOperator = operators[0];
-    const operatorsInfo = operators.map((operator) => getOperatorInfo(operator));
+    const operatorsInfo = operators.map((operator) => getOperatorInfo(operator, fieldDef?.type));
     return {
         component: Select,
         extractProps: ({ update, value: [operator, negate] }) => {
-            const [operatorKey, operatorLabel] = getOperatorInfo(operator, negate);
+            const [operatorKey, operatorLabel] = getOperatorInfo(operator, fieldDef?.type, negate);
             const options = [...operatorsInfo];
             if (!options.some(([key]) => key === operatorKey)) {
                 options.push([operatorKey, operatorLabel]);

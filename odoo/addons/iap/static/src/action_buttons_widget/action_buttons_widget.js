@@ -6,6 +6,13 @@ import { standardWidgetProps } from "@web/views/widgets/standard_widget_props";
 import { Component } from "@odoo/owl";
 
 class IAPActionButtonsWidget extends Component {
+    static template = "iap.ActionButtonsWidget";
+    static props = {
+        ...standardWidgetProps,
+        serviceName: String,
+        showServiceButtons: Boolean,
+    };
+
     setup() {
         this.orm = useService("orm");
         this.action = useService("action");
@@ -15,20 +22,16 @@ class IAPActionButtonsWidget extends Component {
         this.action.doAction("iap.iap_account_action");
     }
 
-    async onBuyLinkClicked() {
-        const url = await this.orm.silent.call("iap.account", "get_credits_url", [this.props.serviceName]);
+    async onManageServiceLinkClicked() {
+        const account_id = await this.orm.silent.call("iap.account", "get_account_id", [this.props.serviceName]);
         this.action.doAction({
-            type: "ir.actions.act_url",
-            url: url,
+            type: "ir.actions.act_window",
+            res_model: "iap.account",
+            res_id: account_id,
+            views: [[false, "form"]],
         });
     }
 }
-IAPActionButtonsWidget.template = "iap.ActionButtonsWidget";
-IAPActionButtonsWidget.props = {
-    ...standardWidgetProps,
-    serviceName: String,
-    showServiceButtons: Boolean,
-};
 
 export const iapActionButtonsWidget = {
     component: IAPActionButtonsWidget,

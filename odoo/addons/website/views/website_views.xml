@@ -6,7 +6,7 @@
         <record id="action_website_add_features" model="ir.actions.act_window">
             <field name="name">Apps</field>
             <field name="res_model">ir.module.module</field>
-            <field name="view_mode">kanban,tree,form</field>
+            <field name="view_mode">kanban,list,form</field>
             <field name="domain">['!', ('name', '=like', 'theme_%')]</field>
             <field name="context" eval="{'search_default_category_id': ref('base.module_category_website_website'), 'searchpanel_default_category_id': ref('base.module_category_website')}"/>
         </record>
@@ -66,24 +66,24 @@
         </record>
 
         <record id="view_website_tree" model="ir.ui.view">
-            <field name="name">website.tree</field>
+            <field name="name">website.list</field>
             <field name="model">website</field>
             <field name="arch" type="xml">
-                <tree string="Websites" duplicate="0">
+                <list string="Websites" duplicate="0">
                     <field name="sequence" widget="handle"/>
                     <field name="name"/>
                     <field name="domain"/>
                     <field name="company_id" groups="base.group_multi_company"/>
                     <field name="default_lang_id"/>
                     <field name="theme_id" groups="base.group_no_one"/>
-                </tree>
+                </list>
             </field>
         </record>
 
         <record id="action_website_list" model="ir.actions.act_window">
             <field name="name">Websites</field>
             <field name="res_model">website</field>
-            <field name="view_mode">tree,form</field>
+            <field name="view_mode">list,form</field>
             <field name="view_id" ref="view_website_tree"/>
             <field name="target">current</field>
         </record>
@@ -111,15 +111,19 @@
                             </group>
                             <group>
                                 <field name="parent_id" context="{'display_website': True}"/>
+                                <div colspan="2" class="oe_edit_only alert alert-info" role="alert">
+                                    Note that the "Website / Editor and Designer" group is implicitly added when saving if any group is specified.
+                                </div>
+                                <field name="group_ids"/>
                             </group>
                         </group>
                         <label for="child_id" string="Child Menus"/>
                         <field name="child_id">
-                            <tree>
+                            <list>
                                 <field name="sequence" widget="handle"/>
                                 <field name="name"/>
                                 <field name="url"/>
-                            </tree>
+                            </list>
                         </field>
                     </sheet>
                 </form>
@@ -127,10 +131,10 @@
         </record>
 
         <record id="menu_tree" model="ir.ui.view">
-            <field name="name">website.menu.tree</field>
+            <field name="name">website.menu.list</field>
             <field name="model">website.menu</field>
             <field name="arch" type="xml">
-                <tree string="Website menu">
+                <list string="Website menu">
                     <field name="sequence" widget="handle"/>
                     <field name="website_id" options="{'no_create': True}" groups="website.group_multi_website"/>
                     <field name="name"/>
@@ -138,7 +142,8 @@
                     <field name="is_mega_menu"/>
                     <field name="new_window"/>
                     <field name="parent_id" context="{'display_website': True}"/>
-                </tree>
+                    <field name="group_ids" widget="many2many_tags"/>
+                </list>
             </field>
         </record>
 
@@ -162,7 +167,7 @@
         <record id="action_website_menu" model="ir.actions.act_window">
             <field name="name">Website Menu</field>
             <field name="res_model">website.menu</field>
-            <field name="view_mode">tree,form</field>
+            <field name="view_mode">list,form</field>
             <field name="context">{'search_default_group_by_website_id':1}</field>
             <field name="view_id" ref="menu_tree"/>
             <field name="target">current</field>
@@ -201,7 +206,13 @@
 
         <record id="website_preview" model="ir.actions.client">
             <field name="name">Website Preview</field>
+            <field name="path">website</field>
             <field name="tag">website_preview</field>
+        </record>
+
+        <record id="open_custom_menu" model="ir.actions.client">
+            <field name="name">Open Custom Menu</field>
+            <field name="tag">open_website_custom_menu</field>
         </record>
 
         <record id="ir_actions_server_website_dashboard" model="ir.actions.server">
@@ -228,7 +239,7 @@
             <field name="name">Themes Kanban</field>
             <field name="model">ir.module.module</field>
             <field name="arch" type="xml">
-                <kanban create="false" default_order="state,sequence,name" js_class="theme_preview_kanban">
+                <kanban create="false" can_open="0" default_order="state,sequence,name" js_class="theme_preview_kanban">
                     <field name="icon"/>
                     <field name="summary"/>
                     <field name="name"/>
@@ -239,31 +250,35 @@
                     <field name="display_name"/>
                     <field name="is_installed_on_current_website"/>
                     <templates>
-                        <div t-name="kanban-box" t-attf-class="o_theme_preview #{record.is_installed_on_current_website.raw_value? 'o_theme_installed' : ''}">
+                        <div t-name="card" t-attf-class="o_theme_preview #{record.is_installed_on_current_website.raw_value? 'o_theme_installed' : ''}">
                             <t t-set="has_image" t-value="record.image_ids.raw_value.length > 0"/>
                             <t t-set="has_screenshot" t-value="record.image_ids.raw_value.length > 1"/>
                             <t t-set="image_url" t-value="has_image ? '/web/image/' + record.image_ids.raw_value[0] : record.icon.value"/>
 
-                            <div class="o_theme_preview_top bg-white mb4 border">
-                                <div t-attf-class="bg-gray-lighter #{has_screenshot? 'o_theme_screenshot' : (has_image ? 'o_theme_cover' : 'o_theme_logo')}" t-attf-style="background-image: url(#{image_url});"/>
-                                <div t-if="record.is_installed_on_current_website.raw_value" class="o_button_area">
-                                    <button type="object" name="button_refresh_theme" class="btn btn-primary">Update theme</button>
-                                    <hr />
-                                    <button type="object" name="button_remove_theme" class="btn btn-secondary">Remove theme</button>
+                            <div class="o_theme_preview_top position-relative border rounded-3 transition-base">
+                                <div t-attf-class="bg-gray-lighter #{has_screenshot? 'o_theme_screenshot' : (has_image ? 'o_theme_cover' : 'o_theme_logo')} rounded-3" t-attf-style="background-image: url(#{image_url});"/>
+                                <div t-if="record.is_installed_on_current_website.raw_value or !record.url.value" class="o_button_area position-absolute top-50 start-50 translate-middle d-flex align-items-center justify-content-center w-100 h-100 bg-dark bg-opacity-50 rounded opacity-0 opacity-100-hover transition-fade">
+                                    <div class="d-flex flex-column gap-2 w-50">
+                                        <t t-if="record.is_installed_on_current_website.raw_value">
+                                            <button type="object" name="button_refresh_theme" class="btn btn-primary">Update theme</button>
+                                            <button type="object" name="button_remove_theme" class="btn btn-secondary">Remove theme</button>
+                                        </t>
+                                        <t t-else="">
+                                            <button type="object" name="button_choose_theme" class="btn btn-primary">Use default theme</button>
+                                        </t>
+                                    </div>
                                 </div>
-                                <div t-else="" class="o_button_area">
-                                    <button type="object" name="button_choose_theme" class="btn btn-primary">Use this theme</button>
-                                    <hr t-if="record.url.value"/>
-                                    <button role="button" type="edit" t-if="record.url.value" class="btn btn-secondary">Live Preview</button>
-                                </div>
+                                <t t-else="">
+                                    <button class="position-absolute top-0 start-0 h-100 w-100 opacity-0" role="button" type="edit" t-if="record.url.value"/>
+                                </t>
                             </div>
-                            <div class="o_theme_preview_bottom clearfix">
-                                <h5 t-if="record.summary.value" class="text-uppercase float-start">
+                            <div class="o_theme_preview_bottom mt-2 mb-3 px-2">
+                                <small t-if="record.summary.value" class="text-uppercase text-muted">
                                     <b><t t-esc="record.summary.value.split(',')[0]"/></b>
-                                </h5>
-                                <h6 t-if="record.display_name.value" class="text-muted float-end">
+                                </small>
+                                <h3 t-if="record.display_name.value">
                                     <b><t t-esc="record.display_name.value.replace('Theme', '').replace('theme', '')"/></b>
-                                </h6>
+                                </h3>
                             </div>
                         </div>
                     </templates>

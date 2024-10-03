@@ -1,5 +1,3 @@
-/** @odoo-module */
-
 import { Component, useExternalListener, useState } from "@odoo/owl";
 import { useAutofocus, useService } from "@web/core/utils/hooks";
 
@@ -27,6 +25,12 @@ import { useAutofocus, useService } from "@web/core/utils/hooks";
  */
 export class SearchBar extends Component {
     static template = "point_of_sale.SearchBar";
+    static props = {
+        config: Object,
+        placeholder: String,
+        onSearch: Function,
+        onFilterSelected: Function,
+    };
 
     setup() {
         this.ui = useState(useService("ui"));

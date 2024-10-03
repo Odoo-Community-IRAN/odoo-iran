@@ -6,7 +6,7 @@
     'version': '3.0',
     'category': 'Accounting/Localizations/Account Charts',
     'author': 'Vauxoo, Odoo S.A.',
-    'website': 'https://www.odoo.com/documentation/17.0/applications/finance/fiscal_localizations/peru.html',
+    'website': 'https://www.odoo.com/documentation/master/applications/finance/fiscal_localizations/peru.html',
     'license': 'LGPL-3',
     'depends': [
         'base_vat',
@@ -16,9 +16,11 @@
         'account_debit_note',
         'account',
     ],
+    'auto_install': ['account'],
     'data': [
         'security/ir.model.access.csv',
         'views/account_tax_view.xml',
+        'views/res_bank_view.xml',
         'data/l10n_latam_document_type_data.xml',
         'data/res.city.csv',
         'data/l10n_pe.res.city.district.csv',

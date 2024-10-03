@@ -201,7 +201,7 @@ class SaleOrderLine(models.Model):
         if line_description:
             name += line_description
 
-        return {
+        purchase_line_vals = {
             'name': name,
             'product_qty': purchase_qty_uom,
             'product_id': self.product_id.id,
@@ -213,6 +213,9 @@ class SaleOrderLine(models.Model):
             'sale_line_id': self.id,
             'discount': supplierinfo.discount,
         }
+        if self.analytic_distribution:
+            purchase_line_vals['analytic_distribution'] = self.analytic_distribution
+        return purchase_line_vals
 
     def _purchase_service_match_supplier(self, warning=True):
         # determine vendor of the order (take the first matching company and product)

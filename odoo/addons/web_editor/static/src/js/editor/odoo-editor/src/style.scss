@@ -258,8 +258,10 @@
             padding: 5px;
         }
     }
-    #style .dropdown-menu {
-        text-align: left;
+    #style, #translate {
+        .dropdown-menu {
+            text-align: left;
+        }
     }
 }
 
@@ -304,7 +306,9 @@
 
 @include media-breakpoint-down(md) {
     .oe-toolbar {
-        position: relative;
+        position: sticky;
+        z-index: 1;
+        top: 0;
         overflow-x: auto;
         visibility: visible;
         width: auto;
@@ -313,7 +317,7 @@
         border-radius: 0;
         background-color: white;
         box-shadow: none;
-        
+
         .btn {
             color: black;
             padding: 3px 4px !important;
@@ -388,7 +392,7 @@ i.oe-powerbox-commandImg {
 .oe-hint {
     position: relative;
 
-    &:before {
+    &:after {
         content: attr(placeholder);
         position: absolute;
         top: 0;
@@ -536,11 +540,4 @@ $oe-dropzone-size: $oe-dropzone-size-outside + $oe-dropzone-size-inside;
     border-radius: 50%;
     font-size: 9px;
     padding: 0 4px;
-}
-code.o_inline_code {
-    background-color: #c5c5c5;
-    padding: 2px;
-    margin: 2px;
-    color: black;
-    font-size: inherit;
 }

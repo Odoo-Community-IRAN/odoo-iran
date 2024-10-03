@@ -2,6 +2,8 @@
 
 from odoo import api, fields, models
 from odoo.osv import expression
+from odoo.tools import SQL
+from odoo.addons.mail.tools.discuss import Store
 
 
 class ResPartner(models.Model):
@@ -16,6 +18,7 @@ class ResPartner(models.Model):
         copy=False,
     )
 
+    @api.readonly
     @api.model
     def search_for_channel_invite(self, search_term, channel_id=None, limit=30):
         """Returns partners matching search_term that can be invited to a channel.
@@ -36,25 +39,34 @@ class ResPartner(models.Model):
                 [("user_ids.share", "=", False)],
             ]
         )
+        channel = self.env["discuss.channel"]
         if channel_id:
             channel = self.env["discuss.channel"].search([("id", "=", int(channel_id))])
             domain = expression.AND([domain, [("channel_ids", "not in", channel.id)]])
             if channel.group_public_id:
-                domain = expression.AND([domain, [("user_ids.groups_id", "in", channel.group_public_id.id)]])
-        query = self.env["res.partner"]._search(domain, order="name, id")
-        query.order = 'LOWER("res_partner"."name"), "res_partner"."id"'  # bypass lack of support for case insensitive order in search()
-        query.limit = int(limit)
+                domain = expression.AND(
+                    [domain, [("user_ids.groups_id", "in", channel.group_public_id.id)]]
+                )
+        query = self._search(domain, limit=limit)
+        # bypass lack of support for case insensitive order in search()
+        query.order = SQL('LOWER(%s), "res_partner"."id"', self._field_to_sql(self._table, "name"))
+        store = Store()
+        self.env["res.partner"].browse(query)._search_for_channel_invite_to_store(store, channel)
         return {
             "count": self.env["res.partner"].search_count(domain),
-            "partners": list(self.env["res.partner"].browse(query).mail_partner_format().values()),
+            "data": store.get_result(),
         }
 
+    def _search_for_channel_invite_to_store(self, store: Store, channel):
+        store.add(self)
+
+    @api.readonly
     @api.model
     def get_mention_suggestions_from_channel(self, channel_id, search, limit=8):
         """Return 'limit'-first partners' such that the name or email matches a 'search' string.
         Prioritize partners that are also (internal) users, and then extend the research to all partners.
         Only members of the given channel are returned.
-        The return format is a list of partner data (as per returned by `mail_partner_format()`).
+        The return format is a list of partner data (as per returned by `_to_store()`).
         """
         channel = self.env["discuss.channel"].search([("id", "=", channel_id)])
         if not channel:
@@ -66,29 +78,10 @@ class ResPartner(models.Model):
             ]
         )
         partners = self._search_mention_suggestions(domain, limit)
-        member_by_partner = {
-            member.partner_id: member
-            for member in self.env["discuss.channel.member"].search(
-                [
-                    ("channel_id", "=", channel.id),
-                    ("partner_id", "in", partners.ids),
-                ]
-            )
-        }
-        partners_format = partners.mail_partner_format()
-        for partner in partners:
-            partners_format.get(partner)["channelMembers"] = [
-                    (
-                        "ADD",
-                        member_by_partner.get(partner)
-                        ._discuss_channel_member_format(
-                            fields={
-                                "id": True,
-                                "channel": {"id"},
-                                "persona": {"partner": {"id"}},
-                            }
-                        )
-                        .get(member_by_partner.get(partner)),
-                    )
+        members = self.env["discuss.channel.member"].search(
+            [
+                ("channel_id", "=", channel.id),
+                ("partner_id", "in", partners.ids),
             ]
-        return list(partners_format.values())
+        )
+        return Store(members, fields={"channel": [], "persona": []}).add(partners).get_result()

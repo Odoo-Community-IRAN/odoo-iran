@@ -6,8 +6,7 @@ import { FormViewDialog } from "@web/views/view_dialogs/form_view_dialog";
 import { useComponent } from "@odoo/owl";
 
 export function formatNumber(lang, number, maxDecimals = 2) {
-    const userLang = lang.split("_").join("-");
-    const numberFormat = new Intl.NumberFormat(userLang, { maximumFractionDigits: maxDecimals });
+    const numberFormat = new Intl.NumberFormat(lang, { maximumFractionDigits: maxDecimals });
     return numberFormat.format(number);
 }
 
@@ -16,20 +15,9 @@ export function useMandatoryDays(props) {
         const date = luxon.DateTime.fromJSDate(info.date).toISODate();
         const mandatoryDay = props.model.mandatoryDays[date];
         if (mandatoryDay) {
-            const dayNumberElTop = info.view.el.querySelector(
-                `.fc-day-top[data-date="${info.el.dataset.date}"]`
-            );
-            const dayNumberEl = info.view.el.querySelector(
-                `.fc-day[data-date="${info.el.dataset.date}"]`
-            );
-            if (dayNumberElTop) {
-                dayNumberElTop.classList.add('hr_mandatory_day', `hr_mandatory_day_top_${mandatoryDay}`);
-            }
-            if (dayNumberEl) {
-                dayNumberEl.classList.add('hr_mandatory_day',`hr_mandatory_day_${mandatoryDay}`);
-            }
+            return [`hr_mandatory_day hr_mandatory_day_${mandatoryDay}`];
         }
-        return props.model.mandatoryDays;
+        return [];
     };
 }
 
@@ -39,7 +27,7 @@ export function useLeaveCancelWizard() {
     return (leaveId, callback) => {
         action.doAction(
             {
-                name: _t("Delete Confirmation"),
+                name: _t("Cancel Time Off"),
                 type: "ir.actions.act_window",
                 res_model: "hr.holidays.cancel.leave",
                 target: "new",
@@ -65,7 +53,6 @@ export function useNewAllocationRequest() {
         };
         if (employeeId) {
             context["default_employee_id"] = employeeId;
-            context["default_employee_ids"] = [employeeId];
             context["form_view_ref"] =
                 "hr_holidays.hr_leave_allocation_view_form_manager_dashboard";
         }

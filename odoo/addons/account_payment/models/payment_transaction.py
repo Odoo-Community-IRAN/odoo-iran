@@ -59,7 +59,7 @@ class PaymentTransaction(models.Model):
             action['view_mode'] = 'form'
             action['views'] = [(self.env.ref('account.view_move_form').id, 'form')]
         else:
-            action['view_mode'] = 'tree,form'
+            action['view_mode'] = 'list,form'
             action['domain'] = [('id', 'in', invoice_ids)]
         return action
 
@@ -88,44 +88,49 @@ class PaymentTransaction(models.Model):
             invoice_ids = self._fields['invoice_ids'].convert_to_cache(command_list, self)
             invoices = self.env['account.move'].browse(invoice_ids).exists()
             if len(invoices) == len(invoice_ids):  # All ids are valid
-                return separator.join(invoices.mapped('name'))
+                prefix = separator.join(invoices.mapped('name'))
+                if name := values.get('name_next_installment'):
+                    prefix = name
+                return prefix
         return super()._compute_reference_prefix(provider_code, separator, **values)
-
-    def _set_canceled(self, state_message=None, **kwargs):
-        """ Update the transactions' state to 'cancel'.
-
-        :param str state_message: The reason for which the transaction is set in 'cancel' state
-        :return: updated transactions
-        :rtype: `payment.transaction` recordset
-        """
-        processed_txs = super()._set_canceled(state_message, **kwargs)
-        # Cancel the existing payments
-        processed_txs.payment_id.action_cancel()
-        return processed_txs
 
     #=== BUSINESS METHODS - POST-PROCESSING ===#
 
-    def _reconcile_after_done(self):
-        """ Post relevant fiscal documents and create missing payments.
+    def _post_process(self):
+        """ Override of `payment` to add account-specific logic to the post-processing.
 
-        As there is nothing to reconcile for validation transactions, no payment is created for
-        them. This is also true for validations with a validity check (transfer of a small amount
-        with immediate refund) because validation amounts are not included in payouts.
-
-        As the reconciliation is done in the child transactions for partial voids and captures, no
-        payment is created for their source transactions.
-
-        :return: None
+        In particular, for confirmed transactions we write a message in the chatter with the payment
+        and transaction references, post relevant fiscal documents, and create missing payments. For
+        cancelled transactions, we cancel the payment.
         """
-        super()._reconcile_after_done()
+        super()._post_process()
+        for tx in self.filtered(lambda t: t.state == 'done'):
+            # Validate invoices automatically once the transaction is confirmed.
+            self.invoice_ids.filtered(lambda inv: inv.state == 'draft').action_post()
 
-        # Validate invoices automatically once the transaction is confirmed
-        self.invoice_ids.filtered(lambda inv: inv.state == 'draft').action_post()
-
-        # Create and post missing payments for transactions requiring reconciliation
-        for tx in self.filtered(lambda t: t.operation != 'validation' and not t.payment_id):
-            if not any(child.state in ['done', 'cancel'] for child in tx.child_transaction_ids):
+            # Create and post missing payments.
+            # As there is nothing to reconcile for validation transactions, no payment is created
+            # for them. This is also true for validations with or without a validity check (transfer
+            # of a small amount with immediate refund) because validation amounts are not included
+            # in payouts. As the reconciliation is done in the child transactions for partial voids
+            # and captures, no payment is created for their source transactions either.
+            if (
+                tx.operation != 'validation'
+                and not tx.payment_id
+                and not any(child.state in ['done', 'cancel'] for child in tx.child_transaction_ids)
+            ):
                 tx.with_company(tx.company_id)._create_payment()
+
+            if tx.payment_id:
+                message = _(
+                    "The payment related to the transaction with reference %(ref)s has been"
+                    " posted: %(link)s",
+                    ref=tx.reference,
+                    link=tx.payment_id._get_html_link(),
+                )
+                tx._log_message_on_linked_documents(message)
+        for tx in self.filtered(lambda t: t.state == 'cancel'):
+            tx.payment_id.action_cancel()
 
     def _create_payment(self, **extra_create_values):
         """Create an `account.payment` record for the current transaction.
@@ -158,9 +163,29 @@ class PaymentTransaction(models.Model):
             'payment_method_line_id': payment_method_line.id,
             'payment_token_id': self.token_id.id,
             'payment_transaction_id': self.id,
-            'ref': reference,
+            'memo': reference,
+            'write_off_line_vals': [],
+            'invoice_ids': self.invoice_ids,
             **extra_create_values,
         }
+
+        if self.invoice_ids:
+            next_payment_values = self.invoice_ids._get_invoice_next_payment_values()
+            if next_payment_values['installment_state'] == 'epd' and self.amount == next_payment_values['amount_due']:
+                aml = next_payment_values['epd_line']
+                epd_aml_values_list = [({
+                    'aml': aml,
+                    'amount_currency': -aml.amount_residual_currency,
+                    'balance': -aml.balance,
+                })]
+                open_balance = next_payment_values['epd_discount_amount']
+                early_payment_values = self.env['account.move']._get_invoice_counterpart_amls_for_early_payment_discount(epd_aml_values_list, open_balance)
+                for aml_values_list in early_payment_values.values():
+                    if (aml_values_list):
+                        aml_vl = aml_values_list[0]
+                        aml_vl['partner_id'] = self.partner_id.id
+                        payment_values['write_off_line_vals'] += [aml_vl]
+
         payment = self.env['account.payment'].create(payment_values)
         payment.action_post()
 
@@ -175,7 +200,7 @@ class PaymentTransaction(models.Model):
         if invoices:
             invoices.filtered(lambda inv: inv.state == 'draft').action_post()
 
-            (payment.line_ids + invoices.line_ids).filtered(
+            (payment.move_id.line_ids + invoices.line_ids).filtered(
                 lambda line: line.account_id == payment.destination_account_id
                 and not line.reconciled
             ).reconcile()
@@ -205,18 +230,3 @@ class PaymentTransaction(models.Model):
                 payment_id.message_post(body=message, author_id=author.id)
         for invoice in self.invoice_ids:
             invoice.message_post(body=message, author_id=author.id)
-
-    #=== BUSINESS METHODS - POST-PROCESSING ===#
-
-    def _finalize_post_processing(self):
-        """ Override of `payment` to write a message in the chatter with the payment and transaction
-        references.
-
-        :return: None
-        """
-        super()._finalize_post_processing()
-        for tx in self.filtered('payment_id'):
-            message = _("The payment related to the transaction with reference %(ref)s has been posted: %(link)s",
-                ref=tx.reference, link=tx.payment_id._get_html_link(),
-            )
-            tx._log_message_on_linked_documents(message)

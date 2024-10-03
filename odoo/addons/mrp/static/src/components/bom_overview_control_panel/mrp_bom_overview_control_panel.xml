@@ -4,7 +4,7 @@
     <t t-name="mrp.BomOverviewControlPanel">
         <ControlPanel display="controlPanelDisplay">
             <t t-set-slot="control-panel-create-button">
-                <button t-on-click="() => this.props.print()" type="button" class="btn btn-primary">Print</button>
+                <button t-on-click="manufactureFromBoM" type="button" class="btn btn-primary">Manufacture</button>
             </t>
             <t t-set-slot="control-panel-always-buttons">
                 <div class="o_cp_buttons">
@@ -12,7 +12,7 @@
                         <t t-if="props.showVariants">
                             <button t-on-click="() => this.props.print(true)" type="button" class="btn btn-secondary text-nowrap">Print All Variants</button>
                         </t>
-                        <button t-on-click="clickUnfold" type="button" class="btn btn-secondary">Unfold</button>
+                        <button t-on-click="clickTogglefold" type="button" class="btn btn-secondary"><t t-esc="props.allFolded ? 'Unfold' : 'Fold'"/></button>
                     </div>
                 </div>
             </t>
@@ -47,16 +47,16 @@
             <t t-set-slot="control-panel-navigation-additional">
                 <div class="d-flex gap-1 w-100 w-sm-auto">
                     <div class="col d-flex gap-1">
-                        <t t-if="props.warehouses.length > 1">
-                            <Dropdown class="'btn-group flex-grow-1 flex-md-grow-0'" togglerClass="'btn btn-secondary'" showCaret="true">
-                                <t t-set-slot="toggler">
-                                    <span class="fa fa-home"/> Warehouse
-                                </t>
-                                <t t-foreach="props.warehouses" t-as="wh" t-key="wh.id">
-                                    <DropdownItem onSelected="() => this.props.changeWarehouse(wh.id)" t-esc="wh.name" class="{selected : wh.name === props.currentWarehouse.name }"/>
-                                </t>
-                            </Dropdown>
+                        <t t-set-slot="control-panel-create-button">
+                            <button t-on-click="() => this.props.print()" type="button" class="btn btn-primary">Print</button>
                         </t>
+                        <div t-if="props.warehouses.length > 1" class="btn-group flex-grow-1 flex-md-grow-0">
+                            <Dropdown items="warehousesItems">
+                                <button class="btn btn-secondary o-dropdown-caret">
+                                    <span class="fa fa-home"/> Warehouse
+                                </button>
+                            </Dropdown>
+                        </div>
                         <BomOverviewDisplayFilter
                             showOptions="props.showOptions"
                             changeDisplay.bind="props.changeDisplay"/>

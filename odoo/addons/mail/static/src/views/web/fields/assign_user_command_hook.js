@@ -1,11 +1,11 @@
-/* @odoo-module */
-
 import { useComponent } from "@odoo/owl";
 
 import { useCommand } from "@web/core/commands/command_hook";
 import { Domain } from "@web/core/domain";
 import { _t } from "@web/core/l10n/translation";
+import { user } from "@web/core/user";
 import { useService } from "@web/core/utils/hooks";
+import { getFieldDomain } from "@web/model/relational_model/utils";
 
 /**
  * Use this hook to add "Assign to.." and "Assign/Unassign me" to the command palette.
@@ -14,7 +14,6 @@ import { useService } from "@web/core/utils/hooks";
 export function useAssignUserCommand() {
     const component = useComponent();
     const orm = useService("orm");
-    const user = useService("user");
     const type = component.props.record.fields[component.props.name].type;
     if (component.relation !== "res.users") {
         return;
@@ -49,10 +48,11 @@ export function useAssignUserCommand() {
 
     const provide = async (env, options) => {
         const value = options.searchValue.trim();
-        let domain =
-            typeof component.props.domain === "function"
-                ? component.props.domain()
-                : component.props.domain;
+        let domain = getFieldDomain(
+            component.props.record,
+            component.props.name,
+            component.props.domain
+        );
         const context = component.props.context;
         if (type === "many2many") {
             const selectedUserIds = getCurrentIds();

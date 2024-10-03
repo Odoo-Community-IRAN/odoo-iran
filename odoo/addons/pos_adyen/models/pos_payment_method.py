@@ -3,11 +3,8 @@
 import json
 import logging
 import pprint
-import random
 import requests
-import string
 from urllib.parse import parse_qs
-from werkzeug.exceptions import Forbidden
 
 from odoo import fields, models, api, _
 from odoo.exceptions import ValidationError, UserError, AccessDenied
@@ -29,7 +26,19 @@ class PosPaymentMethod(models.Model):
     adyen_test_mode = fields.Boolean(help='Run transactions in the test environment.', groups='base.group_erp_manager')
 
     adyen_latest_response = fields.Char(copy=False, groups='base.group_erp_manager') # used to buffer the latest asynchronous notification from Adyen.
-    adyen_latest_diagnosis = fields.Char(copy=False, groups='base.group_erp_manager') # used to determine if the terminal is still connected.
+    adyen_event_url = fields.Char(
+        string="Event URL",
+        help="This URL needs to be pasted on Adyen's portal terminal settings.",
+        readonly=True,
+        store=False,
+        default=lambda self: f"{self.get_base_url()}/pos_adyen/notification",
+    )
+
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        params = super()._load_pos_data_fields(config_id)
+        params += ['adyen_terminal_identifier']
+        return params
 
     @api.constrains('adyen_terminal_identifier')
     def _check_adyen_terminal_identifier(self):
@@ -42,13 +51,13 @@ class PosPaymentMethod(models.Model):
                                                   limit=1)
             if existing_payment_method:
                 if existing_payment_method.company_id == payment_method.company_id:
-                    raise ValidationError(_('Terminal %s is already used on payment method %s.',
-                                      payment_method.adyen_terminal_identifier, existing_payment_method.display_name))
+                    raise ValidationError(_('Terminal %(terminal)s is already used on payment method %(payment_method)s.',
+                                      terminal=payment_method.adyen_terminal_identifier, payment_method=existing_payment_method.display_name))
                 else:
-                    raise ValidationError(_('Terminal %s is already used in company %s on payment method %s.',
-                                             payment_method.adyen_terminal_identifier,
-                                             existing_payment_method.company_id.name,
-                                             existing_payment_method.display_name))
+                    raise ValidationError(_('Terminal %(terminal)s is already used in company %(company)s on payment method %(payment_method)s.',
+                                             terminal=payment_method.adyen_terminal_identifier,
+                                             company=existing_payment_method.company_id.name,
+                                             payment_method=existing_payment_method.display_name))
 
     def _get_adyen_endpoints(self):
         return {
@@ -60,7 +69,7 @@ class PosPaymentMethod(models.Model):
 
     def get_latest_adyen_status(self):
         self.ensure_one()
-        if not self.env.su and not self.user_has_groups('point_of_sale.group_pos_user'):
+        if not self.env.su and not self.env.user.has_group('point_of_sale.group_pos_user'):
             raise AccessDenied()
 
         latest_response = self.sudo().adyen_latest_response
@@ -70,7 +79,7 @@ class PosPaymentMethod(models.Model):
     def proxy_adyen_request(self, data, operation=False):
         ''' Necessary because Adyen's endpoints don't have CORS enabled '''
         self.ensure_one()
-        if not self.env.su and not self.user_has_groups('point_of_sale.group_pos_user'):
+        if not self.env.su and not self.env.user.has_group('point_of_sale.group_pos_user'):
             raise AccessDenied()
         if not data:
             raise UserError(_('Invalid Adyen request'))

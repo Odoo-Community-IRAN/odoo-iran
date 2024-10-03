@@ -1,13 +1,15 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from psycopg2 import IntegrityError
+from odoo import Command
+from odoo.addons.website.tools import MockRequest
+from odoo.exceptions import ValidationError
+from odoo.service.model import retrying
+from odoo.tests.common import TransactionCase, new_test_user
+from odoo.tools import mute_logger
+
 from unittest import TestCase
 
-from odoo.tests.common import TransactionCase, new_test_user
-from odoo.exceptions import ValidationError
-from odoo.tools import mute_logger
-from odoo.service.model import retrying
-from odoo.addons.website.tools import MockRequest
+import psycopg2
 
 
 class TestWebsiteResUsers(TransactionCase):
@@ -26,19 +28,19 @@ class TestWebsiteResUsers(TransactionCase):
             new_test_user(self.env, login='Pou', website_id=False)
 
     def test_websites_set_null(self):
-        user_1 = new_test_user(self.env, login='Pou', website_id=self.website_1.id)
-        user_2 = new_test_user(self.env, login='Pou', website_id=self.website_2.id)
+        user_1 = new_test_user(self.env, login='Pou', website_id=self.website_1.id, groups='base.group_portal')
+        user_2 = new_test_user(self.env, login='Pou', website_id=self.website_2.id, groups='base.group_portal')
         with self.assertRaises(ValidationError):
             (user_1 | user_2).write({'website_id': False})
 
     def test_null_and_website(self):
-        new_test_user(self.env, login='Pou', website_id=self.website_1.id)
-        new_test_user(self.env, login='Pou', website_id=False)
+        new_test_user(self.env, login='Pou', website_id=self.website_1.id, groups='base.group_portal')
+        new_test_user(self.env, login='Pou', website_id=False, groups='base.group_portal')
 
     def test_change_login(self):
-        new_test_user(self.env, login='Pou', website_id=self.website_1.id)
-        user_belle = new_test_user(self.env, login='Belle', website_id=self.website_1.id)
-        with self.assertRaises(IntegrityError), mute_logger('odoo.sql_db'):
+        new_test_user(self.env, login='Pou', website_id=self.website_1.id, groups='base.group_portal')
+        user_belle = new_test_user(self.env, login='Belle', website_id=self.website_1.id, groups='base.group_portal')
+        with self.assertRaises(psycopg2.errors.UniqueViolation), mute_logger('odoo.sql_db'):
             user_belle.login = 'Pou'
 
     def test_change_login_no_website(self):
@@ -54,7 +56,7 @@ class TestWebsiteResUsers(TransactionCase):
         env = self.env(context={'lang': 'en_US'}, cr=self.env.registry.cursor())
 
         def create_user_pou():
-            return new_test_user(env, login='Pou', website_id=self.website_1.id)
+            return new_test_user(env, login='Pou', website_id=self.website_1.id, groups='base.group_portal')
 
         # First user creation works.
         create_user_pou()
@@ -110,3 +112,22 @@ class TestWebsiteResUsers(TransactionCase):
         # The company cannot be archived because it has a website linked to it
         with self.assertRaises(ValidationError):
             company.action_archive()
+
+    def test_user_become_internal(self):
+        # This tests if the website_id is correctly removed when a user becomes
+        # an internal user.
+        website = self.env['website'].create({'name': "Awesome Website"})
+        website.write({
+            # Permit uninvited signup for portal users.
+            'auth_signup_uninvited': 'b2c',
+            # Disable cross-website for portal users.
+            'specific_user_account': True,
+        })
+        user = self._create_user_via_website(website, 'Portal_User')
+        self.assertEqual(user.website_id, website)
+        self.assertTrue(user._is_portal())
+        with self.assertRaises(ValidationError):
+            user.groups_id = [
+                Command.link(self.env.ref('base.group_user').id),
+                Command.unlink(self.env.ref('base.group_portal').id),
+            ]

@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { registry } from "@web/core/registry";
 import { _t } from "@web/core/l10n/translation";
 import { standardFieldProps } from "../standard_field_props";
@@ -18,6 +16,7 @@ export const handleField = {
     displayName: _t("Handle"),
     supportedTypes: ["integer"],
     isEmpty: () => false,
+    listViewWidth: 20,
 };
 
 registry.category("fields").add("handle", handleField);

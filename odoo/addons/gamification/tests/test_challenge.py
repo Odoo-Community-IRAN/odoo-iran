@@ -228,6 +228,7 @@ class test_challenge(TestGamificationCommon):
                 "Challenge last report date is not as expected"
             )
 
+
 class test_badge_wizard(TestGamificationCommon):
 
     def test_grant_badge(self):

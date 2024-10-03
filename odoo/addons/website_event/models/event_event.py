@@ -9,8 +9,7 @@ import werkzeug.urls
 from pytz import utc, timezone
 
 from odoo import api, fields, models, _
-from odoo.addons.http_routing.models.ir_http import slug
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 from odoo.osv import expression
 from odoo.tools.misc import get_lang, format_date
 
@@ -36,23 +35,25 @@ class Event(models.Model):
         })
         return res
 
-    def _default_question_ids(self):
-        return self.env['event.type']._default_question_ids()
-
     # description
     subtitle = fields.Char('Event Subtitle', translate=True)
     # registration
-    is_participating = fields.Boolean("Is Participating", compute="_compute_is_participating")
+    is_participating = fields.Boolean("Is Participating", compute="_compute_is_participating",
+                                      search="_search_is_participating")
     # website
+    is_visible_on_website = fields.Boolean(string="Visible On Website", compute='_compute_is_visible_on_website', search='_search_is_visible_on_website')
+    event_register_url = fields.Char('Event Registration Link', compute='_compute_event_register_url')
+    website_visibility = fields.Selection(
+        [('public', 'Public'), ('link', 'Via a Link'), ('logged_users', 'Logged Users')],
+        string="Website Visibility", required=True, default='public', tracking=True,
+        help="""Defines the Visibility of the Event on the Website and searches.\n
+            Note that the Event is however always available via its link.""")
     website_published = fields.Boolean(tracking=True)
     website_menu = fields.Boolean(
         string='Website Menu',
         compute='_compute_website_menu', precompute=True, readonly=False, store=True,
         help="Allows to display and manage event-specific menus on website.")
     menu_id = fields.Many2one('website.menu', 'Event Menu', copy=False)
-    menu_register_cta = fields.Boolean(
-        'Extra Register Button', compute='_compute_menu_register_cta',
-        readonly=False, store=True)
     # sub-menus management
     introduction_menu = fields.Boolean(
         "Introduction Menu", compute="_compute_website_menu_data",
@@ -92,16 +93,26 @@ class Event(models.Model):
     start_remaining = fields.Integer(
         'Remaining before start', compute='_compute_time_data',
         help="Remaining time before event starts (minutes)")
-    # questions
-    question_ids = fields.One2many(
-        'event.question', 'event_id', 'Questions', copy=True,
-        compute='_compute_question_ids', readonly=False, store=True)
-    general_question_ids = fields.One2many('event.question', 'event_id', 'General Questions',
-                                           domain=[('once_per_order', '=', True)])
-    specific_question_ids = fields.One2many('event.question', 'event_id', 'Specific Questions',
-                                            domain=[('once_per_order', '=', False)])
 
+    @api.depends('registration_ids')
+    @api.depends_context('uid')
     def _compute_is_participating(self):
+        participating_events = self._fetch_is_participating_events()
+        participating_events.is_participating = True
+        (self - participating_events).is_participating = False
+
+    @api.model
+    def _search_is_participating(self, operator, value):
+        if operator not in ['=', '!=']:
+            raise NotImplementedError(_('This operator is not supported'))
+        if not isinstance(value, bool):
+            raise UserError(_('Value should be True or False (not %)', value))
+        check_is_participating = operator == '=' and value or operator == '!=' and not value
+
+        return [('id', 'in' if check_is_participating else 'not in', self._fetch_is_participating_events().ids)]
+
+    @api.model
+    def _fetch_is_participating_events(self):
         """Heuristic
 
           * public, no visitor: not participating as we have no information;
@@ -115,29 +126,63 @@ class Event(models.Model):
           * logged as visitor: check partner or visitor are linked to a
             registration;
         """
-        current_visitor = self.env['website.visitor']._get_visitor_from_request(force_create=False)
-        base_domain = [('event_id', 'in', self.ids), ('state', 'in', ['open', 'done'])]
+        current_visitor = self.env['website.visitor']._get_visitor_from_request()
         if self.env.user._is_public() and not current_visitor:
-            events = self.env['event.event']
-        elif self.env.user._is_public():
-            events = self.env['event.registration'].sudo().search(
-                expression.AND([base_domain, [('visitor_id', '=', current_visitor.id)]])
-            ).event_id
-        else:
-            if current_visitor:
-                domain = [
-                    '|',
-                    ('partner_id', '=', self.env.user.partner_id.id),
-                    ('visitor_id', '=', current_visitor.id)
-                ]
-            else:
-                domain = [('partner_id', '=', self.env.user.partner_id.id)]
-            events = self.env['event.registration'].sudo().search(
-                expression.AND([base_domain, domain])
-            ).event_id
+            return self.env['event.event']
 
+        base_domain = [('state', 'in', ['open', 'done'])]
+        if self:
+            base_domain = expression.AND([[('event_id', 'in', self.ids)], base_domain])
+
+        visitor_domain = []
+        partner_id = self.env.user.partner_id
+        if current_visitor:
+            visitor_domain = [('visitor_id', '=', current_visitor.id)]
+            partner_id = current_visitor.partner_id
+        if partner_id:
+            visitor_domain = expression.OR([visitor_domain, [('partner_id', '=', partner_id.id)]])
+
+        registrations_events = self.env['event.registration'].sudo()._read_group(
+            expression.AND([visitor_domain, base_domain]),
+            ['event_id'], ['__count'])
+        return self.env['event.event'].browse([event.id for event, _reg_count in registrations_events])
+
+    @api.depends_context('uid')
+    @api.depends('website_visibility', 'is_participating')
+    def _compute_is_visible_on_website(self):
+        if all(event.website_visibility == 'public' for event in self):
+            self.is_visible_on_website = True
+            return
         for event in self:
-            event.is_participating = event in events
+            if event.website_visibility == 'public' or event.is_participating:
+                event.is_visible_on_website = True
+            elif not self.env.user._is_public() and event.website_visibility == 'logged_users':
+                event.is_visible_on_website = True
+            else:
+                event.is_visible_on_website = False
+
+    @api.model
+    def _search_is_visible_on_website(self, operator, value):
+        if operator not in ['=', '!=']:
+            raise NotImplementedError(_('This operator is not supported'))
+        if not isinstance(value, bool):
+            raise UserError(_('Value should be True or False (not %)', value))
+        check_is_visible_on_website = operator == '=' and value or operator == '!=' and not value
+        user = self.env.user
+        domain = [('is_participating', '=', True)]
+
+        if not user._is_public():
+            domain = expression.OR([domain, [('website_visibility', 'in', ['public', 'logged_users'])]])
+        else:
+            domain = expression.OR([domain, [('website_visibility', '=', 'public')]])
+
+        event_ids = self.env['event.event']._search(domain)
+        return [('id', 'in' if check_is_visible_on_website else 'not in', event_ids)]
+
+    @api.depends('website_url')
+    def _compute_event_register_url(self):
+        for event in self:
+            event.event_register_url = werkzeug.urls.url_join(event.get_base_url(), f"{event.website_url}/register")
 
     @api.depends('event_type_id')
     def _compute_website_menu(self):
@@ -165,17 +210,6 @@ class Event(models.Model):
             event.location_menu = event.website_menu
             event.register_menu = event.website_menu
 
-    @api.depends("event_type_id", "website_menu")
-    def _compute_menu_register_cta(self):
-        """ At type onchange: synchronize. At website_menu update: synchronize. """
-        for event in self:
-            if event.event_type_id and event.event_type_id != event._origin.event_type_id:
-                event.menu_register_cta = event.event_type_id.menu_register_cta
-            elif event.website_menu and (event.website_menu != event._origin.website_menu or not event.menu_register_cta):
-                event.menu_register_cta = True
-            elif not event.website_menu:
-                event.menu_register_cta = False
-
     @api.depends('date_begin', 'date_end')
     def _compute_time_data(self):
         """ Compute start and remaining time. Do everything in UTC as we compute only
@@ -198,42 +232,7 @@ class Event(models.Model):
         super(Event, self)._compute_website_url()
         for event in self:
             if event.id:  # avoid to perform a slug on a not yet saved record in case of an onchange.
-                event.website_url = '/event/%s' % slug(event)
-
-    @api.depends('event_type_id')
-    def _compute_question_ids(self):
-        """ Update event questions from its event type. Depends are set only on
-        event_type_id itself to emulate an onchange. Changing event type content
-        itself should not trigger this method.
-
-        When synchronizing questions:
-
-          * lines with no registered answers are removed;
-          * type lines are added;
-        """
-        if self._origin.question_ids:
-            # lines to keep: those with already given answers
-            questions_tokeep_ids = self.env['event.registration.answer'].search(
-                [('question_id', 'in', self._origin.question_ids.ids)]
-            ).question_id.ids
-        else:
-            questions_tokeep_ids = []
-        for event in self:
-            if not event.event_type_id and not event.question_ids:
-                event.question_ids = self._default_question_ids()
-                continue
-
-            if questions_tokeep_ids:
-                questions_toremove = event._origin.question_ids.filtered(
-                    lambda question: question.id not in questions_tokeep_ids)
-                command = [(3, question.id) for question in questions_toremove]
-            else:
-                command = [(5, 0)]
-            event.question_ids = command
-
-            # copy questions so changes in the event don't affect the event type
-            for question in event.event_type_id.question_ids:
-                event.question_ids += question.copy({'event_type_id': False})
+                event.website_url = '/event/%s' % self.env['ir.http']._slug(event)
 
     # -------------------------------------------------------------------------
     # CONSTRAINT METHODS
@@ -345,8 +344,8 @@ class Event(models.Model):
         return [
             (_('Introduction'), False, 'website_event.template_intro', 1, 'introduction'),
             (_('Location'), False, 'website_event.template_location', 50, 'location'),
-            (_('Register'), '/event/%s/register' % slug(self), False, 100, 'register'),
-            (_('Community'), '/event/%s/community' % slug(self), False, 80, 'community'),
+            (_('Info'), '/event/%s/register' % self.env['ir.http']._slug(self), False, 100, 'register'),
+            (_('Community'), '/event/%s/community' % self.env['ir.http']._slug(self), False, 80, 'community'),
         ]
 
     def _update_website_menus(self, menus_update_by_field=None):
@@ -412,7 +411,7 @@ class Event(models.Model):
         :param menu_type: type of menu. Mainly used for inheritance purpose
           allowing more fine-grain tuning of menus.
         """
-        self.check_access_rights('write')
+        self.browse().check_access('write')
         view_id = False
         if not url:
             # add_menu=False, ispage=False -> simply create a new ir.ui.view with name
@@ -422,7 +421,7 @@ class Event(models.Model):
                 add_menu=False, ispage=False)
             view_id = page_result['view_id']
             view = self.env["ir.ui.view"].browse(view_id)
-            url = f"/event/{slug(self)}/page/{view.key.split('.')[-1]}"  # url contains starting "/"
+            url = f"/event/{self.env['ir.http']._slug(self)}/page/{view.key.split('.')[-1]}"  # url contains starting "/"
 
         website_menu = self.env['website.menu'].sudo().create({
             'name': name,
@@ -461,6 +460,13 @@ class Event(models.Model):
             return self.env.ref('website_event.mt_event_unpublished', raise_if_not_found=False)
         return super(Event, self)._track_subtype(init_values)
 
+    def _get_external_description(self):
+        """ Adding the URL of the event into the description """
+        self.ensure_one()
+        event_url = f'<a href="{self.event_register_url}">{self.name}</a>'
+        description = event_url + '\n' + super()._get_external_description()
+        return description
+
     def _get_event_resource_urls(self):
         url_date_start = self.date_begin.astimezone(timezone(self.date_tz)).strftime('%Y%m%dT%H%M%S')
         url_date_stop = self.date_end.astimezone(timezone(self.date_tz)).strftime('%Y%m%dT%H%M%S')
@@ -469,7 +475,7 @@ class Event(models.Model):
             'text': self.name,
             'dates': f'{url_date_start}/{url_date_stop}',
             'ctz': self.date_tz,
-            'details': self.name,
+            'details': self._get_external_description(),
         }
         if self.address_id:
             params.update(location=self.address_inline)
@@ -535,6 +541,8 @@ class Event(models.Model):
         event_type = options.get('type', 'all')
 
         domain = [website.website_domain()]
+        domain.append([('is_visible_on_website', '=', True)])
+
         if event_type != 'all':
             domain.append([("event_type_id", "=", int(event_type))])
         search_tags = self.env['event.tag']
@@ -559,7 +567,7 @@ class Event(models.Model):
             if country == 'online':
                 domain.append([("country_id", "=", False)])
             elif country != 'all':
-                domain.append(['|', ("country_id", "=", int(country)), ("country_id", "=", False)])
+                domain.append([("country_id", "=", int(country))])
 
         no_date_domain = domain.copy()
         dates = self._search_build_dates()

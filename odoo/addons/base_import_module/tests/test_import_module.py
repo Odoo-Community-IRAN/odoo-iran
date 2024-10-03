@@ -64,9 +64,9 @@ class TestImportModule(odoo.tests.TransactionCase):
             """),
         ]
         self.env['res.lang']._activate_lang('fr_FR')
-        with self.assertLogs('odoo.addons.base_import_module.models.ir_module') as log_catcher:
+        with self.assertLogs('odoo.addons.base.models.ir_module') as log_catcher:
             self.import_zipfile(files)
-            self.assertIn('INFO:odoo.addons.base_import_module.models.ir_module:module foo: no translation for language fr_FR', log_catcher.output)
+            self.assertIn('INFO:odoo.addons.base.models.ir_module:module foo: no translation for language fr_FR', log_catcher.output)
         self.assertEqual(self.env.ref('foo.foo')._name, 'res.partner')
         self.assertEqual(self.env.ref('foo.foo').name, 'foo')
         self.assertEqual(self.env.ref('foo.bar')._name, 'res.partner')
@@ -78,8 +78,8 @@ class TestImportModule(odoo.tests.TransactionCase):
         self.assertEqual(self.env.ref('bar.foo').with_context(lang="fr_FR").name, 'dumb')
 
         # Check that activating a non-loaded language does not crash the code
-        self.env['res.lang']._activate_lang('es')
-        self.assertEqual(self.env.ref('bar.foo').with_context(lang="es").name, 'foo')
+        self.env['res.lang']._activate_lang('es_419')
+        self.assertEqual(self.env.ref('bar.foo').with_context(lang="es_419").name, 'foo')
 
         for path, data in files:
             if path.split('/')[1] == 'static':

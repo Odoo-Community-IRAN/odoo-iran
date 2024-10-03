@@ -2,34 +2,36 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import markupsafe
-from odoo import _, api, fields, models, release
+from odoo import api, fields, models, release
+from odoo.tools import LazyTranslate
 
+_lt = LazyTranslate(__name__)
 
 # === TBAI license values ===
 L10N_ES_TBAI_LICENSE_DICT = {
     'production': {
-        'license_name': _('Production license'),  # all agencies
+        'license_name': _lt('Production license'),  # all agencies
         'license_number': 'TBAIGI5A266A7CCDE1EC',
         'license_nif': 'N0251909H',
         'software_name': 'Odoo SA',
         'software_version': release.version,
     },
     'araba': {
-        'license_name': _('Test license (Araba)'),
+        'license_name': _lt('Test license (Araba)'),
         'license_number': 'TBAIARbjjMClHKH00849',
         'license_nif': 'N0251909H',
         'software_name': 'Odoo SA',
         'software_version': release.version,
     },
     'bizkaia': {
-        'license_name': _('Test license (Bizkaia)'),
+        'license_name': _lt('Test license (Bizkaia)'),
         'license_number': 'TBAIBI00000000PRUEBA',
         'license_nif': 'A99800005',
         'software_name': 'SOFTWARE GARANTE TICKETBAI PRUEBA',
         'software_version': '1.0',
     },
     'gipuzkoa': {
-        'license_name': _('Test license (Gipuzkoa)'),
+        'license_name': _lt('Test license (Gipuzkoa)'),
         'license_number': 'TBAIGIPRE00000000965',
         'license_nif': 'N0251909H',
         'software_name': 'Odoo SA',
@@ -39,6 +41,19 @@ L10N_ES_TBAI_LICENSE_DICT = {
 
 class ResCompany(models.Model):
     _inherit = 'res.company'
+
+    l10n_es_tbai_certificate_id = fields.Many2one(
+        string="Certificate (TicketBAI)",
+        store=True,
+        readonly=False,
+        comodel_name='certificate.certificate',
+        compute="_compute_l10n_es_tbai_certificate",
+    )
+    l10n_es_tbai_certificate_ids = fields.One2many(
+        comodel_name='certificate.certificate',
+        inverse_name='company_id',
+        domain=[('scope', '=', 'tbai')],
+    )
 
     # === TBAI config ===
     l10n_es_tbai_tax_agency = fields.Selection(
@@ -62,16 +77,41 @@ class ResCompany(models.Model):
         copy=False,
     )
 
-    @api.depends('country_id', 'l10n_es_edi_test_env', 'l10n_es_tbai_tax_agency')
+    l10n_es_tbai_test_env = fields.Boolean(
+        string="TBAI Test Mode",
+        help="Use the test environment for TicketBAI",
+        default=True,
+    )
+
+    l10n_es_tbai_is_enabled = fields.Boolean(compute='_compute_l10n_es_tbai_is_enabled')
+
+    @api.depends('country_id', 'l10n_es_tbai_tax_agency')
+    def _compute_l10n_es_tbai_is_enabled(self):
+        for company in self:
+            company.l10n_es_tbai_is_enabled = company.country_code == 'ES' and company.l10n_es_tbai_tax_agency
+
+    @api.depends('country_id', 'l10n_es_tbai_certificate_ids')
+    def _compute_l10n_es_tbai_certificate(self):
+        for company in self:
+            if company.country_code == 'ES':
+                company.l10n_es_tbai_certificate_id = self.env['certificate.certificate'].search(
+                    [('company_id', '=', company.id), ('is_valid', '=', True), ('scope', '=', 'tbai')],
+                    order='date_end desc',
+                    limit=1,
+                )
+            else:
+                company.l10n_es_tbai_certificate_id = False
+
+    @api.depends('country_id', 'l10n_es_tbai_test_env', 'l10n_es_tbai_tax_agency')
     def _compute_l10n_es_tbai_license_html(self):
         for company in self:
             license_dict = company._get_l10n_es_tbai_license_dict()
             if license_dict:
                 license_dict.update({
-                    'tr_nif': _('Licence NIF'),
-                    'tr_number': _('Licence number'),
-                    'tr_name': _('Software name'),
-                    'tr_version': _('Software version')
+                    'tr_nif': self.env._('Licence NIF'),
+                    'tr_number': self.env._('Licence number'),
+                    'tr_name': self.env._('Software name'),
+                    'tr_version': self.env._('Software version')
                 })
                 company.l10n_es_tbai_license_html = markupsafe.Markup('''
 <strong>{license_name}</strong><br/>
@@ -83,12 +123,12 @@ class ResCompany(models.Model):
 </p>''').format(**license_dict)
             else:
                 company.l10n_es_tbai_license_html = markupsafe.Markup('''
-<strong>{tr_no_license}</strong>''').format(tr_no_license=_('TicketBAI is not configured'))
+<strong>{tr_no_license}</strong>''').format(tr_no_license=self.env._('TicketBAI is not configured'))
 
     def _get_l10n_es_tbai_license_dict(self):
         self.ensure_one()
-        if self.country_code == 'ES' and self.l10n_es_tbai_tax_agency:
-            if self.l10n_es_edi_test_env:  # test env: each agency has its test license
+        if self.l10n_es_tbai_is_enabled:
+            if self.l10n_es_tbai_test_env:  # test env: each agency has its test license
                 license_key = self.l10n_es_tbai_tax_agency
             else:  # production env: only one license
                 license_key = 'production'
@@ -107,18 +147,14 @@ class ResCompany(models.Model):
             })
         return self.l10n_es_tbai_chain_sequence_id.next_by_id()
 
-    def _get_l10n_es_tbai_last_posted_invoice(self, being_posted=False):
+    def _get_l10n_es_tbai_last_chained_document(self):
         """
-        Returns the last invoice posted to this company's chain.
-        That invoice may have been received by the govt or not (eg. in case of a timeout).
-        Only upon confirmed reception/refusal of that invoice can another one be posted.
-        :param being_posted: next invoice to be posted on the chain, ignored in search domain
+        Returns the last tbai document posted to this company's chain.
+        That tbai document may have been received by the govt or not (eg. in case of a timeout).
+        Only upon confirmed reception/refusal of that tbai document can another one be posted.
         """
         domain = [
-            ('l10n_es_tbai_chain_index', '!=', 0),
+            ('chain_index', '!=', 0),
             ('company_id', '=', self.id)
         ]
-        if being_posted:
-            domain.append(('l10n_es_tbai_chain_index', '!=', being_posted.l10n_es_tbai_chain_index))
-            # NOTE: being_posted may not have a chain index at all (if being posted for the first time)
-        return self.env['account.move'].search(domain, limit=1, order='l10n_es_tbai_chain_index desc')
+        return self.env['l10n_es_edi_tbai.document'].search(domain, limit=1, order='chain_index desc')

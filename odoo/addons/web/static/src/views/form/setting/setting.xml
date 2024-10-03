@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="web.Setting">
-        <div t-att-class="classNames">
+        <div t-att-class="classNames" t-att-id="props.id">
             <div class="o_setting_left_pane" t-att-data-tooltip="props.title" data-tooltip-delay="800">
                 <t t-if="props.fieldName and fieldType==='boolean'">
                     <t t-slot="fieldSlot"/>
@@ -13,7 +13,7 @@
                     <span class="o_form_label"><t t-esc="labelString"/></span>
                 </t>
                 <t t-if="labelString and props.documentation">
-                    <DocumentationLink path="props.documentation"/>
+                    <DocumentationLink path="props.documentation" icon="'fa-question-circle'"/>
                 </t>
                 <t t-if="displayCompanyDependentIcon">
                     <span class="fa fa-lg fa-building-o" title="Values set here are company-specific."/>

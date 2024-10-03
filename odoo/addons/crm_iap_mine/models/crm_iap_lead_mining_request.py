@@ -47,7 +47,6 @@ class CRMLeadMiningRequest(models.Model):
     # Lead / Opportunity Data
 
     lead_type = fields.Selection([('lead', 'Leads'), ('opportunity', 'Opportunities')], string='Type', required=True, default=_default_lead_type)
-    display_lead_label = fields.Char(compute='_compute_display_lead_label')
     team_id = fields.Many2one(
         'crm.team', string='Sales Team', ondelete="set null",
         domain="[('use_opportunities', '=', True)]", readonly=False, compute='_compute_team_id', store=True)
@@ -77,23 +76,22 @@ class CRMLeadMiningRequest(models.Model):
     lead_contacts_credits = fields.Char(compute='_compute_tooltip', readonly=True)
     lead_total_credits = fields.Char(compute='_compute_tooltip', readonly=True)
 
-    @api.depends('lead_type', 'lead_number')
-    def _compute_display_lead_label(self):
-        selection_description_values = {
-            e[0]: e[1] for e in self._fields['lead_type']._description_selection(self.env)}
-        for request in self:
-            lead_type = selection_description_values[request.lead_type]
-            request.display_lead_label = '%s %s' % (request.lead_number, lead_type)
-
-
     @api.onchange('lead_number', 'contact_number')
     def _compute_tooltip(self):
         for record in self:
             company_credits = CREDIT_PER_COMPANY * record.lead_number
             contact_credits = CREDIT_PER_CONTACT * record.contact_number
             total_contact_credits = contact_credits * record.lead_number
-            record.lead_contacts_credits = _("Up to %d additional credits will be consumed to identify %d contacts per company.", contact_credits*company_credits, record.contact_number)
-            record.lead_credits = _('%d credits will be consumed to find %d companies.', company_credits, record.lead_number)
+            record.lead_contacts_credits = _(
+                "Up to %(credit_count)d additional credits will be consumed to identify %(contact_count)d contacts per company.",
+                credit_count=contact_credits * company_credits,
+                contact_count=record.contact_number,
+            )
+            record.lead_credits = _(
+                "%(credit_count)d credits will be consumed to find %(company_count)d companies.",
+                credit_count=company_credits,
+                company_count=record.lead_number,
+            )
             record.lead_total_credits = _("This makes a total of %d credits for this request.", total_contact_credits + company_credits)
 
     @api.depends('lead_ids.lead_mining_request_id')

@@ -8,30 +8,33 @@
     .o-selection input {
         display: initial;
     }
+
+    .o-scorecard, .o-gauge-chart {
+        border-radius: 8px;
+    }
 }
 
 .o-sidePanel {
-    .o-input{
-        background-origin: content-box;
+    .o_input {
+        color: #111827;
+        border-color: #D8DADD;
+        &::placeholder {
+            opacity: 0.5;
+        }
     }
 
-    .o-sidePanelButtons .o-button {
-        color: #666;
-
-        &.o_global_filter_save {
-            color: $o-brand-primary;
-            border-color: $o-brand-primary;
+    .o_required_modifier {
+        .o-input {
+            border-color: #111827;
         }
+    }
 
-        &.o_delete_element {
-            color: #fff;
-            background-color: map-get($theme-colors, "danger");
-            border-color: map-get($theme-colors, "danger");
+    .o_tree_editor_condition {
+        flex-wrap: wrap;
+    }
 
-            &:hover:enabled {
-                background-color: darken(map-get($theme-colors, "danger"), 7%);
-                border-color: #bd2130;
-            }
-        }
+    .o-sp-badge {
+        background-color: #374151C2;
+        color: #fff;
     }
 }

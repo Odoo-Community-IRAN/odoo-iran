@@ -5,14 +5,18 @@ import { useService } from "@web/core/utils/hooks";
 
 import { ListRenderer } from "@web/views/list/list_renderer";
 import { X2ManyField, x2ManyField } from "@web/views/fields/x2many/x2many_field";
+import { KanbanRenderer } from "@web/views/kanban/kanban_renderer";
+import { KanbanRecord } from "@web/views/kanban/kanban_record";
+import { uniqueId } from "@web/core/utils/functions";
+import { FileViewer } from "@web/core/file_viewer/file_viewer";
 
 export class ExpenseLinesListRenderer extends ListRenderer {
     setup() {
         super.setup();
-        this.threadService = useService("mail.thread");
+        this.store = useService("mail.store");
 
         this.sheetId = this.env.model.root.resId;
-        this.sheetThread = this.threadService.getThread('hr.expense.sheet', this.sheetId);
+        this.sheetThread = this.store.Thread.insert({ model: "hr.expense.sheet", id: this.sheetId });
     }
 
     /** @override **/
@@ -26,10 +30,54 @@ export class ExpenseLinesListRenderer extends ListRenderer {
     }
 }
 
+export class ExpenseLinesKanbanRecord extends KanbanRecord {
+
+    setup() {
+        super.setup();
+        this.orm = useService("orm");
+    }
+
+    /** @override **/
+    async onGlobalClick(ev) {
+        const expenseName = this.props.record.data.name;
+        const attachments = await this.orm.call('hr.expense', 'get_expense_attachments', [this.props.record.resId]);
+        const files = attachments.map((attachment, index) => ({
+            isImage: true,
+            isViewable: true,
+            displayName: expenseName + ` (${index + 1})`,
+            defaultSource: attachment,
+            downloadUrl: attachment,
+        }));
+        const viewerId = uniqueId('web.file_viewer');
+
+        if (files.length) {
+            registry.category("main_components").add(viewerId, {
+                Component: FileViewer,
+                props: {
+                    files: files,
+                    startIndex: 0,
+                    close: () => {
+                        registry.category('main_components').remove(viewerId);
+                    },
+                },
+            });
+        }
+        super.onGlobalClick(ev);
+    }
+}
+
+export class ExpenseLinesKanbanRenderer extends KanbanRenderer {
+    static components = {
+        ...KanbanRenderer.components,
+        KanbanRecord: ExpenseLinesKanbanRecord,
+    };
+}
+
 export class ExpenseLinesWidget extends X2ManyField {
     static components = {
         ...X2ManyField.components,
         ListRenderer: ExpenseLinesListRenderer,
+        KanbanRenderer: ExpenseLinesKanbanRenderer,
     };
 
     setup() {
@@ -46,7 +94,6 @@ export class ExpenseLinesWidget extends X2ManyField {
 export const expenseLinesWidget = {
     ...x2ManyField,
     component: ExpenseLinesWidget,
-    relatedFields: [{ name: "message_main_attachment_checksum", type: "char" }],
     additionalClasses: ["o_field_many2many"],
 };
 

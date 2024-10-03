@@ -1,7 +1,7 @@
-/** @odoo-module **/
-
+import { formatCurrency } from "@web/core/currency";
 import { _t } from "@web/core/l10n/translation";
 import publicWidget from '@web/legacy/js/public/public_widget';
+import { rpc } from "@web/core/network/rpc";
 
 const CUSTOM_BUTTON_EXTRA_WIDTH = 10;
 let cachedCurrency;
@@ -13,13 +13,6 @@ publicWidget.registry.DonationSnippet = publicWidget.Widget.extend({
         'click .s_donation_btn': '_onClickPrefilledButton',
         'click .s_donation_donate_btn': '_onClickDonateNowButton',
         'input #s_donation_range_slider': '_onInputRangeSlider',
-    },
-    /**
-     * @override
-     */
-    init() {
-        this._super(...arguments);
-        this.rpc = this.bindService("rpc");
     },
 
     /**
@@ -116,7 +109,7 @@ publicWidget.registry.DonationSnippet = publicWidget.Widget.extend({
     _getCachedCurrency() {
         return cachedCurrency
             ? Promise.resolve(cachedCurrency)
-            : this.rpc("/website/get_current_currency").then((result) => {
+            : rpc("/website/get_current_currency").then((result) => {
                 cachedCurrency = result;
                 return result;
             });
@@ -155,13 +148,16 @@ publicWidget.registry.DonationSnippet = publicWidget.Widget.extend({
             } else if ($buttons.length) {
                 amount = parseFloat(this.$('#s_donation_amount_input').val());
                 let errorMessage = '';
-                const minAmount = this.el.dataset.minimumAmount;
+                const minAmount = parseFloat(this.el.dataset.minimumAmount);
                 if (!amount) {
                     errorMessage = _t("Please select or enter an amount");
-                } else if (amount < parseFloat(minAmount)) {
-                    const before = this.currency.position === "before" ? this.currency.symbol : "";
-                    const after = this.currency.position === "after" ? this.currency.symbol : "";
-                    errorMessage = _t("The minimum donation amount is %s%s%s", before, minAmount, after);
+                } else if (amount < minAmount) {
+                    errorMessage = _t(
+                        "The minimum donation amount is %(amount)s",
+                        {
+                            amount: formatCurrency(minAmount, this.currency.id),
+                        }
+                    );
                 }
                 if (errorMessage) {
                     $(ev.currentTarget).before($('<p>', {

@@ -3,15 +3,15 @@
 # 	* auth_password_policy
 # 
 # Translators:
-# Wil Odoo, 2023
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:55+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Wil Odoo, 2023\n"
+"POT-Creation-Date: 2024-09-25 08:40+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Japanese (https://app.transifex.com/odoo/teams/41243/ja/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -38,21 +38,12 @@ msgstr "パスワードの最小文字数, 設定が不要の場合0に設定"
 #. module: auth_password_policy
 #. odoo-javascript
 #: code:addons/auth_password_policy/static/src/password_field.js:0
-#, python-format
 msgid "Password"
 msgstr "パスワード"
 
 #. module: auth_password_policy
-#. odoo-python
-#: code:addons/auth_password_policy/models/res_users.py:0
-#, python-format
-msgid "Passwords must have at least %d characters, got %d."
-msgstr "パスワードは%d文字以上である必要がありますが、%d文字でした"
-
-#. module: auth_password_policy
 #. odoo-javascript
 #: code:addons/auth_password_policy/static/src/password_meter.js:0
-#, python-format
 msgid ""
 "Required: %s\n"
 "\n"
@@ -68,22 +59,27 @@ msgid "User"
 msgstr "ユーザ"
 
 #. module: auth_password_policy
+#. odoo-python
+#: code:addons/auth_password_policy/models/res_users.py:0
+msgid ""
+"Your password must contain at least %(minimal_length)d characters and only "
+"has %(current_count)d."
+msgstr "パスワードは少なくとも %(minimal_length)d 文字必要ですが、 %(current_count)dしかありません。"
+
+#. module: auth_password_policy
 #. odoo-javascript
 #: code:addons/auth_password_policy/static/src/password_policy.js:0
-#, python-format
 msgid "at least %s character classes"
 msgstr "最低%s以上の文字クラス"
 
 #. module: auth_password_policy
 #. odoo-javascript
 #: code:addons/auth_password_policy/static/src/password_policy.js:0
-#, python-format
 msgid "at least %s characters"
 msgstr "最低 %s 文字以上"
 
 #. module: auth_password_policy
 #. odoo-javascript
 #: code:addons/auth_password_policy/static/src/password_policy.js:0
-#, python-format
 msgid "at least %s words"
 msgstr "最低 %s 語以上"

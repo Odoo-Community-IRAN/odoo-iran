@@ -1,11 +1,11 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
 import { Component, useRef, useState } from "@odoo/owl";
 import { Dialog } from "@web/core/dialog/dialog";
 import { Domain } from "@web/core/domain";
 import { DomainSelector } from "@web/core/domain_selector/domain_selector";
+import { rpc } from "@web/core/network/rpc";
 import { useService } from "@web/core/utils/hooks";
+import { user } from "@web/core/user";
 
 export class DomainSelectorDialog extends Component {
     static template = "web.DomainSelectorDialog";
@@ -37,9 +37,7 @@ export class DomainSelectorDialog extends Component {
 
     setup() {
         this.notification = useService("notification");
-        this.rpc = useService("rpc");
         this.orm = useService("orm");
-        this.user = useService("user");
         this.state = useState({ domain: this.props.domain });
         this.confirmButtonRef = useRef("confirm");
     }
@@ -82,13 +80,13 @@ export class DomainSelectorDialog extends Component {
         let domain;
         let isValid;
         try {
-            const evalContext = { ...this.user.context, ...this.props.context };
+            const evalContext = { ...user.context, ...this.props.context };
             domain = new Domain(this.state.domain).toList(evalContext);
         } catch {
             isValid = false;
         }
         if (isValid === undefined) {
-            isValid = await this.rpc("/web/domain/validate", {
+            isValid = await rpc("/web/domain/validate", {
                 model: this.props.resModel,
                 domain,
             });

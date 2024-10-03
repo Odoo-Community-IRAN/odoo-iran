@@ -19,12 +19,10 @@
         'views/stock_quant_views.xml',
         'views/stock_picking_views.xml',
         'views/supplier_info_views.xml',
-        'views/product_views.xml',
         'views/mrp_production_views.xml',
         'views/subcontracting_portal_views.xml',
         'views/subcontracting_portal_templates.xml',
         'views/stock_location_views.xml',
-        'wizard/stock_picking_return_views.xml',
     ],
     'demo': [
         'data/mrp_subcontracting_demo.xml',
@@ -36,6 +34,7 @@
         'web.assets_backend': [
             'mrp_subcontracting/static/src/components/**/*',
             'mrp_subcontracting/static/src/views/**/*',
+            'mrp_subcontracting/static/src/subcontracting_portal/move_list_view.js',
         ],
         'web.assets_frontend': [
             'mrp_subcontracting/static/src/scss/subcontracting_portal.scss',
@@ -46,11 +45,11 @@
 
             'web/static/src/scss/pre_variables.scss',
             'web/static/lib/bootstrap/scss/_variables.scss',
+            'web/static/lib/bootstrap/scss/_variables-dark.scss',
+            'web/static/lib/bootstrap/scss/_maps.scss',
 
             'web/static/src/libs/fontawesome/css/font-awesome.css',
             'web/static/lib/odoo_ui_icons/*',
-            'web/static/lib/select2/select2.css',
-            'web/static/lib/select2-bootstrap-css/select2-bootstrap.css',
             'web/static/src/webclient/navbar/navbar.scss',
             'web/static/src/scss/animation.scss',
             'web/static/src/core/colorpicker/colorpicker.scss',
@@ -68,10 +67,19 @@
             'web/static/lib/owl/odoo_module.js',
             'web/static/lib/jquery/jquery.js',
             'web/static/lib/popper/popper.js',
+            'web/static/lib/bootstrap/js/dist/util/index.js',
             'web/static/lib/bootstrap/js/dist/dom/data.js',
             'web/static/lib/bootstrap/js/dist/dom/event-handler.js',
             'web/static/lib/bootstrap/js/dist/dom/manipulator.js',
             'web/static/lib/bootstrap/js/dist/dom/selector-engine.js',
+            'web/static/lib/bootstrap/js/dist/util/config.js',
+            'web/static/lib/bootstrap/js/dist/util/component-functions.js',
+            'web/static/lib/bootstrap/js/dist/util/backdrop.js',
+            'web/static/lib/bootstrap/js/dist/util/focustrap.js',
+            'web/static/lib/bootstrap/js/dist/util/sanitizer.js',
+            'web/static/lib/bootstrap/js/dist/util/scrollbar.js',
+            'web/static/lib/bootstrap/js/dist/util/swipe.js',
+            'web/static/lib/bootstrap/js/dist/util/template-factory.js',
             'web/static/lib/bootstrap/js/dist/base-component.js',
             'web/static/lib/bootstrap/js/dist/alert.js',
             'web/static/lib/bootstrap/js/dist/button.js',
@@ -85,8 +93,7 @@
             'web/static/lib/bootstrap/js/dist/scrollspy.js',
             'web/static/lib/bootstrap/js/dist/tab.js',
             'web/static/lib/bootstrap/js/dist/toast.js',
-            'web/static/lib/select2/select2.js',
-            'web/static/src/legacy/js/libs/bootstrap.js',
+            'web/static/src/libs/bootstrap.js',
             'web/static/src/legacy/js/libs/jquery.js',
 
             ('include', 'web._assets_bootstrap'),
@@ -112,6 +119,7 @@
             'web/static/src/webclient/**/*',
             ('remove', 'web/static/src/webclient/clickbot/clickbot.js'),  # lazy loaded
             ('remove', 'web/static/src/views/form/button_box/*.scss'),
+            ('remove', 'web/static/src/webclient/share_target/*'),
 
             # remove the report code and whitelist only what's needed
             ('remove', 'web/static/src/webclient/actions/reports/**/*'),

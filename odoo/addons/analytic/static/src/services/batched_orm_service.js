@@ -7,7 +7,7 @@ import { Deferred } from "@web/core/utils/concurrency";
 
 class RequestBatcherORM extends ORM {
     constructor() {
-        super(...arguments);
+        super();
         this.searchReadBatches = {};
         this.searchReadBatchId = 1;
         this.batches = {};
@@ -70,7 +70,6 @@ class RequestBatcherORM extends ORM {
 }
 
 export const batchedOrmService = {
-    dependencies: ["rpc", "user"],
     async: [
         "call",
         "create",
@@ -83,8 +82,8 @@ export const batchedOrmService = {
         "webSearchRead",
         "write",
     ],
-    start(env, { rpc, user }) {
-        return new RequestBatcherORM(rpc, user);
+    start() {
+        return new RequestBatcherORM();
     },
 };
 

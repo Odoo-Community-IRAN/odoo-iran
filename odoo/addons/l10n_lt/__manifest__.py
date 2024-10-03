@@ -17,11 +17,12 @@ This module also includes:
     """,
     'license': 'LGPL-3',
     'author': 'Focusate',
-    'website': 'https://www.odoo.com/documentation/17.0/applications/finance/fiscal_localizations.html',
+    'website': 'https://www.odoo.com/documentation/master/applications/finance/fiscal_localizations.html',
     'category': 'Accounting/Localizations/Account Charts',
     'depends': [
         'account',
     ],
+    'auto_install': ['account'],
     'data': [
         'data/account_account_tag_data.xml',
         'data/res_bank_data.xml',

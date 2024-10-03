@@ -2,16 +2,20 @@
 <odoo>
 
     <record id="view_delivery_carrier_tree" model="ir.ui.view">
-        <field name="name">delivery.carrier.tree</field>
+        <field name="name">delivery.carrier.list</field>
         <field name="model">delivery.carrier</field>
         <field name="arch" type="xml">
-            <tree string="Carrier">
+            <list string="Carrier">
                 <field name="sequence" widget="handle"/>
                 <field name="name"/>
                 <field name="delivery_type"/>
                 <field name="company_id" groups="base.group_multi_company"/>
                 <field name="country_ids" widget="many2many_tags" optional="hide"/>
-            </tree>
+                <field name="max_weight" optional="show"/>
+                <field name="max_volume" optional="hide"/>
+                <field name="must_have_tag_ids" widget="many2many_tags" optional="hide"/>
+                <field name="excluded_tag_ids" widget="many2many_tags" optional="hide"/>
+            </list>
         </field>
     </record>
 
@@ -76,7 +80,7 @@
                     </div>
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
                     <div class="oe_title" name="title">
-                        <label for="name" string="Shipping Method"/>
+                        <label for="name" string="Delivery Method"/>
                         <h1>
                             <field name="name" placeholder="e.g. UPS Express"/>
                         </h1>
@@ -119,7 +123,13 @@
                                         invisible="not free_over"
                                         required="free_over"/>
                             </div>
-                            <field name="product_id" context="{'default_detailed_type': 'service', 'default_sale_ok': False, 'default_purchase_ok': False, 'default_invoice_policy': 'order'}" />
+                            <field name="product_id" context="{
+                                'default_type': 'service',
+                                'default_sale_ok': False,
+                                'default_purchase_ok': False,
+                                'default_invoice_policy': 'order',
+                            }"/>
+                            <field name="tracking_url" placeholder="i.e. https://ekartlogistics.com/shipmenttrack/&lt;shipmenttrackingnumber&gt;" invisible="delivery_type not in ('fixed', 'base_on_rule')"/>
                             <field name="invoice_policy" widget="radio" invisible="delivery_type in ('fixed', 'base_on_rule') or integration_level == 'rate'"/>
                             <field name="supports_shipping_insurance" invisible="1"/>
                             <label for="shipping_insurance" String="Shipping Insurance" invisible="not supports_shipping_insurance"/>
@@ -131,29 +141,49 @@
                     <notebook>
                         <page name="pricing" string="Pricing" invisible="delivery_type != 'base_on_rule'">
                             <group name="general">
-                                <field name="price_rule_ids" nolabel="1" colspan="2"/>
+                                <field name="price_rule_ids" nolabel="1"/>
                             </group>
                         </page>
-                        <page string="Destination Availability" name="destination">
+                        <page string="Availability" name="destination">
                             <group col="1">
                                 <p>
-                                    Filling this form allows you to filter delivery carriers according to the delivery address of your customer.
+                                    Filling this form allows you to make the shipping method available according to the content of the order or its destination.
                                 </p>
-                                <group name="country_details" class="oe_inline">
-                                    <field name="country_ids"
-                                            widget="many2many_tags"
-                                            options="{'no_open': True, 'no_create': True}"/>
-                                    <field name="state_ids"
-                                            widget="many2many_tags"
-                                            domain="[('country_id', 'in', country_ids)]"
-                                            readonly="not country_ids"
-                                            force_save="1"
-                                            options="{'no_create': True}"/>
-                                    <field name="zip_prefix_ids"
-                                            widget="many2many_tags"
-                                            readonly="not country_ids"
-                                            force_save="1"
-                                            options="{'no_create_edit': True}"/>
+                                <group>
+                                    <group name="country_details" string="Destination">
+                                        <field name="country_ids"
+                                                widget="many2many_tags"
+                                                options="{'no_open': True, 'no_create': True}"/>
+                                        <field name="state_ids"
+                                                widget="many2many_tags"
+                                                domain="[('country_id', 'in', country_ids)]"
+                                                readonly="not country_ids"
+                                                force_save="1"
+                                                options="{'no_create': True}"/>
+                                        <field name="zip_prefix_ids"
+                                                widget="many2many_tags"
+                                                readonly="not country_ids"
+                                                force_save="1"
+                                                options="{'no_create_edit': True}"/>
+                                    </group>
+                                    <group name="content" string="Content">
+                                        <label for="max_weight"/>
+                                        <div class="o_row">
+                                            <field name="max_weight" class="oe_inline"/>
+                                            <field name="weight_uom_name"/>
+                                        </div>
+                                        <label for="max_volume"/>
+                                        <div class="o_row">
+                                            <field name="max_volume" class="oe_inline"/>
+                                            <field name="volume_uom_name"/>
+                                        </div>
+                                        <field name="must_have_tag_ids"
+                                                widget="many2many_tags"
+                                                options="{'no_open': True, 'no_create': True}"/>
+                                        <field name="excluded_tag_ids"
+                                                widget="many2many_tags"
+                                                options="{'no_open': True, 'no_create': True}"/>
+                                    </group>
                                 </group>
                                 <p class="fst-italic" invisible="country_ids">
                                     Please select a country before choosing a state or a zip prefix.
@@ -170,9 +200,9 @@
     </record>
 
     <record id="action_delivery_carrier_form" model="ir.actions.act_window">
-        <field name="name">Shipping Methods</field>
+        <field name="name">Delivery Methods</field>
         <field name="res_model">delivery.carrier</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
         <field name="context">{'search_default_group_by_provider': True}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">

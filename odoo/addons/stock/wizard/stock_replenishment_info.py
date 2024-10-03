@@ -4,12 +4,14 @@
 import babel.dates
 from json import dumps
 from datetime import datetime, time
+from dateutil.relativedelta import relativedelta
 
 
 from odoo import api, fields, models, SUPERUSER_ID, _
 from odoo.osv.expression import AND
-from odoo.tools import get_month, subtract, format_date
-from odoo.tools.misc import get_lang
+from odoo.tools.date_utils import get_month, subtract
+from odoo.tools.float_utils import float_compare
+from odoo.tools.misc import get_lang, format_date
 
 
 class StockReplenishmentInfo(models.TransientModel):
@@ -55,6 +57,8 @@ class StockReplenishmentInfo(models.TransientModel):
                 'product_max_qty': self.env['ir.qweb.field.float'].value_to_html(orderpoint.product_max_qty, {'decimal_precision': 'Product Unit of Measure'}),
                 'product_uom_name': orderpoint.product_uom_name,
                 'virtual': orderpoint.trigger == 'manual' and orderpoint.create_uid.id == SUPERUSER_ID,
+                'visibility_days': orderpoint.visibility_days if float_compare(orderpoint.qty_forecast, orderpoint.product_min_qty, precision_rounding=orderpoint.product_uom.rounding) < 0 else 0,
+                'visibility_days_date': format_date(self.env, replenishment_report.orderpoint_id.lead_days_date + relativedelta(days=orderpoint.visibility_days))
             })
 
     @api.depends('orderpoint_id')
@@ -122,7 +126,8 @@ class StockReplenishmentOption(models.TransientModel):
                 'route_ids': record.route_id,
                 'warehouse_id': record.warehouse_id,
             })
-            record.lead_time = str(rule._get_lead_days(record.product_id)[0]['total_delay'] if rule else 0) + " days"
+            delay = rule._get_lead_days(record.product_id)[0]['total_delay'] if rule else 0
+            record.lead_time = _("%s days", delay)
 
     @api.depends('warehouse_id', 'free_qty', 'uom', 'qty_to_order')
     def _compute_warning_message(self):

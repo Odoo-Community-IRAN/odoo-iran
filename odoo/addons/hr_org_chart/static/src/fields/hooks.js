@@ -1,7 +1,8 @@
 /** @odoo-module **/
 
 import { _t } from "@web/core/l10n/translation";
-import { session } from "@web/session";
+import { user } from "@web/core/user";
+import { rpc } from "@web/core/network/rpc";
 import { useService } from "@web/core/utils/hooks";
 
 /**
@@ -15,7 +16,6 @@ import { useService } from "@web/core/utils/hooks";
 export function onEmployeeSubRedirect() {
     const actionService = useService('action');
     const orm = useService('orm');
-    const rpc = useService('rpc');
 
     return async (event) => {
         const employeeId = parseInt(event.currentTarget.dataset.employeeId);
@@ -27,7 +27,7 @@ export function onEmployeeSubRedirect() {
         const subordinateIds = await rpc('/hr/get_subordinates', {
             employee_id: employeeId,
             subordinates_type: type,
-            context: session.user_context
+            context: user.context
         });
         let action = await orm.call('hr.employee', 'get_formview_action', [employeeId]);
         action = {...action,

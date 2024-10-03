@@ -8,14 +8,19 @@
         <field name="arch" type="xml">
             <group name="main_fields" position="inside">
                 <group name="ecommerce_main_fields">
-                    <field name="visibility" string="eCommerce Filter Visibility" widget="radio"/>
+                    <field
+                        name="visibility"
+                        string="eCommerce Filter"
+                        widget="radio"
+                        options="{'horizontal': True}"
+                    />
                 </group>
             </group>
         </field>
     </record>
 
     <record id="attribute_tree_view" model="ir.ui.view">
-        <field name="name">product.attribute.tree</field>
+        <field name="name">product.attribute.list</field>
         <field name="model">product.attribute</field>
         <field name="inherit_id" ref="product.attribute_tree_view"/>
         <field name="arch" type="xml">

@@ -7,30 +7,37 @@
         <field name="inherit_id" ref="product.product_template_form_view"/>
         <field name="arch" type="xml">
             <page name="sales" position="attributes">
-                <attribute name="invisible" remove="1" separator=" or "></attribute>
+                <attribute name="invisible" remove="1" separator="or"/>
             </page>
             <field name="product_variant_count" position="after">
                 <field name="service_type" widget="radio" invisible="True"/>
                 <field name="visible_expense_policy" invisible="1"/>
             </field>
-            <field name="detailed_type" position="after">
-                <field name="invoice_policy" required="1"/>
-                <field name="expense_policy" widget="radio" invisible="not visible_expense_policy"/>
+            <field name="type" position="after">
+                <field
+                    name="invoice_policy"
+                    required="1"
+                    invisible="not sale_ok or type == 'combo'"
+                />
             </field>
-            <field name="product_tooltip" position="after">
-                <label for="product_tooltip" string=""
-                    invisible="type not in ('product', 'consu') or invoice_policy != 'order'"/>
-                <div invisible="type not in ('product', 'consu') or invoice_policy != 'order'"
-                    class="fst-italic text-muted">
-                    You can invoice them before they are delivered.
-                </div>
-                <label for="product_tooltip" string=""
-                    invisible="type not in ('product', 'consu') or invoice_policy != 'delivery'"/>
-                <div invisible="type not in ('product', 'consu') or invoice_policy != 'delivery'"
-                    class="fst-italic text-muted">
-                    Invoice after delivery, based on quantities delivered, not ordered.
-                </div>
+            <field name="service_tracking" position="attributes">
+                <attribute name="invisible" add="not sale_ok" separator="or"/>
             </field>
+            <group name="description" position="after">
+                <t groups="sales_team.group_sale_salesman">
+                    <group string="Warning when Selling this Product" groups="sale.group_warning_sale">
+                        <field name="sale_line_warn" string="Warning"/>
+                        <field name="sale_line_warn_msg"
+                               string="Message"
+                               placeholder="Type a message..."
+                               invisible="sale_line_warn == 'no-message'"
+                               required="sale_line_warn != 'no-message'"/>
+                    </group>
+                </t>
+                <group name="expense_info" string="Expense" invisible="not visible_expense_policy">
+                    <field name="expense_policy" widget="radio"/>
+                </group>
+            </group>
         </field>
     </record>
 
@@ -57,16 +64,6 @@
                     </div>
                 </button>
             </div>
-            <group name="description" position="after">
-                <t groups="sales_team.group_sale_salesman">
-                    <group string="Warning when Selling this Product" groups="sale.group_warning_sale">
-                        <field name="sale_line_warn" nolabel="1" colspan="2"/>
-                        <field name="sale_line_warn_msg" colspan="2" nolabel="1" placeholder="Type a message..."
-                                readonly="sale_line_warn == 'no-message'"
-                                required="sale_line_warn != 'no-message'"/>
-                    </group>
-                </t>
-            </group>
         </field>
     </record>
 
@@ -75,7 +72,7 @@
         <field name="model">product.template</field>
         <field name="inherit_id" ref="product.product_template_only_form_view"/>
         <field name="arch" type="xml">
-            <div name="button_box" position="inside">
+            <button name="action_open_documents" position="after">
                 <button class="oe_stat_button"
                     name="action_view_sales"
                     type="object" icon="fa-signal"
@@ -90,25 +87,15 @@
                         <span class="o_stat_text">Sold</span>
                     </div>
                 </button>
-            </div>
-            <group name="description" position="after">
-                <t groups="sales_team.group_sale_salesman">
-                    <group string="Warning when Selling this Product" groups="sale.group_warning_sale">
-                        <field name="sale_line_warn" string="Warning"/>
-                        <field name="sale_line_warn_msg" string="Message" placeholder="Type a message..."
-                                invisible="sale_line_warn == 'no-message'"
-                                readonly="sale_line_warn == 'no-message'"
-                                required="sale_line_warn != 'no-message'"/>
-                    </group>
-                </t>
-            </group>
+            </button>
         </field>
     </record>
 
     <record id="product_template_action" model="ir.actions.act_window">
         <field name="name">Products</field>
         <field name="res_model">product.template</field>
-        <field name="view_mode">kanban,tree,form,activity</field>
+        <field name="path">products</field>
+        <field name="view_mode">kanban,list,form,activity</field>
         <field name="view_id" ref="product.product_template_kanban_view"/>
         <field name="search_view_id" ref="product.product_template_search_view"/>
         <field name="context">{"search_default_filter_to_sell":1, "sale_multi_pricelist_product_template": 1}</field>
@@ -127,7 +114,7 @@
         <field name="inherit_id" ref="product.product_view_kanban_catalog"/>
         <field name="model">product.product</field>
         <field name="arch" type="xml">
-            <xpath expr="//t[@t-name='kanban-menu']" position="attributes">
+            <xpath expr="//t[@t-name='menu']" position="attributes">
                 <attribute name="groups">sales_team.group_sale_manager</attribute>
             </xpath>
         </field>
@@ -138,12 +125,23 @@
         <field name="inherit_id" ref="product.product_view_search_catalog"/>
         <field name="model">product.product</field>
         <field name="arch" type="xml">
-            <filter name="products" position="after">
+            <filter name="goods" position="after">
                 <filter string="In the Order"
                         invisible="context.get('active_model', '') != 'sale.order.line'"
                         name="products_in_order"
                         domain="[('product_catalog_product_is_in_sale_order', '=', True)]"/>
             </filter>
+        </field>
+    </record>
+
+    <record id="view_category_property_form" model="ir.ui.view">
+        <field name="name">product.category.property.form.inherit.sale</field>
+        <field name="model">product.category</field>
+        <field name="inherit_id" ref="product.product_category_form_view"/>
+        <field name="arch" type="xml">
+            <field name="property_account_expense_categ_id" position="after">
+                <field name="property_account_downpayment_categ_id"/>
+            </field>
         </field>
     </record>
 

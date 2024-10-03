@@ -6,8 +6,8 @@
         <field name="inherit_id" ref="point_of_sale.view_pos_pos_form"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='user_id']" position='replace'>
-                <field string='Cashier' name="employee_id" readonly="1" invisible="not employee_id"/>
-                <field string='Cashier' name="user_id" readonly="1" invisible="employee_id"/>
+                <field name="employee_id" readonly="1" invisible="not employee_id"/>
+                <field name="user_id" readonly="1" invisible="employee_id"/>
             </xpath>
         </field>
     </record>
@@ -27,7 +27,7 @@
     </record>
 
     <record id="view_pos_order_tree_inherit" model="ir.ui.view">
-        <field name="name">pos.order.tree.inherit</field>
+        <field name="name">pos.order.list.inherit</field>
         <field name="model">pos.order</field>
         <field name="inherit_id" ref="point_of_sale.view_pos_order_tree"/>
         <field name="arch" type="xml">

@@ -10,7 +10,7 @@ class ProductCategory(models.Model):
 
     property_account_creditor_price_difference_categ = fields.Many2one(
         'account.account', string="Price Difference Account",
-        company_dependent=True,
+        company_dependent=True, ondelete='restrict',
         help="This account will be used to value price difference between purchase price and accounting cost.")
 
 
@@ -19,7 +19,7 @@ class ProductTemplate(models.Model):
     _inherit = 'product.template'
 
     property_account_creditor_price_difference = fields.Many2one(
-        'account.account', string="Price Difference Account", company_dependent=True,
+        'account.account', string="Price Difference Account", company_dependent=True, ondelete='restrict',
         help="This account is used in automated inventory valuation to "\
              "record the price difference between a purchase order and its related vendor bill when validating this vendor bill.")
 
@@ -48,11 +48,13 @@ class ProductProduct(models.Model):
         qty_by_product_location, qty_by_product_wh = super()._get_quantity_in_progress(location_ids, warehouse_ids)
         domain = self._get_lines_domain(location_ids, warehouse_ids)
         groups = self.env['purchase.order.line']._read_group(domain,
-            ['order_id', 'product_id', 'product_uom', 'orderpoint_id'],
+            ['order_id', 'product_id', 'product_uom', 'orderpoint_id', 'location_final_id'],
             ['product_qty:sum'])
-        for order, product, uom, orderpoint, product_qty_sum in groups:
+        for order, product, uom, orderpoint, location_final, product_qty_sum in groups:
             if orderpoint:
                 location = orderpoint.location_id
+            elif location_final:
+                location = location_final
             else:
                 location = order.picking_type_id.default_location_dest_id
             product_qty = uom._compute_quantity(product_qty_sum, product.uom_id, round=False)
@@ -61,29 +63,32 @@ class ProductProduct(models.Model):
         return qty_by_product_location, qty_by_product_wh
 
     def _get_lines_domain(self, location_ids=False, warehouse_ids=False):
-        domain = []
+        domains = []
         rfq_domain = [
             ('state', 'in', ('draft', 'sent', 'to approve')),
             ('product_id', 'in', self.ids)
         ]
         if location_ids:
-            domain = expression.AND([rfq_domain, [
+            domains.append(expression.AND([rfq_domain, [
+                '|',
                 '|',
                     ('order_id.picking_type_id.default_location_dest_id', 'in', location_ids),
                     '&',
+                        ('move_ids', '=', False),
+                        ('location_final_id', 'child_of', location_ids),
+                    '&',
                         ('move_dest_ids', '=', False),
                         ('orderpoint_id.location_id', 'in', location_ids)
-            ]])
+            ]]))
         if warehouse_ids:
-            wh_domain = expression.AND([rfq_domain, [
+            domains.append(expression.AND([rfq_domain, [
                 '|',
                     ('order_id.picking_type_id.warehouse_id', 'in', warehouse_ids),
                     '&',
                         ('move_dest_ids', '=', False),
                         ('orderpoint_id.warehouse_id', 'in', warehouse_ids)
-            ]])
-            domain = expression.OR([domain, wh_domain])
-        return domain
+            ]]))
+        return expression.OR(domains) if domains else []
 
 
 class SupplierInfo(models.Model):

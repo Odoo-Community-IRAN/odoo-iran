@@ -1,16 +1,11 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 import base64
-import logging
-
-from collections import defaultdict
+import re
 
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, RedirectWarning, UserError
-from odoo.tools import frozendict
 from odoo.tools.image import image_data_uri
-
-_logger = logging.getLogger(__name__)
 
 
 class AccountMove(models.Model):
@@ -34,6 +29,7 @@ class AccountMove(models.Model):
     l10n_in_shipping_port_code_id = fields.Many2one('l10n_in.port.code', 'Port code')
     l10n_in_reseller_partner_id = fields.Many2one('res.partner', 'Reseller', domain=[('vat', '!=', False)], help="Only Registered Reseller")
     l10n_in_journal_type = fields.Selection(string="Journal Type", related='journal_id.type')
+    l10n_in_warning = fields.Json(compute="_compute_l10n_in_warning")
 
     @api.depends('partner_id', 'partner_id.l10n_in_gst_treatment', 'state')
     def _compute_l10n_in_gst_treatment(self):
@@ -71,12 +67,62 @@ class AccountMove(models.Model):
             else:
                 move.l10n_in_state_id = False
 
+    @api.onchange('name')
+    def _onchange_name_warning(self):
+        if self.country_code == 'IN' and self.journal_id.type == 'sale' and self.name and (len(self.name) > 16 or not re.match(r'^[a-zA-Z0-9-\/]+$', self.name)):
+            return {'warning': {
+                'title' : _("Invalid sequence as per GST rule 46(b)"),
+                'message': _(
+                    "The invoice number should not exceed 16 characters\n"
+                    "and must only contain '-' (hyphen) and '/' (slash) as special characters"
+                )
+            }}
+        return super()._onchange_name_warning()
+
+    @api.depends('invoice_line_ids.l10n_in_hsn_code', 'company_id.l10n_in_hsn_code_digit')
+    def _compute_l10n_in_warning(self):
+
+        def build_warning(record, action_name, message, views, domain=False):
+            return {
+                'message': message,
+                'action_text': self.env._("View %s", action_name),
+                'action': record._get_records_action(name=self.env._("Check %s", action_name), target='current', views=views, domain=domain or [])
+            }
+
+        indian_invoice = self.filtered(lambda m: m.country_code == 'IN' and m.move_type != 'entry')
+        for move in indian_invoice:
+            filtered_lines = move.invoice_line_ids.filtered(lambda line: line.display_type == 'product' and line.tax_ids and line._origin)
+            if move.company_id.l10n_in_hsn_code_digit and filtered_lines:
+                lines = self.env['account.move.line']
+                for line in filtered_lines:
+                    if (line.l10n_in_hsn_code and (not re.match(r'^\d{4}$|^\d{6}$|^\d{8}$', line.l10n_in_hsn_code) or len(line.l10n_in_hsn_code) < int(move.company_id.l10n_in_hsn_code_digit))) or not line.l10n_in_hsn_code:
+                        lines |= line._origin
+
+                digit_suffixes = {
+                    '4': _("4 digits, 6 digits or 8 digits"),
+                    '6': _("6 digits or 8 digits"),
+                    '8': _("8 digits")
+                }
+                msg = _("Ensure that the HSN/SAC Code consists either %s in invoice lines",
+                    digit_suffixes.get(move.company_id.l10n_in_hsn_code_digit, _("Invalid HSN/SAC Code digit"))
+                )
+                move.l10n_in_warning = {
+                    'invalid_hsn_code_length': build_warning(
+                        message=msg,
+                        action_name=_("Journal Items(s)"),
+                        record=lines,
+                        views=[(self.env.ref("l10n_in.view_move_line_tree_hsn_l10n_in").id, "list")],
+                        domain=[('id', 'in', lines.ids)]
+                    )
+                } if lines else {}
+            else:
+                move.l10n_in_warning = {}
+        (self - indian_invoice).l10n_in_warning = {}
+
     def _get_name_invoice_report(self):
+        self.ensure_one()
         if self.country_code == 'IN':
-            # TODO: remove the view mode check in master, only for stable releases
-            in_invoice_view = self.env.ref('l10n_in.l10n_in_report_invoice_document_inherit', raise_if_not_found=False)
-            if (in_invoice_view and in_invoice_view.sudo().mode == "primary"):
-                return 'l10n_in.l10n_in_report_invoice_document_inherit'
+            return 'l10n_in.l10n_in_report_invoice_document_inherit'
         return super()._get_name_invoice_report()
 
     def _post(self, soft=True):
@@ -114,33 +160,9 @@ class AccountMove(models.Model):
         self.ensure_one()
         return False
 
-    @api.ondelete(at_uninstall=False)
-    def _unlink_l10n_in_except_once_post(self):
-        # Prevent deleting entries once it's posted for Indian Company only
-        if any(m.country_code == 'IN' and m.posted_before for m in self) and not self._context.get('force_delete'):
-            raise UserError(_("To keep the audit trail, you can not delete journal entries once they have been posted.\nInstead, you can cancel the journal entry."))
-
     def _can_be_unlinked(self):
         self.ensure_one()
         return (self.country_code != 'IN' or not self.posted_before) and super()._can_be_unlinked()
-
-    def unlink(self):
-        # Add logger here becouse in api ondelete account.move.line is deleted and we can't get total amount
-        logger_msg = False
-        if any(m.country_code == 'IN' and m.posted_before for m in self):
-            if self._context.get('force_delete'):
-                moves_details = ", ".join("{entry_number} ({move_id}) amount {amount_total} {currency} and partner {partner_name}".format(
-                    entry_number=m.name,
-                    move_id=m.id,
-                    amount_total=m.amount_total,
-                    currency=m.currency_id.name,
-                    partner_name=m.partner_id.display_name)
-                    for m in self)
-                logger_msg = 'Force deleted Journal Entries %s by %s (%s)' % (moves_details, self.env.user.name, self.env.user.id)
-        res = super().unlink()
-        if logger_msg:
-            _logger.info(logger_msg)
-        return res
 
     def _generate_qr_code(self, silent_errors=False):
         self.ensure_one()
@@ -157,114 +179,17 @@ class AccountMove(models.Model):
 
     def _l10n_in_get_hsn_summary_table(self):
         self.ensure_one()
-        display_uom = self.env.user.user_has_groups('uom.group_uom')
-        tag_igst = self.env.ref('l10n_in.tax_tag_igst')
-        tag_cgst = self.env.ref('l10n_in.tax_tag_cgst')
-        tag_sgst = self.env.ref('l10n_in.tax_tag_sgst')
-        tag_cess = self.env.ref('l10n_in.tax_tag_cess')
+        display_uom = self.env.user.has_group('uom.group_uom')
 
-        def filter_invl_to_apply(invoice_line):
-            return bool(invoice_line.product_id.l10n_in_hsn_code)
-
-        def grouping_key_generator(base_line, _tax_values):
-            # The rate is only for SGST/CGST.
-            if base_line['is_refund']:
-                tax_rep_field = 'refund_repartition_line_ids'
-            else:
-                tax_rep_field = 'invoice_repartition_line_ids'
-            gst_taxes = base_line['taxes'].flatten_taxes_hierarchy()[tax_rep_field]\
-                .filtered(lambda tax_rep: (
-                    tax_rep.repartition_type == 'tax'
-                    and any(tag in tax_rep.tag_ids for tag in tag_sgst + tag_cgst + tag_igst)
-                ))\
-                .tax_id
-
-            return {
-                'l10n_in_hsn_code': base_line['record'].product_id.l10n_in_hsn_code,
-                'rate': sum(gst_taxes.mapped('amount')),
-                'uom': base_line['record'].product_uom_id,
-            }
-
-        aggregated_values = self._prepare_invoice_aggregated_taxes(
-            filter_invl_to_apply=filter_invl_to_apply,
-            grouping_key_generator=grouping_key_generator,
-        )
-
-        results_map = {}
-        has_igst = False
-        has_gst = False
-        has_cess = False
-        for grouping_key, tax_details in aggregated_values['tax_details'].items():
-            values = results_map.setdefault(grouping_key, {
-                'quantity': 0.0,
-                'amount_untaxed': tax_details['base_amount_currency'],
-                'tax_amounts': defaultdict(lambda: 0.0),
+        base_lines = []
+        for line in self.invoice_line_ids.filtered(lambda x: x.display_type == 'product'):
+            base_lines.append({
+                'l10n_in_hsn_code': line.l10n_in_hsn_code,
+                'quantity': line.quantity,
+                'price_unit': line.price_unit,
+                'discount': line.discount or 0.0,
+                'product': line.product_id,
+                'uom': line.product_uom_id,
+                'taxes_data': line.tax_ids,
             })
-
-            # Quantity.
-            invoice_line_ids = set()
-            for invoice_line in tax_details['records']:
-                if invoice_line.id not in invoice_line_ids:
-                    values['quantity'] += invoice_line.quantity
-                    invoice_line_ids.add(invoice_line.id)
-
-            # Tax amounts.
-            for tax_details in tax_details['group_tax_details']:
-                tax_rep = tax_details['tax_repartition_line']
-                if tag_igst in tax_rep.tag_ids:
-                    has_igst = True
-                    values['tax_amounts'][tag_igst] += tax_details['tax_amount_currency']
-                if tag_cgst in tax_rep.tag_ids:
-                    has_gst = True
-                    values['tax_amounts'][tag_cgst] += tax_details['tax_amount_currency']
-                if tag_sgst in tax_rep.tag_ids:
-                    has_gst = True
-                    values['tax_amounts'][tag_sgst] += tax_details['tax_amount_currency']
-                if tag_cess in tax_rep.tag_ids:
-                    has_cess = True
-                    values['tax_amounts'][tag_cess] += tax_details['tax_amount_currency']
-
-        # In case of base_line with HSN code but no taxes, an entry in results_map should be created.
-        for base_line, _to_update_vals, _tax_values_list in aggregated_values['to_process']:
-            if base_line['taxes']:
-                continue
-
-            grouping_key = frozendict(grouping_key_generator(base_line, None))
-            results = results_map.setdefault(grouping_key, {
-                'quantity': 0.0,
-                'amount_untaxed': 0.0,
-                'tax_amounts': defaultdict(lambda: 0.0),
-            })
-            results['quantity'] += base_line['quantity']
-            results['amount_untaxed'] += base_line['price_subtotal']
-
-        nb_columns = 5
-        if has_igst:
-            nb_columns += 1
-        if has_gst:
-            nb_columns += 2
-        if has_cess:
-            nb_columns += 1
-
-        items = []
-        for grouping_key, values in results_map.items():
-            items.append({
-                'l10n_in_hsn_code': grouping_key['l10n_in_hsn_code'],
-                'quantity': values['quantity'],
-                'uom': grouping_key['uom'],
-                'rate': grouping_key['rate'],
-                'amount_untaxed': values['amount_untaxed'],
-                'tax_amount_igst': values['tax_amounts'].get(tag_igst, 0.0),
-                'tax_amount_cgst': values['tax_amounts'].get(tag_cgst, 0.0),
-                'tax_amount_sgst': values['tax_amounts'].get(tag_sgst, 0.0),
-                'tax_amount_cess': values['tax_amounts'].get(tag_cess, 0.0),
-            })
-
-        return {
-            'has_igst': has_igst,
-            'has_gst': has_gst,
-            'has_cess': has_cess,
-            'nb_columns': nb_columns,
-            'display_uom': display_uom,
-            'items': items,
-        }
+        return self.env['account.tax']._l10n_in_get_hsn_summary_table(base_lines, display_uom)

@@ -27,6 +27,8 @@ class AccountChartTemplate(models.AbstractModel):
             'ir.attachment': self._get_demo_data_attachment(company),
             'mail.message': self._get_demo_data_mail_message(company),
             'mail.activity': self._get_demo_data_mail_activity(company),
+            'res.partner.bank': self._get_demo_data_bank(company),
+            'account.journal': self._get_demo_data_journal(company),
         }
 
     def _post_load_demo_data(self, company=False):
@@ -57,6 +59,29 @@ class AccountChartTemplate(models.AbstractModel):
                 _logger.exception('Error while posting demo data')
 
     @api.model
+    def _get_demo_data_bank(self, company=False):
+        if company.partner_id.bank_ids:
+            return {}
+        return {
+            'demo_bank_1': {
+                'acc_number': f'BANK{company.id}34567890',
+                'partner_id': company.partner_id.id,
+                'journal_id': 'bank',
+            },
+        }
+
+    @api.model
+    def _get_demo_data_journal(self, company=False):
+        if company.partner_id.bank_ids:
+            # if a bank is created in xml, link it to the journal
+            return {
+                'bank': {
+                    'bank_account_id': company.partner_id.bank_ids[0].id,
+                }
+            }
+        return {}
+
+    @api.model
     def _get_demo_data_move(self, company=False):
         one_month_ago = fields.Date.today() + relativedelta(months=-1)
         fifteen_months_ago = fields.Date.today() + relativedelta(months=-15)
@@ -75,9 +100,9 @@ class AccountChartTemplate(models.AbstractModel):
             ],
             limit=1,
         )
-        default_receivable = self.env.ref('base.res_partner_3').with_company(company).property_account_receivable_id
-        income_account = self.env['account.account'].search([
-            ('company_id', '=', cid),
+        default_receivable = self.env.ref('base.res_partner_3').with_company(company or self.env.company).property_account_receivable_id
+        income_account = self.env['account.account'].with_company(company or self.env.company).search([
+            ('company_ids', '=', cid),
             ('account_type', '=', 'income'),
             ('id', '!=', (company or self.env.company).account_journal_early_pay_discount_gain_account_id.id)
         ], limit=1)
@@ -295,40 +320,34 @@ class AccountChartTemplate(models.AbstractModel):
                 'journal_id': bnk_journal.id,
                 'payment_ref': 'Bank Fees',
                 'amount': -32.58,
-                'date': time.strftime('%Y-01-01'),
             },
             'demo_bank_statement_line_1': {
                 'journal_id': bnk_journal.id,
                 'payment_ref': 'Prepayment',
                 'amount': 650,
-                'date': time.strftime('%Y-01-01'),
                 'partner_id': 'base.res_partner_12',
             },
             'demo_bank_statement_line_2': {
                 'journal_id': bnk_journal.id,
                 'payment_ref': time.strftime(f'First {formatLang(self.env, 2000, currency_obj=self.env.company.currency_id)} of invoice %Y/00001'),
                 'amount': 2000,
-                'date': time.strftime('%Y-01-01'),
                 'partner_id': 'base.res_partner_12',
             },
             'demo_bank_statement_line_3': {
                 'journal_id': bnk_journal.id,
                 'payment_ref': 'Last Year Interests',
                 'amount': 102.78,
-                'date': time.strftime('%Y-01-01'),
             },
             'demo_bank_statement_line_4': {
                 'journal_id': bnk_journal.id,
                 'payment_ref': time.strftime('INV/%Y/00002'),
                 'amount': 750,
-                'date': time.strftime('%Y-01-01'),
                 'partner_id': 'base.res_partner_2',
             },
             'demo_bank_statement_line_5': {
                 'journal_id': bnk_journal.id,
                 'payment_ref': f'R:9772938  10/07 AX 9415116318 T:5 BRT: {formatLang(self.env, 100.0, digits=2)} C/ croip',
                 'amount': 96.67,
-                'date': time.strftime('%Y-01-01'),
             },
         }
 
@@ -468,11 +487,11 @@ class AccountChartTemplate(models.AbstractModel):
                 ('model', '=', 'account.account'),
                 ('module', '=like', 'l10n%')
             ], limit=1).res_id)
-            or self.env['account.account'].search([
+            or self.env['account.account'].with_company(company).search([
                 *self.env['account.account']._check_company_domain(company),
                 ('account_type', '=', account_type),
             ], limit=1)
-            or self.env['account.account'].search([
+            or self.env['account.account'].with_company(company).search([
                 *self.env['account.account']._check_company_domain(company),
             ], limit=1)
         )

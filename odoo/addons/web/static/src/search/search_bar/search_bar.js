@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { Domain } from "@web/core/domain";
 import { serializeDate, serializeDateTime } from "@web/core/l10n/dates";
 import { registry } from "@web/core/registry";
@@ -11,14 +9,36 @@ import { _t } from "@web/core/l10n/translation";
 import { SearchBarMenu } from "../search_bar_menu/search_bar_menu";
 
 import { Component, useExternalListener, useRef, useState } from "@odoo/owl";
+import { useDropdownState } from "@web/core/dropdown/dropdown_hooks";
+import { hasTouch } from "@web/core/browser/feature_detection";
 const parsers = registry.category("parsers");
 
 const CHAR_FIELDS = ["char", "html", "many2many", "many2one", "one2many", "text", "properties"];
 const FOLDABLE_TYPES = ["properties", "many2one", "many2many"];
 
 let nextItemId = 1;
+const SUB_ITEMS_DEFAULT_LIMIT = 8;
 
 export class SearchBar extends Component {
+    static template = "web.SearchBar";
+    static components = {
+        SearchBarMenu,
+    };
+    static props = {
+        autofocus: { type: Boolean, optional: true },
+        slots: {
+            type: Object,
+            optional: true,
+            shape: {
+                default: { optional: true },
+                "search-bar-additional-menu": { optional: true },
+            },
+        },
+    };
+    static defaultProps = {
+        autofocus: true,
+    };
+
     setup() {
         this.dialogService = useService("dialog");
         this.fields = this.env.searchModel.searchViewFields;
@@ -31,11 +51,14 @@ export class SearchBar extends Component {
             expanded: [],
             focusedIndex: 0,
             query: "",
+            subItemsLimits: {},
         });
 
         // derived state
         this.items = useState([]);
         this.subItems = {};
+
+        this.searchBarDropdownState = useDropdownState();
 
         this.orm = useService("orm");
 
@@ -85,6 +108,9 @@ export class SearchBar extends Component {
             if (searchItem.type === "field" && searchItem.fieldType === "properties") {
                 tasks.push({ id, prom: this.getSearchItemsProperties(searchItem) });
             } else if (!subItems[id]) {
+                if (!this.state.subItemsLimits[id]) {
+                    this.state.subItemsLimits[id] = SUB_ITEMS_DEFAULT_LIMIT;
+                }
                 tasks.push({ id, prom: this.computeSubItems(searchItem, query) });
             }
         }
@@ -115,6 +141,11 @@ export class SearchBar extends Component {
         for (const searchItem of this.searchItemsFields) {
             this.items.push(...this.getItems(searchItem, trimmedQuery));
         }
+
+        this.items.push({
+            title: _t("Add a custom filter"),
+            isAddCustomFilterButton: true,
+        });
     }
 
     /**
@@ -238,12 +269,13 @@ export class SearchBar extends Component {
     }
 
     getFieldType(searchItem) {
-        const { type } = searchItem.type === "field_property"
-            ? searchItem.propertyFieldDefinition
-            : this.fields[searchItem.fieldName];
+        const { type } =
+            searchItem.type === "field_property"
+                ? searchItem.propertyFieldDefinition
+                : this.fields[searchItem.fieldName];
         const fieldType = type === "reference" ? "char" : type;
 
-        return fieldType
+        return fieldType;
     }
 
     /**
@@ -261,10 +293,11 @@ export class SearchBar extends Component {
      */
     async computeSubItems(searchItem, query) {
         const field = this.fields[searchItem.fieldName];
+        const context = { ...this.env.searchModel.domainEvalContext, ...field.context };
         let domain = [];
         if (searchItem.domain) {
             try {
-                domain = new Domain(searchItem.domain).toList();
+                domain = new Domain(searchItem.domain).toList(context);
             } catch {
                 // Pass
             }
@@ -274,12 +307,26 @@ export class SearchBar extends Component {
                 ? searchItem.propertyFieldDefinition.comodel
                 : field.relation;
 
+        let nameSearchOperator = "ilike";
+        if (query && query[0] === '"' && query[query.length - 1] === '"') {
+            query = query.slice(1, -1);
+            nameSearchOperator = "=";
+        }
+        const limitToFetch = this.state.subItemsLimits[searchItem.id] + 1;
         const options = await this.orm.call(relation, "name_search", [], {
             args: domain,
-            context: { ...this.env.searchModel.globalContext, ...field.context },
-            limit: 8,
+            operator: nameSearchOperator,
+            context,
+            limit: limitToFetch,
             name: query.trim(),
         });
+
+        let showLoadMore = false;
+        if (options.length === limitToFetch) {
+            options.pop();
+            showLoadMore = true;
+        }
+
         const subItems = [];
         if (options.length) {
             const operator = searchItem.operator || "=";
@@ -291,6 +338,21 @@ export class SearchBar extends Component {
                     value,
                     label,
                     operator,
+                });
+            }
+            if (showLoadMore) {
+                subItems.push({
+                    id: nextItemId++,
+                    isChild: true,
+                    searchItemId: searchItem.id,
+                    label: _t("Load more"),
+                    unselectable: true,
+                    loadMore: () => {
+                        this.state.subItemsLimits[searchItem.id] += SUB_ITEMS_DEFAULT_LIMIT;
+                        const newSubItems = [...this.subItems];
+                        newSubItems[searchItem.id] = undefined;
+                        this.computeState({ subItems: newSubItems });
+                    },
                 });
             }
         } else {
@@ -328,6 +390,7 @@ export class SearchBar extends Component {
     }
 
     resetState(options = { focus: true }) {
+        this.state.subItemsLimits = {};
         this.computeState({ expanded: [], focusedIndex: 0, query: "", subItems: [] });
         if (options.focus) {
             this.inputRef.el.focus();
@@ -338,6 +401,10 @@ export class SearchBar extends Component {
      * @param {Object} item
      */
     selectItem(item) {
+        if (item.isAddCustomFilterButton) {
+            return this.env.searchModel.spawnCustomFilterDialog();
+        }
+
         const searchItem = this.getSearchItem(item.searchItemId);
         if (
             (searchItem.type === "field" && searchItem.fieldType === "properties") ||
@@ -349,9 +416,21 @@ export class SearchBar extends Component {
 
         if (!item.unselectable) {
             const { searchItemId, label, operator, value } = item;
-            this.env.searchModel.addAutoCompletionValues(searchItemId, { label, operator, value });
+            const autoCompleteValues = { label, operator, value };
+            if (value && value[0] === '"' && value[value.length - 1] === '"') {
+                autoCompleteValues.value = value.slice(1, -1);
+                autoCompleteValues.label = label.slice(1, -1);
+                autoCompleteValues.operator = "=";
+                autoCompleteValues.enforceEqual = true;
+            }
+            this.env.searchModel.addAutoCompletionValues(searchItemId, autoCompleteValues);
         }
-        this.resetState();
+
+        if (item.loadMore) {
+            item.loadMore();
+        } else {
+            this.resetState();
+        }
     }
 
     /**
@@ -380,7 +459,10 @@ export class SearchBar extends Component {
 
     onFacetLabelClick(target, facet) {
         const { domain, groupId } = facet;
-        if (!domain) {
+        if (this.env.searchModel.canOrderByCount && facet.type === "groupBy") {
+            this.env.searchModel.switchGroupBySort();
+            return;
+        } else if (!domain) {
             return;
         }
         const { resModel } = this.env.searchModel;
@@ -546,15 +628,33 @@ export class SearchBar extends Component {
         }
     }
 
+    onSearchClick() {
+        if (!hasTouch() && !this.inputRef.el.value.length) {
+            this.searchBarDropdownState.open();
+        }
+    }
+
     /**
      * @param {InputEvent} ev
      */
     onSearchInput(ev) {
+        if (!hasTouch()) {
+            this.searchBarDropdownState.close();
+        }
         const query = ev.target.value;
         if (query.trim()) {
             this.computeState({ query, expanded: [], focusedIndex: 0, subItems: [] });
         } else if (this.items.length) {
             this.resetState();
+        }
+    }
+
+    onClickSearchIcon() {
+        const focusedItem = this.items[this.state.focusedIndex];
+        if (!this.state.query.length) {
+            this.env.searchModel.search();
+        } else if (focusedItem) {
+            this.selectItem(focusedItem);
         }
     }
 
@@ -580,22 +680,3 @@ export class SearchBar extends Component {
         }
     }
 }
-
-SearchBar.template = "web.SearchBar";
-SearchBar.components = {
-    SearchBarMenu,
-};
-SearchBar.props = {
-    autofocus: { type: Boolean, optional: true },
-    slots: {
-        type: Object,
-        optional: true,
-        shape: {
-            default: { optional: true },
-            "search-bar-additional-menu": { optional: true },
-        },
-    },
-};
-SearchBar.defaultProps = {
-    autofocus: true,
-};

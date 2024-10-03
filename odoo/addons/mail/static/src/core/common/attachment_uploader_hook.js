@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { useState } from "@odoo/owl";
 
 import { useService } from "@web/core/utils/hooks";
@@ -12,9 +10,9 @@ function dataUrlToBlob(data, type) {
 }
 
 export class AttachmentUploader {
-    constructor(thread, { composer, onFileUploaded } = {}) {
+    constructor(thread, { composer } = {}) {
         this.attachmentUploadService = useService("mail.attachment_upload");
-        Object.assign(this, { thread, composer, onFileUploaded });
+        Object.assign(this, { thread, composer });
     }
 
     uploadData({ data, name, type }, options) {
@@ -23,7 +21,7 @@ export class AttachmentUploader {
     }
 
     async uploadFile(file, options) {
-        return this.attachmentUploadService.uploadFile(this, file, options);
+        return this.attachmentUploadService.upload(this.thread, this.composer, file, options);
     }
 
     async unlink(attachment) {

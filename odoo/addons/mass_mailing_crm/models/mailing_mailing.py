@@ -42,7 +42,7 @@ class MassMailing(models.Model):
             'name': _("Leads Analysis"),
             'res_model': 'crm.lead',
             'type': 'ir.actions.act_window',
-            'view_mode': 'tree,pivot,graph,form',
+            'view_mode': 'list,pivot,graph,form',
         }
 
     def _prepare_statistics_email_values(self):
@@ -50,10 +50,10 @@ class MassMailing(models.Model):
         values = super(MassMailing, self)._prepare_statistics_email_values()
         if not self.user_id:
             return values
-        if not self.env['crm.lead'].check_access_rights('read', raise_exception=False):
+        if not self.env['crm.lead'].has_access('read'):
             return values
         values['kpi_data'][1]['kpi_col1'] = {
-            'value': tools.format_decimalized_number(self.crm_lead_count, decimal=0),
+            'value': tools.misc.format_decimalized_number(self.crm_lead_count, decimal=0),
             'col_subtitle': _('LEADS'),
         }
         values['kpi_data'][1]['kpi_name'] = 'lead'

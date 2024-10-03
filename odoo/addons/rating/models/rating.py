@@ -1,9 +1,10 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
+
 import base64
 import uuid
 
 from odoo import api, fields, models
+from odoo.addons.mail.tools.discuss import Store
 from odoo.addons.rating.models import rating_data
 from odoo.tools.misc import file_open
 
@@ -40,7 +41,7 @@ class Rating(models.Model):
     rated_partner_id = fields.Many2one('res.partner', string="Rated Operator")
     rated_partner_name = fields.Char(related="rated_partner_id.name")
     partner_id = fields.Many2one('res.partner', string='Customer')
-    rating = fields.Float(string="Rating Value", group_operator="avg", default=0)
+    rating = fields.Float(string="Rating Value", aggregator="avg", default=0)
     rating_image = fields.Binary('Image', compute='_compute_rating_image')
     rating_image_url = fields.Char('Image URL', compute='_compute_rating_image')
     rating_text = fields.Selection(rating_data.RATING_TEXT, string='Rating', store=True, compute='_compute_rating_text', readonly=True)
@@ -193,3 +194,8 @@ class Rating(models.Model):
             data_by_model[rating.res_model]['ratings'] += rating
             data_by_model[rating.res_model]['record_ids'].append(rating.res_id)
         return data_by_model
+
+    def _to_store(self, store: Store, /, *, fields=None):
+        if fields is None:
+            fields = ["rating", "rating_image_url", "rating_text"]
+        store.add(self._name, self._read_format(fields, load=False))

@@ -20,9 +20,6 @@
                 <xpath expr="//field[@name='company_id']" position="attributes">
                     <attribute name="invisible">1</attribute>
                 </xpath>
-                <field name="share" position="after">
-                    <field name="work_contact_id" invisible="1"/>
-                </field>
             </field>
         </record>
 
@@ -67,8 +64,8 @@
                             disabled="1"
                             invisible="context.get('from_my_profile', False) or hr_presence_state == 'absent'">
                             <div role="img" class="fa fa-fw fa-circle text-success o_button_icon" invisible="hr_presence_state != 'present'" aria-label="Available" title="Available"/>
-                            <div role="img" class="fa fa-fw fa-circle text-warning o_button_icon" invisible="hr_presence_state != 'to_define'" aria-label="Away" title="Away"/>
-                            <div role="img" class="fa fa-fw fa-circle text-danger o_button_icon" invisible="hr_presence_state != 'absent'" aria-label="Not available" title="Not available"/>
+                            <div role="img" class="fa fa-fw fa-circle text-muted o_button_icon" invisible="hr_presence_state != 'out_of_working_hour'" aria-label="Away" title="Away"/>
+                            <div role="img" class="fa fa-fw fa-circle text-warning o_button_icon" invisible="hr_presence_state != 'absent'" aria-label="Not available" title="Not available"/>
 
                             <div class="o_stat_info" invisible="hr_presence_state == 'present'">
                                 <span class="o_stat_text">
@@ -149,7 +146,11 @@
                                 <field name="private_phone" string="Phone" class="o_force_ltr" readonly="not can_edit"/>
                                 <field name="private_lang" string="Language" readonly="not can_edit"/>
                                 <field name="employee_bank_account_id" readonly="not can_edit"/>
-                                <field name="km_home_work" readonly="not can_edit"/>
+                                <label for="distance_home_work"/>
+                                <div class="o_row">
+                                    <field name="distance_home_work" readonly="not can_edit" class="o_hr_narrow_field"/>
+                                    <span><field name="distance_home_work_unit" readonly="not can_edit"/></span>
+                                </div>
                             </group>
                             <group string="Citizenship">
                                 <field name="employee_country_id" options='{"no_open": True, "no_create": True}' readonly="not can_edit"/>

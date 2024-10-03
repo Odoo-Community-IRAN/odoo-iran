@@ -12,37 +12,46 @@ Application developers mostly know this module thanks to the
 :func:`~odoo.http.route`: method decorator. Together they are used to
 register methods responsible of delivering web content to matching URLS.
 
-Those two are only the tip of the iceberg, below is an ascii graph that
+Those two are only the tip of the iceberg, below is a call graph that
 shows the various processing layers each request passes through before
-ending at the @route decorated endpoint. Hopefully, this graph and the
-attached function descriptions will help you understand this module.
+ending at the @route decorated endpoint. Hopefully, this call graph and
+the attached function descriptions will help you understand this module.
 
 Here be dragons:
 
     Application.__call__
-        +-> Request._serve_static
-        |
-        +-> Request._serve_nodb
-        |   -> App.nodb_routing_map.match
-        |   -> Dispatcher.pre_dispatch
-        |   -> Dispatcher.dispatch
-        |      -> route_wrapper
-        |         -> endpoint
-        |   -> Dispatcher.post_dispatch
-        |
-        +-> Request._serve_db
-            -> model.retrying
-               -> Request._serve_ir_http
-                  -> env['ir.http']._match
-                  -> env['ir.http']._authenticate
-                  -> env['ir.http']._pre_dispatch
-                     -> Dispatcher.pre_dispatch
-                  -> Dispatcher.dispatch
-                     -> env['ir.http']._dispatch
-                        -> route_wrapper
-                           -> endpoint
-                  -> env['ir.http']._post_dispatch
-                     -> Dispatcher.post_dispatch
+        if path is like '/<module>/static/<path>':
+            Request._serve_static
+
+        elif not request.db:
+            Request._serve_nodb
+                App.nodb_routing_map.match
+                Dispatcher.pre_dispatch
+                Dispatcher.dispatch
+                    route_wrapper
+                        endpoint
+                Dispatcher.post_dispatch
+
+        else:
+            Request._serve_db
+                env['ir.http']._match
+
+                if not match:
+                    Request._transactioning
+                        model.retrying
+                            env['ir.http']._serve_fallback
+                            env['ir.http']._post_dispatch
+                else:
+                    Request._transactioning
+                        model.retrying
+                            env['ir.http']._authenticate
+                            env['ir.http']._pre_dispatch
+                            Dispatcher.pre_dispatch
+                            Dispatcher.dispatch
+                                env['ir.http']._dispatch
+                                    route_wrapper
+                                        endpoint
+                            env['ir.http']._post_dispatch
 
 Application.__call__
   WSGI entry point, it sanitizes the request, it wraps it in a werkzeug
@@ -66,21 +75,27 @@ Request._serve_nodb
 
 Request._serve_db
   Handle all requests that are not static when it is possible to connect
-  to a database. It opens a session and initializes the ORM before
-  forwarding the request to ``retrying`` and ``_serve_ir_http``.
+  to a database. It opens a registry on the database and then delegates
+  most of the effort the the ``ir.http`` abstract model. This model acts
+  as a module-aware middleware, its implementation in ``base`` is merely
+  more than just delegating to Dispatcher.
 
-service.model.retrying
-  Protect against SQL serialisation errors (when two different
-  transactions write on the same record), when such an error occurs this
-  function resets the session and the environment then re-dispatches the
-  request.
+Request._transactioning & service.model.retrying
+  Manage the cursor, the environment and exceptions that occured while
+  executing the underlying function. They recover from various
+  exceptions such as serialization errors and writes in read-only
+  transactions. They catches all other exceptions and attach a http
+  response to them (e.g. 500 - Internal Server Error)
 
-Request._serve_ir_http
-  Delegate most of the effort to the ``ir.http`` abstract model which
-  itself calls RequestDispatch back. ``ir.http`` grants modularity in
-  the http stack. The notable difference with nodb is that there is an
-  authentication layer and a mechanism to serve pages that are not
-  accessible through controllers.
+ir.http._match
+  Match the controller endpoint that correspond to the request path.
+  Beware that there is an important override for portal and website
+  inside of the ``http_routing`` module.
+
+ir.http._serve_fallback
+  Find alternative ways to serve a request when its path does not match
+  any controller. The path could be matching an attachment URL, a blog
+  page, etc.
 
 ir.http._authenticate
   Ensure the user on the current environment fulfill the requirement of
@@ -99,6 +114,11 @@ ir.http._dispatch/Dispatcher.dispatch
 ir.http._post_dispatch/Dispatcher.post_dispatch
   Post process the response returned by the controller endpoint. Used to
   inject various headers such as Content-Security-Policy.
+
+ir.http._handle_error
+  Not present in the call-graph, is called for un-managed exceptions (SE
+  or RO) that occured inside of ``Request._transactioning``. It returns
+  a http response that wraps the error that occured.
 
 route_wrapper, closure of the http.route decorator
   Sanitize the request parameters, call the route endpoint and
@@ -127,9 +147,9 @@ import threading
 import time
 import traceback
 import warnings
-import zlib
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
+from hashlib import sha512
 from io import BytesIO
 from os.path import join as opj
 from pathlib import Path
@@ -177,35 +197,15 @@ from .exceptions import UserError, AccessError, AccessDenied
 from .modules.module import get_manifest
 from .modules.registry import Registry
 from .service import security, model as service_model
-from .tools import (config, consteq, date_utils, file_path, parse_version,
-                    profiler, submap, unique, ustr,)
+from .tools import (config, consteq, file_path, get_lang, json_default,
+                    parse_version, profiler, unique, exception_to_unicode)
 from .tools.func import filter_kwargs, lazy_property
-from .tools.mimetypes import guess_mimetype
-from .tools.misc import pickle
+from .tools.misc import submap
 from .tools._vendor import sessions
 from .tools._vendor.useragents import UserAgent
 
 
 _logger = logging.getLogger(__name__)
-
-
-# =========================================================
-# Lib fixes
-# =========================================================
-
-# Add potentially missing (older ubuntu) font mime types
-mimetypes.add_type('application/font-woff', '.woff')
-mimetypes.add_type('application/vnd.ms-fontobject', '.eot')
-mimetypes.add_type('application/x-font-ttf', '.ttf')
-mimetypes.add_type('image/webp', '.webp')
-# Add potentially wrong (detected on windows) svg mime types
-mimetypes.add_type('image/svg+xml', '.svg')
-# this one can be present on windows with the value 'text/plain' which
-# breaks loading js files from an addon's static folder
-mimetypes.add_type('text/javascript', '.js')
-
-# To remove when corrected in Babel
-babel.core.LOCALE_ALIASES['nb'] = 'nb_NO'
 
 
 # =========================================================
@@ -233,6 +233,7 @@ def get_default_session():
         'login': None,
         'uid': None,
         'session_token': None,
+        '_trace': [],
     }
 
 DEFAULT_MAX_CONTENT_LENGTH = 128 * 1024 * 1024  # 128MiB
@@ -252,7 +253,7 @@ No CSRF validation token provided for path %r
 
 Odoo URLs are CSRF-protected by default (when accessed with unsafe
 HTTP methods). See
-https://www.odoo.com/documentation/17.0/developer/reference/addons/http.html#csrf
+https://www.odoo.com/documentation/master/developer/reference/addons/http.html#csrf
 for more details.
 
 * if this endpoint is accessed through Odoo via py-QWeb form, embed a CSRF
@@ -303,13 +304,19 @@ STATIC_CACHE_LONG = 60 * 60 * 24 * 365
 # Helpers
 # =========================================================
 
+class RegistryError(RuntimeError):
+    pass
+
+
 class SessionExpiredException(Exception):
     pass
+
 
 def content_disposition(filename):
     return "attachment; filename*=UTF-8''{}".format(
         url_quote(filename, safe='', unsafe='()<>@,;:"/[]?={}\\*\'%') # RFC6266
     )
+
 
 def db_list(force=False, host=None):
     """
@@ -326,6 +333,7 @@ def db_list(force=False, host=None):
     except psycopg2.OperationalError:
         return []
     return db_filter(dbs, host)
+
 
 def db_filter(dbs, host=None):
     """
@@ -391,6 +399,19 @@ def dispatch_rpc(service_name, method, params):
         return dispatch(method, params)
 
 
+def get_session_max_inactivity(env):
+    if not env or env.cr._closed:
+        return SESSION_LIFETIME
+
+    ICP = env['ir.config_parameter'].sudo()
+
+    try:
+        return int(ICP.get_param('sessions.max_inactivity_seconds', SESSION_LIFETIME))
+    except ValueError:
+        _logger.warning("Invalid value for 'sessions.max_inactivity_seconds', using default value.")
+        return SESSION_LIFETIME
+
+
 def is_cors_preflight(request, endpoint):
     return request.httprequest.method == 'OPTIONS' and endpoint.routing.get('cors', False)
 
@@ -402,7 +423,7 @@ def serialize_exception(exception):
     return {
         'name': f'{module}.{name}' if module else name,
         'debug': traceback.format_exc(),
-        'message': ustr(exception),
+        'message': exception_to_unicode(exception),
         'arguments': exception.args,
         'context': getattr(exception, 'context', {}),
     }
@@ -412,22 +433,6 @@ def serialize_exception(exception):
 # File Streaming
 # =========================================================
 
-def send_file(filepath_or_fp, mimetype=None, as_attachment=False, filename=None, mtime=None,
-              add_etags=True, cache_timeout=STATIC_CACHE, conditional=True):
-    warnings.warn('odoo.http.send_file is deprecated, please use odoo.http.Stream instead.', DeprecationWarning, stacklevel=2)
-    return _send_file(
-        filepath_or_fp,
-        request.httprequest.environ,
-        mimetype=mimetype,
-        as_attachment=as_attachment,
-        download_name=filename,
-        last_modified=mtime,
-        etag=add_etags,
-        max_age=cache_timeout,
-        response_class=Response,
-        conditional=conditional
-    )
-
 
 class Stream:
     """
@@ -436,9 +441,9 @@ class Stream:
     This utility is safe, cache-aware and uses the best available
     streaming strategy. Works best with the --x-sendfile cli option.
 
-    Create a Stream via one of the constructors: :meth:`~from_path`:,
-    :meth:`~from_attachment`: or :meth:`~from_binary_field`:, generate
-    the corresponding HTTP response object via :meth:`~get_response`:.
+    Create a Stream via one of the constructors: :meth:`~from_path`:, or
+    :meth:`~from_binary_field`:, generate the corresponding HTTP response
+    object via :meth:`~get_response`:.
 
     Instantiating a Stream object manually without using one of the
     dedicated constructors is discouraged.
@@ -491,55 +496,6 @@ class Stream:
         )
 
     @classmethod
-    def from_attachment(cls, attachment):
-        """ Create a :class:`~Stream`: from an ir.attachment record. """
-        attachment.ensure_one()
-
-        self = cls(
-            mimetype=attachment.mimetype,
-            download_name=attachment.name,
-            etag=attachment.checksum,
-            public=attachment.public,
-        )
-
-        if attachment.store_fname:
-            self.type = 'path'
-            self.path = werkzeug.security.safe_join(
-                os.path.abspath(config.filestore(request.db)),
-                attachment.store_fname
-            )
-            stat = os.stat(self.path)
-            self.last_modified = stat.st_mtime
-            self.size = stat.st_size
-
-        elif attachment.db_datas:
-            self.type = 'data'
-            self.data = attachment.raw
-            self.last_modified = attachment.write_date
-            self.size = len(self.data)
-
-        elif attachment.url:
-            # When the URL targets a file located in an addon, assume it
-            # is a path to the resource. It saves an indirection and
-            # stream the file right away.
-            static_path = root.get_static_file(
-                attachment.url,
-                host=request.httprequest.environ.get('HTTP_HOST', '')
-            )
-            if static_path:
-                self = cls.from_path(static_path, public=True)
-            else:
-                self.type = 'url'
-                self.url = attachment.url
-
-        else:
-            self.type = 'data'
-            self.data = b''
-            self.size = 0
-
-        return self
-
-    @classmethod
     def from_binary_field(cls, record, field_name):
         """ Create a :class:`~Stream`: from a binary field. """
         data_b64 = record[field_name]
@@ -574,7 +530,7 @@ class Stream:
         """
         Create the corresponding :class:`~Response` for the current stream.
 
-        :param bool as_attachment: Indicate to the browser that it
+        :param bool|None as_attachment: Indicate to the browser that it
             should offer to save the file instead of displaying it.
         :param bool|None immutable: Add the ``immutable`` directive to
             the ``Cache-Control`` response header, allowing intermediary
@@ -593,6 +549,10 @@ class Stream:
         assert getattr(self, self.type) is not None, "There is nothing to stream, missing {self.type!r} attribute."
 
         if self.type == 'url':
+            if self.max_age is not None:
+                res = request.redirect(self.url, code=302, local=False)
+                res.headers['Cache-Control'] = f'max-age={self.max_age}'
+                return res
             return request.redirect(self.url, code=301, local=False)
 
         if as_attachment is None:
@@ -720,6 +680,12 @@ def route(route=None, **routing):
 
         * ``'user'``: The user must be authenticated and the current
           request will be executed using the rights of the user.
+        * ``'bearer'``: The user is authenticated using an "Authorization"
+          request header, using the Bearer scheme with an API token.
+          The request will be executed with the permissions of the
+          corresponding user. If the header is missing, the request
+          must belong to an authentication session, as for the "user"
+          authentication method.
         * ``'public'``: The user may or may not be authenticated. If he
           isn't, the current request will be executed using the shared
           Public user.
@@ -733,6 +699,9 @@ def route(route=None, **routing):
     :param bool csrf: Whether CSRF protection should be enabled for the
         route. Enabled by default for ``'http'``-type requests, disabled
         by default for ``'json'``-type requests.
+    :param Union[bool, Callable[[registry, request], bool]] readonly:
+        Whether this endpoint should open a cursor on a read-only
+        replica instead of (by default) the primary read/write database.
     :param Callable[[Exception], Response] handle_params_access_error:
         Implement a custom behavior if an error occurred when retrieving the record
         from the URL parameters (access error or missing error).
@@ -765,6 +734,7 @@ def route(route=None, **routing):
         route_wrapper.original_endpoint = endpoint
         return route_wrapper
     return decorator
+
 
 def _generate_routing_rules(modules, nodb_only, converters=None):
     """
@@ -837,7 +807,6 @@ def _generate_routing_rules(modules, nodb_only, converters=None):
                 'auth': 'user',
                 'methods': None,
                 'routes': [],
-                'readonly': False,
             }
 
             for cls in unique(reversed(type(ctrl).mro()[:-2])):  # ancestors first
@@ -877,10 +846,10 @@ def _check_and_complete_route_definition(controller_cls, submethod, merged_routi
     """Verify and complete the route definition.
 
     * Ensure 'type' is defined on each method's own routing.
-    * also ensure overrides don't change the routing type.
+    * Ensure overrides don't change the routing type or the read/write mode
 
     :param submethod: route method
-    :param dict merged_routing: accumulated routing values (defaults + submethod ancestor methods)
+    :param dict merged_routing: accumulated routing values
     """
     default_type = submethod.original_routing.get('type', 'http')
     routing_type = merged_routing.setdefault('type', default_type)
@@ -891,14 +860,31 @@ def _check_and_complete_route_definition(controller_cls, submethod, merged_routi
             routing_type)
     submethod.original_routing['type'] = routing_type
 
+    default_auth = submethod.original_routing.get('auth', merged_routing['auth'])
+    default_mode = submethod.original_routing.get('readonly', default_auth == 'none')
+    parent_readonly = merged_routing.setdefault('readonly', default_mode)
+    child_readonly = submethod.original_routing.get('readonly')
+    if child_readonly not in (None, parent_readonly) and not callable(child_readonly):
+        _logger.warning(
+            "The endpoint %s made the route %s altough its parent was defined as %s. Setting the route read/write.",
+            f'{controller_cls.__module__}.{controller_cls.__name__}.{submethod.__name__}',
+            'readonly' if child_readonly else 'read/write',
+            'readonly' if parent_readonly else 'read/write',
+        )
+        submethod.original_routing['readonly'] = False
+
+
 # =========================================================
 # Session
 # =========================================================
 
+_base64_urlsafe_re = re.compile(r'^[A-Za-z0-9_-]{84}$')
+
+
 class FilesystemSessionStore(sessions.FilesystemSessionStore):
     """ Place where to load and save session objects. """
     def get_session_filename(self, sid):
-        # scatter sessions across 256 directories
+        # scatter sessions across 4096 (64^2) directories
         if not self.is_valid_key(sid):
             raise ValueError(f'Invalid session id {sid!r}')
         sha_dir = sid[:2]
@@ -943,6 +929,43 @@ class FilesystemSessionStore(sessions.FilesystemSessionStore):
                 if os.path.getmtime(path) < threshold:
                     os.unlink(path)
 
+    def generate_key(self, salt=None):
+        # The generated key is case sensitive (base64) and the length is 84 chars.
+        # In the worst-case scenario, i.e. in an insensitive filesystem (NTFS for example)
+        # taking into account the proportion of characters in the pool and a length
+        # of 42 (stored part in the database), the entropy for the base64 generated key
+        # is 217.875 bits which is better than the 160 bits entropy of a hexadecimal key
+        # with a length of 40 (method ``generate_key`` of ``SessionStore``).
+        # The risk of collision is negligible in practice.
+        # Formulas:
+        #   - L: length of generated word
+        #   - p_char: probability of obtaining the character in the pool
+        #   - n: size of the pool
+        #   - k: number of generated word
+        #   Entropy = - L * sum(p_char * log2(p_char))
+        #   Collision ~= (1 - exp((-k * (k - 1)) / (2 * (n**L))))
+        key = str(time.time()).encode() + os.urandom(64)
+        hash_key = sha512(key).digest()[:-1]  # prevent base64 padding
+        return base64.urlsafe_b64encode(hash_key).decode('utf-8')
+
+    def is_valid_key(self, key):
+        return _base64_urlsafe_re.match(key) is not None
+
+    def delete_from_identifiers(self, identifiers):
+        files_to_unlink = []
+        for identifier in identifiers:
+            # Avoid to remove a session if less than 42 chars.
+            # This prevent malicious user to delete sessions from a different
+            # database by specifying a ``res.device.log`` with only 2 characters.
+            if len(identifier) < 42:
+                continue
+            normalized_path = os.path.normpath(os.path.join(self.path, identifier[:2], identifier + '*'))
+            if normalized_path.startswith(self.path):
+                files_to_unlink.extend(glob.glob(normalized_path))
+        for fn in files_to_unlink:
+            with contextlib.suppress(OSError):
+                os.unlink(fn)
+
 
 class Session(collections.abc.MutableMapping):
     """ Structure containing data persisted across requests. """
@@ -962,13 +985,10 @@ class Session(collections.abc.MutableMapping):
     # MutableMapping implementation with DocDict-like extension
     #
     def __getitem__(self, item):
-        if item == 'geoip':
-            warnings.warn('request.session.geoip have been moved to request.geoip', DeprecationWarning)
-            return request.geoip if request else {}
         return self.__data[item]
 
     def __setitem__(self, item, value):
-        value = pickle.loads(pickle.dumps(value))
+        value = json.loads(json.dumps(value))
         if item not in self.__data or self.__data[item] != value:
             self.is_dirty = True
         self.__data[item] = value
@@ -999,10 +1019,10 @@ class Session(collections.abc.MutableMapping):
     #
     # Session methods
     #
-    def authenticate(self, dbname, login=None, password=None):
+    def authenticate(self, dbname, credential):
         """
         Authenticate the current user with the given db, login and
-        password. If successful, store the authentication parameters in
+        credential. If successful, store the authentication parameters in
         the current session, unless multi-factor-auth (MFA) is
         activated. In that case, that last part will be done by
         :ref:`finalize`.
@@ -1021,10 +1041,11 @@ class Session(collections.abc.MutableMapping):
         }
 
         registry = Registry(dbname)
-        pre_uid = registry['res.users'].authenticate(dbname, login, password, wsgienv)
+        auth_info = registry['res.users'].authenticate(dbname, credential, wsgienv)
+        pre_uid = auth_info['uid']
 
         self.uid = None
-        self.pre_login = login
+        self.pre_login = credential['login']
         self.pre_uid = pre_uid
 
         with registry.cursor() as cr:
@@ -1032,17 +1053,16 @@ class Session(collections.abc.MutableMapping):
 
             # if 2FA is disabled we finalize immediately
             user = env['res.users'].browse(pre_uid)
-            if not user._mfa_url():
+            if auth_info.get('mfa') == 'skip' or not user._mfa_url():
                 self.finalize(env)
 
         if request and request.session is self and request.db == dbname:
-            # Like update_env(user=request.session.uid) but works when uid is None
             request.env = odoo.api.Environment(request.env.cr, self.uid, self.context)
-            request.update_context(**self.context)
+            request.update_context(lang=get_lang(request.env(user=pre_uid)).code)
             # request env needs to be able to access the latest changes from the auth layers
             request.env.cr.commit()
 
-        return pre_uid
+        return auth_info
 
     def finalize(self, env):
         """
@@ -1078,6 +1098,43 @@ class Session(collections.abc.MutableMapping):
     def touch(self):
         self.is_dirty = True
 
+    def update_trace(self, request):
+        """
+            :return: dict if a device log has to be inserted, ``None`` otherwise
+        """
+        if self._trace_disable:
+            # To avoid generating useless logs, e.g. for automated technical sessions,
+            # a session can be flagged with `_trace_disable`. This should never be done
+            # without a proper assessment of the consequences for auditability.
+            # Non-admin users have no direct or indirect way to set this flag, so it can't
+            # be abused by unprivileged users. Such sessions will of course still be
+            # subject to all other auditing mechanisms (server logs, web proxy logs,
+            # metadata tracking on modified records, etc.)
+            return
+
+        user_agent = request.httprequest.user_agent
+        platform = user_agent.platform
+        browser = user_agent.browser
+        ip_address = request.httprequest.remote_addr
+        now = int(datetime.now().timestamp())
+        for trace in self._trace:
+            if trace['platform'] == platform and trace['browser'] == browser and trace['ip_address'] == ip_address:
+                # If the device logs are not up to date (i.e. not updated for one hour or more)
+                if bool(now - trace['last_activity'] >= 3600):
+                    trace['last_activity'] = now
+                    self.is_dirty = True
+                    return trace
+                return
+        new_trace = {
+            'platform': platform,
+            'browser': browser,
+            'ip_address': ip_address,
+            'first_activity': now,
+            'last_activity': now
+        }
+        self._trace.append(new_trace)
+        self.is_dirty = True
+        return new_trace
 
 
 # =========================================================
@@ -1186,6 +1243,7 @@ class GeoIP(collections.abc.Mapping):
 
     def __len__(self):
         raise NotImplementedError("The dictionnary GeoIP API is deprecated.")
+
 
 # =========================================================
 # Request and Response
@@ -1422,6 +1480,15 @@ class Request:
         session.is_dirty = False
         return session, dbname
 
+    def _open_registry(self):
+        try:
+            registry = Registry(self.db)
+            cr_readonly = registry.cursor(readonly=True)
+            registry = registry.check_signaling(cr_readonly)
+        except (AttributeError, psycopg2.OperationalError, psycopg2.ProgrammingError) as e:
+            raise RegistryError(f"Cannot get registry {self.db}") from e
+        return registry, cr_readonly
+
     # =====================================================
     # Getters and setters
     # =====================================================
@@ -1488,6 +1555,13 @@ class Request:
             return lang
         except (ValueError, KeyError):
             return None
+
+    @lazy_property
+    def cookies(self):
+        cookies = werkzeug.datastructures.MultiDict(self.httprequest.cookies)
+        if self.registry:
+            self.registry['ir.http']._sanitize_cookies(cookies)
+        return werkzeug.datastructures.ImmutableMultiDict(cookies)
 
     # =====================================================
     # Helpers
@@ -1642,7 +1716,7 @@ class Request:
         :param collections.abc.Mapping cookies: cookies to set on the client
         :rtype: :class:`~odoo.http.Response`
         """
-        data = json.dumps(data, ensure_ascii=False, default=date_utils.json_default)
+        data = json.dumps(data, ensure_ascii=False, default=json_default)
 
         headers = werkzeug.datastructures.Headers(headers)
         headers['Content-Length'] = len(data)
@@ -1691,6 +1765,32 @@ class Request:
             return response.render()
         return response
 
+    def reroute(self, path, query_string=None):
+        """
+        Rewrite the current request URL using the new path and query
+        string. This act as a light redirection, it does not return a
+        3xx responses to the browser but still change the current URL.
+        """
+        # WSGI encoding dance https://peps.python.org/pep-3333/#unicode-issues
+        if isinstance(path, str):
+            path = path.encode('utf-8')
+        path = path.decode('latin1', 'replace')
+
+        if query_string is None:
+            query_string = request.httprequest.environ['QUERY_STRING']
+
+        # Change the WSGI environment
+        environ = self.httprequest._HTTPRequest__environ.copy()
+        environ['PATH_INFO'] = path
+        environ['QUERY_STRING'] = query_string
+        environ['RAW_URI'] = f'{path}?{query_string}'
+        # REQUEST_URI left as-is so it still contains the original URI
+
+        # Create and expose a new request from the modified WSGI env
+        httprequest = HTTPRequest(environ)
+        threading.current_thread().url = httprequest.url
+        self.httprequest = httprequest
+
     def _save_session(self):
         """ Save a modified session on disk. """
         sess = self.session
@@ -1703,9 +1803,9 @@ class Request:
         elif sess.is_dirty:
             root.session_store.save(sess)
 
-        cookie_sid = self.httprequest.cookies.get('session_id')
+        cookie_sid = self.cookies.get('session_id')
         if sess.is_dirty or cookie_sid != sess.sid:
-            self.future_response.set_cookie('session_id', sess.sid, max_age=SESSION_LIFETIME, httponly=True)
+            self.future_response.set_cookie('session_id', sess.sid, max_age=get_session_max_inactivity(self.env), httponly=True)
 
     def _set_request_dispatcher(self, rule):
         routing = rule.endpoint.routing
@@ -1758,59 +1858,110 @@ class Request:
         Prepare the user session and load the ORM before forwarding the
         request to ``_serve_ir_http``.
         """
-        try:
-            self.registry = Registry(self.db).check_signaling()
-        except (AttributeError, psycopg2.OperationalError, psycopg2.ProgrammingError):
-            # psycopg2 error or attribute error while constructing
-            # the registry. That means either
-            #  - the database probably does not exists anymore, or
-            #  - the database is corrupted, or
-            #  - the database version doesn't match the server version.
-            # So remove the database from the cookie
-            self.db = None
-            self.session.db = None
-            root.session_store.save(self.session)
-            if request.httprequest.path == '/web':
-                # Internal Server Error
-                raise
-            else:
-                return self._serve_nodb()
+        cr_readonly = None
+        rule = None
+        args = None
+        not_found = None
 
-        with contextlib.closing(self.registry.cursor()) as cr:
-            self.env = odoo.api.Environment(cr, self.session.uid, self.session.context)
-            threading.current_thread().uid = self.env.uid
+        # reuse the same cursor for building+checking the registry and
+        # for matching the controller endpoint
+        try:
+            self.registry, cr_readonly = self._open_registry()
+            self.env = odoo.api.Environment(cr_readonly, self.session.uid, self.session.context)
             try:
-                return service_model.retrying(self._serve_ir_http, self.env)
-            except Exception as exc:
-                if isinstance(exc, HTTPException) and exc.code is None:
-                    raise  # bubble up to odoo.http.Application.__call__
-                exc.error_response = self.registry['ir.http']._handle_error(exc)
-                raise
+                rule, args = self.registry['ir.http']._match(self.httprequest.path)
+            except NotFound as not_found_exc:
+                not_found = not_found_exc
+        finally:
+            if cr_readonly is not None:
+                cr_readonly.close()
 
-    def _serve_ir_http(self):
-        """
-        Delegate most of the processing to the ir.http model that is
-        extensible by applications.
-        """
-        ir_http = self.registry['ir.http']
+        if not_found:
+            # no controller endpoint matched -> fallback or 404
+            return self._transactioning(
+                functools.partial(self._serve_ir_http_fallback, not_found),
+                readonly=True,
+            )
 
-        try:
-            rule, args = ir_http._match(self.httprequest.path)
-        except NotFound:
-            self.params = self.get_http_params()
-            response = ir_http._serve_fallback()
-            if response:
-                self.dispatcher.post_dispatch(response)
-                return response
-            raise
-
+        # a controller endpoint matched -> dispatch it the request
         self._set_request_dispatcher(rule)
-        ir_http._authenticate(rule.endpoint)
-        ir_http._pre_dispatch(rule, args)
+        readonly = rule.endpoint.routing['readonly']
+        if callable(readonly):
+            readonly = readonly(rule.endpoint.func.__self__)
+        return self._transactioning(
+            functools.partial(self._serve_ir_http, rule, args),
+            readonly=readonly,
+        )
+
+    def _serve_ir_http_fallback(self, not_found):
+        """
+        Called when no controller match the request path. Delegate to
+        ``ir.http._serve_fallback`` to give modules the opportunity to
+        find an alternative way to serve the request. In case no module
+        provided a response, a generic 404 - Not Found page is returned.
+        """
+        self.params = self.get_http_params()
+        response = self.registry['ir.http']._serve_fallback()
+        if response:
+            self.registry['ir.http']._post_dispatch(response)
+            return response
+
+        no_fallback = NotFound()
+        no_fallback.__context__ = not_found  # During handling of {not_found}, {no_fallback} occurred:
+        no_fallback.error_response = self.registry['ir.http']._handle_error(no_fallback)
+        raise no_fallback
+
+    def _serve_ir_http(self, rule, args):
+        """
+        Called when a controller match the request path. Delegate to
+        ``ir.http`` to serve a response.
+        """
+        self.registry['ir.http']._authenticate(rule.endpoint)
+        self.registry['ir.http']._pre_dispatch(rule, args)
         response = self.dispatcher.dispatch(rule.endpoint, args)
-        # the registry can have been reniewed by dispatch
         self.registry['ir.http']._post_dispatch(response)
         return response
+
+    def _transactioning(self, func, readonly):
+        """
+        Call ``func`` within a new SQL transaction.
+
+        If ``func`` performs a write query (insert/update/delete) on a
+        read-only transaction, the transaction is rolled back, and
+        ``func`` is called again in a read-write transaction.
+
+        Other errors are handled by ``ir.http._handle_error`` within
+        the same transaction.
+
+        Note: This function does not reset any state set on ``request``
+        and ``request.env`` upon returning. Therefore, any recordset
+        set on request during one transaction WILL NOT be usable inside
+        the following transactions unless the recordset is reset with
+        ``with_env(request.env)``. This is especially a concern between
+        ``_match`` and other ``ir.http`` methods, as ``_match`` is
+        called inside its own dedicated transaction.
+        """
+        for readonly_cr in (True, False) if readonly else (False,):
+            threading.current_thread().cursor_mode = (
+                'ro' if readonly_cr
+                else 'ro->rw' if readonly
+                else 'rw'
+            )
+
+            with contextlib.closing(self.registry.cursor(readonly=readonly_cr)) as cr:
+                self.env = self.env(cr=cr)
+                try:
+                    return service_model.retrying(func, env=self.env)
+                except psycopg2.errors.ReadOnlySqlTransaction as exc:
+                    _logger.warning("%s, retrying with a read/write cursor", exc.args[0].rstrip(), exc_info=True)
+                    continue
+                except Exception as exc:
+                    if isinstance(exc, HTTPException) and exc.code is None:
+                        raise  # bubble up to odoo.http.Application.__call__
+                    if 'werkzeug' in config['dev_mode'] and self.dispatcher.routing_type != 'json':
+                        raise  # bubble up to werkzeug.debug.DebuggedApplication
+                    exc.error_response = self.registry['ir.http']._handle_error(exc)
+                    raise
 
 
 # =========================================================
@@ -1864,7 +2015,10 @@ class Dispatcher(ABC):
             werkzeug.exceptions.abort(Response(status=204))
 
         if 'max_content_length' in routing:
-            self.request.httprequest.max_content_length = routing['max_content_length']
+            max_content_length = routing['max_content_length']
+            if callable(max_content_length):
+                max_content_length = max_content_length(rule.endpoint.func.__self__)
+            self.request.httprequest.max_content_length = max_content_length
 
     @abstractmethod
     def dispatch(self, endpoint, args):
@@ -1946,7 +2100,7 @@ class HttpDispatcher(Dispatcher):
             response = self.request.redirect_query('/web/login', {'redirect': self.request.httprequest.full_path})
             if was_connected:
                 root.session_store.rotate(session, self.request.env)
-                response.set_cookie('session_id', session.sid, max_age=SESSION_LIFETIME, httponly=True)
+                response.set_cookie('session_id', session.sid, max_age=get_session_max_inactivity(self.env), httponly=True)
             return response
 
         return (exc if isinstance(exc, HTTPException)
@@ -2001,10 +2155,10 @@ class JsonRPCDispatcher(Dispatcher):
         try:
             self.jsonrequest = self.request.get_json_data()
             self.request_id = self.jsonrequest.get('id')
-        except ValueError as exc:
+        except ValueError:
             # must use abort+Response to bypass handle_error
             werkzeug.exceptions.abort(Response("Invalid JSON data", status=400))
-        except AttributeError as exc:
+        except AttributeError:
             # must use abort+Response to bypass handle_error
             werkzeug.exceptions.abort(Response("Invalid JSON-RPC data", status=400))
 
@@ -2179,6 +2333,7 @@ class Application:
         current_thread.query_count = 0
         current_thread.query_time = 0
         current_thread.perf_t0 = time.time()
+        current_thread.cursor_mode = None
         if hasattr(current_thread, 'dbname'):
             del current_thread.dbname
         if hasattr(current_thread, 'uid'):
@@ -2204,8 +2359,22 @@ class Application:
                 if self.get_static_file(httprequest.path):
                     response = request._serve_static()
                 elif request.db:
-                    with request._get_profiler_context_manager():
-                        response = request._serve_db()
+                    try:
+                        with request._get_profiler_context_manager():
+                            response = request._serve_db()
+                    except RegistryError as e:
+                        _logger.warning("Database or registry unusable, trying without", exc_info=e.__cause__)
+                        request.db = None
+                        request.session.logout()
+                        if (httprequest.path.startswith('/odoo/')
+                            or httprequest.path in (
+                                '/odoo', '/web', '/web/login', '/test_http/ensure_db',
+                            )):
+                            # ensure_db() protected routes, remove ?db= from the query string
+                            args_nodb = request.httprequest.args.copy()
+                            args_nodb.pop('db', None)
+                            request.reroute(httprequest.path, url_encode(args_nodb))
+                        response = request._serve_nodb()
                 else:
                     response = request._serve_nodb()
                 return response(environ, start_response)

@@ -22,7 +22,7 @@ class SaleOrderLine(models.Model):
     @api.depends('product_id.type')
     def _compute_is_event_booth(self):
         for record in self:
-            record.is_event_booth = record.product_id.detailed_type == 'event_booth'
+            record.is_event_booth = record.product_id.service_tracking == 'event_booth'
 
     @api.depends('event_booth_ids')
     def _compute_name_short(self):
@@ -109,8 +109,7 @@ class SaleOrderLine(models.Model):
     def _get_display_price(self):
         if self.event_booth_pending_ids and self.event_id:
             company = self.event_id.company_id or self.env.company
-            pricelist = self.order_id.pricelist_id
-            if pricelist.discount_policy == "with_discount":
+            if not self.pricelist_item_id._show_discount():
                 event_booths = self.event_booth_pending_ids.with_context(**self._get_pricelist_price_context())
                 total_price = sum(booth.booth_category_id.price_reduce for booth in event_booths)
             else:

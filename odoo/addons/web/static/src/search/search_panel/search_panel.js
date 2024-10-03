@@ -1,8 +1,17 @@
-/** @odoo-module **/
-
+import { Dropdown } from "@web/core/dropdown/dropdown";
 import { useBus } from "@web/core/utils/hooks";
 
-import { Component, onMounted, onWillUpdateProps, onWillStart, useRef, useState } from "@odoo/owl";
+import {
+    Component,
+    onMounted,
+    onWillStart,
+    onWillUpdateProps,
+    reactive,
+    useEffect,
+    useRef,
+    useState,
+} from "@odoo/owl";
+import { useSetupAction } from "@web/search/action_hook";
 
 //-------------------------------------------------------------------------
 // Helpers
@@ -35,22 +44,54 @@ const nameOfCheckedValues = (values) => {
  * Its state is directly affected by its model (@see SearchModel).
  */
 export class SearchPanel extends Component {
+    static template = "web.SearchPanel";
+    static props = {};
+    static components = {
+        Dropdown,
+    };
+    static subTemplates = {
+        section: "web.SearchPanel.Section",
+        category: "web.SearchPanel.Category",
+        filtersGroup: "web.SearchPanel.FiltersGroup",
+    };
+
     setup() {
         this.state = useState({
             active: {},
             expanded: {},
             showMobileSearch: false,
+            sidebarExpanded: !this.env.searchModel.searchPanelInfo.fold,
         });
+        this.hasImportedState = false;
         this.root = useRef("root");
         this.scrollTop = 0;
-        this.hasImportedState = false;
+        this.dropdownStates = {};
+        this.width = "10px";
 
-        this.importState(this.props.importedState);
+        this.importState(this.env.searchPanelState);
 
         useBus(this.env.searchModel, "update", async () => {
             await this.env.searchModel.sectionsPromise;
             this.updateActiveValues();
             this.render();
+        });
+
+        useEffect(
+            (el) => {
+                if (el && this.hasImportedState) {
+                    el.style["min-width"] = this.width;
+                    el.scroll({ top: this.scrollTop });
+                }
+            },
+            () => [this.root.el]
+        );
+
+        useSetupAction({
+            getGlobalState: () => {
+                return {
+                    searchPanel: this.exportState(),
+                };
+            },
         });
 
         onWillStart(async () => {
@@ -66,9 +107,6 @@ export class SearchPanel extends Component {
 
         onMounted(() => {
             this.updateGroupHeadersChecked();
-            if (this.hasImportedState) {
-                this.root.el.scroll({ top: this.scrollTop });
-            }
         });
     }
 
@@ -87,23 +125,38 @@ export class SearchPanel extends Component {
     exportState() {
         const exported = {
             expanded: this.state.expanded,
-            scrollTop: this.root.el.scrollTop,
+            scrollTop: this.root.el?.scrollTop || 0,
+            sidebarExpanded: this.state.sidebarExpanded,
+            width: this.width,
         };
         return JSON.stringify(exported);
     }
 
-    importState(stringifiedState) {
-        this.hasImportedState = Boolean(stringifiedState);
+    importState(state) {
+        this.hasImportedState = Boolean(state);
         if (this.hasImportedState) {
-            const state = JSON.parse(stringifiedState);
             this.state.expanded = state.expanded;
             this.scrollTop = state.scrollTop;
+            this.state.sidebarExpanded = state.sidebarExpanded;
+            this.width = state.width;
         }
     }
 
     //---------------------------------------------------------------------
     // Protected
     //---------------------------------------------------------------------
+
+    getDropdownState(sectionId) {
+        if (!this.dropdownStates[sectionId]) {
+            const state = reactive({
+                isOpen: false,
+                open: () => (state.isOpen = true),
+                close: () => (state.isOpen = false),
+            });
+            this.dropdownStates[sectionId] = reactive(state);
+        }
+        return this.dropdownStates[sectionId];
+    }
 
     /**
      * Expands category values holding the default value of a category.
@@ -182,6 +235,32 @@ export class SearchPanel extends Component {
     }
 
     /**
+     * Checks if the section matching the provided id has at least one active selection.
+     * If no id is provided, checks if at least one section has an active selection.
+     * @param {Number} sectionId
+     */
+    hasSelection(sectionId = 0) {
+        if (sectionId) {
+            const sectionState = this.state.active[sectionId];
+            if (sectionState instanceof Object) {
+                return Object.values(sectionState).some((val) => val);
+            }
+            return Boolean(sectionState);
+        }
+        return Object.keys(this.state.active).some((key) => this.hasSelection(key));
+    }
+
+    /**
+     * Clears all active selection in the section which id was provided.
+     * If no id is provided, clears the selection of all sections.
+     * @param {Number} sectionId
+     */
+    clearSelection(sectionId = 0) {
+        const sectionIds = sectionId ? [sectionId] : Object.keys(this.state.active).map(Number);
+        this.env.searchModel.clearSections(sectionIds);
+    }
+
+    /**
      * Prevent unnecessary calls to the model by ensuring a different category
      * is clicked.
      * @param {Object} category
@@ -195,10 +274,16 @@ export class SearchPanel extends Component {
             } else {
                 categoryState[value.id] = true;
             }
+        } else {
+            this.getDropdownState(category.id).close();
         }
         if (category.activeValueId !== value.id) {
             this.env.searchModel.toggleCategoryValue(category.id, value.id);
         }
+    }
+
+    toggleSidebar() {
+        this.state.sidebarExpanded = !this.state.sidebarExpanded;
     }
 
     /**
@@ -256,7 +341,7 @@ export class SearchPanel extends Component {
      * headers according to the state of their values.
      */
     updateGroupHeadersChecked() {
-        const groups = this.root.el.querySelectorAll(":scope .o_search_panel_filter_group");
+        const groups = document.querySelectorAll(".o_search_panel_filter_group");
         for (const group of groups) {
             const header = group.querySelector(":scope .o_search_panel_group_header input");
             const vals = [...group.querySelectorAll(":scope .o_search_panel_filter_value input")];
@@ -269,13 +354,60 @@ export class SearchPanel extends Component {
             }
         }
     }
-}
 
-SearchPanel.props = {
-    importedState: { type: String, optional: true },
-};
-SearchPanel.subTemplates = {
-    category: "web.SearchPanel.Category",
-    filtersGroup: "web.SearchPanel.FiltersGroup",
-};
-SearchPanel.template = "web.SearchPanel";
+    /**
+     * Handles the resize feature on the sidebar
+     *
+     * @private
+     * @param {PointerEvent} ev
+     */
+    _onStartResize(ev) {
+        // Only triggered by left mouse button
+        if (ev.button !== 0) {
+            return;
+        }
+
+        const initialX = ev.pageX;
+        const initialWidth = this.root.el.offsetWidth;
+        const resizeStoppingEvents = ["keydown", "pointerdown", "pointerup"];
+
+        // Pointermove event : resize header
+        const resizePanel = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            const maxWidth = Math.max(0.5 * window.innerWidth, initialWidth);
+            const delta = ev.pageX - initialX;
+            const newWidth = Math.min(maxWidth, Math.max(10, initialWidth + delta));
+            this.width = `${newWidth}px`;
+            this.root.el.style["min-width"] = this.width;
+        };
+        document.addEventListener("pointermove", resizePanel, true);
+
+        // Pointer or keyboard events : stop resize
+        const stopResize = (ev) => {
+            // Ignores the initial 'left mouse button down' event in order
+            // to not instantly remove the listener
+            if (ev.type === "pointerdown" && ev.button === 0) {
+                return;
+            }
+            ev.preventDefault();
+            ev.stopPropagation();
+
+            document.removeEventListener("pointermove", resizePanel, true);
+            resizeStoppingEvents.forEach((stoppingEvent) => {
+                document.removeEventListener(stoppingEvent, stopResize, true);
+            });
+            // we remove the focus to make sure that the there is no focus inside
+            // the panel. If that is the case, there is some css to darken the whole
+            // thead, and it looks quite weird with the small css hover effect.
+            document.activeElement.blur();
+        };
+        // We have to listen to several events to properly stop the resizing function. Those are:
+        // - pointerdown (e.g. pressing right click)
+        // - pointerup : logical flow of the resizing feature (drag & drop)
+        // - keydown : (e.g. pressing 'Alt' + 'Tab' or 'Windows' key)
+        resizeStoppingEvents.forEach((stoppingEvent) => {
+            document.addEventListener(stoppingEvent, stopResize, true);
+        });
+    }
+}

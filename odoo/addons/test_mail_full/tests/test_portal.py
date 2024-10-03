@@ -49,11 +49,9 @@ class TestPortalControllers(TestPortal):
 
         self.assertEqual(response.status_code, 200)
 
-        fragment = url_parse(response.url).fragment
-        params = url_decode(fragment)
-        self.assertEqual(params['cids'], '%s' % self.user_admin.company_id.id)
-        self.assertEqual(params['id'], '%s' % self.record_portal.id)
-        self.assertEqual(params['model'], self.record_portal._name)
+        self.assertEqual(response.request._cookies.get('cids'), '%s' % self.user_admin.company_id.id)
+        path = url_parse(response.url).path
+        self.assertEqual(path, f'/odoo/mail.test.portal/{self.record_portal.id}')
 
     def test_redirect_to_records_norecord(self):
         """ Check specific use case of missing model, should directly redirect
@@ -83,12 +81,22 @@ class TestPortalControllers(TestPortal):
             'model': self.record_portal._name,
             'res_id': self.record_portal.id,
         })
-        response = self.url_open(f'/mail/avatar/mail.message/{mail_record.id}/author_avatar/50x50?access_token={self.record_portal.access_token}')
+        token = self.record_portal.access_token
+        formatted_record = mail_record.portal_message_format(options={"token": token})[0]
+        self.assertEqual(
+            formatted_record.get("author_avatar_url"),
+            f"/mail/avatar/mail.message/{mail_record.id}/author_avatar/50x50?access_token={token}",
+        )
+        response = self.url_open(
+            f"/mail/avatar/mail.message/{mail_record.id}/author_avatar/50x50?access_token={token}"
+        )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/png')
         self.assertRegex(response.headers.get('Content-Disposition', ''), r'mail_message-\d+-author_avatar\.png')
 
-        placeholder_response = self.url_open(f'/mail/avatar/mail.message/{mail_record.id}/author_avatar/50x50?access_token={self.record_portal.access_token + "a"}') # false token
+        placeholder_response = self.url_open(
+            f'/mail/avatar/mail.message/{mail_record.id}/author_avatar/50x50?access_token={token + "a"}'
+        )  # false token
         self.assertEqual(placeholder_response.status_code, 200)
         self.assertEqual(placeholder_response.headers.get('Content-Type'), 'image/png')
         self.assertRegex(placeholder_response.headers.get('Content-Disposition', ''), r'placeholder\.png')
@@ -100,92 +108,67 @@ class TestPortalControllers(TestPortal):
 
     def test_portal_avatar_with_hash_pid(self):
         self.authenticate(None, None)
-        post_url = f"{self.record_portal.get_base_url()}/mail/chatter_post"
+        post_url = f"{self.record_portal.get_base_url()}/mail/message/post"
+        pid = self.partner_2.id
+        _hash = self.record_portal._sign_token(pid)
         res = self.opener.post(
             url=post_url,
             json={
                 'params': {
-                    'csrf_token': http.Request.csrf_token(self),
-                    'message': 'Test',
-                    'res_model': self.record_portal._name,
-                    'res_id': self.record_portal.id,
-                    'hash': self.record_portal._sign_token(self.partner_2.id),
-                    'pid': self.partner_2.id,
+                    'thread_model': self.record_portal._name,
+                    'thread_id': self.record_portal.id,
+                    'post_data': {'body': "Test"},
+                    'hash': _hash,
+                    'pid': pid,
                 },
             },
         )
         res.raise_for_status()
         self.assertNotIn("error", res.json())
         message = self.record_portal.message_ids[0]
+        formatted_message = message.portal_message_format(options={"hash": _hash, "pid": pid})[0]
+        self.assertEqual(
+            formatted_message.get("author_avatar_url"),
+            f"/mail/avatar/mail.message/{message.id}/author_avatar/50x50?_hash={_hash}&pid={pid}",
+        )
         response = self.url_open(
-            f'/mail/avatar/mail.message/{message.id}/author_avatar/50x50?_hash={self.record_portal._sign_token(self.partner_2.id)}&pid={self.partner_2.id}')
+            f"/mail/avatar/mail.message/{message.id}/author_avatar/50x50?_hash={_hash}&pid={pid}"
+        )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/png')
         self.assertRegex(response.headers.get('Content-Disposition', ''), r'mail_message-\d+-author_avatar\.png')
 
         placeholder_response = self.url_open(
-            f'/mail/avatar/mail.message/{message.id}/author_avatar/50x50?_hash={self.record_portal._sign_token(self.partner_2.id) + "a"}&pid={self.partner_2.id}')  # false hash
+            f'/mail/avatar/mail.message/{message.id}/author_avatar/50x50?_hash={_hash + "a"}&pid={pid}'
+        )  # false hash
         self.assertEqual(placeholder_response.status_code, 200)
         self.assertEqual(placeholder_response.headers.get('Content-Type'), 'image/png')
         self.assertRegex(placeholder_response.headers.get('Content-Disposition', ''), r'placeholder\.png')
-
-    def test_portal_message_fetch(self):
-        """Test retrieving chatter messages through the portal controller"""
-        self.authenticate(None, None)
-        message_fetch_url = '/mail/chatter_fetch'
-
-        def get_chatter_message_count():
-            return self.make_jsonrpc_request(message_fetch_url, {
-                'res_model': 'mail.test.portal',
-                'res_id': self.record_portal.id,
-                'token': self.record_portal.access_token,
-            }).get('message_count', 0)
-
-        self.assertEqual(get_chatter_message_count(), 0)
-
-        for _ in range(8):
-            self.record_portal.message_post(
-                body='Test',
-                author_id=self.partner_1.id,
-                message_type='comment',
-                subtype_id=self.env.ref('mail.mt_comment').id,
-            )
-
-        self.assertEqual(get_chatter_message_count(), 8)
-
-        # Empty the body of a few messages
-        for i in (2, 5, 6):
-            self.record_portal.message_ids[i].body = ""
-
-        # Empty messages should be ignored
-        self.assertEqual(get_chatter_message_count(), 5)
 
     def test_portal_share_comment(self):
         """ Test posting through portal controller allowing to use a hash to
         post wihtout access rights. """
         self.authenticate(None, None)
-        post_url = f"{self.record_portal.get_base_url()}/mail/chatter_post"
+        post_url = f"{self.record_portal.get_base_url()}/mail/message/post"
 
         # test as not logged
         self.opener.post(
             url=post_url,
             json={
                 'params': {
-                    'csrf_token': http.Request.csrf_token(self),
-                    'hash': self.record_portal._sign_token(self.partner_2.id),
-                    'message': 'Test',
-                    'pid': self.partner_2.id,
-                    'redirect': '/',
-                    'res_model': self.record_portal._name,
-                    'res_id': self.record_portal.id,
+                    'thread_model': self.record_portal._name,
+                    'thread_id': self.record_portal.id,
+                    'post_data': {'body': "Test"},
                     'token': self.record_portal.access_token,
+                    'hash': self.record_portal._sign_token(self.partner_2.id),
+                    'pid': self.partner_2.id,
                 },
             },
         )
-        message = self.record_portal.message_ids[0]
+        # Only messages from the current user not OdooBot
+        messages = self.record_portal.message_ids.filtered(lambda msg: msg.author_id == self.partner_2)
 
-        self.assertIn('Test', message.body)
-        self.assertEqual(message.author_id, self.partner_2)
+        self.assertIn('Test', messages[0].body)
 
 
 @tagged('portal')
@@ -264,7 +247,7 @@ class TestPortalFlow(MailCommon, HttpCase):
             'default_res_ids': self.record_portal.ids,
             'default_template_id': template_id,
             'force_email': True,
-            'lang': '{{ object.partner_id.lang }}',
+            'lang': 'en_US',
         })
 
     def test_initial_data(self):
@@ -306,7 +289,7 @@ class TestPortalFlow(MailCommon, HttpCase):
         self.authenticate(self.env.user.login, self.env.user.login)
         res = self.url_open(self.record_access_url_wrong_token)
         self.assertEqual(res.status_code, 200)
-        self.assert_URL(res.url, '/my', {'action': 'mail.action_discuss'})
+        self.assert_URL(res.url, '/my', expected_query='subpath=action-mail.action_discuss')
 
     def test_customer_access_not_logged(self):
         """Check that the access link redirects the customer (not logged) to the portal for viewing the record."""
@@ -328,7 +311,7 @@ class TestPortalFlow(MailCommon, HttpCase):
         self.authenticate(self.env.user.login, self.env.user.login)
         res = self.url_open(self.record_access_url)
         self.assertEqual(res.status_code, 200)
-        self.assert_URL(res.url, '/web', {'model': 'mail.test.portal', 'id': str(self.record_portal.id)})
+        self.assert_URL(res.url, f'/odoo/mail.test.portal/{self.record_portal.id}')
 
     @users('employee')
     def test_employee_access_wrong_token(self):
@@ -336,7 +319,7 @@ class TestPortalFlow(MailCommon, HttpCase):
         self.authenticate(self.env.user.login, self.env.user.login)
         res = self.url_open(self.record_access_url_wrong_token)
         self.assertEqual(res.status_code, 200)
-        self.assert_URL(res.url, '/web', {'model': 'mail.test.portal', 'id': str(self.record_portal.id)})
+        self.assert_URL(res.url, f'/odoo/mail.test.portal/{self.record_portal.id}')
 
     @users('employee')
     def test_send_message_to_customer(self):

@@ -9,7 +9,8 @@ from odoo import exceptions
 from odoo.addons.mail.tests.common import MailCommon
 from odoo.addons.test_mail.models.test_mail_models import MailTestSimple
 from odoo.addons.test_mail.tests.common import TestRecipients
-from odoo.tests.common import tagged, Form, users
+from odoo.addons.mail.tools.discuss import Store
+from odoo.tests import Form, tagged, users
 from odoo.tools import mute_logger
 
 
@@ -94,7 +95,7 @@ class TestAPI(MailCommon, TestRecipients):
         )
         self.assertEqual(message.body, expected)
         ticket_record._message_update_content(message, "Hello <R&D/>")
-        self.assertEqual(message.body, Markup("<p>Hello &lt;R&amp;D/&gt;</p>"))
+        self.assertEqual(message.body, Markup('<p>Hello &lt;R&amp;D/&gt;<span class="o-mail-Message-edited"></span></p>'))
 
     @mute_logger('openerp.addons.mail.models.mail_mail')
     @users('employee')
@@ -118,6 +119,12 @@ class TestAPI(MailCommon, TestRecipients):
         self.assertEqual(message.body, "<p>Initial Body</p>")
         self.assertEqual(message.subtype_id, self.env.ref('mail.mt_note'))
 
+        # clear the content when having attachments should show edit label
+        ticket_record._message_update_content(
+            message, "",
+        )
+        self.assertEqual(message.attachment_ids, attachments)
+        self.assertEqual(message.body, Markup('<span class="o-mail-Message-edited"></span>'))
         # update the content with new attachments
         new_attachments = self.env['ir.attachment'].create(
             self._generate_attachments_data(2, 'mail.compose.message', 0)
@@ -129,7 +136,7 @@ class TestAPI(MailCommon, TestRecipients):
         self.assertEqual(message.attachment_ids, attachments + new_attachments)
         self.assertEqual(set(message.mapped('attachment_ids.res_id')), set(ticket_record.ids))
         self.assertEqual(set(message.mapped('attachment_ids.res_model')), set([ticket_record._name]))
-        self.assertEqual(message.body, "<p>New Body</p>")
+        self.assertEqual(message.body, Markup('<p>New Body</p><span class="o-mail-Message-edited"></span>'))
 
         # void attachments
         ticket_record._message_update_content(
@@ -138,7 +145,7 @@ class TestAPI(MailCommon, TestRecipients):
         )
         self.assertFalse(message.attachment_ids)
         self.assertFalse((attachments + new_attachments).exists())
-        self.assertEqual(message.body, "<p>Another Body, void attachments</p>")
+        self.assertEqual(message.body, Markup('<p>Another Body, void attachments</p><span class="o-mail-Message-edited"></span>'))
 
     @mute_logger('openerp.addons.mail.models.mail_mail')
     @users('employee')
@@ -282,16 +289,13 @@ class TestDiscuss(MailCommon, TestRecipients):
 
     @mute_logger('openerp.addons.mail.models.mail_mail')
     def test_mark_all_as_read(self):
-        def _employee_crash(*args, **kwargs):
+        def _employee_crash(recordset, operation):
             """ If employee is test employee, consider they have no access on document """
-            recordset = args[0]
             if recordset.env.uid == self.user_employee.id and not recordset.env.su:
-                if kwargs.get('raise_exception', True):
-                    raise exceptions.AccessError('Hop hop hop Ernest, please step back.')
-                return False
+                return recordset, lambda: exceptions.AccessError('Hop hop hop Ernest, please step back.')
             return DEFAULT
 
-        with patch.object(MailTestSimple, 'check_access_rights', autospec=True, side_effect=_employee_crash):
+        with patch.object(MailTestSimple, '_check_access', autospec=True, side_effect=_employee_crash):
             with self.assertRaises(exceptions.AccessError):
                 self.env['mail.test.simple'].with_user(self.user_employee).browse(self.test_record.ids).read(['name'])
 
@@ -366,6 +370,56 @@ class TestDiscuss(MailCommon, TestRecipients):
         self.assertFalse(msg.starred)
         self.assertTrue(msg_emp.starred)
 
+    def test_delete_starred_message(self):
+        msg = self.test_record.message_post(body="Hello!", message_type="comment")
+        msg_2 = self.test_record.message_post(body="Goodbye!", message_type="comment")
+        msg.with_user(self.user_admin).toggle_message_starred()
+        msg.with_user(self.user_employee).toggle_message_starred()
+        msg_2.with_user(self.user_employee).toggle_message_starred()
+        self.assertIn(self.partner_admin, msg.starred_partner_ids)
+        self.assertIn(self.partner_employee, msg.starred_partner_ids)
+        self._reset_bus()
+        bus_last_id = self.env["bus.bus"].sudo()._bus_last_id()
+        self.test_record._message_update_content(message=msg, body="")
+        self.assertFalse(msg.starred)
+        self.assertBusNotifications(
+            [
+                (self.cr.dbname, "res.partner", self.partner_admin.id),
+                (self.cr.dbname, "res.partner", self.partner_employee.id),
+            ],
+            [
+                {
+                    "type": "mail.record/insert",
+                    "payload": {
+                        "mail.thread": [
+                            {
+                                "counter": 1,
+                                "counter_bus_id": bus_last_id,
+                                "id": "starred",
+                                "messages": [["DELETE", [msg.id]]],
+                                "model": "mail.box",
+                            }
+                        ],
+                    },
+                },
+                {
+                    "type": "mail.record/insert",
+                    "payload": {
+                        "mail.thread": [
+                            {
+                                "counter": 0,
+                                "counter_bus_id": bus_last_id,
+                                "id": "starred",
+                                "messages": [["DELETE", [msg.id]]],
+                                "model": "mail.box",
+                            }
+                        ],
+                    },
+                },
+            ],
+            check_unique=False,
+        )
+
     def test_inbox_message_fetch_needaction(self):
         user1 = self.env['res.users'].create({'login': 'user1', 'name': 'User 1'})
         user1.notification_type = 'inbox'
@@ -425,26 +479,29 @@ class TestDiscuss(MailCommon, TestRecipients):
             'email_from': email,
             'mobile_number': data_from_record_mobile,
         })
-        suggestions = record._message_get_suggested_recipients()[record.id]
-        self.assertEqual(
+        suggestions = record._message_get_suggested_recipients()
+        self.assertItemsEqual(
             suggestions,
-            [(False, email, None, 'Customer Email', {'mobile': '+33199001015', 'phone': False})]
+            [
+                {
+                    'lang': None,
+                    'reason': 'Customer Email',
+                    'name': 'newpartner@example.com',
+                    'email': 'newpartner@example.com',
+                    'create_values': {'mobile': '+33199001015', 'phone': False},
+                }
+            ],
         )
 
     @users("employee")
     def test_unlink_notification_message(self):
         channel = self.env['discuss.channel'].create({'name': 'testChannel'})
-        notification_msg = channel.with_user(self.user_admin).message_notify(
+        channel.with_user(self.user_admin).message_notify(
             body='test',
             partner_ids=[self.partner_2.id],
         )
-
-        with self.assertRaises(exceptions.AccessError):
-            notification_msg.with_env(self.env).message_format(['id', 'body', 'date', 'author_id', 'email_from'])
-
         channel_message = self.env['mail.message'].sudo().search([('model', '=', 'discuss.channel'), ('res_id', 'in', channel.ids)])
         self.assertEqual(len(channel_message), 1, "Test message should have been posted")
-
         channel.sudo().unlink()
         remaining_message = channel_message.exists()
         self.assertEqual(len(remaining_message), 0, "Test message should have been deleted")
@@ -455,7 +512,7 @@ class TestNoThread(MailCommon, TestRecipients):
     """ Specific tests for cross models thread features """
 
     @users('employee')
-    def test_message_format(self):
+    def test_message_to_store(self):
         """ Test formatting of messages when linked to non-thread models.
         Format could be asked notably if an inbox notification due to a
         'message_notify' happens. """
@@ -465,15 +522,15 @@ class TestNoThread(MailCommon, TestRecipients):
         })
         message = self.env['mail.message'].create({
             'model': test_record._name,
-            'record_name': 'Not used in message_format',
+            'record_name': 'Not used in message _to_store',
             'res_id': test_record.id,
         })
-        formatted = message.message_format()[0]
+        formatted = Store(message, for_current_user=True).get_result()["mail.message"][0]
         self.assertEqual(formatted['default_subject'], test_record.name)
         self.assertEqual(formatted['record_name'], test_record.name)
 
         test_record.write({'name': 'Just Test'})
-        formatted = message.message_format()[0]
+        formatted = Store(message, for_current_user=True).get_result()["mail.message"][0]
         self.assertEqual(formatted['default_subject'], 'Just Test')
         self.assertEqual(formatted['record_name'], 'Just Test')
 

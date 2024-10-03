@@ -7,7 +7,7 @@ from werkzeug.urls import url_encode
 
 from odoo import api, fields, models
 from odoo.osv import expression
-from odoo.tools import formatLang
+from odoo.tools import format_amount, formatLang
 
 STATUS_COLOR = {
     'on_track': 20,  # green / success
@@ -49,18 +49,18 @@ class ProjectUpdate(models.Model):
         ('off_track', 'Off Track'),
         ('on_hold', 'On Hold'),
         ('done', 'Done'),
-    ], required=True, tracking=True)
-    color = fields.Integer(compute='_compute_color')
+    ], required=True, tracking=True, export_string_translation=False)
+    color = fields.Integer(compute='_compute_color', export_string_translation=False)
     progress = fields.Integer(tracking=True)
-    progress_percentage = fields.Float(compute='_compute_progress_percentage')
+    progress_percentage = fields.Float(compute='_compute_progress_percentage', export_string_translation=False)
     user_id = fields.Many2one('res.users', string='Author', required=True, default=lambda self: self.env.user)
     description = fields.Html()
     date = fields.Date(default=fields.Date.context_today, tracking=True)
-    project_id = fields.Many2one('project.project', required=True)
-    name_cropped = fields.Char(compute="_compute_name_cropped")
-    task_count = fields.Integer("Task Count", readonly=True)
-    closed_task_count = fields.Integer("Closed Task Count", readonly=True)
-    closed_task_percentage = fields.Integer("Closed Task Percentage", compute="_compute_closed_task_percentage")
+    project_id = fields.Many2one('project.project', required=True, export_string_translation=False)
+    name_cropped = fields.Char(compute="_compute_name_cropped", export_string_translation=False)
+    task_count = fields.Integer("Task Count", readonly=True, export_string_translation=False)
+    closed_task_count = fields.Integer("Closed Task Count", readonly=True, export_string_translation=False)
+    closed_task_percentage = fields.Integer("Closed Task Percentage", compute="_compute_closed_task_percentage", export_string_translation=False)
 
     @api.depends('status')
     def _compute_color(self):
@@ -92,7 +92,7 @@ class ProjectUpdate(models.Model):
             project.sudo().last_update_id = update
             update.write({
                 "task_count": project.task_count,
-                "closed_task_count": project.closed_task_count,
+                "closed_task_count": project.task_count - project.open_task_count,
             })
         return updates
 
@@ -119,6 +119,7 @@ class ProjectUpdate(models.Model):
             'show_activities': milestones['show_section'],
             'milestones': milestones,
             'format_lang': lambda value, digits: formatLang(self.env, value, digits=digits),
+            'format_monetary': lambda value: format_amount(self.env, value, project.currency_id),
         }
 
     @api.model

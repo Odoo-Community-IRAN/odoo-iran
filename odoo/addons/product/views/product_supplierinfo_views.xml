@@ -24,11 +24,11 @@
                             <label for="min_qty"/>
                             <div class="o_row">
                                 <field name="min_qty"/>
-                                <field name="product_uom" groups="uom.group_uom"/>
+                                <field name="product_uom" groups="uom.group_uom" options="{'no_open': True}"/>
                             </div>
                             <label for="price" string="Unit Price"/>
                             <div class="o_row">
-                                <field name="price" class="oe_inline" /><field name="currency_id" groups="base.group_multi_currency"/>
+                                <field name="price" class="oe_inline" /><field name="currency_id" groups="base.group_multi_currency" options="{'no_open': True}"/>
                             </div>
                             <label for="date_start" string="Validity"/>
                             <div class="o_row"><field name="date_start" class="oe_inline"/> to <field name="date_end" class="oe_inline"/></div>
@@ -67,28 +67,16 @@
         <field name="model">product.supplierinfo</field>
         <field name="arch" type="xml">
             <kanban class="o_kanban_mobile">
-                <field name="min_qty"/>
-                <field name="delay"/>
-                <field name="price"/>
-                <field name="partner_id"/>
                 <field name="currency_id"/>
                 <templates>
-                    <t t-name="kanban-box">
-                        <div class="oe_kanban_global_click">
-                            <div class="row mb4">
-                                <strong class="col-6">
-                                    <span t-esc="record.partner_id.value"/>
-                                </strong>
-                                <strong class="col-6 text-end">
-                                    <strong><field name="price" widget="monetary"/></strong>
-                                </strong>
-                                <div class="col-6">
-                                    <span t-esc="record.min_qty.value"/>
-                                </div>
-                                <div class="col-6 text-end">
-                                    <span t-esc="record.delay.value"/> days
-                                </div>
-                            </div>
+                    <t t-name="card">
+                        <div class="d-flex fw-bolder mb4">
+                            <field name="partner_id" />
+                            <field name="price" widget="monetary" class="ms-auto"/>
+                        </div>
+                        <div class="d-flex">
+                            <field name="min_qty"/>
+                            <field name="delay" class="ms-auto me-1"/>days
                         </div>
                     </t>
                 </templates>
@@ -97,10 +85,10 @@
     </record>
 
     <record id="product_supplierinfo_tree_view" model="ir.ui.view">
-        <field name="name">product.supplierinfo.tree.view</field>
+        <field name="name">product.supplierinfo.list.view</field>
         <field name="model">product.supplierinfo</field>
         <field name="arch" type="xml">
-            <tree string="Vendor Information" multi_edit="1">
+            <list string="Vendor Information" multi_edit="1">
                 <field name="sequence" widget="handle"/>
                 <field name="partner_id" readonly="1"/>
                 <field name="product_id" optional="hide"
@@ -122,14 +110,14 @@
                 <field name="discount" optional="hide"/>
                 <field name="currency_id" groups="base.group_multi_currency"/>
                 <field name="delay" optional="show"/>
-            </tree>
+            </list>
         </field>
     </record>
 
     <record id="product_supplierinfo_type_action" model="ir.actions.act_window">
         <field name="name">Vendor Pricelists</field>
         <field name="res_model">product.supplierinfo</field>
-        <field name="view_mode">tree,form,kanban</field>
+        <field name="view_mode">list,form,kanban</field>
         <field name="context">{'visible_product_tmpl_id': False, 'search_default_active_products': True}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">

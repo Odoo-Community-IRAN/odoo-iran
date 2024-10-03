@@ -1,14 +1,17 @@
-/** @odoo-module */
-
 import { Component } from "@odoo/owl";
-import { DROPDOWN } from "@web/core/dropdown/dropdown";
+import { useDropdownCloser } from "@web/core/dropdown/dropdown_hooks";
 
 export class KanbanDropdownMenuWrapper extends Component {
+    static template = "web.KanbanDropdownMenuWrapper";
+    static props = {
+        slots: Object,
+    };
+
+    setup() {
+        this.dropdownControl = useDropdownCloser();
+    }
+
     onClick(ev) {
-        this.env[DROPDOWN].closeAllParents();
+        this.dropdownControl.closeAll();
     }
 }
-KanbanDropdownMenuWrapper.template = "web.KanbanDropdownMenuWrapper";
-KanbanDropdownMenuWrapper.props = {
-    slots: Object,
-};

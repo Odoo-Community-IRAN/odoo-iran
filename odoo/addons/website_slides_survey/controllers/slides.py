@@ -7,7 +7,6 @@ import werkzeug.exceptions
 
 from odoo import _
 from odoo import http
-from odoo.addons.http_routing.models.ir_http import slug
 from odoo.exceptions import AccessError
 from odoo.http import request
 from odoo.osv import expression
@@ -32,7 +31,7 @@ class WebsiteSlidesSurvey(WebsiteSlides):
 
     @http.route(['/slides_survey/certification/search_read'], type='json', auth='user', methods=['POST'], website=True)
     def slides_certification_search_read(self, fields):
-        can_create = request.env['survey.survey'].check_access_rights('create', raise_exception=False)
+        can_create = request.env['survey.survey'].has_access('create')
         return {
             'read_results': request.env['survey.survey'].search_read([('certification', '=', True)], fields),
             'can_create': can_create,
@@ -49,7 +48,7 @@ class WebsiteSlidesSurvey(WebsiteSlides):
 
         if create_new_survey:
             # If user cannot create a new survey, no need to create the slide either.
-            if not request.env['survey.survey'].check_access_rights('create', raise_exception=False):
+            if not request.env['survey.survey'].has_access('create'):
                 return {'error': _('You are not allowed to create a survey.')}
 
             # Create survey first as certification slide needs a survey_id (constraint)
@@ -77,7 +76,8 @@ class WebsiteSlidesSurvey(WebsiteSlides):
 
         if post['slide_category'] == "certification":
             # Set the url to redirect the user to the survey
-            result['url'] = '/slides/slide/%s?fullscreen=1' % (slug(request.env['slide.slide'].browse(result['slide_id']))),
+            slide = request.env['slide.slide'].browse(result['slide_id'])
+            result['url'] = f'/slides/slide/{request.env["ir.http"]._slug(slide)}?fullscreen=1'
 
         return result
 

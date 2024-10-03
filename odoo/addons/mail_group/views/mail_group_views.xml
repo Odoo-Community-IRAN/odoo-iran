@@ -4,12 +4,12 @@
         <field name="name">mail.group.view.list</field>
         <field name="model">mail.group</field>
         <field name="arch" type="xml">
-            <tree sample="1">
+            <list sample="1">
                 <field name="name"/>
                 <field name="alias_email" string="Alias"/>
                 <field name="moderation" string="Moderated"/>
                 <field name="member_count" string="Members"/>
-            </tree>
+            </list>
         </field>
     </record>
     <record id="mail_group_view_kanban" model="ir.ui.view">
@@ -17,32 +17,23 @@
         <field name="model">mail.group</field>
         <field name="arch" type="xml">
             <kanban string="Mail Groups" sample="1">
-                <field name="id"/>
-                <field name="description"/>
                 <field name="is_member"/>
-                <field name="member_count"/>
                 <templates>
-                    <t t-name="kanban-description">
-                        <div class="oe_group_description" t-if="record.description.raw_value">
-                            <field name="description"/>
-                        </div>
-                    </t>
-                    <t t-name="kanban-box">
-                        <div class="oe_module_vignette oe_kanban_global_click">
-                            <img t-att-src="kanban_image('mail.group', 'image_128', record.id.raw_value)" class="oe_module_icon" alt="Group"/>
-                            <div class="oe_module_desc">
-                                <h4 class="o_kanban_record_title">#<field name="name"/></h4>
-                                <p class="o_mg_description text-truncate text-nowrap" t-esc="record.description.raw_value or ''"/>
-                                <span>
-                                    <t t-esc="record.member_count.raw_value"/>
-                                    <t t-if="record.member_count.raw_value > 1">Members</t>
-                                    <t t-else="">Member</t>
-                                </span>
-                                <field name="is_member" invisible="1"/>
-                                <button type="object" invisible="is_member" class="btn btn-primary float-end" name="action_join">Join</button>
-                                <button type="object" invisible="not is_member" class="btn btn-secondary float-end" name="action_leave">Leave</button>
-                            </div>
-                        </div>
+                    <t t-name="card" class="flex-row">
+                        <aside>
+                            <field name="image_128" widget="image" alt="Group"/>
+                        </aside>
+                        <main>
+                            <span class="fw-bold fs-5">#<field name="name"/></span>
+                            <field class="text-truncate text-nowrap" name="description"/>
+                            <span>
+                                <field name="member_count"/>
+                                <t t-if="record.member_count.raw_value > 1">Members</t>
+                                <t t-else="">Member</t>
+                            </span>
+                            <button type="object" invisible="is_member" class="btn btn-primary ms-auto" name="action_join">Join</button>
+                            <button type="object" invisible="not is_member" class="btn btn-secondary ms-auto" name="action_leave">Leave</button>
+                        </main>
                     </t>
                 </templates>
             </kanban>
@@ -112,8 +103,8 @@
                                 <field name="alias_id" class="oe_read_only oe_inline" string="Email Alias" required="0"/>
                                 <div class="oe_inline" name="edit_alias" style="display: inline;">
                                     <div class="oe_edit_only" dir="ltr">
-                                        <field name="alias_name" class="oe_inline"/>@
-                                        <field name="alias_domain_id" class="oe_inline" placeholder="e.g. domain.com"
+                                        <field name="alias_name" placeholder="alias" class="oe_inline"/>@
+                                        <field name="alias_domain_id" class="oe_inline" placeholder="e.g. mycompany.com"
                                                options="{'no_create': True, 'no_open': True}"/>
                                     </div>
                                     <button icon="oi-arrow-right" type="action" name="%(base_setup.action_general_configuration)d"
@@ -177,7 +168,7 @@
     <record id="mail_group_action" model="ir.actions.act_window">
         <field name="name">Mail Groups</field>
         <field name="res_model">mail.group</field>
-        <field name="view_mode">kanban,tree,form</field>
+        <field name="view_mode">kanban,list,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">Create a Mail Group</p>
             <p>Mailing groups are communities that like to discuss a specific topic together.</p>

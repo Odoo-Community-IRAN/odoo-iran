@@ -11,7 +11,7 @@
                 <filter string="Service" name="service" domain="[('cost_type', '=', 'service')]"/>
                 <filter string="Contract" name="contract" domain="[('cost_type', '=', 'contract')]"/>
                 <separator/>
-                <filter name="filter_date_start" date="date_start" default_period="this_year"/>
+                <filter name="filter_date_start" date="date_start" default_period="year"/>
                 <group expand="1" string="Group By">
                     <filter string="Vehicle" name="vehicle" context="{'group_by':'vehicle_id'}"/>
                     <filter string="Driver" name="driver" context="{'group_by':'driver_id'}"/>
@@ -46,10 +46,10 @@
     </record>
 
     <record id="fleet_vechicle_costs_report_view_tree" model="ir.ui.view">
-        <field name="name">fleet.vehicle.cost.report.view.tree</field>
+        <field name="name">fleet.vehicle.cost.report.view.list</field>
         <field name="model">fleet.vehicle.cost.report</field>
         <field name="arch" type="xml">
-            <tree string="Fleet Costs Analysis" create="0">
+            <list string="Fleet Costs Analysis" create="0">
                 <field name="name"/>
                 <field name="driver_id" optional="show"/>
                 <field name="fuel_type" optional="hide"/>
@@ -57,7 +57,7 @@
                 <field name="cost" optional="show" sum="Sum of Cost"/>
                 <field name="cost_type" optional="show"/>
                 <field name="company_id" groups="base.group_multi_company"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -90,7 +90,7 @@
         <field name="res_model">fleet.vehicle.cost.report</field>
         <field name="view_mode">graph,pivot</field>
         <field name="view_id"></field>
-        <field name="context" eval="{'search_default_filter_date_start': 1}"/>
+        <field name="context">{'search_default_filter_date_start': 1}</field>
         <field name="search_view_id" ref="fleet.fleet_costs_report_view_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_empty_folder">

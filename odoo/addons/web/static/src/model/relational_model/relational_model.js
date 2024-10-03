@@ -1,12 +1,10 @@
-/* @odoo-module */
 // @ts-check
 
 import { EventBus, markRaw, toRaw } from "@odoo/owl";
 import { makeContext } from "@web/core/context";
 import { Domain } from "@web/core/domain";
 import { WarningDialog } from "@web/core/errors/error_dialogs";
-import { registry } from "@web/core/registry";
-import { shallowEqual, unique } from "@web/core/utils/arrays";
+import { shallowEqual } from "@web/core/utils/arrays";
 import { KeepLast, Mutex } from "@web/core/utils/concurrency";
 import { orderByToString } from "@web/search/utils/order_by";
 import { Model } from "../model";
@@ -16,13 +14,13 @@ import { Group } from "./group";
 import { Record } from "./record";
 import { StaticList } from "./static_list";
 import {
-    FetchRecordError,
     extractInfoFromGroupData,
     getBasicEvalContext,
     getFieldsSpec,
     isRelational,
     makeActiveField,
 } from "./utils";
+import { FetchRecordError } from "./errors";
 
 /**
  * @typedef Params
@@ -94,17 +92,8 @@ const DEFAULT_HOOKS = {
     onRecordChanged: () => {},
 };
 
-export function fetchRecordErrorHandler(env, error, originalError) {
-    if (originalError instanceof FetchRecordError) {
-        env.services.notification.add(originalError.message, { sticky: true, type: "danger" });
-        return true;
-    }
-}
-const errorHandlerRegistry = registry.category("error_handlers");
-errorHandlerRegistry.add("fetchRecordErrorHandler", fetchRecordErrorHandler);
-
 export class RelationalModel extends Model {
-    static services = ["action", "company", "dialog", "notification", "orm", "rpc", "user"];
+    static services = ["action", "company", "dialog", "notification", "orm"];
     static Record = Record;
     static Group = Group;
     static DynamicRecordList = DynamicRecordList;
@@ -119,12 +108,10 @@ export class RelationalModel extends Model {
     /**
      * @param {Params} params
      */
-    setup(params, { action, company, dialog, notification, rpc, user }) {
+    setup(params, { action, company, dialog, notification }) {
         this.action = action;
         this.dialog = dialog;
         this.notification = notification;
-        this.rpc = rpc;
-        this.user = user;
 
         this.bus = new EventBus();
 
@@ -289,6 +276,9 @@ export class RelationalModel extends Model {
             if (!shallowEqual(config.groupBy || [], currentGroupBy || [])) {
                 delete config.groups;
             }
+            if (!config.groupBy.length) {
+                config.orderBy = config.orderBy.filter((order) => order.name !== "__count");
+            }
         }
         if (!config.isMonoRecord && this.root) {
             // always reset the offset to 0 when reloading from above
@@ -318,7 +308,6 @@ export class RelationalModel extends Model {
             if (!config.resId) {
                 return this._loadNewRecord(config, { evalContext });
             }
-
             const records = await this._loadRecords(
                 {
                     ...config,
@@ -380,10 +369,10 @@ export class RelationalModel extends Model {
         const orderBy = config.orderBy.filter(
             (o) =>
                 o.name === firstGroupByName ||
-                (o.name in config.activeFields &&
-                    config.fields[o.name].group_operator !== undefined)
+                o.name === "__count" ||
+                (o.name in config.activeFields && config.fields[o.name].aggregator !== undefined)
         );
-        const response = await this._webReadGroup(config, firstGroupByName, orderBy);
+        const response = await this._webReadGroup(config, orderBy);
         const { groups: groupsData, length } = response;
         const groupBy = config.groupBy.slice(1);
         const groupByField = config.fields[config.groupBy[0].split(":")[0]];
@@ -575,10 +564,11 @@ export class RelationalModel extends Model {
      * @returns
      */
     async _loadUngroupedList(config) {
+        const orderBy = config.orderBy.filter((o) => o.name !== "__count");
         const kwargs = {
             specification: getFieldsSpec(config.activeFields, config.fields, config.context),
             offset: config.offset,
-            order: orderByToString(config.orderBy),
+            order: orderByToString(orderBy),
             limit: config.limit,
             context: { bin_size: true, ...config.context },
             count_limit:
@@ -693,17 +683,20 @@ export class RelationalModel extends Model {
         }
     }
 
-    async _webReadGroup(config, firstGroupByName, orderBy) {
+    async _webReadGroup(config, orderBy) {
+        const aggregates = Object.values(config.fields)
+            .filter((field) => field.aggregator && field.name in config.activeFields)
+            .map((field) => `${field.name}:${field.aggregator}`);
         return this.orm.webReadGroup(
             config.resModel,
             config.domain,
-            unique([...Object.keys(config.activeFields), firstGroupByName]),
+            aggregates,
             [config.groupBy[0]],
             {
                 orderby: orderByToString(orderBy),
-                lazy: true, // maybe useless
+                lazy: true,
                 offset: config.offset,
-                limit: config.limit,
+                limit: config.limit, // TODO: remove limit when == MAX_integer
                 context: config.context,
             }
         );

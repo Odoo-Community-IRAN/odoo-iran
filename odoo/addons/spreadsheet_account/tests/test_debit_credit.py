@@ -10,12 +10,13 @@ from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 @tagged("post_install", "-at_install")
 class SpreadsheetAccountingFunctionsTest(AccountTestInvoicingCommon):
     @classmethod
-    def setUpClass(cls, chart_template_ref=None):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.company_data_2 = cls.setup_other_company()
 
         cls.account_revenue_c1 = cls.env["account.account"].create(
             {
-                "company_id": cls.company_data["company"].id,
+                "company_ids": [Command.link(cls.company_data["company"].id)],
                 "name": "spreadsheet revenue Company 1",
                 "account_type": "income",
                 "code": "sp1234566",
@@ -24,25 +25,26 @@ class SpreadsheetAccountingFunctionsTest(AccountTestInvoicingCommon):
 
         cls.account_expense_c1 = cls.env["account.account"].create(
             {
-                "company_id": cls.company_data["company"].id,
+                "company_ids": [Command.link(cls.company_data["company"].id)],
                 "name": "spreadsheet expense Company 1",
                 "account_type": "expense",
                 "code": "sp1234577",
             }
         )
 
-        cls.account_revenue_c2 = cls.env["account.account"].create(
+        company_2 = cls.company_data_2["company"]
+        cls.account_revenue_c2 = cls.env["account.account"].with_company(company_2).create(
             {
-                "company_id": cls.company_data_2["company"].id,
+                "company_ids": [Command.link(company_2.id)],
                 "name": "spreadsheet revenue Company 2",
                 "account_type": "income",
                 "code": "sp99887755",
             }
         )
 
-        cls.account_expense_c2 = cls.env["account.account"].create(
+        cls.account_expense_c2 = cls.env["account.account"].with_company(company_2).create(
             {
-                "company_id": cls.company_data_2["company"].id,
+                "company_ids": [Command.link(company_2.id)],
                 "name": "spreadsheet expense Company 2",
                 "account_type": "expense",
                 "code": "sp99887766",
@@ -141,7 +143,7 @@ class SpreadsheetAccountingFunctionsTest(AccountTestInvoicingCommon):
         )
 
     def test_two_codes_mixing_balance(self):
-        self.account_revenue_c1.sudo().include_initial_balance = True
+        self.account_revenue_c1.sudo().account_type = 'asset_receivable'
         self.env["account.move"].create(
             {
                 "company_id": self.company_data["company"].id,
@@ -577,7 +579,7 @@ class SpreadsheetAccountingFunctionsTest(AccountTestInvoicingCommon):
 
     def test_balance_account_by_year(self):
         # On balance accounts, we sum the lines from the creation up to the last dat of date_range
-        self.account_revenue_c1.sudo().include_initial_balance = True
+        self.account_revenue_c1.sudo().account_type = 'asset_receivable'
         self.assertEqual(
             self.env["account.account"].spreadsheet_fetch_debit_credit(
                 [
@@ -598,7 +600,7 @@ class SpreadsheetAccountingFunctionsTest(AccountTestInvoicingCommon):
         )
 
     def test_balance_quarter_date_period(self):
-        self.account_revenue_c1.sudo().include_initial_balance = True
+        self.account_revenue_c1.sudo().account_type = 'asset_receivable'
         self.env["account.move"].create(
             {
                 "company_id": self.company_data["company"].id,
@@ -643,7 +645,7 @@ class SpreadsheetAccountingFunctionsTest(AccountTestInvoicingCommon):
         )
 
     def test_balance_month_date_period(self):
-        self.account_revenue_c1.sudo().include_initial_balance = True
+        self.account_revenue_c1.sudo().account_type = 'asset_receivable'
         self.env["account.move"].create(
             {
                 "company_id": self.company_data["company"].id,
@@ -684,7 +686,7 @@ class SpreadsheetAccountingFunctionsTest(AccountTestInvoicingCommon):
         )
 
     def test_balance_day_date_period(self):
-        self.account_revenue_c1.sudo().include_initial_balance = True
+        self.account_revenue_c1.sudo().account_type = 'asset_receivable'
         self.env["account.move"].create(
             {
                 "company_id": self.company_data["company"].id,
@@ -730,7 +732,7 @@ class SpreadsheetAccountingFunctionsTest(AccountTestInvoicingCommon):
         )
 
     def test_move_state_ignore_cancel(self):
-        self.account_revenue_c1.sudo().include_initial_balance = True
+        self.account_revenue_c1.sudo().account_type = 'asset_receivable'
         self.env["account.move"].create(
             {
                 "company_id": self.company_data["company"].id,
@@ -793,7 +795,7 @@ class SpreadsheetAccountingFunctionsTest(AccountTestInvoicingCommon):
         )
 
     def test_move_state_unposted(self):
-        self.account_revenue_c1.sudo().include_initial_balance = True
+        self.account_revenue_c1.sudo().account_type = 'asset_receivable'
         move = self.env["account.move"].create(
             {
                 "company_id": self.company_data["company"].id,
@@ -924,7 +926,7 @@ class SpreadsheetAccountingFunctionsTest(AccountTestInvoicingCommon):
                     "year": 2022,
                 },
                 "codes": [self.account_revenue_c1.code],
-                "company_id": self.account_revenue_c1.company_id.id,
+                "company_id": self.account_revenue_c1.company_ids.id,
                 "include_unposted": True,
             }
         )
@@ -950,7 +952,7 @@ class SpreadsheetAccountingFunctionsTest(AccountTestInvoicingCommon):
                     ("account_id.include_initial_balance", "=", False),
                     ("date", ">=", date(2022, 1, 1)),
                     ("date", "<=", date(2022, 12, 31)),
-                    ("company_id", "=", self.account_revenue_c1.company_id.id),
+                    ("company_id", "=", self.account_revenue_c1.company_ids.id),
                     ("move_id.state", "!=", "cancel"),
                 ],
                 "name": "Journal items for account prefix sp1234566",

@@ -1,10 +1,8 @@
-/** @odoo-module **/
-
 import {
     BUTTON_HANDLER_SELECTOR,
     makeAsyncHandler,
     makeButtonHandler,
-} from '@web/legacy/js/core/minimal_dom';
+} from '@web/legacy/js/public/minimal_dom';
 
 // Track when all JS files have been lazy loaded. Will allow to unblock the
 // related DOM sections when the whole JS have been loaded and executed.
@@ -67,8 +65,6 @@ let waitingLazy = false;
  * a form in any way should most of the time simulate a click on the submit
  * button if any anyway.
  *
- * @todo This function used to consider the o_wait_lazy_js class. In master, the
- * uses of this classes should be removed in XML templates.
  * @see stopWaitingLazy
  */
 function waitLazy() {
@@ -106,13 +102,8 @@ function waitLazy() {
     for (const buttonEl of loadingEffectButtonEls) {
         for (const eventType of loadingEffectEventTypes) {
             const loadingEffectHandler = eventType === 'click'
-                ? makeButtonHandler.call({
-                    '__makeButtonHandler_preventDefault': true,
-                    '__makeButtonHandler_stopImmediatePropagation': true,
-                }, waitForLazyAndRetrigger)
-                : makeAsyncHandler.call({
-                    '__makeAsyncHandler_stopImmediatePropagation': true,
-                }, waitForLazyAndRetrigger, true);
+                ? makeButtonHandler(waitForLazyAndRetrigger, true, true, true)
+                : makeAsyncHandler(waitForLazyAndRetrigger, true, true, true);
             registerLoadingEffectHandler(buttonEl, eventType, loadingEffectHandler);
         }
     }

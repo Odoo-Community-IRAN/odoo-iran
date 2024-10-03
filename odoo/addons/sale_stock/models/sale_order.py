@@ -5,6 +5,7 @@ import json
 import logging
 
 from odoo import api, fields, models, _
+from odoo.exceptions import UserError
 from odoo.tools import float_compare
 
 _logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ class SaleOrder(models.Model):
         help="If you deliver all products at once, the delivery order will be scheduled based on the greatest "
         "product lead time. Otherwise, it will be based on the shortest.")
     warehouse_id = fields.Many2one(
-        'stock.warehouse', string='Warehouse', required=True,
+        'stock.warehouse', string='Warehouse',
         compute='_compute_warehouse_id', store=True, readonly=False, precompute=True,
         check_company=True)
     picking_ids = fields.One2many('stock.picking', 'sale_id', string='Transfers')
@@ -34,7 +35,10 @@ class SaleOrder(models.Model):
         ('started', 'Started'),
         ('partial', 'Partially Delivered'),
         ('full', 'Fully Delivered'),
-    ], string='Delivery Status', compute='_compute_delivery_status', store=True)
+    ], string='Delivery Status', compute='_compute_delivery_status', store=True,
+       help="Red: Late\n\
+            Orange: To process today\n\
+            Green: On time")
     procurement_group_id = fields.Many2one('procurement.group', 'Procurement Group', copy=False)
     effective_date = fields.Datetime("Effective Date", compute='_compute_effective_date', store=True, help="Completion date of the first delivery order.")
     expected_date = fields.Datetime( help="Delivery date you can promise to the customer, computed from the minimum lead time of "
@@ -57,7 +61,7 @@ class SaleOrder(models.Model):
         field = self._fields[column_name]
         default = self.env['stock.warehouse'].search([('company_id', '=', self.env.company.id)], limit=1)
         value = field.convert_to_write(default, self)
-        value = field.convert_to_column(value, self)
+        value = field.convert_to_column_insert(value, self)
         if value is not None:
             _logger.debug("Table '%s': setting default value of new column %s to %r",
                 self._table, column_name, value)
@@ -95,6 +99,22 @@ class SaleOrder(models.Model):
             return super()._select_expected_date(expected_dates)
         return max(expected_dates)
 
+    @api.constrains('warehouse_id', 'state', 'order_line')
+    def _check_warehouse(self):
+        """ Ensure that the warehouse is set in case of storable products """
+        orders_without_wh = self.filtered(lambda order: order.state not in ('draft', 'cancel') and not order.warehouse_id)
+        other_company = set()
+        for order_line in orders_without_wh.order_line:
+            if order_line.product_id.type != 'consu':
+                continue
+            if order_line.route_id.company_id and order_line.route_id.company_id != order_line.company_id:
+                other_company.add(order_line.route_id.company_id.id)
+                continue
+            self.env['stock.warehouse'].with_company(order_line.order_id.company_id)._warehouse_redirect_warning()
+        other_company_warehouses = self.env['stock.warehouse'].search([('company_id', 'in', list(other_company))])
+        if any(c not in other_company_warehouses.company_id.ids for c in other_company):
+            raise UserError(_("You must have a warehouse for line using a delivery in different company."))
+
     def write(self, values):
         if values.get('order_line') and self.state == 'sale':
             for order in self:
@@ -105,9 +125,9 @@ class SaleOrder(models.Model):
             for record in self:
                 picking = record.mapped('picking_ids').filtered(lambda x: x.state not in ('done', 'cancel'))
                 message = _("""The delivery address has been changed on the Sales Order<br/>
-                        From <strong>"%s"</strong> To <strong>"%s"</strong>,
+                        From <strong>"%(old_address)s"</strong> to <strong>"%(new_address)s"</strong>,
                         You should probably update the partner on this document.""",
-                            record.partner_shipping_id.display_name, new_partner.display_name)
+                            old_address=record.partner_shipping_id.display_name, new_address=new_partner.display_name)
                 picking.activity_schedule('mail.mail_activity_data_warning', note=message, user_id=self.env.user.id)
 
         if 'commitment_date' in values:
@@ -226,9 +246,7 @@ class SaleOrder(models.Model):
             picking_id = picking_id[0]
         else:
             picking_id = pickings[0]
-        # View context from sale_renting `rental_schedule_view_form`
-        cleaned_context = {k: v for k, v in self._context.items() if k != 'form_view_ref'}
-        action['context'] = dict(cleaned_context, default_partner_id=self.partner_id.id, default_picking_type_id=picking_id.picking_type_id.id, default_origin=self.name, default_group_id=picking_id.group_id.id)
+        action['context'] = dict(default_partner_id=self.partner_id.id, default_picking_type_id=picking_id.picking_type_id.id, default_origin=self.name, default_group_id=picking_id.group_id.id)
         return action
 
     def _prepare_invoice(self):

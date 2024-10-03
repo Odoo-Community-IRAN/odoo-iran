@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo.tests.common import Form, TransactionCase
+from odoo.tests import Form, TransactionCase
 
 class TestMrpSubcontractingCommon(TransactionCase):
 
@@ -19,17 +19,17 @@ class TestMrpSubcontractingCommon(TransactionCase):
         # 2. Create a BOM of subcontracting type
         cls.comp1 = cls.env['product.product'].create({
             'name': 'Component1',
-            'type': 'product',
+            'is_storable': True,
             'categ_id': cls.env.ref('product.product_category_all').id,
         })
         cls.comp2 = cls.env['product.product'].create({
             'name': 'Component2',
-            'type': 'product',
+            'is_storable': True,
             'categ_id': cls.env.ref('product.product_category_all').id,
         })
         cls.finished = cls.env['product.product'].create({
             'name': 'finished',
-            'type': 'product',
+            'is_storable': True,
             'categ_id': cls.env.ref('product.product_category_all').id,
         })
         bom_form = Form(cls.env['mrp.bom'])
@@ -48,7 +48,7 @@ class TestMrpSubcontractingCommon(TransactionCase):
         # Create a BoM for cls.comp2
         cls.comp2comp = cls.env['product.product'].create({
             'name': 'component for Component2',
-            'type': 'product',
+            'is_storable': True,
             'categ_id': cls.env.ref('product.product_category_all').id,
         })
         bom_form = Form(cls.env['mrp.bom'])

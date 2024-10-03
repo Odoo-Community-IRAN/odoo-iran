@@ -6,7 +6,6 @@
             <field name="model">res.company</field>
             <field name="arch" type="xml">
                 <form string="Company" duplicate="0">
-                  <field name="all_child_ids" invisible="1"/>
                   <sheet>
                     <div class="oe_button_box" name="button_box">
                         <button class="oe_stat_button"
@@ -47,8 +46,6 @@
                                     <field name="email"/>
                                     <field name="website" string="Website" widget="url" placeholder="e.g. https://www.odoo.com"/>
                                     <field name="parent_id" groups="base.group_no_one"/>
-                                    <field name="parent_id" invisible="1"/>
-                                    <field name="sequence" invisible="1"/>
                                     <field name="color" widget="color_picker"/>
                                 </group>
                                 <group name="social_media"/>
@@ -63,16 +60,15 @@
             </field>
         </record>
         <record id="view_company_tree" model="ir.ui.view">
-            <field name="name">res.company.tree</field>
+            <field name="name">res.company.list</field>
             <field name="model">res.company</field>
             <field name="arch" type="xml">
-                <tree string="Companies" decoration-muted="not active">
+                <list string="Companies" decoration-muted="not active">
                     <field name="sequence" widget="handle"/>
                     <field name="name"/>
                     <field name="partner_id" required="0"/>
                     <field name="child_ids" widget="many2many_tags" options="{'color_field': 'color'}"/>
-                    <field name="active" column_invisible="True"/>
-                </tree>
+                </list>
             </field>
         </record>
         <record id="view_res_company_kanban" model="ir.ui.view">
@@ -80,39 +76,34 @@
             <field name="model">res.company</field>
             <field name="arch" type="xml">
                 <kanban>
-                    <field name="name"/>
-                    <field name="email"/>
-                    <field name="phone"/>
                     <templates>
-                        <t t-name="kanban-box">
-                            <div t-attf-class="oe_kanban_global_click">
-                                <div t-attf-class="#{!selection_mode ? 'text-center' : ''}">
-                                    <i class="fa fa-building" role="img" aria-label="Enterprise" title="Enterprise"></i> <strong><field name="name"/></strong>
+                        <t t-name="card">
+                            <div t-attf-class="#{!selection_mode ? 'text-center' : ''}">
+                                <i class="fa fa-building" role="img" aria-label="Enterprise" title="Enterprise"></i> <field class="fw-bold fs-5" name="name"/>
+                            </div>
+                            <hr class="mt4 mb4"/>
+                            <div class="row" t-if="!selection_mode">
+                                <div t-if="record.email.value" class="col-6 text-center">
+                                    <strong>Email:</strong>
                                 </div>
-                                <hr class="mt4 mb4"/>
-                                <div class="row" t-if="!selection_mode">
-                                    <div t-if="record.email.value" class="col-6 text-center">
-                                        <strong>Email:</strong>
-                                    </div>
-                                    <div t-if="record.phone.value" class="col-6 text-center">
-                                        <strong>Phone</strong>
-                                    </div>
-                                    <div t-if="record.email.value" class="col-6 text-center">
-                                        <field name="email"/>
-                                    </div>
-                                    <div t-if="record.phone.value" class="col-6 text-center o_force_ltr">
-                                        <field name="phone"/>
-                                    </div>
+                                <div t-if="record.phone.value" class="col-6 text-center">
+                                    <strong>Phone</strong>
                                 </div>
-                                <div t-else="">
-                                    <div t-if="record.email.value">
-                                        <strong>Email:</strong>
-                                        <field name="email"/>
-                                    </div>
-                                    <div t-if="record.phone.value" class="o_force_ltr">
-                                        <strong>Phone:</strong>
-                                        <field name="phone"/>
-                                    </div>
+                                <div t-if="record.email.value" class="col-6 text-center">
+                                    <field name="email"/>
+                                </div>
+                                <div t-if="record.phone.value" class="col-6 text-center o_force_ltr">
+                                    <field name="phone"/>
+                                </div>
+                            </div>
+                            <div t-else="">
+                                <div t-if="record.email.value">
+                                    <strong>Email:</strong>
+                                    <field name="email"/>
+                                </div>
+                                <div t-if="record.phone.value" class="o_force_ltr">
+                                    <strong>Phone:</strong>
+                                    <field name="phone"/>
                                 </div>
                             </div>
                         </t>
@@ -123,7 +114,8 @@
         <record id="action_res_company_form" model="ir.actions.act_window">
             <field name="name">Companies</field>
             <field name="res_model">res.company</field>
-            <field name="view_mode">tree,kanban,form</field>
+            <field name="path">companies</field>
+            <field name="view_mode">list,kanban,form</field>
             <field name="domain">[('parent_id', '=', False)]</field>
             <field name="help" type="html">
               <p class="o_view_nocontent_smiling_face">

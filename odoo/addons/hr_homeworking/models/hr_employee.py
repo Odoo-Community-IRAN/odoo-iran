@@ -1,9 +1,6 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from collections import defaultdict
-
-from odoo import _, api, fields, models
-from odoo.tools import DEFAULT_SERVER_DATE_FORMAT
+from odoo import api, fields, models
 
 from .hr_homeworking import DAYS
 
@@ -25,7 +22,6 @@ class HrEmployeeBase(models.AbstractModel):
     hr_icon_display = fields.Selection(selection_add=[('presence_home', 'At Home'),
                                                       ('presence_office', 'At Office'),
                                                       ('presence_other', 'At Other')])
-    name_work_location_display = fields.Char(compute="_compute_name_work_location_display")
     today_location_name = fields.Char()
 
     @api.model
@@ -41,16 +37,17 @@ class HrEmployeeBase(models.AbstractModel):
         if 'search' in res['views']:
             res['views']['search']['arch'] = res['views']['search']['arch'].replace('today_location_name', dayfield)
         if 'list' in res['views']:
-            res['views']['list']['arch'] = res['views']['list']['arch'].replace('name_work_location_display', dayfield)
+            res['views']['list']['arch'] = res['views']['list']['arch'].replace('work_location_name', dayfield)
         return res
 
-    @api.depends('exceptional_location_id')
-    def _compute_name_work_location_display(self):
+    @api.depends("work_location_id.name", "work_location_id.location_type", "exceptional_location_id")
+    def _compute_work_location_name_type(self):
+        super()._compute_work_location_name_type()
         dayfield = self._get_current_day_location_field()
-        unspecified = _('Unspecified')
         for employee in self:
             current_location_id = employee.exceptional_location_id or employee[dayfield]
-            employee.name_work_location_display = current_location_id.name if current_location_id else unspecified
+            employee.work_location_name = current_location_id.name or employee.work_location_name
+            employee.work_location_type = current_location_id.location_type or employee.work_location_type
 
     def _compute_exceptional_location_id(self):
         today = fields.Date.today()
@@ -73,41 +70,3 @@ class HrEmployeeBase(models.AbstractModel):
                 continue
             employee.hr_icon_display = f'presence_{today_employee_location_id.location_type}'
             employee.show_hr_icon_display = True
-
-    def _get_worklocation(self, start_date, end_date):
-        work_locations_by_employee = defaultdict(dict)
-        for employee in self:
-            work_locations_by_employee[employee.id].update({
-                "user_id": employee.user_id.id,
-                "employee_id": employee.id,
-                "partner_id": employee.user_partner_id.id or employee.work_contact_id.id,
-                "employee_name": employee.name
-            })
-
-            for day in DAYS:
-                work_locations_by_employee[employee.id][day] = {
-                    'location_type': employee[day]["location_type"],
-                    'location_name': employee[day]["name"],
-                    'work_location_id': employee[day].id,
-                }
-
-        exceptions_for_period = self.env['hr.employee.location'].search_read([
-            ('employee_id', 'in', self.ids),
-            ('date', '>=', start_date),
-            ('date', '<=', end_date)
-        ], ['employee_id', 'date', 'work_location_name', 'work_location_id', 'work_location_type'])
-
-        for exception in exceptions_for_period:
-            date = exception["date"].strftime(DEFAULT_SERVER_DATE_FORMAT)
-            exception_value = {
-                'hr_employee_location_id': exception["id"],
-                'location_type': exception['work_location_type'],
-                'location_name': exception['work_location_name'],
-                'work_location_id': exception['work_location_id'][0],
-            }
-            employee_id = exception["employee_id"][0]
-            if "exceptions" not in work_locations_by_employee[employee_id]:
-                work_locations_by_employee[employee_id]["exceptions"] = {}
-            work_locations_by_employee[employee_id]["exceptions"][date] = exception_value
-
-        return work_locations_by_employee

@@ -8,7 +8,7 @@ from odoo import Command
 from odoo.addons.event.tests.common import EventCase
 from odoo import exceptions
 from odoo.fields import Datetime as FieldsDatetime
-from odoo.tests.common import users, Form, tagged
+from odoo.tests import Form, users, tagged
 from odoo.tools import mute_logger
 
 
@@ -57,6 +57,54 @@ class TestEventInternalsCommon(EventCase):
 class TestEventData(TestEventInternalsCommon):
 
     @users('user_eventmanager')
+    def test_event_configuration_question_from_type(self):
+        """ Enure configuration & translations are copied from Event Type on Event creation """
+        self.env['res.lang'].sudo()._activate_lang('nl_NL')
+
+        event_type = self.event_type_questions.with_user(self.env.user)
+        event_type_question_nl = self.event_question_1.with_context(lang='nl_NL')
+        event_type_question_nl.title = "Vraag1"
+        event_type_question_nl.answer_ids[0].name = "V1-Antwoord1"
+
+        event = self.env['event.event'].create({
+            'name': 'Event Update Type',
+            'event_type_id': event_type.id,
+            'date_begin': FieldsDatetime.to_string(datetime.today() + timedelta(days=1)),
+            'date_end': FieldsDatetime.to_string(datetime.today() + timedelta(days=15)),
+        })
+
+        self.assertEqual(
+            event.question_ids.mapped('question_type'),
+            ['name', 'email', 'phone', 'simple_choice', 'simple_choice', 'text_box'])
+        self.assertEqual(event.specific_question_ids.filtered(
+            lambda q: q.question_type in ['simple_choice', 'text_box']).title, 'Question1')
+        self.assertEqual(event.specific_question_ids.filtered(
+            lambda q: q.question_type in ['name', 'email', 'phone', 'company_name'])
+                         .mapped('title'), ['Name', 'Email', 'Phone'])
+        self.assertEqual(
+            set(event.specific_question_ids.filtered(
+            lambda q: q.question_type in ['simple_choice', 'text_box']).mapped('answer_ids.name')),
+            {'Q1-Answer1', 'Q1-Answer2'})
+        self.assertEqual(len(event.general_question_ids), 2)
+        self.assertEqual(event.general_question_ids[0].title, 'Question2')
+        self.assertEqual(event.general_question_ids[1].title, 'Question3')
+        self.assertEqual(
+            set(event.general_question_ids[0].mapped('answer_ids.name')),
+            {'Q2-Answer1', 'Q2-Answer2'})
+        # verify translations
+        event_question_nl = event.specific_question_ids.filtered_domain([
+            ('title', '=', self.event_question_1.title),
+        ]).with_context(lang='nl_NL')
+        self.assertNotEqual(event_question_nl.title, self.event_question_1.title,
+            "Translated title should differ from untranslated title.")
+        self.assertEqual(event_question_nl.title, event_type_question_nl.title,
+            "Translated title should be copied.")
+        self.assertEqual(
+            set(event_question_nl.answer_ids.mapped('name')),
+            set(event_type_question_nl.answer_ids.mapped('name')),
+            "Translated answer names should be copied.")
+
+    @users('user_eventmanager')
     def test_event_date_computation(self):
         event = self.event_0.with_user(self.env.user)
         with freeze_time(self.reference_now):
@@ -66,19 +114,23 @@ class TestEventData(TestEventInternalsCommon):
                 'date_end': datetime(2020, 4, 5, 18, 0, 0),
             })
             registration = event.registration_ids[0]
-            self.assertEqual(registration.get_date_range_str(), u'today')
+            self.assertEqual(registration.event_date_range, 'today')
 
             event.date_begin = datetime(2020, 2, 1, 15, 0, 0)
-            self.assertEqual(registration.get_date_range_str(), u'tomorrow')
+            registration.invalidate_recordset(['event_date_range'])
+            self.assertEqual(registration.event_date_range, 'tomorrow')
 
             event.date_begin = datetime(2020, 2, 2, 6, 0, 0)
-            self.assertEqual(registration.get_date_range_str(), u'in 2 days')
+            registration.invalidate_recordset(['event_date_range'])
+            self.assertEqual(registration.event_date_range, 'in 2 days')
 
             event.date_begin = datetime(2020, 2, 20, 17, 0, 0)
-            self.assertEqual(registration.get_date_range_str(), u'next month')
+            registration.invalidate_recordset(['event_date_range'])
+            self.assertEqual(registration.event_date_range, 'next month')
 
             event.date_begin = datetime(2020, 3, 1, 10, 0, 0)
-            self.assertEqual(registration.get_date_range_str(), u'on Mar 1, 2020')
+            registration.invalidate_recordset(['event_date_range'])
+            self.assertEqual(registration.event_date_range, 'on Mar 1, 2020')
 
             # Is actually 8:30 to 20:00 in Mexico
             event.write({
@@ -98,7 +150,8 @@ class TestEventData(TestEventInternalsCommon):
             # event_date_tz = 2020-06-26 18:00
             # today_tz = 2020-06-20 13:00
             # event_date_tz.date() - today_tz.date() = 6 days
-            self.assertEqual(registration.get_date_range_str(), 'in 6 days')
+            registration.invalidate_recordset(['event_date_range'])
+            self.assertEqual(registration.event_date_range, 'in 6 days')
 
         # Checks case when event changes date before mocked today, when event.date_tz considered
         with freeze_time(datetime(2020, 6, 20, 13, 0, 0)):
@@ -110,7 +163,8 @@ class TestEventData(TestEventInternalsCommon):
             # event_date_tz = 2020-06-26 06:00
             # today_tz = 2020-06-20 23:00
             # event_date_tz.date() - today_tz.date() = 6 days
-            self.assertEqual(registration.get_date_range_str(), 'in 6 days')
+            registration.invalidate_recordset(['event_date_range'])
+            self.assertEqual(registration.event_date_range, 'in 6 days')
 
     @freeze_time('2020-1-31 10:00:00')
     @users('user_eventmanager')
@@ -208,7 +262,6 @@ class TestEventData(TestEventInternalsCommon):
             'event_type_mail_ids': [
                 Command.clear(),
                 Command.create({
-                    'notification_type': 'mail',
                     'interval_nbr': 77,
                     'interval_unit': 'days',
                     'interval_type': 'after_event',
@@ -226,7 +279,6 @@ class TestEventData(TestEventInternalsCommon):
             'event_mail_ids': [
                 Command.clear(),
                 Command.create({
-                    'notification_type': 'mail',
                     'interval_unit': 'now',
                     'interval_type': 'after_sub',
                     'template_ref': 'mail.template,%i' % self.env['ir.model.data']._xmlid_to_res_id('event.event_subscription'),

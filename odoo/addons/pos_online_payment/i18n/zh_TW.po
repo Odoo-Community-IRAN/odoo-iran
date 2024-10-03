@@ -3,17 +3,16 @@
 # 	* pos_online_payment
 # 
 # Translators:
-# Wil Odoo, 2023
+# Wil Odoo, 2024
 # Tony Ng, 2024
-# Pak Wai Ho, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:55+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Pak Wai Ho, 2024\n"
+"POT-Creation-Date: 2024-09-26 08:55+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Tony Ng, 2024\n"
 "Language-Team: Chinese (Taiwan) (https://app.transifex.com/odoo/teams/41243/zh_TW/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -33,34 +32,20 @@ msgid ""
 msgstr "<strong>錯誤：</strong>付款過程中出現問題。"
 
 #. module: pos_online_payment
-#: model_terms:ir.ui.view,arch_db:pos_online_payment.pay
-msgid ""
-"<strong>No suitable payment method could be found.</strong>\n"
-"                            <br/>\n"
-"                            If you believe that it is an error, please contact the website administrator."
-msgstr ""
-"<strong>找不到合適的付款方式。</strong>\n"
-"                            <br/>\n"
-"                            若你認為有錯誤，請聯絡網站管理員。"
-
-#. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/models/pos_config.py:0
-#, python-format
 msgid "A POS config cannot have more than one online payment method."
 msgstr "一個POS配置不能有超過一種網上付款方式。"
 
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/controllers/payment_portal.py:0
-#, python-format
 msgid "A payment option must be specified."
 msgstr "必須指定付款方式。"
 
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/controllers/payment_portal.py:0
-#, python-format
 msgid ""
 "A validation payment cannot be used for a Point of Sale online payment."
 msgstr "驗證付款不能用於銷售點網上付款。"
@@ -73,7 +58,6 @@ msgstr "所有可用的服務商"
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/models/pos_payment_method.py:0
-#, python-format
 msgid ""
 "All payment providers configured for an online payment method must use the "
 "same currency as the Sales Journal, or the company currency if that is not "
@@ -92,18 +76,9 @@ msgstr "金額"
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/customer_display/customer_display_template.xml:0
-#: code:addons/pos_online_payment/static/src/app/utils/online_payment_popup/online_payment_popup.xml:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/app/online_payment_popup/online_payment_popup.xml:0
 msgid "Amount:"
 msgstr "金額:"
-
-#. module: pos_online_payment
-#. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/utils/online_payment_popup/online_payment_popup.xml:0
-#, python-format
-msgid "Cancel"
-msgstr "取消"
 
 #. module: pos_online_payment
 #: model_terms:ir.ui.view,arch_db:pos_online_payment.pay
@@ -113,15 +88,12 @@ msgstr "取消付款"
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/models/pos_payment.py:0
-#: code:addons/pos_online_payment/models/pos_payment.py:0
-#, python-format
 msgid "Cannot create a POS online payment without an accounting payment."
 msgstr "如果沒有會計付款，則無法創建POS網上付款。"
 
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/models/pos_payment.py:0
-#, python-format
 msgid ""
 "Cannot create a POS payment with a not online payment method and an online "
 "accounting payment."
@@ -130,17 +102,16 @@ msgstr "無法使用非網上支付方式和網上會計付款創建POS付款。
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/models/pos_payment.py:0
-#, python-format
 msgid "Cannot edit a POS online payment essential data."
 msgstr "無法編輯POS網上支付基本數據。"
 
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/models/pos_payment_method.py:0
-#, python-format
 msgid ""
-"Could not create an online payment method (company_id=%d, pos_config_id=%d)"
-msgstr "無法建立網上付款方式(company_id=%d, pos_config_id=%d)"
+"Could not create an online payment method (company_id=%(company_id)d, "
+"pos_config_id=%(pos_config_id)d)"
+msgstr "未能建立網上付款方式（company_id=%(company_id)d，pos_config_id=%(pos_config_id)d）"
 
 #. module: pos_online_payment
 #: model:ir.model.fields,field_description:pos_online_payment.field_pos_payment_method__has_an_online_payment_provider
@@ -149,29 +120,19 @@ msgstr "有網上付款服務商"
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/overrides/pos_overrides/components/payment_screen/payment_screen.js:0
 msgid "Invalid online payment"
 msgstr "網上付款無效"
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/overrides/pos_overrides/components/payment_screen/payment_screen.js:0
 msgid "Invalid online payments"
 msgstr "網上付款無效"
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/utils/online_payment_popup/online_payment_popup.xml:0
-#, python-format
-msgid "Invite your customer to scan the QR code to pay:"
-msgstr "請客戶掃描二維碼付款:"
-
-#. module: pos_online_payment
-#. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/overrides/pos_overrides/components/payment_screen/payment_screen.js:0
 msgid "Invoice could not be generated"
 msgstr "未能產生發票"
 
@@ -189,7 +150,6 @@ msgstr "網上進行"
 #. odoo-python
 #: code:addons/pos_online_payment/models/pos_payment_method.py:0
 #: model:ir.model.fields,field_description:pos_online_payment.field_pos_payment_method__is_online_payment
-#, python-format
 msgid "Online Payment"
 msgstr "線上支付"
 
@@ -205,18 +165,13 @@ msgstr "網上會計付款"
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/overrides/pos_overrides/components/payment_screen/payment_screen.js:0
 msgid "Online payment unavailable"
 msgstr "網上付款不可用"
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/overrides/pos_overrides/components/payment_screen/payment_screen.js:0
 msgid "Online payments cannot have a negative amount (%s: %s)."
 msgstr "網上付款金額不可為負數(%s: %s)."
 
@@ -237,24 +192,13 @@ msgstr "訂單參考"
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/customer_display/customer_display_template.xml:0
-#: code:addons/pos_online_payment/static/src/app/utils/online_payment_popup/online_payment_popup.xml:0
-#, python-format
-msgid "Order id:"
-msgstr "訂單識別碼:"
-
-#. module: pos_online_payment
-#. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/customer_display/customer_display_template.xml:0
-#: code:addons/pos_online_payment/static/src/app/utils/online_payment_popup/online_payment_popup.xml:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/app/online_payment_popup/online_payment_popup.xml:0
 msgid "Order reference:"
 msgstr "訂單參考："
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/overrides/pos_overrides/components/payment_screen/payment_screen.js:0
 msgid "Order saving issue"
 msgstr "訂單儲存問題"
 
@@ -266,7 +210,6 @@ msgstr "訂單儲存問題"
 #: model:ir.model.fields,field_description:pos_online_payment.field_payment_transaction__pos_order_id
 #: model_terms:ir.ui.view,arch_db:pos_online_payment.payment_transaction_form
 #: model_terms:ir.ui.view,arch_db:pos_online_payment.view_account_payment_form_inherit_pos_online_payment
-#, python-format
 msgid "POS Order"
 msgstr "POS 訂單"
 
@@ -284,13 +227,6 @@ msgstr "付款交易"
 #: model:ir.model,name:pos_online_payment.model_account_payment
 msgid "Payments"
 msgstr "付款"
-
-#. module: pos_online_payment
-#. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/customer_display/customer_display_template.xml:0
-#, python-format
-msgid "Please scan the QR code to open the payment page"
-msgstr "請掃描二維碼打開付款頁面"
 
 #. module: pos_online_payment
 #: model:ir.model,name:pos_online_payment.model_pos_config
@@ -324,37 +260,37 @@ msgstr "處理人"
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/customer_display/customer_display_template.xml:0
-#: code:addons/pos_online_payment/static/src/app/utils/online_payment_popup/online_payment_popup.xml:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/app/online_payment_popup/online_payment_popup.xml:0
 msgid "QR Code to pay"
 msgstr "二維碼付款"
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/utils/online_payment_popup/online_payment_popup.xml:0
-#, python-format
-msgid "Scan to Pay"
-msgstr "掃碼支付"
+#: code:addons/pos_online_payment/static/src/app/online_payment_popup/online_payment_popup.xml:0
+msgid "Scan the QR code to pay"
+msgstr "掃瞄二維碼付款"
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/app/online_payment_popup/online_payment_popup.xml:0
+msgid "Scan to pay"
+msgstr ""
+
+#. module: pos_online_payment
+#. odoo-javascript
+#: code:addons/pos_online_payment/static/src/overrides/pos_overrides/components/payment_screen/payment_screen.js:0
 msgid "Server error"
 msgstr "伺服器錯誤"
 
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/models/payment_transaction.py:0
-#, python-format
 msgid "The POS online payment (tx.id=%d) could not be saved correctly"
 msgstr "POS網上付款(tx.id=%d) 未能正確儲存"
 
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/models/payment_transaction.py:0
-#, python-format
 msgid ""
 "The POS online payment (tx.id=%d) could not be saved correctly because the "
 "online payment method could not be found"
@@ -363,7 +299,6 @@ msgstr "POS網上付款(tx.id=%d) 未能正確儲存,因為找不到網上支付
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/controllers/payment_portal.py:0
-#, python-format
 msgid "The POS session is not opened."
 msgstr "POS時段未開啟。"
 
@@ -379,64 +314,55 @@ msgstr "與該付款關聯的銷售點訂單"
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/overrides/pos_overrides/components/payment_screen/payment_screen.js:0
 msgid "The QR Code for paying could not be generated."
 msgstr "無法生成用於支付的二維碼。"
 
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/controllers/payment_portal.py:0
-#, python-format
 msgid "The amount to pay has changed. Please refresh the page."
 msgstr "支付金額已更改,請刷新頁面。"
 
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/controllers/payment_portal.py:0
-#, python-format
 msgid "The currency is invalid."
 msgstr "貨幣無效。"
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/overrides/pos_overrides/components/payment_screen/payment_screen.js:0
 msgid "The invoice could not be generated."
 msgstr "未能產生發票。"
 
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/controllers/payment_portal.py:0
-#, python-format
-msgid "The order has been canceled."
-msgstr "訂單已被取消。"
+msgid "The order has been cancelled."
+msgstr "訂單已取消。"
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/overrides/pos_overrides/components/payment_screen/payment_screen.js:0
 msgid "The order has not been saved correctly on the server."
 msgstr "訂單未能正確儲存至伺服器。"
 
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/models/pos_session.py:0
-#, python-format
 msgid "The partner of the POS online payment (id=%d) could not be found"
 msgstr "無法找到POS網上付款的合作夥伴(id=%d)"
 
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/controllers/payment_portal.py:0
-#, python-format
 msgid "The payment provider is invalid."
 msgstr "付款服務商無效。"
 
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/controllers/payment_portal.py:0
-#, python-format
 msgid ""
 "The payment should either be direct, with redirection, or made by a token."
 msgstr "付款應該是直接的、重定向的或通過密鑰進行的。"
@@ -444,67 +370,50 @@ msgstr "付款應該是直接的、重定向的或通過密鑰進行的。"
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/controllers/payment_portal.py:0
-#, python-format
 msgid "The payment token is invalid."
 msgstr "付款權杖無效。"
 
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/models/payment_transaction.py:0
-#, python-format
 msgid "The payment transaction (%d) has a negative amount."
 msgstr "付款交易(%d) 的金額為負數。"
 
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/controllers/payment_portal.py:0
-#, python-format
 msgid "The provided order or access token is invalid."
 msgstr "提供的訂單或存取權杖無效。"
 
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/controllers/payment_portal.py:0
-#, python-format
 msgid "The provided partner_id is different than expected."
 msgstr "提供的 partner_id與預期不同。"
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/overrides/pos_overrides/components/payment_screen/payment_screen.js:0
 msgid "The saved order could not be retrieved."
 msgstr "未能讀取已儲存的訂單。"
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/overrides/pos_overrides/components/payment_screen/payment_screen.js:0
 msgid ""
 "The total amount of remaining online payments to execute (%s) doesn't "
 "correspond to the remaining unpaid amount of the order (%s)."
-msgstr "要執行的剩餘在線支付總額 (%s) 與訂單的剩餘未支付金額 (%s) 不一致。"
+msgstr "要執行的剩餘網上付款總額 (%s) 與訂單的剩餘未支付金額 (%s) 不一致。"
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/overrides/pos_overrides/components/payment_screen/payment_screen.js:0
 msgid "There are online payments that were missing in your view."
-msgstr "您的檢視畫面中缺少在線支付。"
+msgstr "您的檢視畫面中缺少網上付款。"
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#, python-format
-msgid ""
-"There is a problem with the server. The order cannot be saved and therefore "
-"the online payment is not possible."
-msgstr "伺服器出現問題, 無法保存訂單，因此無法進行網上付款。"
-
-#. module: pos_online_payment
-#. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/overrides/pos_overrides/components/payment_screen/payment_screen.js:0
 msgid ""
 "There is a problem with the server. The order online payment status cannot "
 "be retrieved."
@@ -512,8 +421,7 @@ msgstr "伺服器出現問題,無法讀取訂單的網上付款狀態。"
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/overrides/pos_overrides/components/payment_screen/payment_screen.js:0
 msgid ""
 "There is a problem with the server. The order online payment status cannot "
 "be retrieved. Are you sure there is no online payment for this order ?"
@@ -522,7 +430,6 @@ msgstr "伺服器出現問題, 無法讀取訂單網上付款狀態。您確定�
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/controllers/payment_portal.py:0
-#, python-format
 msgid ""
 "There is no online payment method configured for this Point of Sale order."
 msgstr "此銷售點訂單未配置網上付款方式。"
@@ -530,7 +437,6 @@ msgstr "此銷售點訂單未配置網上付款方式。"
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/controllers/payment_portal.py:0
-#, python-format
 msgid "There is nothing to pay for this order."
 msgstr "此訂單無需付款。"
 
@@ -547,7 +453,6 @@ msgstr "待支付"
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/models/pos_config.py:0
-#, python-format
 msgid ""
 "To use an online payment method in a POS config, it must have at least one "
 "published payment provider supporting the currency of that POS config."
@@ -556,7 +461,6 @@ msgstr "要在 POS配置中使用在線支付方法，必須至少有一個已�
 #. module: pos_online_payment
 #. odoo-python
 #: code:addons/pos_online_payment/controllers/payment_portal.py:0
-#, python-format
 msgid "Tokenization is not available for logged out customers."
 msgstr "已登出客戶無法使用權杖化。"
 
@@ -577,8 +481,7 @@ msgstr "類型"
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/overrides/pos_overrides/components/payment_screen/payment_screen.js:0
 msgid "Updated online payments"
 msgstr "已更新網上付款"
 
@@ -591,8 +494,7 @@ msgstr "使用此付款方式進行網上付款（即透過網上付款服務商
 
 #. module: pos_online_payment
 #. odoo-javascript
-#: code:addons/pos_online_payment/static/src/app/screens/payment_screen/payment_screen.js:0
-#, python-format
+#: code:addons/pos_online_payment/static/src/overrides/pos_overrides/components/payment_screen/payment_screen.js:0
 msgid "Yes"
 msgstr "是"
 

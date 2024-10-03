@@ -59,10 +59,10 @@
         </record>
 
     <record id="report_membership_view_tree" model="ir.ui.view">
-        <field name="name">report.membership.view.tree</field>
+        <field name="name">report.membership.view.list</field>
         <field name="model">report.membership</field>
         <field name="arch" type="xml">
-            <tree string="Membership">
+            <list string="Membership">
                 <field name="partner_id"/>
                 <field name="membership_id" optional="hide"/>
                 <field name="start_date" optional="hide"/>
@@ -74,7 +74,7 @@
                 <field name="quantity" optional="show" sum="Sum of Quantity"/>
                 <field name="tot_earned" optional="show" sum="Sum of Earned Amount"/>
                 <field name="membership_state" optional="hide"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -83,7 +83,7 @@
             <field name="res_model">report.membership</field>
             <field name="view_mode">graph,pivot</field>
             <field name="search_view_id" ref="view_report_membership_search"/>
-            <field name="context">{"search_default_start_date":1,"search_default_member":1, 'search_default_Revenue':1, 'search_default_this_month':1, 'search_default_salesman':1,'group_by_no_leaf':1}</field>
+            <field name="context">{"search_default_start_date":1,"search_default_member":1, 'search_default_Revenue':1, 'search_default_this_month':1, 'search_default_salesman':1}</field>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">
                     No data yet!

@@ -63,7 +63,15 @@ class AccountMove(models.Model):
                     }
                 }
 
+    def _prepare_product_base_line_for_taxes_computation(self, product_line):
+        # EXTENDS 'account'
+        results = super()._prepare_product_base_line_for_taxes_computation(product_line)
+        if product_line.expense_id:
+            results['special_mode'] = 'total_included'
+        return results
+
     def _reverse_moves(self, default_values_list=None, cancel=False):
+        # EXTENDS account
         own_expense_moves = self.filtered(lambda move: move.expense_sheet_id.payment_mode == 'own_account')
         own_expense_moves.write({'expense_sheet_id': False, 'ref': False})
         # else, when restarting the expense flow we get duplicate issue on vendor.bill
@@ -73,3 +81,12 @@ class AccountMove(models.Model):
     def _must_delete_all_expense_entries(self):
         if self.expense_sheet_id and self.expense_sheet_id.account_move_ids - self:  # If not all the payments are to be deleted
             raise UserError(_("You cannot delete only some entries linked to an expense report. All entries must be deleted at the same time."))
+
+    def button_cancel(self):
+        # EXTENDS account
+        # We need to override this method to unlink the move from the expenses paid by an employee, else we cannot reimburse them anymore.
+        # And cancelling the move != cancelling the expense
+        res = super().button_cancel()
+        own_expense_moves = self.filtered(lambda move: move.expense_sheet_id.payment_mode == 'own_account')
+        own_expense_moves.write({'expense_sheet_id': False, 'ref': False})
+        return res

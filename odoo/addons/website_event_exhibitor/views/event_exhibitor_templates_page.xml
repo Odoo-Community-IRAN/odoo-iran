@@ -5,6 +5,11 @@
     <t t-set="no_header" t-value="option_widescreen"/>
     <t t-set="no_footer" t-value="option_widescreen"/>
     <t t-call="website_event.layout">
+        <t t-set="navbar__back_url" t-value="'/event/%s/exhibitors' % (slug(event))"/>
+        <t t-set="navbar__back_title">Back to all Exhibitors</t>
+        <t t-set="navbar__back_text">All Exhibitors</t>
+
+
         <div class="o_wevent_online o_wesponsor_index">
             <!-- Options -->
             <t t-set="option_widescreen" t-value="option_widescreen or False"/>
@@ -152,10 +157,6 @@
                  placeholder="e.g. &quot;Openwood specializes in home decoration...&quot;"/>
             <div class="alert alert-info mx-3 mt-3 o_wesponsor_exhibitor_main_empty_website_descr_warning">
                 The sponsor website description is missing.
-                <a class="alert-link" t-attf-href="?{{ keep_query('*', enable_editor=1) }}">
-                    <i class="oi oi-fw oi-arrow-right"></i>
-                    Write one.
-                </a>
             </div>
         </t>
     </div>
@@ -186,9 +187,9 @@
                             t-att-src="sponsor_other.partner_id.country_id.image_url"
                             t-att-alt="sponsor_other.partner_id.country_id.name"/>
                             <span t-if="sponsor_other.sponsor_type_id.display_ribbon_style not in [False, 'no_ribbon']"
-                                t-att-class="'badge text-bg-light ribbon_%s' % sponsor_other.sponsor_type_id.display_ribbon_style"
+                                t-att-class="'badge text-white ribbon_%s' % sponsor_other.sponsor_type_id.display_ribbon_style"
                                 t-out="sponsor_other.sponsor_type_id.name"/>
-                            <span t-else="" class="badge text-bg-light"
+                            <span t-else="" class="badge text-bg-info"
                                 t-out="sponsor_other.sponsor_type_id.name"/>
                         </div>
                         <div class="flex-grow-1 overflow-auto px-2">

@@ -9,9 +9,9 @@ from odoo.osv import expression
 class AccountAnalyticLine(models.Model):
     _inherit = 'account.analytic.line'
 
-    holiday_id = fields.Many2one("hr.leave", string='Time Off Request', copy=False, index='btree_not_null')
-    global_leave_id = fields.Many2one("resource.calendar.leaves", string="Global Time Off", index='btree_not_null', ondelete='cascade')
-    task_id = fields.Many2one(domain="[('allow_timesheets', '=', True), ('project_id', '=?', project_id), ('is_timeoff_task', '=', False)]")
+    holiday_id = fields.Many2one("hr.leave", string='Time Off Request', copy=False, index='btree_not_null', export_string_translation=False)
+    global_leave_id = fields.Many2one("resource.calendar.leaves", string="Global Time Off", index='btree_not_null', ondelete='cascade', export_string_translation=False)
+    task_id = fields.Many2one(domain="[('allow_timesheets', '=', True), ('project_id', '=?', project_id), ('is_timeoff_task', '=', False)]", export_string_translation=False)
 
     def _get_redirect_action(self):
         leave_form_view_id = self.env.ref('hr_holidays.hr_leave_view_form').id
@@ -30,11 +30,11 @@ class AccountAnalyticLine(models.Model):
     @api.ondelete(at_uninstall=False)
     def _unlink_except_linked_leave(self):
         if any(line.holiday_id for line in self):
+            error_message = _('You cannot delete timesheets that are linked to time off requests. Please cancel your time off request from the Time Off application instead.')
             if not self.env.user.has_group('hr_holidays.group_hr_holidays_user') and self.env.user not in self.holiday_id.sudo().user_id:
-                raise UserError(_('You cannot delete timesheets that are linked to time off requests. Please cancel your time off request from the Time Off application instead.'))
-            warning_msg = _('You cannot delete timesheets linked to time off. Please, cancel the time off instead.')
+                raise UserError(error_message)
             action = self._get_redirect_action()
-            raise RedirectWarning(warning_msg, action, _('View Time Off'))
+            raise RedirectWarning(error_message, action, _('View Time Off'))
 
     def _check_can_write(self, values):
         if not self.env.su and self.holiday_id:

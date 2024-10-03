@@ -2,8 +2,8 @@
 <templates xml:space="preserve">
 
     <t t-name="web.KanbanColumnQuickCreate">
-        <div class="o_column_quick_create flex-shrink-0 flex-grow-1 flex-md-grow-0" t-ref="root">
-            <div t-if="props.folded" class="o_quick_create_folded position-sticky z-index-1 my-3 text-nowrap" t-on-click="unfold">
+        <div class="o_column_quick_create d-print-none flex-shrink-0 flex-grow-1 flex-md-grow-0" t-ref="root">
+            <div t-if="props.folded" class="o_quick_create_folded position-sticky z-1 my-3 text-nowrap" t-on-click="unfold">
                 <button class="o_kanban_add_column btn btn-light w-100" aria-label="Add column" data-tooltip="Add column">
                     <i class="fa fa-plus me-2" role="img"/><t t-out="relatedFieldName"/>
                 </button>
@@ -23,9 +23,9 @@
                             Add
                         </button>
                     </div>
-                    <small t-if="!env.isSmall and state.hasInputFocused" class="o_discard_msg text-muted float-end">
+                    <div t-if="!env.isSmall and state.hasInputFocused" t-attf-class="o_discard_msg small text-muted {{ canShowExamples ? 'float-end' : 'text-end'}}">
                         Press <kbd>Esc</kbd> to discard
-                    </small>
+                    </div>
                     <t t-if="canShowExamples and !env.isSmall">
                         <button type="button" class="btn btn-link o_kanban_examples p-0" t-on-click="showExamples">See examples</button>
                     </t>

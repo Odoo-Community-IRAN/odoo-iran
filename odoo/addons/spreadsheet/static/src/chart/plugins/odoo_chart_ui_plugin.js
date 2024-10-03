@@ -1,18 +1,26 @@
 /** @odoo-module */
 
-import * as spreadsheet from "@odoo/o-spreadsheet";
 import { Domain } from "@web/core/domain";
 import { globalFiltersFieldMatchers } from "@spreadsheet/global_filters/plugins/global_filters_core_plugin";
 import { ChartDataSource } from "../data_source/chart_data_source";
 import { sprintf } from "@web/core/utils/strings";
 import { _t } from "@web/core/l10n/translation";
+import { OdooUIPlugin } from "@spreadsheet/plugins";
+import { navigateTo } from "../../actions/helpers";
 
-const { UIPlugin } = spreadsheet;
+export class OdooChartUIPlugin extends OdooUIPlugin {
+    static getters = /** @type {const} */ ([
+        "getChartDataSource",
+        "getChartDatasetActionCallbacks",
+    ]);
 
-export class OdooChartUIPlugin extends UIPlugin {
     constructor(config) {
         super(config);
-        this.dataSources = config.custom.dataSources;
+
+        this.custom = config.custom;
+
+        /** @type {Record<string, ChartDataSource>} */
+        this.charts = {};
 
         globalFiltersFieldMatchers["chart"] = {
             ...globalFiltersFieldMatchers["chart"],
@@ -112,9 +120,6 @@ export class OdooChartUIPlugin extends UIPlugin {
                 }
                 break;
             }
-            case "REFRESH_ODOO_CHART":
-                this._refreshOdooChart(cmd.chartId);
-                break;
             case "REFRESH_ALL_DATA_SOURCES":
                 this._refreshOdooCharts();
                 break;
@@ -127,7 +132,53 @@ export class OdooChartUIPlugin extends UIPlugin {
      */
     getChartDataSource(chartId) {
         const dataSourceId = this._getOdooChartDataSourceId(chartId);
-        return this.dataSources.get(dataSourceId);
+        return this.charts[dataSourceId];
+    }
+
+    /**
+     * Get the callback used for onClick and onHover in an Odoo Chart
+     */
+    getChartDatasetActionCallbacks(chart) {
+        const { datasets, labels } = chart.dataSource.getData();
+        const env = this.custom.env;
+        return {
+            onClick: async (event, items) => {
+                if (!items.length) {
+                    return;
+                }
+                if (!env) {
+                    return;
+                }
+                const { datasetIndex, index } = items[0];
+                const dataset = datasets[datasetIndex];
+                let name = labels[index];
+                if (dataset.label) {
+                    name += ` / ${dataset.label}`;
+                }
+                await navigateTo(
+                    env,
+                    chart.actionXmlId,
+                    {
+                        name,
+                        type: "ir.actions.act_window",
+                        res_model: chart.metaData.resModel,
+                        views: [
+                            [false, "list"],
+                            [false, "form"],
+                        ],
+                        domain: dataset.domains[index],
+                    },
+                    { viewType: "list" }
+                );
+            },
+            onHover: (event, items) => {
+                if (items.length > 0) {
+                    event.native.target.style.cursor = "pointer";
+                } else {
+                    event.native.target.style.cursor = "";
+                }
+            },
+        };
     }
 
     // -------------------------------------------------------------------------
@@ -170,7 +221,7 @@ export class OdooChartUIPlugin extends UIPlugin {
      */
     _setupChartDataSource(chartId) {
         const dataSourceId = this._getOdooChartDataSourceId(chartId);
-        if (!this.dataSources.contains(dataSourceId)) {
+        if (!(dataSourceId in this.charts)) {
             this._resetChartDataSource(chartId);
         }
         this._setChartDataSource(chartId);
@@ -183,7 +234,7 @@ export class OdooChartUIPlugin extends UIPlugin {
     _resetChartDataSource(chartId) {
         const definition = this.getters.getChart(chartId).getDefinitionForDataSource();
         const dataSourceId = this._getOdooChartDataSourceId(chartId);
-        this.dataSources.add(dataSourceId, ChartDataSource, definition);
+        this.charts[dataSourceId] = new ChartDataSource(this.custom, definition);
     }
 
     /**
@@ -226,5 +277,3 @@ export class OdooChartUIPlugin extends UIPlugin {
         }
     }
 }
-
-OdooChartUIPlugin.getters = ["getChartDataSource"];

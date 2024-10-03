@@ -52,10 +52,9 @@
                 </div>
                 <div t-attf-class="o_configurator_typing_text d-inline d-md-flex align-items-center o_configurator_industry mb-md-2 mb-lg-4 {{!state.selectedType ? 'o_configurator_hide' : 'o_configurator_show'}}">
                     <!-- Use t-set in order to be able to translate, if put in the attribute directly then export POT file will not exist this text-->
-                    <t t-set="industry_placeholder">Clothes, Marketing, ...</t>
                     <label class="o_configurator_industry_wrapper me-2" t-ref="industrySelection">
                         <AutoComplete
-                            placeholder="industry_placeholder"
+                            placeholder.translate="Clothes, Marketing, ..."
                             value="state.selectedIndustry?.label ?? ''"
                             sources="sources"
                             onSelect.bind="_setSelectedIndustry"
@@ -118,7 +117,7 @@
                                 <div class="color_sample w-100" t-attf-style="background-color: {{state.recommendedPalette.color3}}"/>
                                 <div class="color_sample w-100" t-attf-style="background-color: {{state.recommendedPalette.color2}}"/>
                             </div>
-                            <button class="btn btn-primary text-nowrap mt-3 d-block mx-auto" t-on-click="() => this.selectPalette('recommendedPalette')">
+                            <button class="btn btn-primary btn-lg text-nowrap mt-3 d-block mx-auto" t-on-click="() => this.selectPalette('recommendedPalette')">
                                 Let's go!<i class="fa fa-angle-right text-white-50 ps-2" role="img"/>
                             </button>
                         </div>
@@ -131,7 +130,7 @@
                 </div>
                 <div class="o_palettes_container w-auto flex-grow-1 o_configurator_show_fast">
                     <div class="h2 text-center">
-                        <b>Choose</b> a pre-made Palette</div>
+                        <b>Choose</b> a Color Palette</div>
                     <div class="d-flex flex-wrap align-items-end">
                         <t t-foreach="state.getPalettes()" t-as="palette" t-key="palette_index">
                             <div class="o_palette_card_container w-25 px-2 pt-3">
@@ -166,7 +165,7 @@
                                 <div t-attf-class="card h-100 {{isInstalled ? 'card_installed' : (feature.selected ? 'border-success' : '')}}" t-on-click="() => state.toggleFeature(feature.id)">
                                     <div class="h3 card-body py-3 px-4">
                                         <t t-if="isInstalled">
-                                            <i t-attf-class="o_configurator_feature_status fa fa-info-circle text-muted" title="Already installed"/>
+                                            <i t-attf-class="o_configurator_feature_status fa fa-check-circle text-success" title="Already installed"/>
                                         </t>
                                         <t t-else="">
                                             <i t-attf-class="o_configurator_feature_status fa {{feature.selected ? 'fa-check-circle text-success' : 'fa-circle-o text-300'}}" />
@@ -189,13 +188,12 @@
                 </div>
             </div>
         </div>
-        <SkipButton skip="this.props.skip"/>
     </div>
 </t>
 
 <t t-name="website.Configurator.ThemeSelectionScreen">
     <div class="o_configurator_screen h-100 d-flex flex-column o_theme_selection_screen">
-        <div class="o_configurator_odoo_logo mt-4 ms-5" style="height: 31px; width: 99px;"/>
+        <div class="o_configurator_odoo_logo flex-shrink-0 mt-4 ms-5" style="height: 31px; width: 99px;"/>
         <div class="o_configurator_screen_content d-flex flex-column flex-grow-1 align-items-center">
             <div class="m-auto w-100 w-md-75 w-xl-100">
                 <div class="o_configurator_typing_text text-center mt-4 mb-lg-4">Choose your favorite <b>Theme</b>
@@ -233,6 +231,29 @@
                             </t>
                         </div>
                     </div>
+                    <t t-if="showViewMoreThemesButton">
+                        <p style="text-align: center;">
+                            <button class="btn btn-primary btn-lg px-4 py-2 center-block" t-on-click="getMoreThemes" t-ref="extraThemesButton">View more themes</button>
+                        </p>
+                    </t>
+                    <t t-elif="state.extraThemes.length" t-foreach="[...Array(Math.ceil(state.extraThemes.length/3)).keys()]" t-as="nbrExtraRow" t-key="nbrExtraRow">
+                        <div class="row pb-4 pt-5">
+                            <t t-foreach="[...Array(3).keys()]" t-as="nbrExtraCol" t-key="nbrExtraCol">
+                                <div class="col-12 col-lg-4 d-flex align-items-end mb-4 mb-lg-0">
+                                    <t t-set="extraThemeId" t-value="nbrExtraRow * 3 + nbrExtraCol"/>
+                                    <t t-set="extraThemeName" t-value="getExtraThemeName(extraThemeId)"/>
+                                    <t t-if="extraThemeName">
+                                        <div class="theme_preview border rounded position-relative w-100 small o_configurator_show_fast">
+                                            <h6 class="theme_preview_tip text-center text-muted">Click to select</h6>
+                                            <!-- Force LTR to prevent SVG issues in RTL languages -->
+                                            <div class="theme_svg_container rounded overflow-hidden" t-ref="ExtraThemePreview{{extraThemeId}}" dir="ltr"/>
+                                            <div class="button_area" t-on-click="() => this.chooseTheme(extraThemeName)"/>
+                                        </div>
+                                    </t>
+                                </div>
+                            </t>
+                        </div>
+                    </t>
                 </div>
             </div>
         </div>
@@ -241,11 +262,11 @@
 
 <t t-name="website.Configurator.Configurator">
     <div class="o_configurator_container">
-        <DescriptionScreen t-if="state.currentStep === 2" navigate="(screen) => this.navigate(screen)" skip.bind="skipConfigurator"/>
-        <PaletteSelectionScreen t-elif="state.currentStep === 3" navigate="(screen) => this.navigate(screen)" skip.bind="skipConfigurator"/>
-        <FeaturesSelectionScreen t-elif="state.currentStep === 4" navigate="(screen) => this.navigate(screen)" skip.bind="skipConfigurator" clearStorage.bind="clearStorage"/>
-        <ThemeSelectionScreen t-elif="state.currentStep === 5" navigate="(screen) => this.navigate(screen)" clearStorage.bind="clearStorage"/>
-        <WelcomeScreen t-else="" navigate="(screen) => this.navigate(screen)" skip.bind="skipConfigurator"/>
+        <DescriptionScreen t-if="state.currentStep === 2" navigate.bind="navigate" skip.bind="skipConfigurator"/>
+        <PaletteSelectionScreen t-elif="state.currentStep === 3" navigate.bind="navigate" skip.bind="skipConfigurator"/>
+        <FeaturesSelectionScreen t-elif="state.currentStep === 4" navigate.bind="navigate" skip.bind="skipConfigurator" clearStorage.bind="clearStorage"/>
+        <ThemeSelectionScreen t-elif="state.currentStep === 5" navigate.bind="navigate" clearStorage.bind="clearStorage"/>
+        <WelcomeScreen t-else="" navigate.bind="navigate" skip.bind="skipConfigurator"/>
     </div>
 </t>
 

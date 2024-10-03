@@ -60,7 +60,7 @@ class ResPartnerBank(models.Model):
         """ Block enabling the setting, but it can be set to false without the group. (For example, at creation) """
         for bank in self:
             if bank.allow_out_payment:
-                if not self.user_has_groups('account.group_validate_bank_account'):
+                if not self.env.user.has_group('account.group_validate_bank_account'):
                     raise ValidationError(_('You do not have the right to trust or un-trust a bank account.'))
 
     @api.depends('partner_id.country_id', 'sanitized_acc_number', 'allow_out_payment', 'acc_type')
@@ -95,7 +95,7 @@ class ResPartnerBank(models.Model):
     @api.depends('acc_number')
     @api.depends_context('uid')
     def _compute_user_has_group_validate_bank_account(self):
-        user_has_group_validate_bank_account = self.user_has_groups('account.group_validate_bank_account')
+        user_has_group_validate_bank_account = self.env.user.has_group('account.group_validate_bank_account')
         for bank in self:
             bank.user_has_group_validate_bank_account = user_has_group_validate_bank_account
 
@@ -129,8 +129,8 @@ class ResPartnerBank(models.Model):
         available_qr_methods = self.get_available_qr_methods_in_sequence()
         candidate_methods = qr_method and [(qr_method, dict(available_qr_methods)[qr_method])] or available_qr_methods
         for candidate_method, candidate_name in candidate_methods:
-            error_msg = self._get_error_messages_for_qr(candidate_method, debtor_partner, currency)
-            if not error_msg:
+            error_message = self._get_error_messages_for_qr(candidate_method, debtor_partner, currency)
+            if not error_message:
                 error_message = self._check_for_qr_code_errors(candidate_method, amount, currency, debtor_partner, free_communication, structured_communication)
 
                 if not error_message:
@@ -143,9 +143,9 @@ class ResPartnerBank(models.Model):
                         'structured_communication': structured_communication,
                     }
 
-                elif not silent_errors:
-                    error_header = _("The following error prevented '%s' QR-code to be generated though it was detected as eligible: ", candidate_name)
-                    raise UserError(error_header + error_message)
+            if not silent_errors:
+                error_header = _("The following error prevented '%s' QR-code to be generated though it was detected as eligible: ", candidate_name)
+                raise UserError(error_header + error_message)
 
         return None
 
@@ -248,7 +248,7 @@ class ResPartnerBank(models.Model):
     def create(self, vals_list):
         # EXTENDS base res.partner.bank
 
-        if not self.user_has_groups('account.group_validate_bank_account'):
+        if not self.env.user.has_group('account.group_validate_bank_account'):
             for vals in vals_list:
                 # force the allow_out_payment field to False in order to prevent scam payments on newly created bank accounts
                 vals['allow_out_payment'] = False
@@ -291,7 +291,7 @@ class ResPartnerBank(models.Model):
         if ('acc_number' in vals or 'partner_id' in vals) and not should_allow_changes:
             raise UserError(_("You cannot modify the account number or partner of an account that has been trusted."))
 
-        if 'allow_out_payment' in vals and not self.user_has_groups('account.group_validate_bank_account'):
+        if 'allow_out_payment' in vals and not self.env.user.has_group('account.group_validate_bank_account'):
             raise UserError(_("You do not have the rights to trust or un-trust accounts."))
 
         res = super().write(vals)
@@ -309,7 +309,7 @@ class ResPartnerBank(models.Model):
     def unlink(self):
         # EXTENDS base res.partner.bank
         for account in self:
-            msg = _("Bank Account %s with number %s deleted", account._get_html_link(title=f"#{account.id}"), account.acc_number)
+            msg = _("Bank Account %(link)s with number %(number)s deleted", link=account._get_html_link(title=f"#{account.id}"), number=account.acc_number)
             account.partner_id._message_log(body=msg)
         return super().unlink()
 

@@ -3,16 +3,16 @@
 # 	* payment_adyen
 # 
 # Translators:
-# Wil Odoo, 2023
-# Daye Jeong, 2023
+# Wil Odoo, 2024
+# Daye Jeong, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:56+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Daye Jeong, 2023\n"
+"POT-Creation-Date: 2024-09-26 08:56+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Daye Jeong, 2024\n"
 "Language-Team: Korean (https://app.transifex.com/odoo/teams/41243/ko/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -32,9 +32,10 @@ msgstr ""
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
-msgid "A request was sent to void the transaction with reference %s (%s)."
-msgstr "거래를 무효화하라는 요청이 전송되었습니다. 참조 %s (%s)."
+msgid ""
+"A request was sent to void the transaction with reference %(reference)s "
+"(%(provider)s)."
+msgstr "%(reference)s 거래를 취소하려는 요청이 전송되었습니다. (%(provider)s)"
 
 #. module: payment_adyen
 #: model:ir.model.fields,field_description:payment_adyen.field_payment_provider__adyen_api_key
@@ -54,7 +55,6 @@ msgstr "Adyen"
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid ""
 "An error occurred during the processing of your payment. Please try again."
 msgstr "결제를 처리하는 동안 오류가 발생했습니다. 다시 시도해 주세요."
@@ -62,7 +62,6 @@ msgstr "결제를 처리하는 동안 오류가 발생했습니다. 다시 시�
 #. module: payment_adyen
 #. odoo-javascript
 #: code:addons/payment_adyen/static/src/js/payment_form.js:0
-#, python-format
 msgid "Cannot display the payment form"
 msgstr "결제 양식을 표시할 수 없습니다."
 
@@ -79,7 +78,6 @@ msgstr "코드"
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_provider.py:0
-#, python-format
 msgid "Could not establish the connection to the API."
 msgstr "API 연결을 설정할 수 없습니다."
 
@@ -96,7 +94,6 @@ msgstr "Adyen Tx 있음"
 #. module: payment_adyen
 #. odoo-javascript
 #: code:addons/payment_adyen/static/src/js/payment_form.js:0
-#, python-format
 msgid "Incorrect payment details"
 msgstr "결제 정보가 잘못되었습니다."
 
@@ -113,7 +110,6 @@ msgstr "상인 계정"
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "No transaction found matching reference %s."
 msgstr "%s 참조와 일치하는 거래 항목이 없습니다."
 
@@ -140,44 +136,36 @@ msgstr "지불 거래"
 #. module: payment_adyen
 #. odoo-javascript
 #: code:addons/payment_adyen/static/src/js/payment_form.js:0
-#: code:addons/payment_adyen/static/src/js/payment_form.js:0
-#: code:addons/payment_adyen/static/src/js/payment_form.js:0
-#, python-format
 msgid "Payment processing failed"
 msgstr "결제 프로세스 실패"
 
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "Received data for child transaction with missing transaction values"
 msgstr "거래 값이 누락된 하위 거래에 대한 수신 데이터"
 
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with invalid payment state: %s"
 msgstr "잘못된 결제 상태의 데이터가 수신되었습니다: %s"
 
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with missing merchant reference"
 msgstr "판매자 참조가 누락된 데이터가 수신되었습니다"
 
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with missing payment state."
 msgstr "결제 상태가 누락된 데이터가 수신되었습니다. "
 
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/controllers/main.py:0
-#, python-format
 msgid "Received tampered payment request data."
 msgstr "변조된 결제 요청 데이터가 수신되었습니다."
 
@@ -199,7 +187,6 @@ msgstr "webhook의 HMAC 키"
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid ""
 "The amount processed by Adyen for the transaction %s is different than the "
 "one requested. Another transaction is created with the correct amount."
@@ -213,8 +200,6 @@ msgstr "API 엔드포인트의 기본 URL"
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "The capture of the transaction with reference %s failed."
 msgstr "참조 %s가 포함된 거래를 캡처하지 못했습니다."
 
@@ -230,7 +215,6 @@ msgstr ""
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid ""
 "The capture request of %(amount)s for the transaction with reference %(ref)s"
 " has been requested (%(provider_name)s)."
@@ -249,7 +233,6 @@ msgstr "이 공급업체에서 사용할 판매자 계정 코드입니다."
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_provider.py:0
-#, python-format
 msgid "The communication with the API failed. Details: %s"
 msgstr "API와의 통신에 실패했습니다. 세부 정보: %s"
 
@@ -261,7 +244,6 @@ msgstr "이 결제대행업체의 기술 코드입니다."
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "The transaction is not linked to a token."
 msgstr "거래가 토큰에 연결되어 있지 않습니다."
 
@@ -273,14 +255,11 @@ msgstr "이 토큰을 소유하고 있는 협력사의 고유 참조"
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "The void of the transaction with reference %s failed."
 msgstr "참조 %s가 포함된 거래를 무효화하지 못했습니다."
 
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "Your payment was refused. Please try again."
 msgstr "결제가 승인되지 않았습니다. 다시 시도해 주세요."

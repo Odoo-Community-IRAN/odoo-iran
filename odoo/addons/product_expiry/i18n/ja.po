@@ -3,17 +3,15 @@
 # 	* product_expiry
 # 
 # Translators:
-# Wil Odoo, 2023
-# Ryoko Tsuda <ryoko@quartile.co>, 2023
-# Junko Augias, 2024
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:55+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Junko Augias, 2024\n"
+"POT-Creation-Date: 2024-09-26 08:55+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Japanese (https://app.transifex.com/odoo/teams/41243/ja/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -28,7 +26,7 @@ msgid ""
 "product_expiry_alert\">Expiration Alert</span>"
 msgstr ""
 "<span class=\"badge text-bg-danger\" invisible=\"not "
-"product_expiry_alert\">使用期限切れ警告</span>"
+"product_expiry_alert\">使用期限切れアラート</span>"
 
 #. module: product_expiry
 #: model_terms:ir.ui.view,arch_db:product_expiry.view_production_lot_view_kanban
@@ -56,12 +54,12 @@ msgstr "<span> 日前(使用期限の)</span>"
 #: model:ir.model.fields,field_description:product_expiry.field_product_template__alert_time
 #: model:ir.model.fields,field_description:product_expiry.field_stock_lot__alert_date
 msgid "Alert Date"
-msgstr "警告日"
+msgstr "アラート日"
 
 #. module: product_expiry
 #: model:mail.activity.type,name:product_expiry.mail_activity_type_alert_date_reached
 msgid "Alert Date Reached"
-msgstr "警告日に達しました"
+msgstr "アラート日に達しました"
 
 #. module: product_expiry
 #: model_terms:ir.ui.view,arch_db:product_expiry.report_lot_label_expiry
@@ -98,7 +96,6 @@ msgstr "期限切れ確認"
 #. odoo-python
 #: code:addons/product_expiry/models/stock_picking.py:0
 #: model_terms:ir.ui.view,arch_db:product_expiry.confirm_expiry_view
-#, python-format
 msgid "Confirmation"
 msgstr "確認"
 
@@ -154,7 +151,7 @@ msgstr "使用期限:"
 #: model_terms:ir.ui.view,arch_db:product_expiry.quant_search_view_inherit_product_expiry
 #: model_terms:ir.ui.view,arch_db:product_expiry.search_product_lot_filter_inherit_product_expiry
 msgid "Expiration Alerts"
-msgstr "有効期限警告"
+msgstr "有効期限アラート"
 
 #. module: product_expiry
 #: model:ir.model.fields,field_description:product_expiry.field_product_product__expiration_time
@@ -190,7 +187,7 @@ msgstr "使用期限がリマインドされました"
 #. module: product_expiry
 #: model:product.removal,name:product_expiry.removal_fefo
 msgid "First Expiry First Out (FEFO)"
-msgstr "使用期限順先出 (FEFO)"
+msgstr "先消費先出 (FEFO)"
 
 #. module: product_expiry
 #: model:ir.model.fields,field_description:product_expiry.field_expiry_picking_confirmation__id
@@ -239,7 +236,7 @@ msgid ""
 "Number of days before the Expiration Date after which an alert should be "
 "raised on the lot/serial number. It will be computed on the lot/serial "
 "number."
-msgstr "そのロット/シリアル番号の警告が発せられるべき使用期限までの日数。ロット/シリアル番号で計算されます。"
+msgstr "そのロット/シリアル番号のアラートが発せられるべき使用期限までの日数。ロット/シリアル番号で計算されます。"
 
 #. module: product_expiry
 #: model:ir.model.fields,help:product_expiry.field_product_product__removal_time
@@ -331,9 +328,8 @@ msgstr "期限切れ日付に達しました。"
 #. module: product_expiry
 #. odoo-python
 #: code:addons/product_expiry/models/production_lot.py:0
-#, python-format
 msgid "The alert date has been reached for this lot/serial number"
-msgstr "このロット/シリアル番号の警告日に達しました"
+msgstr "このロット/シリアル番号のアラート日に達しました"
 
 #. module: product_expiry
 #: model:ir.model.fields,help:product_expiry.field_stock_lot__expiration_date
@@ -350,7 +346,7 @@ msgstr "これは、このシリアルナンバーの製品が危険になる可
 msgid ""
 "This is the date on which the goods with this Serial Number should be "
 "removed from the stock. This date will be used in FEFO removal strategy."
-msgstr "このシリアル番号の商品が在庫から払出されるべき日付です。この日付は使用期限順先出(FEFO)方式で使用されます。"
+msgstr "このシリアル番号の商品が在庫から払出されるべき日付です。この日付は先消費先出(FEFO)方式で使用されます。"
 
 #. module: product_expiry
 #: model:ir.model.fields,help:product_expiry.field_stock_lot__use_date
@@ -360,21 +356,9 @@ msgid ""
 msgstr "これは、このシリアルナンバーの製品が危険にさらされることなく悪化し始める日付です。"
 
 #. module: product_expiry
-#: model_terms:ir.ui.view,arch_db:product_expiry.view_stock_move_line_detailed_operation_tree_expiry
-#: model_terms:ir.ui.view,arch_db:product_expiry.view_stock_move_line_operation_tree_expiry
-msgid "This lot is expired"
-msgstr "このロットは使用期限切れです。"
-
-#. module: product_expiry
-#: model_terms:ir.ui.view,arch_db:product_expiry.view_stock_move_line_detailed_operation_tree_expiry
-#: model_terms:ir.ui.view,arch_db:product_expiry.view_stock_move_line_operation_tree_expiry
-msgid "This lot is expired."
-msgstr "このロットは使用期限切れです。"
-
-#. module: product_expiry
 #: model:ir.model,name:product_expiry.model_stock_picking
 msgid "Transfer"
-msgstr "移動"
+msgstr "転送"
 
 #. module: product_expiry
 #: model:ir.model.fields,field_description:product_expiry.field_product_product__use_expiration_date
@@ -403,7 +387,6 @@ msgstr ""
 #. module: product_expiry
 #. odoo-python
 #: code:addons/product_expiry/wizard/confirm_expiry.py:0
-#, python-format
 msgid ""
 "You are going to deliver some product expired lots.\n"
 "Do you confirm you want to proceed?"
@@ -414,7 +397,6 @@ msgstr ""
 #. module: product_expiry
 #. odoo-python
 #: code:addons/product_expiry/wizard/confirm_expiry.py:0
-#, python-format
 msgid ""
 "You are going to deliver the product %(product_name)s, %(lot_name)s which is expired.\n"
 "Do you confirm you want to proceed?"

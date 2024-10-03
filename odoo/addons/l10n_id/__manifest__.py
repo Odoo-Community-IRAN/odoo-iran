@@ -11,14 +11,19 @@ This is the latest Indonesian Odoo localisation necessary to run Odoo accounting
     - generic Indonesian chart of accounts
     - tax structure""",
     'author': 'vitraining.com',
-    'website': 'https://www.odoo.com/documentation/17.0/applications/finance/fiscal_localizations/indonesia.html',
+    'website': 'https://www.odoo.com/documentation/master/applications/finance/fiscal_localizations/indonesia.html',
     'depends': [
         'account',
         'base_iban',
         'base_vat',
     ],
+    'auto_install': ['account'],
     'data': [
+        'security/ir.model.access.csv',
         'data/account_tax_template_data.xml',
+        'data/ir_cron.xml',
+        'views/account_move_views.xml',
+        'views/res_bank.xml',
     ],
     'demo': [
         'demo/demo_company.xml',

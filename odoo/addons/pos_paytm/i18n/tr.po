@@ -2,20 +2,12 @@
 # This file contains the translation of the following modules:
 # 	* pos_paytm
 # 
-# Translators:
-# İmat Yahya Çataklı <yahya.catakli@soluto.com.tr>, 2023
-# Martin Trigaux, 2023
-# Umur Akın <umura@projetgrup.com>, 2023
-# Ertuğrul Güreş <ertugrulg@projetgrup.com>, 2023
-# abc Def <hdogan1974@gmail.com>, 2023
-# 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:55+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: abc Def <hdogan1974@gmail.com>, 2023\n"
+"POT-Creation-Date: 2024-09-25 08:39+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
 "Language-Team: Turkish (https://app.transifex.com/odoo/teams/41243/tr/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -31,7 +23,7 @@ msgstr ""
 #. module: pos_paytm
 #: model:ir.model.fields.selection,name:pos_paytm.selection__pos_payment_method__allowed_payment_modes__all
 msgid "All"
-msgstr "Tümü"
+msgstr ""
 
 #. module: pos_paytm
 #: model:ir.model.fields,field_description:pos_paytm.field_pos_payment_method__allowed_payment_modes
@@ -46,12 +38,38 @@ msgstr ""
 #. module: pos_paytm
 #: model:ir.model.fields.selection,name:pos_paytm.selection__pos_payment_method__allowed_payment_modes__card
 msgid "Card"
-msgstr "Kart"
+msgstr ""
+
+#. module: pos_paytm
+#: model:ir.model.fields,help:pos_paytm.field_pos_payment_method__accept_payment
+msgid ""
+"Choose accept payment mode: \n"
+" Manually or Automatically"
+msgstr ""
+
+#. module: pos_paytm
+#: model:ir.model.fields,help:pos_paytm.field_pos_payment_method__allowed_payment_modes
+msgid ""
+"Choose allow payment mode: \n"
+" All/Card or QR"
+msgstr ""
+
+#. module: pos_paytm
+#: model:ir.model.fields,help:pos_paytm.field_pos_payment_method__paytm_mid
+msgid "Go to https://business.paytm.com/ and create the merchant account"
+msgstr ""
 
 #. module: pos_paytm
 #: model:ir.model.fields.selection,name:pos_paytm.selection__pos_payment_method__accept_payment__manual
 msgid "Manually"
-msgstr "Manuel Olarak"
+msgstr ""
+
+#. module: pos_paytm
+#: model:ir.model.fields,help:pos_paytm.field_pos_payment_method__paytm_merchant_key
+msgid ""
+"Merchant/AES key \n"
+" ex: B1o6Ivjy8L1@abc9"
+msgstr ""
 
 #. module: pos_paytm
 #: model:ir.model.fields,field_description:pos_paytm.field_pos_payment_method__channel_id
@@ -61,7 +79,6 @@ msgstr ""
 #. module: pos_paytm
 #. odoo-javascript
 #: code:addons/pos_paytm/static/src/js/payment_paytm.js:0
-#, python-format
 msgid "PayTM Error"
 msgstr ""
 
@@ -86,49 +103,9 @@ msgid "PayTM Test Mode"
 msgstr ""
 
 #. module: pos_paytm
-#: model:ir.model.fields,field_description:pos_paytm.field_pos_payment__paytm_authcode
-msgid "Paytm APPR Code"
-msgstr ""
-
-#. module: pos_paytm
-#: model:ir.model.fields,field_description:pos_paytm.field_pos_payment__paytm_card_scheme
-msgid "Paytm Card Scheme"
-msgstr ""
-
-#. module: pos_paytm
-#: model:ir.model.fields,field_description:pos_paytm.field_pos_payment__paytm_issuer_card_no
-msgid "Paytm Issue Mask Card No."
-msgstr ""
-
-#. module: pos_paytm
-#: model:ir.model.fields,field_description:pos_paytm.field_pos_payment__paytm_issuer_bank
-msgid "Paytm Issuer Bank"
-msgstr ""
-
-#. module: pos_paytm
-#: model:ir.model.fields,field_description:pos_paytm.field_pos_payment__paytm_reference_no
-msgid "Paytm Merchant Reference No."
-msgstr ""
-
-#. module: pos_paytm
-#: model:ir.model.fields,field_description:pos_paytm.field_pos_payment__paytm_payment_method
-msgid "Paytm Payment Method"
-msgstr ""
-
-#. module: pos_paytm
-#: model:ir.model,name:pos_paytm.model_pos_order
-msgid "Point of Sale Orders"
-msgstr "Satış Noktası Siparişi"
-
-#. module: pos_paytm
 #: model:ir.model,name:pos_paytm.model_pos_payment_method
 msgid "Point of Sale Payment Methods"
-msgstr "Satış Noktası Ödeme Yöntemleri"
-
-#. module: pos_paytm
-#: model:ir.model,name:pos_paytm.model_pos_payment
-msgid "Point of Sale Payments"
-msgstr "Satış Noktası Ödemeleri"
+msgstr ""
 
 #. module: pos_paytm
 #: model:ir.model.fields.selection,name:pos_paytm.selection__pos_payment_method__allowed_payment_modes__qr
@@ -138,48 +115,53 @@ msgstr ""
 #. module: pos_paytm
 #. odoo-javascript
 #: code:addons/pos_paytm/static/src/js/payment_paytm.js:0
-#, python-format
 msgid "Reference number mismatched"
 msgstr ""
 
 #. module: pos_paytm
 #. odoo-python
 #: code:addons/pos_paytm/models/pos_payment_method.py:0
-#, python-format
 msgid "Something went wrong with paytm request. Please try later."
 msgstr ""
 
 #. module: pos_paytm
-#. odoo-python
-#: code:addons/pos_paytm/models/pos_payment_method.py:0
-#, python-format
-msgid "This Payment Terminal is only valid for INR Currency"
+#: model:ir.model.fields,help:pos_paytm.field_pos_payment_method__paytm_tid
+msgid ""
+"Terminal model or Activation code \n"
+" ex: 70000123"
 msgstr ""
 
 #. module: pos_paytm
 #. odoo-python
 #: code:addons/pos_paytm/models/pos_payment_method.py:0
-#, python-format
+msgid "This Payment Terminal is only valid for INR Currency"
+msgstr ""
+
+#. module: pos_paytm
+#: model:ir.model.fields,help:pos_paytm.field_pos_payment_method__paytm_test_mode
+msgid "Turn it on when in Test Mode"
+msgstr ""
+
+#. module: pos_paytm
+#. odoo-python
+#: code:addons/pos_paytm/models/pos_payment_method.py:0
 msgid "makePaymentRequest expected resultCode not found in the response"
 msgstr ""
 
 #. module: pos_paytm
 #. odoo-python
 #: code:addons/pos_paytm/models/pos_payment_method.py:0
-#, python-format
 msgid "paymentFetchRequest expected resultCode not found in the response"
 msgstr ""
 
 #. module: pos_paytm
 #. odoo-python
 #: code:addons/pos_paytm/models/pos_payment_method.py:0
-#, python-format
 msgid "paytm transaction failure"
 msgstr ""
 
 #. module: pos_paytm
 #. odoo-python
 #: code:addons/pos_paytm/models/pos_payment_method.py:0
-#, python-format
 msgid "paytm transaction request declined"
 msgstr ""

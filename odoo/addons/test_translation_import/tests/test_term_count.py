@@ -1,12 +1,10 @@
-# -*- coding: utf-8 -*-
-
 import base64
 import io
 from markupsafe import Markup
 
 from odoo.tests import common, tagged
 from odoo.tools.misc import file_open, mute_logger, file_path
-from odoo.tools.translate import TranslationModuleReader, TranslationRecordReader, code_translations, CodeTranslations, PYTHON_TRANSLATION_COMMENT, JAVASCRIPT_TRANSLATION_COMMENT, WEB_TRANSLATION_COMMENT, TranslationFileReader
+from odoo.tools.translate import TranslationModuleReader, TranslationRecordReader, code_translations, CodeTranslations, PYTHON_TRANSLATION_COMMENT, JAVASCRIPT_TRANSLATION_COMMENT, TranslationFileReader
 from odoo import Command
 from odoo.addons.base.models.ir_fields import BOOLEAN_TRANSLATIONS
 
@@ -271,22 +269,18 @@ class TestTranslationFlow(common.TransactionCase):
             po_file.name = 'fr_FR.po'
 
             def filter_func_for_python(row):
-                return row.get('value') and (
-                        PYTHON_TRANSLATION_COMMENT in row['comments']
-                        or JAVASCRIPT_TRANSLATION_COMMENT not in row['comments'])
+                return row.get('value') and PYTHON_TRANSLATION_COMMENT in row['comments']
             new_code_translations.python_translations[('test_translation_import', 'fr_FR')] = \
                 CodeTranslations._read_code_translations_file(po_file, filter_func_for_python)
 
             def filter_func_for_javascript(row):
-                return row.get('value') and (
-                        JAVASCRIPT_TRANSLATION_COMMENT in row['comments']
-                        or WEB_TRANSLATION_COMMENT in row['comments'])
+                return row.get('value') and JAVASCRIPT_TRANSLATION_COMMENT in row['comments']
             new_code_translations.web_translations[('test_translation_import', 'fr_FR')] = {
-                "messages": [
+                "messages": tuple(
                     {"id": src, "string": value}
                     for src, value in CodeTranslations._read_code_translations_file(
                         po_file, filter_func_for_javascript).items()
-                ]
+                )
             }
 
         old_python = code_translations.get_python_translations('test_translation_import', 'fr_FR')
@@ -409,6 +403,23 @@ class TestTranslationFlow(common.TransactionCase):
             'aa (\\"inside\\") bb',
             'with spaces',
             'hello \\"world\\"',
+        })
+
+    def test_export_spreadsheet_new_dataset(self):
+        terms = []
+        po_reader = TranslationModuleReader(self.env.cr, ['test_translation_import'])
+        for line in po_reader:
+            _module, _ttype, name, _res_id, source, _value, _comments = line
+            if name == 'addons/test_translation_import/data/files/test_spreadsheet_v16_dashboard.json':
+                terms.append(source)
+        self.assertEqual(set(terms), {
+            'Bar chart title',
+            'Chart horizontal axis title',
+            'Chart vertical axis title',
+            'Scorecard title',
+            'Opportunities',
+            'Odoo Chart horizontal axis title',
+            'Odoo Chart vertical axis title'
         })
 
     def test_export_records(self):

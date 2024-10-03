@@ -60,7 +60,7 @@
                     <notebook>
                         <page name="tax_mapping" string="Tax Mapping">
                             <field name="tax_ids" widget="one2many" nolabel="1" context="{'append_type_to_tax_name': True}">
-                                <tree name="tax_map_tree" string="Tax Mapping" editable="bottom" no_open="1" decoration-muted="tax_dest_id and not tax_dest_active">
+                                <list name="tax_map_tree" string="Tax Mapping" editable="bottom" no_open="1" decoration-muted="tax_dest_id and not tax_dest_active">
                                     <field name="tax_dest_active" column_invisible="1"/>
                                     <field name="tax_src_id"
                                         domain="[
@@ -78,7 +78,7 @@
                                             '|', ('company_id', '=', False), ('company_id', 'parent_of', parent.company_id)]"
                                         context="{'append_type_to_tax_name': True}"
                                     />
-                                </tree>
+                                </list>
                                 <form name="tax_map_form" string="Tax Mapping">
                                     <group>
                                         <field name="tax_src_id" domain="[('type_tax_use', '!=', 'none')]" context="{'append_type_to_tax_name': True}"/>
@@ -89,13 +89,13 @@
                         </page>
                         <page name="account_mapping" string="Account Mapping" groups="account.group_account_readonly">
                             <field name="account_ids" widget="one2many" nolabel="1">
-                                <tree string="Account Mapping" editable="bottom">
-                                    <field name="account_src_id" domain="['|', '|', ('company_id', '=', False), ('company_id', '=', parent.company_id), ('account_type', '!=', 'off_balance')]"/>
-                                    <field name="account_dest_id" domain="['|', '|', ('company_id', '=', False), ('company_id', '=', parent.company_id), ('account_type', '!=', 'off_balance')]"/>
-                                </tree>
+                                <list string="Account Mapping" editable="bottom">
+                                    <field name="account_src_id" domain="['|', ('company_ids', '=', parent.company_id), ('account_type', '!=', 'off_balance')]"/>
+                                    <field name="account_dest_id" domain="['|', ('company_ids', '=', parent.company_id), ('account_type', '!=', 'off_balance')]"/>
+                                </list>
                                 <form string="Account Mapping">
-                                    <field name="account_src_id" domain="['|', '|', ('company_id', '=', False), ('company_id', '=', parent.company_id), ('account_type', '!=', 'off_balance')]"/>
-                                    <field name="account_dest_id" domain="['|', '|', ('company_id', '=', False), ('company_id', '=', parent.company_id), ('account_type', '!=', 'off_balance')]"/>
+                                    <field name="account_src_id" domain="['|', ('company_ids', '=', parent.company_id), ('account_type', '!=', 'off_balance')]"/>
+                                    <field name="account_dest_id" domain="['|', ('company_ids', '=', parent.company_id), ('account_type', '!=', 'off_balance')]"/>
                                 </form>
                             </field>
                         </page>
@@ -116,14 +116,14 @@
             </field>
         </record>
         <record id="view_account_position_tree" model="ir.ui.view">
-            <field name="name">account.fiscal.position.tree</field>
+            <field name="name">account.fiscal.position.list</field>
             <field name="model">account.fiscal.position</field>
             <field name="arch" type="xml">
-                <tree string="Fiscal Position">
+                <list string="Fiscal Position">
                     <field name="sequence" widget="handle"/>
                     <field name="name"/>
                     <field name="company_id" groups="base.group_multi_company" options="{'no_create': True}"/>
-                </tree>
+                </list>
             </field>
         </record>
 
@@ -131,7 +131,7 @@
             <field name="name">partner.view.buttons</field>
             <field name="model">res.partner</field>
             <field name="inherit_id" ref="base.view_partner_form" />
-            <field name="priority" eval="11"/>
+            <field name="priority" eval="5"/>
             <field name="arch" type="xml">
                 <div name="button_box" position="inside">
                     <button type="object" class="oe_stat_button" icon="fa-pencil-square-o" name="action_view_partner_invoices"
@@ -158,13 +158,20 @@
                         </group>
                     </group>
                 </page>
+
+                <field name="vat" position="before">
+                    <field name="partner_vat_placeholder" invisible="1"/> <!-- Needed for the placeholder widget -->
+                </field>
+                <field name="vat" position="attributes">
+                    <attribute name="options">{'placeholder_field': 'partner_vat_placeholder'}</attribute>
+                </field>
             </field>
         </record>
 
         <record id="action_account_fiscal_position_form" model="ir.actions.act_window">
             <field name="name">Fiscal Positions</field>
             <field name="res_model">account.fiscal.position</field>
-            <field name="view_mode">tree,kanban,form</field>
+            <field name="view_mode">list,kanban,form</field>
             <field name="search_view_id" ref="view_account_position_filter"/>
             <field name="help" type="html">
               <p class="o_view_nocontent_smiling_face">
@@ -198,20 +205,29 @@
                         <field name="show_credit_limit" invisible="1"/>
                         <group>
                             <group string="Bank Accounts" name="banks" groups="account.group_account_invoice,account.group_account_readonly">
-                                <field name="bank_ids" nolabel="1" colspan="2" context="{'default_partner_id': id}" widget="auto_save_res_partner">
-                                    <tree>
+                                <field name="bank_ids" nolabel="1" context="{'default_partner_id': id}" widget="auto_save_res_partner">
+                                    <list>
                                         <field name="sequence" widget="handle"/>
                                         <field name="acc_number"/>
                                         <field name="bank_id"/>
                                         <field name="allow_out_payment"/>
                                         <field name="acc_holder_name" column_invisible="True"/>
-                                    </tree>
+                                    </list>
                                 </field>
+                            </group>
+                            <group id="invoice_send_settings"
+                                   string="Customer Invoices"
+                                   groups="account.group_account_invoice,account.group_account_readonly">
+                                <field name="invoice_sending_method"/>
+                                <field name="invoice_edi_format" invisible="not display_invoice_edi_format"/>
+                                <field name="invoice_template_pdf_report_id"
+                                       invisible="not display_invoice_template_pdf_report_id"
+                                       options="{'no_create': True, 'no_edit': True}"/>
                             </group>
                             <group string="Accounting Entries" name="accounting_entries" groups="account.group_account_readonly">
                                 <field name="currency_id" invisible="1"/>
-                                <field name="property_account_receivable_id"/>
-                                <field name="property_account_payable_id"/>
+                                <field name="property_account_receivable_id" required="True"/>
+                                <field name="property_account_payable_id" required="True"/>
                             </group>
                             <group string="Credit Limits"
                                    name="credit_limits"
@@ -224,6 +240,11 @@
                                     <field name="use_partner_credit_limit"/>
                                     <field name="credit_limit" class="oe_inline" invisible="not use_partner_credit_limit"/>
                                 </div>
+                            </group>
+                            <group name='accounting_automation' string='Automation'>
+                                <field name="autopost_bills" groups="account.group_account_invoice,account.group_account_readonly"/>
+                                <field name="ignore_abnormal_invoice_amount" groups="base.group_no_one"/>
+                                <field name="ignore_abnormal_invoice_date" groups="base.group_no_one"/>
                             </group>
                         </group>
                     </page>
@@ -240,10 +261,31 @@
                 </xpath>
                 <group name="sale" position="inside">
                     <field string="Payment Terms" name="property_payment_term_id" options="{'no_open': True, 'no_create': True}" groups="account.group_account_invoice,account.group_account_readonly"/>
+                    <field string="Payment Method"
+                           name="property_inbound_payment_method_line_id"
+                           options="{'no_open': True, 'no_create': True}"
+                           groups="account.group_account_invoice,account.group_account_readonly"
+                    />
                 </group>
                 <group name="purchase" position="inside">
                     <field string="Payment Terms" name="property_supplier_payment_term_id" options="{'no_open': True, 'no_create': True}" groups="account.group_account_invoice,account.group_account_readonly"/>
+                    <field string="Payment Method"
+                           name="property_outbound_payment_method_line_id"
+                           options="{'no_open': True, 'no_create': True}"
+                           groups="account.group_account_invoice,account.group_account_readonly"
+                    />
                 </group>
+            </field>
+        </record>
+
+        <record id="res_partner_view_tree" model="ir.ui.view">
+            <field name="name">res.partner.list.inherit.account</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="base.view_partner_tree"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='vat']" position="after">
+                    <field name="invoice_edi_format" string="EDI Format" optional="hide"/>
+                </xpath>
             </field>
         </record>
 
@@ -264,7 +306,8 @@
         <record id="res_partner_action_customer" model="ir.actions.act_window">
             <field name="name">Customers</field>
             <field name="res_model">res.partner</field>
-            <field name="view_mode">kanban,tree,form</field>
+            <field name="path">customers</field>
+            <field name="view_mode">kanban,list,form</field>
             <field name="context">{'search_default_customer': 1,'res_partner_search_mode': 'customer', 'default_is_company': True, 'default_customer_rank': 1}</field>
             <field name="help" type="html">
               <p class="o_view_nocontent_smiling_face">
@@ -278,7 +321,8 @@
         <record id="res_partner_action_supplier" model="ir.actions.act_window">
             <field name="name">Vendors</field>
             <field name="res_model">res.partner</field>
-            <field name="view_mode">kanban,tree,form</field>
+            <field name="path">vendors</field>
+            <field name="view_mode">kanban,list,form</field>
             <field name="context">{'search_default_supplier': 1,'res_partner_search_mode': 'supplier', 'default_is_company': True, 'default_supplier_rank': 1}</field>
             <field name="help" type="html">
               <p class="o_view_nocontent_smiling_face">
@@ -286,6 +330,17 @@
               </p><p>
                 Odoo helps you easily track all activities related to a supplier.
               </p>
+            </field>
+        </record>
+
+        <record id="partner_missing_account_list_view" model="ir.ui.view">
+            <field name="name">res.partner.list</field>
+            <field name="model">res.partner</field>
+            <field name="arch" type="xml">
+                <list string="Partners Missing a bank account" create="false" edit="false" delete="false"
+                      import="false" open_form_view="True">
+                    <field name="name"/>
+                </list>
             </field>
         </record>
     </data>

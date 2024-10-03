@@ -27,6 +27,7 @@
                             icon="button.icon"
                             string="button.string"
                             title="button.title"
+                            attrs="button.attrs"
                         />
                     </t>
                 </t>
@@ -39,10 +40,10 @@
                 </t>
 
                 <t t-set-slot="control-panel-additional-actions">
-                    <CogMenu t-if="!nbSelected"/>
+                    <CogMenu t-if="!nbSelected and !model.root.isDomainSelected"/>
                 </t>
                 <t t-set-slot="control-panel-selection-actions">
-                    <div t-if="nbSelected" class="d-flex gap-1">
+                    <div t-if="hasSelectedRecords" class="d-flex gap-1">
                         <t t-call="web.ListView.Selection"/>
                         <t t-foreach="archInfo.headerButtons" t-as="button" t-key="button.id" t-if="!evalViewModifier(button.invisible)">
                             <MultiRecordViewButton
@@ -55,17 +56,11 @@
                                 icon="button.icon"
                                 string="button.string"
                                 title="button.title"
+                                attrs="button.attrs"
                             />
                         </t>
                         <t t-if="props.info.actionMenus">
-                            <ActionMenus
-                                getActiveIds="() => model.root.selection.map((r) => r.resId)"
-                                context="props.context"
-                                domain="props.domain"
-                                items="actionMenuItems"
-                                isDomainSelected="model.root.isDomainSelected"
-                                resModel="model.root.resModel"
-                                onActionExecuted="() => model.load()"/>
+                            <ActionMenus t-props="this.actionMenuProps"/>
                         </t>
                     </div>
                 </t>
@@ -75,12 +70,12 @@
                     archInfo="archInfo"
                     allowSelectors="props.allowSelectors"
                     editable="editable"
-                    onOpenFormView="onOpenFormView" 
+                    onOpenFormView="onOpenFormView"
+                    hasOpenFormViewButton="hasOpenFormViewButton"
                     openRecord.bind="openRecord"
                     noContentHelp="props.info.noContentHelp"
                     onAdd.bind="createRecord"
-                    onOptionalFieldsChanged.bind="onOptionalFieldsChanged"
-                    evalViewModifier.bind="evalViewModifier"
+                    optionalActiveFields="optionalActiveFields"
                 />
             </Layout>
         </div>
@@ -102,16 +97,16 @@
     <t t-name="web.ListView.Selection">
         <div class="o_list_selection_box list-group flex-row" role="alert">
             <span class="list-group-item active d-flex align-items-center pe-0 py-0 rounded-1 lh-1">
-                <span t-if="isDomainSelected">All <b t-esc="isTotalTrustable ? nbTotal : nbRecordsMatchingDomain"/> selected</span>
+                <span t-if="isDomainSelected">All <b t-esc="nbTotal"/> selected</span>
                 <t t-else="">
                     <b class="me-1" t-esc="nbSelected"/> selected
-                    <a t-if="isPageSelected and (nbTotal > nbSelected or !isTotalTrustable)"
+                    <a t-if="isPageSelected and (!model.root.isRecordCountTrustable or nbTotal > nbSelected)"
                         href="#"
                         class="o_list_select_domain ms-3 btn btn-sm btn-info p-1 me-n2 border-0 fw-normal"
                         title="Select all records matching the search"
                         t-on-click="onSelectDomain">
                         <i class="oi oi-fw oi-arrow-right"/>
-                        Select all <span t-if="isTotalTrustable" t-esc="nbTotal"/>
+                        Select all <span t-if="model.root.isRecordCountTrustable" t-esc="nbTotal"/>
                     </a>
                 </t>
                 <a href="#" title="Unselect All" class="o_list_unselect_all btn btn-link py-0" t-on-click="onUnselectAll">

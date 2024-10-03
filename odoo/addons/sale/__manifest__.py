@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 
@@ -30,8 +29,8 @@ This module contains all the common features of Sales Management and eCommerce.
         'data/mail_activity_type_data.xml',
         'data/mail_message_subtype_data.xml',
         'data/mail_template_data.xml',
+        'data/sale_tour.xml',
         'data/ir_config_parameter.xml', # Needs mail_template_data
-        'data/onboarding_data.xml',
 
         'wizard/account_accrued_orders_wizard_views.xml',
         'wizard/mass_cancel_orders_views.xml',
@@ -51,6 +50,7 @@ This module contains all the common features of Sales Management and eCommerce.
         'views/payment_views.xml',
         'views/product_document_views.xml',
         'views/product_packaging_views.xml',
+        'views/product_template_views.xml',
         'views/product_views.xml',
         'views/res_partner_views.xml',
         'views/sale_order_line_views.xml',
@@ -67,10 +67,24 @@ This module contains all the common features of Sales Management and eCommerce.
     'assets': {
         'web.assets_backend': [
             'sale/static/src/scss/sale_onboarding.scss',
+            'sale/static/src/js/badge_extra_price/*',
+            'sale/static/src/js/sale_action_helper/*',
+            'sale/static/src/js/combo_configurator_dialog/*',
+            'sale/static/src/js/models/*',
+            'sale/static/src/js/product/*',
+            'sale/static/src/js/product_card/*',
+            'sale/static/src/js/product_configurator_dialog/*',
+            'sale/static/src/js/product_list/*',
+            'sale/static/src/js/product_template_attribute_line/*',
+            'sale/static/src/js/quantity_buttons/*',
+            'sale/static/src/js/sale_order_line_field/*',
             'sale/static/src/js/sale_progressbar_field.js',
             'sale/static/src/js/tours/sale.js',
             'sale/static/src/js/sale_product_field.js',
+            'sale/static/src/js/sale_product_field.scss',
+            'sale/static/src/js/sale_utils.js',
             'sale/static/src/xml/**/*',
+            'sale/static/src/views/**/*',
         ],
         'web.assets_frontend': [
             'sale/static/src/scss/sale_portal.scss',
@@ -80,15 +94,21 @@ This module contains all the common features of Sales Management and eCommerce.
         ],
         'web.assets_tests': [
             'sale/static/tests/tours/**/*',
+            'sale/static/src/js/tours/product_configurator_tour_utils.js',
+            'sale/static/src/js/tours/tour_utils.js',
+        ],
+        'web.assets_unit_tests': [
+            'sale/static/tests/mock_server/**/*',
         ],
         'web.qunit_suite_tests': [
             'sale/static/tests/**/*',
-            ('remove', 'sale/static/tests/tours/**/*')
+            ('remove', 'sale/static/tests/tours/**/*'),
+            ('remove', 'sale/static/tests/mock_server/**/*'),
         ],
         'web.report_assets_common': [
             'sale/static/src/scss/sale_report.scss',
         ],
     },
-    'post_init_hook': '_synchronize_cron',
+    'post_init_hook': '_post_init_hook',
     'license': 'LGPL-3',
 }

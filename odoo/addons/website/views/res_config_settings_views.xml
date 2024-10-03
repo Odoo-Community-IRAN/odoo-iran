@@ -32,10 +32,6 @@
                                     <field name="website_domain" placeholder="https://www.odoo.com" title="Display this website when users visit this domain"/>
                                 </div>
                                 <div class="row mt8">
-                                    <label class="col-lg-3" string="Homepage URL" for="website_homepage_url"/>
-                                    <field name="website_homepage_url" placeholder="/" title="Main page of your website served to visitors"/>
-                                </div>
-                                <div class="row mt8">
                                     <label class="col-lg-3" string="Languages" for="language_ids"/>
                                     <field name="language_ids" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" required="website_id" title="Languages available on your website"/>
                                 </div>
@@ -68,7 +64,7 @@
                     </block>
 
                     <block title="Email &amp; Marketing" id="website_email_marketing">
-                        <setting id="livechat" string="Livechat" help="Alows your visitors to chat with you">
+                        <setting id="livechat" string="Livechat" help="Allows your visitors to chat with you">
                             <field name="module_website_livechat"/>
                         </setting>
                         <setting id="website_marketing_automation" string="Email Marketing" help="Allows to do mass mailing campaigns to contacts">
@@ -80,6 +76,22 @@
                         <setting id="website_cookies_bar_setting" help="Display a customizable cookies bar on your website"
                             documentation="/applications/websites/website/configuration/cookies_bar.html">
                             <field name="website_cookies_bar"/>
+                            <div class="content-group" invisible="not website_cookies_bar">
+                                <div>
+                                    <field name="website_block_third_party_domains" required="website_cookies_bar"/>
+                                    <label class="o_light_label" string="Block tracking 3rd-party services" for="website_block_third_party_domains"/>
+                                </div>
+                                <div>
+                                    <small class="text-muted">
+                                        Block 3rd-party services that track users (e.g. YouTube, Google Maps, Facebook...) when the user has not given their consent.
+                                    </small>
+                                </div>
+                                <div class="mt4">
+                                    <button type="object" name="action_open_blocked_third_party_domains"
+                                        string="Add domains to the block list" class="btn-link"
+                                        icon="fa-ban" noSaveDialog="true"/>
+                                </div>
+                            </div>
                         </setting>
                         <setting id="shared_user_account_setting" groups="website.group_multi_website" help="Accounts are usable across all your multiple websites">
                             <field name="shared_user_account"/>
@@ -94,7 +106,11 @@
                         </setting>
                     </block>
                     <block title="SEO" id="website_settings" invisible="not website_id">
-                        <setting id="google_analytics_setting" help="Track visits using Google Analytics">
+                        <setting
+                            id="google_analytics_setting"
+                            help="Track visits using Google Analytics"
+                            documentation="/applications/websites/website/reporting/analytics.html#analytics-google-analytics"
+                        >
                             <field name="has_google_analytics"/>
                             <div class="content-group" invisible="not has_google_analytics">
                                 <div class="row mt16">
@@ -104,14 +120,22 @@
                                 </div>
                             </div>
                             <div invisible="not has_google_analytics">
-                                <a href="https://www.odoo.com/documentation/17.0/applications/websites/website/optimize/google_analytics.html"
-                                        class="oe_link" target="_blank">
-                                    <i class="oi oi-arrow-right"/>
-                                    How to get my Measurement ID
-                                </a>
+                                <widget
+                                    class="oe_link"
+                                    name="documentation_link"
+                                    path="/applications/websites/website/reporting/analytics.html#analytics-google-analytics"
+                                    label=" How to get my Measurement ID"
+                                    icon="oi oi-arrow-right"
+                                />
                             </div>
                         </setting>
-                        <setting id="cdn_setting" title="A CDN helps you serve your website’s content with high availability and high performance to any visitor wherever they are located." groups="base.group_no_one" help="Use a CDN to optimize the availability of your website's content">
+                        <setting
+                            id="cdn_setting"
+                            title="A CDN helps you serve your website’s content with high availability and high performance to any visitor wherever they are located."
+                            groups="base.group_no_one"
+                            help="Use a CDN to optimize the availability of your website's content"
+                            documentation="/applications/websites/website/configuration/cdn.html"
+                        >
                             <field name="cdn_activated"/>
                             <div class="content-group" invisible="not cdn_activated">
                                 <div class="row mt16">
@@ -133,19 +157,15 @@
                                 <button type="object" name="action_open_robots" string="Edit robots.txt" class="btn-link" icon="fa-android" noSaveDialog="true"/>
                             </div>
                         </setting>
-                        <setting id="robots_setting" string="Sitemap" help="Sitemap.xml: Help search engine crawlers to find out what pages are present and which have recently changed, and to crawl your site accordingly. This file is automatically generated by Odoo.">
-                            <div class="alert alert-info mt4" role="alert">
-                                Google doesn't need to be pinged anymore. It will automatically fetch your /sitemap.xml.
-                            </div>
-                            <div class="mt4">
-                                <button type="object" name="action_ping_sitemap" string="Submit sitemap to Google" class='btn-link' icon="fa-google" noSaveDialog="true"/>
-                            </div>
-                        </setting>
                         <setting id="social_default_image_setting" string="Default Social Share Image" help="If set, replaces the website logo as the default social share image.">
                             <field name="has_default_share_image"/>
                             <field name="social_default_image" widget="image" class="w-25 mt-2" invisible="not has_default_share_image"/>
                         </setting>
-                        <setting id="google_console_setting" help="Monitor Google Search results data">
+                        <setting
+                            id="google_console_setting"
+                            help="Monitor Google Search results data"
+                            documentation="/applications/websites/website/configuration/google_search_console.html"
+                        >
                             <field name="has_google_search_console"/>
                             <div class="content-group" invisible="not has_google_search_console">
                                 <div class="row mt16">
@@ -160,7 +180,11 @@
                                 </small>
                             </div>
                         </setting>
-                        <setting id="plausbile_setting" help="Use Plausible.io, Simple and privacy-friendly Google Analytics alternative">
+                        <setting
+                            id="plausbile_setting"
+                            help="Use Plausible.io, Simple and privacy-friendly Google Analytics alternative"
+                            documentation="/applications/websites/website/reporting/analytics.html#analytics-plausible"
+                        >
                             <field name="has_plausible_shared_key"/>
                             <div class="content-group" invisible="not has_plausible_shared_key">
                                 <div class="row mt16">
@@ -175,11 +199,13 @@
                                 </div>
                             </div>
                             <div invisible="not has_plausible_shared_key">
-                                <a href="https://www.odoo.com/documentation/17.0/applications/websites/website/reporting/plausible.html"
-                                        class="oe_link" target="_blank">
-                                    <i class="oi oi-arrow-right"/>
-                                    How to create my Plausible Shared Link
-                                </a>
+                                <widget
+                                    class="oe_link"
+                                    name="documentation_link"
+                                    path="/applications/websites/website/reporting/analytics.html#analytics-plausible"
+                                    label=" How to create my Plausible Shared Link"
+                                    icon="oi oi-arrow-right"
+                                />
                             </div>
                         </setting>
                     </block>

@@ -1,7 +1,6 @@
-/* @odoo-module */
-
 import { browser } from "@web/core/browser/browser";
 import { registry } from "@web/core/registry";
+import { url } from "@web/core/utils/urls";
 
 export class SoundEffects {
     /**
@@ -45,7 +44,7 @@ export class SoundEffects {
         if (!soundEffect.audio) {
             const audio = new browser.Audio();
             const ext = audio.canPlayType("audio/ogg; codecs=vorbis") ? ".ogg" : ".mp3";
-            audio.src = soundEffect.path + ext;
+            audio.src = url(soundEffect.path + ext);
             soundEffect.audio = audio;
         }
         if (!soundEffect.audio.paused) {

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import werkzeug.exceptions
@@ -7,8 +6,8 @@ import werkzeug.urls
 from werkzeug.urls import url_parse
 
 from odoo import api, fields, models, _
-from odoo.addons.http_routing.models.ir_http import unslug_url
 from odoo.exceptions import UserError
+from odoo.fields import Command
 from odoo.http import request
 from odoo.tools.translate import html_translate
 
@@ -48,8 +47,10 @@ class Menu(models.Model):
     website_id = fields.Many2one('website', 'Website', ondelete='cascade')
     parent_id = fields.Many2one('website.menu', 'Parent Menu', index=True, ondelete="cascade")
     child_id = fields.One2many('website.menu', 'parent_id', string='Child Menus')
-    parent_path = fields.Char(index=True, unaccent=False)
+    parent_path = fields.Char(index=True)
     is_visible = fields.Boolean(compute='_compute_visible', string='Is Visible')
+    group_ids = fields.Many2many('res.groups', string='Visible Groups',
+        help="User needs to be at least in one of these groups to see the menu")
     is_mega_menu = fields.Boolean(compute=_compute_field_is_mega_menu, inverse=_set_field_is_mega_menu)
     mega_menu_content = fields.Html(translate=html_translate, sanitize=False, prefetch=True)
     mega_menu_classes = fields.Char()
@@ -106,6 +107,20 @@ class Menu(models.Model):
 
     def write(self, values):
         self.env.registry.clear_cache('templates')
+        if 'group_ids' in values:
+            commands = values['group_ids'] or []
+            designer_group_id = self.env.ref('website.group_website_designer').id
+            link_designer_group = Command.link(designer_group_id)
+            for record in self:
+                # Simulate write.
+                ids = set(record.group_ids.mapped('id'))
+                for command, record_id in commands:
+                    if command == Command.LINK:
+                        ids.add(record_id)
+                    elif command == Command.UNLINK and record_id in ids:
+                        ids.remove(record_id)
+                if ids and designer_group_id not in ids:
+                    commands.append(link_designer_group)
         return super().write(values)
 
     def unlink(self):
@@ -127,14 +142,14 @@ class Menu(models.Model):
     def _compute_visible(self):
         for menu in self:
             visible = True
-            if menu.page_id and not menu.user_has_groups('base.group_user'):
+            if menu.page_id and not menu.env.user._is_internal():
                 page_sudo = menu.page_id.sudo()
                 if (not page_sudo.is_visible
                     or (not page_sudo.view_id._handle_visibility(do_raise=False)
                         and page_sudo.view_id._get_cached_visibility() != "password")):
                     visible = False
 
-            if menu.controller_page_id and not menu.user_has_groups('base.group_user'):
+            if menu.controller_page_id and not menu.env.user._is_internal():
                 controller_page_sudo = menu.controller_page_id.sudo()
                 if (not controller_page_sudo.is_published
                     or (not controller_page_sudo.view_id._handle_visibility(do_raise=False)
@@ -193,6 +208,7 @@ class Menu(models.Model):
                 return False
 
             menu_url = url_parse(menu_url)
+            unslug_url = self.env['ir.http']._unslug_url
             if unslug_url(menu_url.path) == unslug_url(request_url.path):
                 if not (
                     set(menu_url.decode_query().items(multi=True))

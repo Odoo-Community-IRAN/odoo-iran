@@ -2,7 +2,7 @@
 
 import json
 
-from odoo.http import request, route, Controller
+from odoo.http import Controller, request, route
 
 
 class WebsiteSaleVariantController(Controller):
@@ -23,7 +23,7 @@ class WebsiteSaleVariantController(Controller):
         )
 
         # Pop data only computed to ease server-side computations.
-        for key in ('product_taxes', 'taxes', 'currency', 'date'):
+        for key in ('product_taxes', 'taxes', 'currency', 'date', 'combination'):
             combination_info.pop(key)
 
         if request.website.product_page_image_width != 'none' and not request.env.context.get('website_sale_no_images', False):
@@ -34,6 +34,14 @@ class WebsiteSaleVariantController(Controller):
                     'product_variant': request.env['product.product'].browse(combination_info['product_id']),
                     'website': request.env['website'].get_current_website(),
                 },
+            )
+
+        product = request.env['product.product'].browse(combination_info['product_id'])
+        if product and request.website.is_view_active('website_sale.product_tags'):
+            combination_info['product_tags'] = request.env['ir.ui.view']._render_template(
+                'website_sale.product_tags', values={
+                    'all_product_tags': product.all_product_tag_ids.filtered('visible_on_ecommerce')
+                }
             )
         return combination_info
 

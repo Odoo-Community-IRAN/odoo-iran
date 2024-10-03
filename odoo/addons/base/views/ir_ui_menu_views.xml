@@ -5,7 +5,6 @@
             <field name="arch" type="xml">
                 <form string="Menu">
                     <sheet>
-                        <field name="active" invisible="1"/>
                         <group>
                             <group>
                                 <field name="name"/>
@@ -27,10 +26,10 @@
                                 <!-- Note: make sure you have 'ir.ui.menu.full_list'
                                     in the context to see all submenus! -->
                                 <field name="child_id" context="{'default_parent_id': id}">
-                                    <tree string="Menu">
+                                    <list string="Menu">
                                         <field name="sequence"/>
                                         <field icon="icon" name="name" string="Menu"/>
-                                    </tree>
+                                    </list>
                                 </field>
                             </page>
                         </notebook>
@@ -43,10 +42,10 @@
             <field name="model">ir.ui.menu</field>
             <field name="priority" eval="8"/>
             <field name="arch" type="xml">
-                <tree string="Menu">
+                <list string="Menu">
                     <field name="sequence" widget='handle'/>
                     <field icon="icon" name="complete_name" string="Menu"/>
-                </tree>
+                </list>
             </field>
         </record>
 

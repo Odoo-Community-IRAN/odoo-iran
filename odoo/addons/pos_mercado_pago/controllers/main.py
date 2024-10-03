@@ -79,7 +79,9 @@ class PosMercadoPagoWebhook(http.Controller):
         _logger.debug('Webhook authenticated, POST message: %s', data)
 
         # Notify the frontend that we received a message from Mercado Pago
-        request.env['bus.bus']._sendone(pos_session_sudo._get_bus_channel_name(), 'MERCADO_PAGO_LATEST_MESSAGE', {})
+        pos_session_sudo.config_id._notify('MERCADO_PAGO_LATEST_MESSAGE', {
+            'config_id': pos_session_sudo.config_id.id
+        })
 
         # Acknowledge Mercado Pago message
         return http.Response('OK', status=200)

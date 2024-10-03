@@ -17,8 +17,10 @@ addons/*
 !web_studio
 !web_studio/**/*
 
-# BlackList libs
-addons/web/static/lib
+# BlackList libs except HOOT
+addons/web/static/lib/**/*
+!addons/web/static/lib/hoot
+!addons/web/static/lib/hoot/**/*
 
 # Ignore everything in web legacy but the top level (adapters)
 addons/web/static/src/legacy/**/*
@@ -65,6 +67,10 @@ web_cohort/static/tests/legacy/**/*
 web_gantt/static/src/legacy/**/*
 web_gantt/static/tests/legacy/**/*
 
+# Whitelist html_editor
+!addons/html_editor
+!addons/html_editor/**/*
+
 # planning
 # whitelist new code
 !planning
@@ -93,8 +99,8 @@ web_map/static/src/legacy/**/*
 web_map/static/tests/legacy/**/*
 
 # whitelist web_tour
-!web_tour
-!web_tour/**/*
+!addons/web_tour
+!addons/web_tour/**/*
 
 # whitelist base_setup
 !addons/base_setup
@@ -163,8 +169,9 @@ addons/spreadsheet/static/src/o_spreadsheet/o_spreadsheet.js
 !spreadsheet_dashboard_documents
 !spreadsheet_dashboard_documents/**/*
 
-!addons/auth_password_policy
-!addons/auth_password_policy/**/*
+# Whitelist spreadsheet_sale_management
+!spreadsheet_sale_management
+!spreadsheet_sale_management/**/*
 
 # Whitelist bus
 !addons/bus/
@@ -177,26 +184,20 @@ addons/spreadsheet/static/src/o_spreadsheet/o_spreadsheet.js
 !addons/hr/**/*
 !addons/hr_holidays
 !addons/hr_holidays/**/*
+!addons/hr_skills
+!addons/hr_skills/**/*
 !addons/im_livechat
 !addons/im_livechat/**/*
 !addons/mail
 !addons/mail/**/*
-!addons/sms
-!addons/sms/**/*
 !addons/snailmail
 !addons/snailmail/**/*
 !addons/test_discuss_full
 !addons/test_discuss_full/**/*
-!addons/test_mail
-!addons/test_mail/**/*
 !addons/website_livechat
 !addons/website_livechat/**/*
 !approvals
 !approvals/**/*
-!documents
-!documents/**/*
-!mail_enterprise
-!mail_enterprise/**/*
 !test_discuss_full_enterprise
 !test_discuss_full_enterprise/**/*
 !whatsapp
@@ -235,8 +236,6 @@ addons/spreadsheet/static/src/o_spreadsheet/o_spreadsheet.js
 !addons/pos_hr_restaurant/**/*
 !addons/pos_loyalty
 !addons/pos_loyalty/**/*
-!addons/pos_mercury
-!addons/pos_mercury/**/*
 !addons/pos_mrp
 !addons/pos_mrp/**/*
 !addons/pos_online_payment
@@ -257,8 +256,6 @@ addons/spreadsheet/static/src/o_spreadsheet/o_spreadsheet.js
 !addons/pos_sale_loyalty/**/*
 !addons/pos_sale_margin
 !addons/pos_sale_margin/**/*
-!addons/pos_sale_product_configurator
-!addons/pos_sale_product_configurator/**/*
 !addons/pos_self_order
 !addons/pos_self_order/**/*
 !addons/pos_self_order_adyen
@@ -319,8 +316,6 @@ addons/spreadsheet/static/src/o_spreadsheet/o_spreadsheet.js
 !pos_self_order_preparation_display/**/*
 !pos_settle_due
 !pos_settle_due/**/*
-!whatsapp_pos
-!whatsapp_pos/**/*
 
 # Whitelist misc enterprise modules
 !sign

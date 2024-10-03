@@ -13,12 +13,18 @@ from odoo.exceptions import UserError, ValidationError
 @tagged('post_install', '-at_install')
 class TestAccountJournal(AccountTestInvoicingCommon):
 
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.other_currency = cls.setup_other_currency('EUR')
+        cls.company_data_2 = cls.setup_other_company()
+
     def test_constraint_currency_consistency_with_accounts(self):
         ''' The accounts linked to a bank/cash journal must share the same foreign currency
         if specified.
         '''
         journal_bank = self.company_data['default_journal_bank']
-        journal_bank.currency_id = self.currency_data['currency']
+        journal_bank.currency_id = self.other_currency
 
         # Try to set a different currency on the 'debit' account.
         with self.assertRaises(ValidationError), self.cr.savepoint():
@@ -98,7 +104,7 @@ class TestAccountJournal(AccountTestInvoicingCommon):
 
         def _get_payment_method_information(self):
             res = Method_get_payment_method_information(self)
-            res['multi'] = {'mode': 'multi', 'domain': [('type', '=', 'bank')]}
+            res['multi'] = {'mode': 'multi', 'type': ('bank',)}
             return res
 
         with patch.object(AccountPaymentMethod, '_get_payment_method_information', _get_payment_method_information):
@@ -170,6 +176,11 @@ class TestAccountJournal(AccountTestInvoicingCommon):
 
 @tagged('post_install', '-at_install', 'mail_alias')
 class TestAccountJournalAlias(AccountTestInvoicingCommon, MailCommon):
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.company_data_2 = cls.setup_other_company()
 
     def test_alias_name_creation(self):
         """ Test alias creation, notably avoid raising constraints due to ascii

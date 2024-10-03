@@ -37,11 +37,11 @@
     </record>
 
     <record id="mailing_contact_view_tree" model="ir.ui.view">
-        <field name="name">mailing.contact.view.tree</field>
+        <field name="name">mailing.contact.view.list</field>
         <field name="model">mailing.contact</field>
         <field name="priority">10</field>
         <field name="arch" type="xml">
-            <tree string="Mailing List Contacts" sample="1" multi_edit="1" js_class="mailing_contact_list">
+            <list string="Mailing List Contacts" sample="1" multi_edit="1">
                 <header>
                     <button name="action_import" string="Import" type="object" display="always"
                         context="{'from_mailing_list_ids': context.get('active_ids') if context.get('active_model') == 'mailing.list' else False}"/>
@@ -49,7 +49,7 @@
                 </header>
                 <field name="create_date" optional="show"/>
                 <field name="title_id" optional="hide"/>
-                <field name="name" readonly="1"/>
+                <field name="name" optional="show" readonly="1"/>
                 <field name="company_name"/>
                 <field name="email" readonly="1"/>
                 <field name="is_blacklisted" string="Email Blacklisted"/>
@@ -57,7 +57,7 @@
                 <field name="message_bounce" sum="Total Bounces" readonly="1"/>
                 <field name="opt_out" readonly="1" column_invisible="'default_list_ids' not in context"/>
                 <field name="list_ids" widget="many2many_tags" optional="hide"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -70,37 +70,19 @@
                     <button name="action_import" string="Import" type="object" display="always"
                         context="{'from_mailing_list_ids': context.get('active_ids') if context.get('active_model') == 'mailing.list' else False}"/>
                 </header>
-                <field name="name"/>
-                <field name="company_name"/>
-                <field name="email"/>
-                <field name="message_bounce"/>
                 <templates>
-                    <t t-name="kanban-box">
-                        <div t-attf-class="oe_kanban_global_click">
-                            <div class="o_kanban_record_top">
-                                <div class="o_kanban_record_headings">
-                                    <strong class="o_kanban_record_title">
-                                        <t t-esc="record.name.value"/>
-                                    </strong>
-                                </div>
-                                <span class="badge rounded-pill" title="Number of bounced email.">
-                                    <i class="fa fa-exclamation-triangle" role="img" aria-label="Warning" title="Warning"/> <t t-esc="record.message_bounce.value" title=""/>
-                                </span>
-                            </div>
-                            <div class="o_kanban_record_body">
-                                <field name="tag_ids"/>
-                            </div>
-                            <div class="o_kanban_record_bottom">
-                                <div class="oe_kanban_bottom_left">
-                                    <strong>
-                                        <t t-esc="record.email.value"/>
-                                    </strong>
-                                </div>
-                                <div class="oe_kanban_bottom_right">
-                                    <t t-esc="record.company_name.value"/>
-                                </div>
+                    <t t-name="card">
+                        <div class="d-flex">
+                            <field name="name" class="fw-bolder fs-5"/>
+                            <div class="badge rounded-pill ms-auto" title="Number of bounced email.">
+                                <i class="fa fa-exclamation-triangle" role="img" aria-label="Warning" title="Warning"/> <field name="message_bounce"/>
                             </div>
                         </div>
+                        <field name="tag_ids"/>
+                        <footer class="pt-1">
+                            <field name="email" class="fw-bolder"/>
+                            <field name="company_name" class="ms-auto"/>
+                        </footer>
                     </t>
                 </templates>
             </kanban>
@@ -120,9 +102,6 @@
                         <h1>
                             <field class="text-break" name="name" placeholder="e.g. John Smith"/>
                         </h1>
-                        <div>
-                            <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" placeholder="Tags" style="width: 100%"/>
-                        </div>
                     </div>
                     <group>
                         <group>
@@ -142,22 +121,21 @@
                         <group>
                             <field name="create_date" readonly="1" invisible="not id"/>
                             <field name="message_bounce" readonly="1" invisible="not id"/>
+                            <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"
+                                   placeholder="e.g. &quot;VIP&quot;, &quot;Roadshow&quot;, ..." style="width: 100%"/>
                         </group>
                     </group>
                     <field name="subscription_ids">
-                        <tree editable="bottom">
+                        <list editable="bottom">
                            <field name="list_id"/>
                            <field name="opt_out_datetime" readonly="1"/>
                            <field name="opt_out"/>
                            <field name="opt_out_reason_id"/>
                            <field name="create_date" string="Subscription Date"/>
-                        </tree>
+                        </list>
                     </field>
                 </sheet>
-                <div class="oe_chatter">
-                    <field name="message_follower_ids"/>
-                    <field name="message_ids"/>
-                </div>
+                <chatter/>
             </form>
         </field>
     </record>
@@ -187,7 +165,7 @@
     <record model="ir.actions.act_window" id="action_view_mass_mailing_contacts">
         <field name="name">Mailing List Contacts</field>
         <field name="res_model">mailing.contact</field>
-        <field name="view_mode">tree,kanban,form,graph,pivot</field>
+        <field name="view_mode">list,kanban,form,graph,pivot</field>
         <field name="context">{'search_default_filter_not_email_bl': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
@@ -197,4 +175,44 @@
             </p>
         </field>
     </record>
+
+<data noupdate="1">
+    <!-- Activated dynamically when the option that splits name into first and last name is enabled. -->
+    <!-- We set them into a noupdate block to avoid the configuration to be reset after an update. -->
+    <record id="mailing_contact_view_tree_split_name" model="ir.ui.view">
+        <field name="name">mailing.contact.view.list.split.name</field>
+        <field name="model">mailing.contact</field>
+        <field name="inherit_id" ref="mass_mailing.mailing_contact_view_tree"/>
+        <field name="active">False</field>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="after">
+                <field name="first_name" optional="hide" readonly="1"/>
+                <field name="last_name" optional="hide" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="mailing_contact_view_form_split_name" model="ir.ui.view">
+        <field name="name">mailing.contact.view.form.split.name</field>
+        <field name="model">mailing.contact</field>
+        <field name="inherit_id" ref="mass_mailing.mailing_contact_view_form"/>
+        <field name="active">False</field>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="attributes">
+                <attribute name="readonly">1</attribute>
+                <attribute name="invisible">not name</attribute>
+            </xpath>
+            <xpath expr="//field[@name='name']" position="after">
+                <!-- simulate the placeholder on the readonly field -->
+                <span class="oe_grey" invisible="name">e.g. "John Smith"</span>
+            </xpath>
+            <xpath expr="//group/label[@for='email']" position="before">
+                <field name="first_name" placeholder="e.g. &quot;John&quot;"/>
+            </xpath>
+            <xpath expr="//group/field[@name='create_date']" position="before">
+                <field name="last_name" placeholder="e.g. &quot;Smith&quot;"/>
+            </xpath>
+        </field>
+    </record>
+</data>
 </odoo>

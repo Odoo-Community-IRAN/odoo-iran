@@ -15,15 +15,10 @@ import subprocess
 import sys
 import threading
 import time
-import unittest
 from io import BytesIO
-from itertools import chain
 
 import psutil
 import werkzeug.serving
-from werkzeug.debug import DebuggedApplication
-
-from ..tests import loader
 
 if os.name == 'posix':
     # Unix only for workers
@@ -60,7 +55,8 @@ from odoo.modules import get_modules
 from odoo.modules.registry import Registry
 from odoo.release import nt_service_name
 from odoo.tools import config
-from odoo.tools import stripped_sys_argv, dumpstacks, log_ormcache_stats
+from odoo.tools.cache import log_ormcache_stats
+from odoo.tools.misc import stripped_sys_argv, dumpstacks
 
 _logger = logging.getLogger(__name__)
 
@@ -79,10 +75,15 @@ def memory_info(process):
 
 
 def set_limit_memory_hard():
-    if platform.system() == 'Linux' and config['limit_memory_hard']:
+    if platform.system() != 'Linux':
+        return
+    limit_memory_hard = config['limit_memory_hard']
+    if odoo.evented and config['limit_memory_hard_gevent']:
+        limit_memory_hard = config['limit_memory_hard_gevent']
+    if limit_memory_hard:
         rlimit = resource.RLIMIT_AS
         soft, hard = resource.getrlimit(rlimit)
-        resource.setrlimit(rlimit, (config['limit_memory_hard'], hard))
+        resource.setrlimit(rlimit, (limit_memory_hard, hard))
 
 def empty_pipe(fd):
     try:
@@ -215,21 +216,7 @@ class ThreadedWSGIServerReloadable(LoggingBaseWSGIServerMixIn, werkzeug.serving.
         t.start_time = time.time()
         t.start()
 
-    # TODO: Remove this method as soon as either of the revision
-    # - python/cpython@8b1f52b5a93403acd7d112cd1c1bc716b31a418a for Python 3.6,
-    # - python/cpython@908082451382b8b3ba09ebba638db660edbf5d8e for Python 3.7,
-    # is included in all Python 3 releases installed on all operating systems supported by Odoo.
-    # These revisions are included in Python from releases 3.6.8 and Python 3.7.2 respectively.
     def _handle_request_noblock(self):
-        """
-        In the python module `socketserver` `process_request` loop,
-        the __shutdown_request flag is not checked between select and accept.
-        Thus when we set it to `True` thanks to the call `httpd.shutdown`,
-        a last request is accepted before exiting the loop.
-        We override this function to add an additional check before the accept().
-        """
-        if self._BaseServer__shutdown_request:
-            return
         if self.max_http_threads and not self.http_threads_sem.acquire(timeout=0.1):
             # If the semaphore is full we will return immediately to the upstream (most probably
             # socketserver.BaseServer's serve_forever loop  which will retry immediately as the
@@ -259,7 +246,7 @@ class FSWatcherBase(object):
             except SyntaxError:
                 _logger.error('autoreload: python code change detected, SyntaxError in %s', path)
             else:
-                if not getattr(odoo, 'phoenix', False):
+                if not server_phoenix:
                     _logger.info('autoreload: python code updated, autoreload activated')
                     restart()
                     return True
@@ -410,7 +397,8 @@ class ThreadedServer(CommonServer):
             os._exit(0)
         elif sig == signal.SIGHUP:
             # restart on kill -HUP
-            odoo.phoenix = True
+            global server_phoenix  # noqa: PLW0603
+            server_phoenix = True
             self.quit_signals_received += 1
             # interrupt run() to start shutdown
             raise KeyboardInterrupt()
@@ -512,14 +500,13 @@ class ThreadedServer(CommonServer):
             t.start()
             _logger.debug("cron%d started!" % i)
 
-    def http_thread(self):
-        self.httpd = ThreadedWSGIServerReloadable(self.interface, self.port, self.app)
-        self.httpd.serve_forever()
-
     def http_spawn(self):
-        t = threading.Thread(target=self.http_thread, name="odoo.service.httpd")
-        t.daemon = True
-        t.start()
+        self.httpd = ThreadedWSGIServerReloadable(self.interface, self.port, self.app)
+        threading.Thread(
+            target=self.httpd.serve_forever,
+            name="odoo.service.httpd",
+            daemon=True,
+        ).start()
 
     def start(self, stop=False):
         _logger.debug("Setting signal handlers")
@@ -544,7 +531,7 @@ class ThreadedServer(CommonServer):
     def stop(self):
         """ Shutdown the WSGI server. Wait for non daemon threads.
         """
-        if getattr(odoo, 'phoenix', None):
+        if server_phoenix:
             _logger.info("Initiating server reload")
         else:
             _logger.info("Initiating shutdown")
@@ -585,13 +572,13 @@ class ThreadedServer(CommonServer):
         The first SIGINT or SIGTERM signal will initiate a graceful shutdown while
         a second one if any will force an immediate exit.
         """
-        self.start(stop=stop)
-
-        rc = preload_registries(preload)
+        with Registry._lock:
+            self.start(stop=stop)
+            rc = preload_registries(preload)
 
         if stop:
             if config['test_enable']:
-                logger = odoo.tests.result._logger
+                from odoo.tests.result import _logger as logger  # noqa: PLC0415
                 with Registry.registries._lock:
                     for db, registry in Registry.registries.d.items():
                         report = registry._assertion_report
@@ -626,7 +613,7 @@ class ThreadedServer(CommonServer):
                         # `reload` increments `self.quit_signals_received`
                         # and the loop will end after this iteration,
                         # therefore leading to the server stop.
-                        # `reload` also sets the `phoenix` flag
+                        # `reload` also sets the `server_phoenix` flag
                         # to tell the server to restart the server after shutting down.
                     else:
                         time.sleep(1)
@@ -652,7 +639,8 @@ class GeventServer(CommonServer):
             _logger.warning("Gevent Parent changed: %s", self.pid)
             restart = True
         memory = memory_info(psutil.Process(self.pid))
-        if config['limit_memory_soft'] and memory > config['limit_memory_soft']:
+        limit_memory_soft = config['limit_memory_soft_gevent'] or config['limit_memory_soft']
+        if limit_memory_soft and memory > limit_memory_soft:
             _logger.warning('Gevent virtual memory limit reached: %s', memory)
             restart = True
         if restart:
@@ -846,7 +834,8 @@ class PreforkServer(CommonServer):
                 raise KeyboardInterrupt
             elif sig == signal.SIGHUP:
                 # restart on kill -HUP
-                odoo.phoenix = True
+                global server_phoenix  # noqa: PLW0603
+                server_phoenix = True
                 raise KeyboardInterrupt
             elif sig == signal.SIGQUIT:
                 # dump stacks on kill -3
@@ -1254,6 +1243,7 @@ class WorkerCron(Worker):
 #----------------------------------------------------------
 
 server = None
+server_phoenix = False
 
 def load_server_wide_modules():
     server_wide_modules = {'base', 'web'} | set(odoo.conf.server_wide_modules)
@@ -1281,9 +1271,11 @@ def _reexec(updated_modules=None):
     # We should keep the LISTEN_* environment variabled in order to support socket activation on reexec
     os.execve(sys.executable, args, os.environ)
 
+
 def load_test_file_py(registry, test_file):
     # pylint: disable=import-outside-toplevel
-    from odoo.tests.suite import OdooSuite
+    from odoo.tests import loader  # noqa: PLC0415
+    from odoo.tests.suite import OdooSuite  # noqa: PLC0415
     threading.current_thread().testing = True
     try:
         test_path, _ = os.path.splitext(os.path.abspath(test_file))
@@ -1291,8 +1283,7 @@ def load_test_file_py(registry, test_file):
             for mod_mod in loader.get_test_modules(mod):
                 mod_path, _ = os.path.splitext(getattr(mod_mod, '__file__', ''))
                 if test_path == config._normalize(mod_path):
-                    tests = loader.unwrap_suite(
-                        unittest.TestLoader().loadTestsFromModule(mod_mod))
+                    tests = loader.get_module_test_cases(mod_mod)
                     suite = OdooSuite(tests)
                     _logger.log(logging.INFO, 'running tests %s.', mod_mod.__name__)
                     suite(registry._assertion_report)
@@ -1301,6 +1292,7 @@ def load_test_file_py(registry, test_file):
                     return
     finally:
         threading.current_thread().testing = False
+
 
 def preload_registries(dbnames):
     """ Preload a registries, possibly run a test file."""
@@ -1325,6 +1317,7 @@ def preload_registries(dbnames):
 
             # run post-install tests
             if config['test_enable']:
+                from odoo.tests import loader  # noqa: PLC0415
                 t0 = time.time()
                 t0_sql = odoo.sql_db.sql_counter
                 module_names = (registry.updated_modules if update_module else
@@ -1344,7 +1337,7 @@ def preload_registries(dbnames):
                              odoo.sql_db.sql_counter - t0_sql)
 
                 registry._assertion_report.log_stats()
-            if not registry._assertion_report.wasSuccessful():
+            if registry._assertion_report and not registry._assertion_report.wasSuccessful():
                 rc += 1
         except Exception:
             _logger.critical('Failed to initialize database `%s`.', dbname, exc_info=True)
@@ -1365,11 +1358,6 @@ def start(preload=None, stop=False):
             _logger.warning("Unit testing in workers mode could fail; use --workers 0.")
 
         server = PreforkServer(odoo.http.root)
-
-        # Workaround for Python issue24291, fixed in 3.6 (see Python issue26721)
-        if sys.version_info[:2] == (3,5):
-            # turn on buffering also for wfile, to avoid partial writes (Default buffer = 8k)
-            werkzeug.serving.WSGIRequestHandler.wbufsize = -1
     else:
         if platform.system() == "Linux" and sys.maxsize > 2**32 and "MALLOC_ARENA_MAX" not in os.environ:
             # glibc's malloc() uses arenas [1] in order to efficiently handle memory allocation of multi-threaded
@@ -1415,7 +1403,7 @@ def start(preload=None, stop=False):
     if watcher:
         watcher.stop()
     # like the legend of the phoenix, all ends with beginnings
-    if getattr(odoo, 'phoenix', False):
+    if server_phoenix:
         _reexec()
 
     return rc if rc else 0

@@ -1,11 +1,18 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
-import { OfflineErrorPopup } from "@point_of_sale/app/errors/popups/offline_error_popup";
-import { ConfirmPopup } from "@point_of_sale/app/utils/confirm_popup/confirm_popup";
-import { ErrorTracebackPopup } from "@point_of_sale/app/errors/popups/error_traceback_popup";
-import { ErrorPopup } from "@point_of_sale/app/errors/popups/error_popup";
-import { useState, useEnv, onMounted, onPatched, useComponent, useRef } from "@odoo/owl";
+import { ConfirmationDialog, AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
+import { ErrorDialog } from "@web/core/errors/error_dialogs";
+import {
+    useEnv,
+    onMounted,
+    onPatched,
+    useComponent,
+    useRef,
+    useState,
+    onWillUnmount,
+    useExternalListener,
+} from "@odoo/owl";
+import { useService } from "@web/core/utils/hooks";
+import { useDropdownState } from "@web/core/dropdown/dropdown_hooks";
 
 /**
  * Introduce error handlers in the component.
@@ -16,12 +23,12 @@ import { useState, useEnv, onMounted, onPatched, useComponent, useRef } from "@o
  */
 export function useErrorHandlers() {
     const component = useComponent();
-    const popup = useEnv().services.popup;
+    const dialog = useEnv().services.dialog;
 
     component._handlePushOrderError = async function (error) {
         // This error handler receives `error` equivalent to `error.message` of the rpc error.
         if (error.message === "Backend Invoice") {
-            await popup.add(ConfirmPopup, {
+            dialog.add(ConfirmationDialog, {
                 title: _t("Please print the invoice from the backend"),
                 body:
                     _t(
@@ -30,22 +37,22 @@ export function useErrorHandlers() {
             });
         } else if (error.code < 0) {
             // XmlHttpRequest Errors
-            const title = _t("Unable to sync order");
-            const body = _t(
-                "Check the internet connection then try to sync again by clicking on the red wifi button (upper right of the screen)."
-            );
-            await popup.add(OfflineErrorPopup, { title, body });
+            dialog.add(ConfirmationDialog, {
+                title: _t("Unable to sync order"),
+                body: _t(
+                    "Check the internet connection then try to sync again by clicking on the red wifi button (upper right of the screen)."
+                ),
+            });
         } else if (error.code === 200) {
             // OpenERP Server Errors
-            await popup.add(ErrorTracebackPopup, {
-                title: error.data.message || _t("Server Error"),
-                body:
-                    error.data.debug ||
+            dialog.add(ErrorDialog, {
+                traceback:
+                    error.data.debug.status.message_body ||
                     _t("The server encountered an error while receiving your order."),
             });
         } else {
             // ???
-            await popup.add(ErrorPopup, {
+            await dialog.add(AlertDialog, {
                 title: _t("Unknown Error"),
                 body: _t("The order could not be sent to the server due to an unknown error"),
             });
@@ -81,7 +88,7 @@ export function useAsyncLockedMethod(method) {
         }
         try {
             called = true;
-            await method.call(component, ...args);
+            return await method.call(component, ...args);
         } finally {
             called = false;
         }
@@ -143,4 +150,98 @@ export function useTrackedAsync(asyncFn) {
         },
         call: lockedCall,
     };
+}
+
+export function useIsChildLarger(container) {
+    const state = useState({
+        isLarger: false,
+        maxItems: 0,
+    });
+
+    const computeSize = () => {
+        if (!container.el || !container.el.children.length) {
+            return;
+        }
+
+        let acc = 0;
+        let nbrItems = 0;
+        let isLarger = false;
+        const oldLargerState = state.isLarger;
+        const containerWidth = container.el.clientWidth - 10;
+
+        for (const child of container.el.children) {
+            acc += child.clientWidth;
+            if (acc < containerWidth) {
+                nbrItems++;
+            } else {
+                isLarger = true;
+                break;
+            }
+        }
+
+        state.isLarger = isLarger;
+        state.maxItems = nbrItems;
+        if (!oldLargerState && state.isLarger) {
+            state.maxItems--;
+        }
+    };
+
+    useExternalListener(window, "resize", () => {
+        computeSize();
+    });
+
+    return {
+        get isLarger() {
+            return state.isLarger;
+        },
+        get maxItems() {
+            return state.maxItems;
+        },
+        reload: () => {
+            computeSize();
+        },
+    };
+}
+
+/**
+ * Manages a component to be used as a popover.
+ *
+ * @param {typeof import("@odoo/owl").Component} component
+ * @param {import("@web/core/popover/popover_service").PopoverServiceAddOptions} [options]
+ * @returns {import("@web/core/popover/popover_hook").PopoverHookReturnType}
+ */
+export function useReactivePopover(component, options = {}) {
+    const popoverService = useService("popover");
+    const owner = useComponent();
+    const newOptions = Object.create(options);
+    newOptions.onClose = () => {
+        if (status(owner) !== "destroyed") {
+            options.onClose?.();
+        }
+    };
+    let removeFn = null;
+    const state = useDropdownState();
+    function close() {
+        state.close();
+        removeFn?.();
+    }
+    const popover = {
+        open(target, props) {
+            close();
+            state.open();
+            const newOptions = Object.create(options);
+            newOptions.onClose = () => {
+                removeFn = null;
+                state.close();
+                options.onClose?.();
+            };
+            removeFn = popoverService.add(target, component, props, newOptions);
+        },
+        close,
+        get isOpen() {
+            return state.isOpen;
+        },
+    };
+    onWillUnmount(popover.close);
+    return popover;
 }

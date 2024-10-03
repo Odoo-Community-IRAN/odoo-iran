@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
-
         <menuitem
             id="menu_hr_root"
             name="Employees"
@@ -40,6 +39,7 @@
             id="hr_menu_hr_reports"
             name="Reporting"
             parent="menu_hr_root"
+            groups="group_hr_user"
             sequence="95"/>
 
         <menuitem
@@ -57,6 +57,14 @@
             sequence="100"/>
 
             <menuitem
+                id="menu_config_plan_plan"
+                name="Activity Plan"
+                action="mail_activity_plan_action"
+                parent="menu_human_resources_configuration"
+                groups="group_hr_manager"
+                sequence="9"/>
+
+            <menuitem
                 id="menu_config_employee"
                 name="Employee"
                 parent="menu_human_resources_configuration"
@@ -64,17 +72,10 @@
                 sequence="10"/>
 
             <menuitem
-                id="menu_hr_department_tree"
-                action="hr_department_tree_action"
-                parent="menu_config_employee"
-                sequence="4"
-                groups="group_hr_user"/>
-
-            <menuitem
                 id="menu_hr_department_kanban"
                 action="hr_department_kanban_action"
                 parent="menu_hr_root"
-                groups="group_hr_user"/>
+                groups="base.group_user"/>
 
             <menuitem
                 id="menu_hr_work_location_tree"
@@ -125,21 +126,6 @@
                     parent="menu_config_recruitment"
                     sequence="2"
                     groups="group_hr_user"/>
-
-            <menuitem
-                id="menu_config_plan"
-                name="Activity Planning"
-                parent="menu_human_resources_configuration"
-                groups="group_hr_manager"
-                sequence="100"/>
-
-                <menuitem
-                    id="menu_config_plan_plan"
-                    name="On/Offboarding Plans"
-                    action="mail_activity_plan_action"
-                    parent="menu_config_plan"
-                    groups="group_hr_manager"
-                    sequence="100"/>
 
     </data>
 </odoo>

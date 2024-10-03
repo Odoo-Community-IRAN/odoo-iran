@@ -3,16 +3,15 @@
 # 	* hr_work_entry_contract
 # 
 # Translators:
-# Wil Odoo, 2023
-# Tony Ng, 2023
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:55+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Tony Ng, 2023\n"
+"POT-Creation-Date: 2024-09-25 08:39+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Chinese (Taiwan) (https://app.transifex.com/odoo/teams/41243/zh_TW/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -43,18 +42,18 @@ msgstr ""
 #. module: hr_work_entry_contract
 #. odoo-python
 #: code:addons/hr_work_entry_contract/models/hr_work_entry.py:0
-#, python-format
-msgid "%s does not have a contract from %s to %s."
-msgstr "%s 沒有從 %s 到 %s 的契約"
+msgid ""
+"%(employee)s does not have a contract from %(date_start)s to %(date_end)s."
+msgstr "%(employee)s 在以下期間沒有合約：由 %(date_start)s 至 %(date_end)s。"
 
 #. module: hr_work_entry_contract
 #. odoo-python
 #: code:addons/hr_work_entry_contract/models/hr_work_entry.py:0
-#, python-format
 msgid ""
-"%s has multiple contracts from %s to %s. A work entry cannot overlap "
-"multiple contracts."
-msgstr "%s 有多個從 %s 到 %s 的契約。一個工時紀錄不能重疊多個契約。"
+"%(employee)s has multiple contracts from %(date_start)s to %(date_end)s. A "
+"work entry cannot overlap multiple contracts."
+msgstr ""
+"員工 %(employee)s 在 %(date_start)s 至 %(date_end)s 期間，有多份不同合約。工作記項不可與多份合約重疊。"
 
 #. module: hr_work_entry_contract
 #: model_terms:ir.ui.view,arch_db:hr_work_entry_contract.hr_work_entry_regeneration_wizard
@@ -139,7 +138,6 @@ msgstr "員工"
 #. module: hr_work_entry_contract
 #. odoo-javascript
 #: code:addons/hr_work_entry_contract/static/src/views/work_entry_calendar/work_entry_calendar_model.js:0
-#, python-format
 msgid "Everybody's work entries"
 msgstr "大家的工時紀錄"
 
@@ -152,6 +150,11 @@ msgstr "加班時數"
 #: model:ir.model.fields,field_description:hr_work_entry_contract.field_hr_work_entry_regeneration_wizard__date_from
 msgid "From"
 msgstr "由"
+
+#. module: hr_work_entry_contract
+#: model_terms:ir.ui.view,arch_db:hr_work_entry_contract.hr_contract_view_form_inherit_work_entry
+msgid "Fully Flexible"
+msgstr ""
 
 #. module: hr_work_entry_contract
 #: model:ir.actions.server,name:hr_work_entry_contract.ir_cron_generate_missing_work_entries_ir_actions_server
@@ -196,7 +199,6 @@ msgstr "識別號"
 #. module: hr_work_entry_contract
 #. odoo-python
 #: code:addons/hr_work_entry_contract/wizard/hr_work_entry_regeneration_wizard.py:0
-#, python-format
 msgid ""
 "In order to regenerate the work entries, you need to provide the wizard with"
 " an employee_id, a date_from and a date_to. In addition to that, the time "
@@ -205,6 +207,14 @@ msgid ""
 msgstr ""
 "為了重新生成工時紀錄，您需要為嚮導提供一個employee_id、一個date_from 和一個date_to。除此之外，由 date_from 和 "
 "date_to 定義的時間間隔不得包含任何經過驗證的工時紀錄。"
+
+#. module: hr_work_entry_contract
+#. odoo-javascript
+#: code:addons/hr_work_entry_contract/static/src/components/work_entry_source_field/work_entry_source_field.js:0
+msgid ""
+"Invalid option: For fully flexible calendars, the work entry source cannot "
+"be 'Working Hours'."
+msgstr ""
 
 #. module: hr_work_entry_contract
 #: model:ir.model.fields,field_description:hr_work_entry_contract.field_hr_contract__last_generation_date
@@ -251,7 +261,6 @@ msgstr "重新生成員工工時紀錄"
 #. odoo-javascript
 #: code:addons/hr_work_entry_contract/static/src/views/work_entry_calendar/work_entry_calendar.xml:0
 #: model_terms:ir.ui.view,arch_db:hr_work_entry_contract.hr_work_entry_regeneration_wizard
-#, python-format
 msgid "Regenerate Work Entries"
 msgstr "重新生成工時紀錄"
 
@@ -273,7 +282,6 @@ msgstr "病假"
 #. module: hr_work_entry_contract
 #. odoo-python
 #: code:addons/hr_work_entry_contract/models/hr_contract.py:0
-#, python-format
 msgid ""
 "Sorry, generating work entries from cancelled contracts is not allowed."
 msgstr "抱歉，不允許從取消的合約中生成工作條目。"
@@ -281,7 +289,6 @@ msgstr "抱歉，不允許從取消的合約中生成工作條目。"
 #. module: hr_work_entry_contract
 #. odoo-python
 #: code:addons/hr_work_entry_contract/wizard/hr_work_entry_regeneration_wizard.py:0
-#, python-format
 msgid ""
 "The from date must be >= '%(earliest_available_date)s' and the to date must "
 "be <= '%(latest_available_date)s', which correspond to the generated work "
@@ -335,6 +342,11 @@ msgstr "工時紀錄重建"
 #: model:ir.model.fields,field_description:hr_work_entry_contract.field_hr_work_entry__work_entry_source
 msgid "Work Entry Source"
 msgstr "工作記錄來源"
+
+#. module: hr_work_entry_contract
+#: model:ir.model.fields,field_description:hr_work_entry_contract.field_hr_contract__work_entry_source_calendar_invalid
+msgid "Work Entry Source Calendar Invalid"
+msgstr ""
 
 #. module: hr_work_entry_contract
 #: model:ir.model.fields.selection,name:hr_work_entry_contract.selection__hr_contract__work_entry_source__calendar

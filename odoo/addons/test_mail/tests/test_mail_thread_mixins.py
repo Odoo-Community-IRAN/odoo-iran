@@ -90,13 +90,29 @@ class TestMailThreadCC(MailCommon):
         record = self.env['mail.test.cc'].create({
             'email_cc': 'cc1@example.com, cc2@example.com, cc3 <cc3@example.com>',
         })
-        suggestions = record._message_get_suggested_recipients()[record.id]
-        self.assertEqual(
-            sorted(suggestions),
+        suggestions = record._message_get_suggested_recipients()
+        self.assertItemsEqual(
+            suggestions,
             [
-                (False, '"cc3" <cc3@example.com>', None, 'CC Email', {}),
-                (False, 'cc1@example.com', None, 'CC Email', {}),
-                (False, 'cc2@example.com', None, 'CC Email', {}),
+                {
+                    'lang': None,
+                    'reason': 'CC Email',
+                    'name': 'cc1@example.com',
+                    'email': 'cc1@example.com',
+                    'create_values': {},
+                }, {
+                    'lang': None,
+                    'reason': 'CC Email',
+                    'name': 'cc2@example.com',
+                    'email': 'cc2@example.com',
+                    'create_values': {},
+                }, {
+                    'lang': None,
+                    'reason': 'CC Email',
+                    'name': '"cc3" <cc3@example.com>',
+                    'email': '"cc3" <cc3@example.com>',
+                    'create_values': {},
+                },
             ],
-            'cc should be in suggestions'
+            'cc should be in suggestions',
         )

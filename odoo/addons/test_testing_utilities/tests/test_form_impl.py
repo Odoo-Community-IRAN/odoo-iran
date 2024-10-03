@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Test for the pseudo-form implementation (odoo.tests.common.Form), which should
+Test for the pseudo-form implementation (odoo.tests.Form), which should
 basically be a server-side implementation of form views (though probably not
 complete) intended for properly validating business "view" flows (onchanges,
 readonly, required, ...) and make it easier to generate sensible & coherent
@@ -339,12 +339,12 @@ class TestO2M(TransactionCase):
         custom_tree = self.env.ref('test_testing_utilities.editable_external')
 
         self.assertEqual(
-            [el.get('name') for el in f._view['tree'].xpath('//field[@name="subs"]/tree//field')],
+            [el.get('name') for el in f._view['tree'].xpath('//field[@name="subs"]/list//field')],
             [el.get('name') for el in etree.fromstring(custom_tree['arch']).xpath('//field')],
-            'check that the tree view is the one referenced by tree_view_ref'
+            'check that the list view is the one referenced by list_view_ref'
         )
         subs_field = f._view['fields']['subs']
-        self.assertIs(subs_field['edition_view']['tree'], f._view['tree'].xpath('//field[@name="subs"]/tree')[0], "check that the edition view is the tree view")
+        self.assertIs(subs_field['edition_view']['tree'], f._view['tree'].xpath('//field[@name="subs"]/list')[0], "check that the edition view is the list view")
         self.assertEqual(
             [el.get('name') for el in subs_field['edition_view']['tree'].xpath('.//field')],
             [el.get('name') for el in etree.fromstring(custom_tree['arch']).xpath('//field')],

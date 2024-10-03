@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-from odoo import api, fields, models
+from odoo import _, api, fields, models, Command
 
 
 class AccountMove(models.Model):
@@ -16,6 +15,44 @@ class AccountMove(models.Model):
         string="UBL/CII File",
         copy=False,
     )
+
+    # -------------------------------------------------------------------------
+    # ACTIONS
+    # -------------------------------------------------------------------------
+
+    def action_invoice_download_ubl(self):
+        if invoices_with_ubl := self.filtered('ubl_cii_xml_id'):
+            return {
+                'type': 'ir.actions.act_url',
+                'url': f'/account/download_invoice_documents/{",".join(map(str, invoices_with_ubl.ids))}/ubl',
+                'target': 'download',
+            }
+        return False
+
+    # -------------------------------------------------------------------------
+    # BUSINESS
+    # -------------------------------------------------------------------------
+
+    def _get_invoice_legal_documents(self, filetype, allow_fallback=False):
+        # EXTENDS account
+        if filetype == 'ubl':
+            if ubl_attachment := self.ubl_cii_xml_id:
+                return {
+                    'filename': ubl_attachment.name,
+                    'filetype': 'xml',
+                    'content': ubl_attachment.raw,
+                }
+        return super()._get_invoice_legal_documents(filetype, allow_fallback=allow_fallback)
+
+    def get_extra_print_items(self):
+        print_items = super().get_extra_print_items()
+        if self.ubl_cii_xml_id:
+            print_items.append({
+                'key': 'download_ubl',
+                'description': _('XML UBL'),
+                **self.action_invoice_download_ubl(),
+            })
+        return print_items
 
     # -------------------------------------------------------------------------
     # EDI
@@ -53,9 +90,33 @@ class AccountMove(models.Model):
 
         return super()._get_edi_decoder(file_data, new=new)
 
-    def _need_ubl_cii_xml(self):
+    def _need_ubl_cii_xml(self, ubl_cii_format):
         self.ensure_one()
-        return not self.invoice_pdf_report_id \
-            and not self.ubl_cii_xml_id \
+        return not self.ubl_cii_xml_id \
             and self.is_sale_document() \
-            and bool(self.partner_id.commercial_partner_id.ubl_cii_format)
+            and ubl_cii_format in self.env['res.partner']._get_ubl_cii_formats()
+
+    @api.model
+    def _get_line_vals_list(self, lines_vals):
+        """ Get invoice line values list.
+
+        param list line_vals: List of values [name, qty, price, tax].
+        :return: List of invoice line values.
+        """
+        return [{
+            'sequence': 0,  # be sure to put these lines above the 'real' invoice lines
+            'name': name,
+            'quantity': quantity,
+            'price_unit': price_unit,
+            'tax_ids': [Command.set(tax_ids)],
+        } for name, quantity, price_unit, tax_ids in lines_vals]
+
+    def _get_specific_tax(self, name, amount_type, amount, tax_type):
+        AccountMoveLine = self.env['account.move.line']
+        if hasattr(AccountMoveLine, '_predict_specific_tax'):
+            # company check is already done in the prediction query
+            predicted_tax_id = AccountMoveLine._predict_specific_tax(
+                self, name, self.partner_id, amount_type, amount, tax_type,
+            )
+            return self.env['account.tax'].browse(predicted_tax_id)
+        return self.env['account.tax']

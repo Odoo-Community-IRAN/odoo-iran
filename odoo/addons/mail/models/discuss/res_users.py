@@ -42,22 +42,26 @@ class ResUsers(models.Model):
             lambda cm: (cm.channel_id.channel_type == "channel" and cm.channel_id.group_public_id)
         ).unlink()
 
-    def _init_messaging(self):
-        self.ensure_one()
-        # 2 different queries because the 2 sub-queries together with OR are less efficient
-        channels = self.env["discuss.channel"].with_user(self)
-        channels += channels.search([("channel_type", "in", ("channel", "group")), ("is_member", "=", True)])
-        channels += channels.search(
-            [
-                ("channel_type", "not in", ("channel", "group")),
-                ("channel_member_ids", "any", [("is_self", "=", True), ("is_pinned", "=", True)]),
-            ]
+    def _init_store_data(self, store):
+        super()._init_store_data(store)
+        # sudo: ir.config_parameter - reading hard-coded keys to check their existence, safe to
+        # return whether the features are enabled
+        get_param = self.env["ir.config_parameter"].sudo().get_param
+        store.add(
+            {
+                "hasGifPickerFeature": get_param("discuss.tenor_api_key"),
+                "hasMessageTranslationFeature": get_param("mail.google_translate_api_key"),
+                "channel_types_with_seen_infos": sorted(self.env["discuss.channel"]._types_allowing_seen_infos()),
+            }
         )
-        return {
-            "channels": channels._channel_info(),
-            # sudo: ir.config_parameter - reading hard-coded key to check its existence, safe to return if the feature is enabled
-            "hasGifPickerFeature": bool(self.env["ir.config_parameter"].sudo().get_param("discuss.tenor_api_key")),
-            # sudo: ir.config_parameter - reading hard-coded key to check its existence, safe to return if the feature is enabled
-            'hasMessageTranslationFeature': bool(self.env["ir.config_parameter"].sudo().get_param("mail.google_translate_api_key")),
-            **super()._init_messaging(),
-        }
+
+    def _init_messaging(self, store):
+        self = self.with_user(self)
+        channels = self.env["discuss.channel"]._get_channels_as_member()
+        domain = [("channel_id", "in", channels.ids), ("is_self", "=", True)]
+        members = self.env["discuss.channel.member"].search(domain)
+        members_with_unread = members.filtered(lambda member: member.message_unread_counter)
+        # fetch channels data before calling super to benefit from prefetching (channel info might
+        # prefetch a lot of data that super could use, about the current user in particular)
+        super()._init_messaging(store)
+        store.add({"initChannelsUnreadCounter": len(members_with_unread)})

@@ -14,12 +14,14 @@
         'data/mail_templates.xml',
         'data/website_blog_data.xml',
         'data/blog_snippet_template_data.xml',
+        'data/website_blog_tour.xml',
         'views/website_blog_views.xml',
         'views/website_blog_components.xml',
         'views/website_blog_posts_loop.xml',
         'views/website_blog_templates.xml',
         'views/snippets/snippets.xml',
         'views/snippets/s_blog_posts.xml',
+        'views/snippets/s_dynamic_snippet_blog_posts_preview_data.xml',
         'views/website_pages_views.xml',
         'views/blog_post_add.xml',
         'security/ir.model.access.csv',
@@ -36,7 +38,6 @@
         ],
         'website.assets_editor': [
             'website_blog/static/src/js/tours/website_blog.js',
-            'website_blog/static/src/js/components/*.js',
             'website_blog/static/src/js/systray_items/*.js',
         ],
         'website.backend_assets_all_wysiwyg': [

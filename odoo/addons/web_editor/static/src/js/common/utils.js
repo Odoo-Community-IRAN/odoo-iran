@@ -27,6 +27,7 @@ const EDITOR_COLOR_CSS_VARIABLES = [...COLOR_PALETTE_COMPATIBILITY_COLOR_NAMES];
 for (let i = 1; i <= 5; i++) {
     EDITOR_COLOR_CSS_VARIABLES.push(`o-color-${i}`);
     EDITOR_COLOR_CSS_VARIABLES.push(`o-cc${i}-bg`);
+    EDITOR_COLOR_CSS_VARIABLES.push(`o-cc${i}-bg-gradient`);
     EDITOR_COLOR_CSS_VARIABLES.push(`o-cc${i}-headings`);
     EDITOR_COLOR_CSS_VARIABLES.push(`o-cc${i}-text`);
     EDITOR_COLOR_CSS_VARIABLES.push(`o-cc${i}-btn-primary`);
@@ -175,11 +176,11 @@ function _getNumericAndUnit(value) {
  * @param {string} value1
  * @param {string} value2
  * @param {string} [cssProp] - the css property on which the unit applies
- * @param {jQuery} [$target] - the jQuery element on which that css property
- *                             may change
+ * @param {Node} [target] - the element on which that css property
  * @returns {boolean}
  */
-function _areCssValuesEqual(value1, value2, cssProp, $target) {
+function _areCssValuesEqual(value1, value2, cssProp, target) {
+    const $target = $(target);
     // String comparison first
     if (value1 === value2) {
         return true;

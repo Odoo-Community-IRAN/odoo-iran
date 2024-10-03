@@ -7,7 +7,7 @@
     'category': 'Accounting/Localizations/Account Charts',
     'author': 'openerp-china',
     'maintainer': 'jeff@osbzr.com',
-    'website': 'https://www.odoo.com/documentation/17.0/applications/finance/fiscal_localizations.html',
+    'website': 'https://www.odoo.com/documentation/master/applications/finance/fiscal_localizations.html',
     'description': r"""
 Includes the following data for the Chinese localization
 ========================================================
@@ -36,6 +36,7 @@ correctly when the cn2an library is installed. (e.g. with pip3 install cn2an)
         'base',
         'account',
     ],
+    'auto_install': ['account'],
     'data': [
         'views/account_move_view.xml',
         'views/account_report.xml',

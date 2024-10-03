@@ -72,9 +72,7 @@ describe('insert HTML', () => {
                 stepFunction: async editor => {
                     await editor.execCommand('insert', parseHTML(editor.document, '<div><p>content</p></div>'));
                 },
-                // Inserts zws to avoid a Chromium bug preventing selection of
-                // contenteditable false element as first child.
-                contentAfter: '\u200b<div><p>content</p></div><p>[]<br></p>',
+                contentAfter: '<div><p>content</p></div><p>[]<br></p>',
             });
         });
         it('should not split a pre to insert another pre but just insert the text', async () => {
@@ -138,7 +136,7 @@ describe('insert HTML', () => {
                 contentAfter: '<p><br><br><br>[]<br></p>',
             });
         });
-        it('should paste an "empty" block', async () => {
+        it('should insert an "empty" block', async () => {
             await testEditor(BasicEditor, {
                 contentBefore: '<p>abcd[]</p>',
                 stepFunction: async editor => {

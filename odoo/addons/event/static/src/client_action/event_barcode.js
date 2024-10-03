@@ -3,21 +3,30 @@
 import { _t } from "@web/core/l10n/translation";
 import { BarcodeScanner } from "@barcodes/components/barcode_scanner";
 import { Component, onWillStart } from "@odoo/owl";
+import { isDisplayStandalone } from "@web/core/browser/feature_detection";
+import { rpc } from "@web/core/network/rpc";
 import { registry } from "@web/core/registry";
 import { useBus, useService } from "@web/core/utils/hooks";
+import { url } from '@web/core/utils/urls';
 import { EventRegistrationSummaryDialog } from "./event_registration_summary_dialog";
+import { scanBarcode } from "@web/core/barcode/barcode_dialog";
+import { standardActionServiceProps } from "@web/webclient/actions/action_service";
 
 export class EventScanView extends Component {
+    static template = "event.EventScanView";
+    static components = { BarcodeScanner };
+    static props = { ...standardActionServiceProps };
+
     setup() {
         this.actionService = useService("action");
         this.dialog = useService("dialog");
         this.notification = useService("notification");
         this.orm = useService("orm");
-        this.rpc = useService("rpc");
 
         const { default_event_id, active_model, active_id } = this.props.action.context;
         this.eventId = default_event_id || (active_model === "event.event" && active_id);
         this.isMultiEvent = !this.eventId;
+        this.isDisplayStandalone = isDisplayStandalone();
 
         const barcode = useService("barcode");
         useBus(barcode.bus, "barcode_scanned", (ev) => this.onBarcodeScanned(ev.detail.barcode));
@@ -32,9 +41,22 @@ export class EventScanView extends Component {
      * from several events and tickets without reloading / changing event in UX.
      */
     async onWillStart() {
-        this.data = await this.rpc("/event/init_barcode_interface", {
+        this.data = await rpc("/event/init_barcode_interface", {
             event_id: this.eventId,
         });
+        const fileExtension = new Audio().canPlayType("audio/ogg") ? "ogg" : "mp3";
+        this.sounds = {
+            error: new Audio(url(`/barcodes/static/src/audio/error.${fileExtension}`)),
+            notify: new Audio(url(`/mail/static/src/audio/ting.${fileExtension}`)),
+        };
+        this.sounds.error.load();
+        this.sounds.notify.load();
+    }
+
+    playSound(type) {
+        type = type || "notify";
+        this.sounds[type].currentTime = 0;
+        this.sounds[type].play();
     }
 
     /**
@@ -49,6 +71,7 @@ export class EventScanView extends Component {
         });
 
         if (result.error && result.error === "invalid_ticket") {
+            this.playSound("error");
             this.notification.add(_t("Invalid ticket"), {
                 title: _t("Warning"),
                 type: "danger",
@@ -56,19 +79,55 @@ export class EventScanView extends Component {
         } else {
             this.registrationId = result.id;
             this.closeLastDialog?.();
-            this.closeLastDialog = this.dialog.add(EventRegistrationSummaryDialog, {
-                registration: result
+            this.closeLastDialog = this.dialog.add(
+                EventRegistrationSummaryDialog,
+                {
+                    playSound: (type) => this.playSound(type),
+                    doNextScan: () => this.doNextScan(),
+                    registration: result
+                }
+            );
+        }
+    }
+
+    /**
+     * Duplication of the openMobileScanner() method from BarcodeScanner component
+     * to avoid using the component in the template and to be able to call it directly
+     * from the dialog.
+     */
+    async doNextScan() {
+        let error = null;
+        let barcode = null;
+        try {
+            barcode = await scanBarcode(this.env, this.facingMode);
+        } catch (err) {
+            error = err.message;
+        }
+
+        if (barcode) {
+            await this.onBarcodeScanned(barcode);
+            if ("vibrate" in window.navigator) {
+                window.navigator.vibrate(100);
+            }
+        } else {
+            this.notification.add(error || _t("Please, Scan again!"), {
+                type: "warning",
             });
         }
     }
 
     onClickSelectAttendee() {
         if (this.isMultiEvent) {
-            this.actionService.doAction("event.event_registration_action");
+            this.actionService.doAction("event.event_registration_action", {
+                additionalContext: {
+                    is_registration_desk_view: true,
+                },
+            });
         } else {
             this.actionService.doAction("event.event_registration_action_kanban", {
                 additionalContext: {
                     active_id: this.eventId,
+                    is_registration_desk_view: true,
                     search_default_unconfirmed: true,
                     search_default_confirmed: true,
                 },
@@ -80,35 +139,11 @@ export class EventScanView extends Component {
         if (this.isMultiEvent) {
             // define action from scratch instead of using existing 'action_event_view' to avoid
             // messing with menu bar
-            this.actionService.doAction({
-                type: "ir.actions.act_window",
-                name: _t("Events"),
-                res_model: "event.event",
-                views: [
-                    [false, "kanban"],
-                    [false, "calendar"],
-                    [false, "list"],
-                    [false, "gantt"],
-                    [false, "form"],
-                    [false, "pivot"],
-                    [false, "graph"],
-                    [false, "map"],
-                ],
-                target: "main",
-            });
+            this.actionService.doAction("event.action_event_view", { clearBreadcrumbs: true });
         } else {
-            this.actionService.doAction({
-                type: "ir.actions.act_window",
-                res_model: "event.event",
-                res_id: this.eventId,
-                views: [[false, "form"]],
-                target: "main",
-            });
+            this.actionService.restore();
         }
     }
 }
-
-EventScanView.template = "event.EventScanView";
-EventScanView.components = { BarcodeScanner };
 
 registry.category("actions").add("event.event_barcode_scan_view", EventScanView);

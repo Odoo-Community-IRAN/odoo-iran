@@ -9,12 +9,11 @@ from stdnum import luhn
 
 import logging
 
-from odoo import api, models, fields, tools, _
-from odoo.tools import zeep
-from odoo.tools.misc import ustr
+from odoo import api, models, fields
+from odoo.tools import _, zeep, LazyTranslate
 from odoo.exceptions import ValidationError
 
-
+_lt = LazyTranslate(__name__)
 _logger = logging.getLogger(__name__)
 
 _eu_country_vat = {
@@ -25,32 +24,32 @@ _eu_country_vat_inverse = {v: k for k, v in _eu_country_vat.items()}
 
 _ref_vat = {
     'al': 'ALJ91402501L',
-    'ar': _('AR200-5536168-2 or 20055361682'),
+    'ar': _lt('AR200-5536168-2 or 20055361682'),
     'at': 'ATU12345675',
     'au': '83 914 571 673',
     'be': 'BE0477472701',
     'bg': 'BG1234567892',
-    'br': _('either 11 digits for CPF or 14 digits for CNPJ'),
-    'cr': _('3101012009'),
-    'ch': _('CHE-123.456.788 TVA or CHE-123.456.788 MWST or CHE-123.456.788 IVA'),  # Swiss by Yannick Vaucher @ Camptocamp
+    'br': _lt('either 11 digits for CPF or 14 digits for CNPJ'),
+    'cr': _lt('3101012009'),
+    'ch': _lt('CHE-123.456.788 TVA or CHE-123.456.788 MWST or CHE-123.456.788 IVA'),  # Swiss by Yannick Vaucher @ Camptocamp
     'cl': 'CL76086428-5',
-    'co': _('CO213123432-1 or CO213.123.432-1'),
+    'co': _lt('CO213123432-1 or CO213.123.432-1'),
     'cy': 'CY10259033P',
     'cz': 'CZ12345679',
-    'de': _('DE123456788 or 12/345/67890'),
+    'de': _lt('DE123456788 or 12/345/67890'),
     'dk': 'DK12345674',
-    'do': _('DO1-01-85004-3 or 101850043'),
-    'ec': _('1792060346001 or 1792060346'),
+    'do': _lt('DO1-01-85004-3 or 101850043'),
+    'ec': _lt('1792060346001 or 1792060346'),
     'ee': 'EE123456780',
     'es': 'ESA12345674',
     'fi': 'FI12345671',
     'fr': 'FR23334175221',
-    'gb': _('GB123456782 or XI123456782'),
+    'gb': _lt('GB123456782 or XI123456782'),
     'gr': 'EL123456783',
-    'hu': _('HU12345676 or 12345678-1-11 or 8071592153'),
+    'hu': _lt('HU12345676 or 12345678-1-11 or 8071592153'),
     'hr': 'HR01234567896',  # Croatia, contributed by Milan Tribuson
     'ie': 'IE1234567FA',
-    'il': _('XXXXXXXXX [9 digits] and it should respect the Luhn algorithm checksum'),
+    'il': _lt('XXXXXXXXX [9 digits] and it should respect the Luhn algorithm checksum'),
     'in': "12AAAAA1234AAZA",
     'is': 'IS062199',
     'it': 'IT12345670017',
@@ -59,11 +58,11 @@ _ref_vat = {
     'lv': 'LV41234567891',
     'mc': 'FR53000004605',
     'mt': 'MT12345634',
-    'mx': _('MXGODE561231GR8 or GODE561231GR8'),
+    'mx': _lt('MXGODE561231GR8 or GODE561231GR8'),
     'nl': 'NL123456782B90',
     'no': 'NO123456785',
-    'nz': _('49-098-576 or 49098576'),
-    'pe': _('10XXXXXXXXY or 20XXXXXXXXY or 15XXXXXXXXY or 16XXXXXXXXY or 17XXXXXXXXY'),
+    'nz': _lt('49-098-576 or 49098576'),
+    'pe': _lt('10XXXXXXXXY or 20XXXXXXXXY or 15XXXXXXXXY or 16XXXXXXXXY or 17XXXXXXXXY'),
     'ph': '123-456-789-123',
     'pl': 'PL1234567883',
     'pt': 'PT123456789',
@@ -74,11 +73,11 @@ _ref_vat = {
     'si': 'SI12345679',
     'sk': 'SK2022749619',
     'sm': 'SM24165',
-    'tr': _('TR1234567890 (VERGINO) or TR17291716060 (TCKIMLIKNO)'),  # Levent Karakas @ Eska Yazilim A.S.
-    'uy': _("'219999830019' (should be 12 digits)"),
+    'tr': _lt('TR1234567890 (VERGINO) or TR17291716060 (TCKIMLIKNO)'),  # Levent Karakas @ Eska Yazilim A.S.
+    'uy': _lt("'219999830019' (should be 12 digits)"),
     've': 'V-12345678-1, V123456781, V-12.345.678-1',
     'xi': 'XI123456782',
-    'sa': _('310175397400003 [Fifteen digits, first and last digits should be "3"]')
+    'sa': _lt('310175397400003 [Fifteen digits, first and last digits should be "3"]')
 }
 
 _region_specific_vat_codes = {
@@ -118,7 +117,7 @@ class ResPartner(models.Model):
         Check the VAT number depending of the country.
         http://sima-pc.com/nif.php
         '''
-        if not ustr(country_code).encode('utf-8').isalpha():
+        if not country_code.encode().isalpha():
             return False
         check_func_name = 'check_vat_' + country_code
         check_func = getattr(self, check_func_name, None) or getattr(stdnum.util.get_cc_module(country_code, 'vat'), 'is_valid', None)
@@ -393,91 +392,33 @@ class ResPartner(models.Model):
 
     # Mexican VAT verification, contributed by Vauxoo
     # and Panos Christeas <p_christ@hol.gr>
-    __check_vat_mx_re = re.compile(br"(?P<primeras>[A-Za-z\xd1\xf1&]{3,4})" \
-                                   br"[ \-_]?" \
-                                   br"(?P<ano>[0-9]{2})(?P<mes>[01][0-9])(?P<dia>[0-3][0-9])" \
-                                   br"[ \-_]?" \
-                                   br"(?P<code>[A-Za-z0-9&\xd1\xf1]{3})$")
+    __check_vat_mx_re = re.compile(r"(?P<primeras>[A-Za-z\xd1\xf1&]{3,4})"
+                                   r"[ \-_]?"
+                                   r"(?P<ano>[0-9]{2})(?P<mes>[01][0-9])(?P<dia>[0-3][0-9])"
+                                   r"[ \-_]?"
+                                   r"(?P<code>[A-Za-z0-9&\xd1\xf1]{3})")
 
     def check_vat_mx(self, vat):
         ''' Mexican VAT verification
 
         Verificar RFC México
         '''
-        # we convert to 8-bit encoding, to help the regex parse only bytes
-        vat = ustr(vat).encode('iso8859-1')
-        m = self.__check_vat_mx_re.match(vat)
+        m = self.__check_vat_mx_re.fullmatch(vat)
         if not m:
             #No valid format
             return False
+        ano = int(m['ano'])
+        if ano > 30:
+            ano = 1900 + ano
+        else:
+            ano = 2000 + ano
         try:
-            ano = int(m.group('ano'))
-            if ano > 30:
-                ano = 1900 + ano
-            else:
-                ano = 2000 + ano
-            datetime.date(ano, int(m.group('mes')), int(m.group('dia')))
+            datetime.date(ano, int(m['mes']), int(m['dia']))
         except ValueError:
             return False
 
         # Valid format and valid date
         return True
-
-    # Netherlands VAT verification
-    __check_vat_nl_re = re.compile("(?:NL)?[0-9A-Z+*]{10}[0-9]{2}")
-
-    def check_vat_nl(self, vat):
-        """
-        Temporary Netherlands VAT validation to support the new format introduced in January 2020,
-        until upstream is fixed.
-
-        Algorithm detail: http://kleineondernemer.nl/index.php/nieuw-btw-identificatienummer-vanaf-1-januari-2020-voor-eenmanszaken
-
-        TODO: remove when fixed upstream
-        """
-
-        try:
-            from stdnum.util import clean
-            from stdnum.nl.bsn import checksum
-        except ImportError:
-            return True
-
-        vat = clean(vat, ' -.').upper().strip()
-
-        # Remove the prefix
-        if vat.startswith("NL"):
-            vat = vat[2:]
-
-        if not len(vat) == 12:
-            return False
-
-        # Check the format
-        match = self.__check_vat_nl_re.match(vat)
-        if not match:
-            return False
-
-        # Match letters to integers
-        char_to_int = {k: str(ord(k) - 55) for k in string.ascii_uppercase}
-        char_to_int['+'] = '36'
-        char_to_int['*'] = '37'
-
-        # 2 possible checks:
-        # - For natural persons
-        # - For non-natural persons and combinations of natural persons (company)
-
-        # Natural person => mod97 full checksum
-        check_val_natural = '2321'
-        for x in vat:
-            check_val_natural += x if x.isdigit() else char_to_int[x]
-        if int(check_val_natural) % 97 == 1:
-            return True
-
-        # Company => weighted(9->2) mod11 on bsn
-        vat = vat[:-3]
-        if vat.isdigit() and checksum(vat) == 0:
-            return True
-
-        return False
 
     # Norway VAT validation, contributed by Rolv Råen (adEgo) <rora@adego.no>
     # Support for MVA suffix contributed by Bringsvor Consulting AS (bringsvor@bringsvor.com)
@@ -686,16 +627,6 @@ class ResPartner(models.Model):
 
         return check_digit == checksum_digit
 
-    def check_vat_xi(self, vat):
-        """ Temporary Nothern Ireland VAT validation following Brexit
-        As of January 1st 2021, companies in Northern Ireland have a
-        new VAT number starting with XI
-        TODO: remove when stdnum is updated to 1.16 in supported distro"""
-        check_func = getattr(stdnum.util.get_cc_module('gb', 'vat'), 'is_valid', None)
-        if not check_func:
-            return len(vat) == 9
-        return check_func(vat)
-
     def check_vat_in(self, vat):
         #reference from https://www.gstzen.in/a/format-of-a-gst-number-gstin.html
         if vat and len(vat) == 15:
@@ -708,29 +639,6 @@ class ResPartner(models.Model):
             ]
             return any(re.compile(rx).match(vat) for rx in all_gstin_re)
         return False
-
-    def check_vat_au(self, vat):
-        '''
-        The Australian equivalent of a VAT number is an ABN number.
-        TFN (Australia Tax file numbers) are private and not to be
-        entered into systems or publicly displayed, so ABN numbers
-        are the public facing number that legally must be displayed
-        on all invoices
-        '''
-        check_func = getattr(stdnum.util.get_cc_module('au', 'abn'), 'is_valid', None)
-        if not check_func:
-            vat = vat.replace(" ", "")
-            return len(vat) == 11 and vat.isdigit()
-        return check_func(vat)
-
-    def check_vat_nz(self, vat):
-        '''
-        The New Zealand equivalent of a VAT number is an IRD number (GST number is another name for this).
-        IRD/GST numbers must legally must be displayed on all tax invoices.
-        https://arthurdejong.org/python-stdnum/doc/1.13/stdnum.nz.ird#module-stdnum.nz.ird
-        '''
-        check_func = stdnum.util.get_cc_module('nz', 'ird').is_valid
-        return check_func(vat)
 
     def check_vat_t(self, vat):
         if self.country_id.code == 'JP':

@@ -1,34 +1,33 @@
 # Translation of Odoo Server.
 # This file contains the translation of the following modules:
 # 	* website_slides_survey
-# 
+#
 # Translators:
-# digitouch UAB <digitouchagencyeur@gmail.com>, 2023
+# digitouch UAB <digitouchagencyeur@gmail.com>, 2022
+# Martin Trigaux, 2022
+# Naglis Jonaitis, 2022
+# Arminas Grigonis <arminas@versada.lt>, 2022
+# Linas Versada <linaskrisiukenas@gmail.com>, 2022
 # Jonas Zinkevicius <jozi@odoo.com>, 2023
-# Martin Trigaux, 2023
-# Naglis Jonaitis, 2023
-# Arminas Grigonis <arminas@versada.lt>, 2023
-# Linas Versada <linaskrisiukenas@gmail.com>, 2023
-# Ramunė ViaLaurea <ramune.vialaurea@gmail.com>, 2024
-# 
+# Ramunė ViaLaurea <ramune.vialaurea@gmail.com>, 2023
+#
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 16.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:56+0000\n"
-"PO-Revision-Date: 2023-10-26 23:10+0000\n"
-"Last-Translator: Ramunė ViaLaurea <ramune.vialaurea@gmail.com>, 2024\n"
+"POT-Creation-Date: 2023-05-16 13:50+0000\n"
+"PO-Revision-Date: 2022-09-22 05:57+0000\n"
+"Last-Translator: Ramunė ViaLaurea <ramune.vialaurea@gmail.com>, 2023\n"
 "Language-Team: Lithuanian (https://app.transifex.com/odoo/teams/41243/lt/)\n"
+"Language: lt\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: \n"
-"Language: lt\n"
 "Plural-Forms: nplurals=4; plural=(n % 10 == 1 && (n % 100 > 19 || n % 100 < 11) ? 0 : (n % 10 >= 2 && n % 10 <=9) && (n % 100 > 19 || n % 100 < 11) ? 1 : n % 1 != 0 ? 2: 3);\n"
 
 #. module: website_slides_survey
 #. odoo-python
 #: code:addons/website_slides_survey/models/survey_survey.py:0
-#, python-format
 msgid "- %s (Courses - %s)"
 msgstr ""
 
@@ -62,24 +61,13 @@ msgstr ""
 
 #. module: website_slides_survey
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.display_certificate
-msgid "<i class=\"fa fa-arrow-right\"/> Get Certified"
-msgstr ""
-
-#. module: website_slides_survey
-#: model_terms:ir.ui.view,arch_db:website_slides_survey.display_certificate
-msgid ""
-"<i class=\"fa fa-download\" aria-label=\"Download certification\" "
-"title=\"Download Certification\"/>"
+msgid "<i class=\"fa fa-download\" aria-label=\"Download certification\" title=\"Download Certification\"/>"
 msgstr ""
 
 #. module: website_slides_survey
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.slide_content_detailed
-msgid ""
-"<i class=\"fa fa-fw fa-trophy\" role=\"img\" aria-label=\"Download "
-"certification\" title=\"Download certification\"/> Download certification"
-msgstr ""
-"<i class=\"fa fa-fw fa-trophy\" role=\"img\" aria-label=\"Download "
-"certification\" title=\"Download certification\"/> Atsisiųsti sertifikatą"
+msgid "<i class=\"fa fa-fw fa-trophy\" role=\"img\" aria-label=\"Download certification\" title=\"Download certification\"/> Download certification"
+msgstr "<i class=\"fa fa-fw fa-trophy\" role=\"img\" aria-label=\"Download certification\" title=\"Download certification\"/> Atsisiųsti sertifikatą"
 
 #. module: website_slides_survey
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.survey_fill_form_done_inherit_website_slides
@@ -123,9 +111,11 @@ msgstr "<span class=\"ms-1\">Sertifikatai</span>"
 #. module: website_slides_survey
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.slide_channel_view_form
 msgid ""
-"<span class=\"o_stat_text\" invisible=\"nbr_certification &gt; 0\">Finished</span>\n"
-"                <span class=\"o_stat_text\" invisible=\"nbr_certification == 0\">Certified</span>"
+"<span class=\"o_stat_text\" attrs=\"{'invisible': [('nbr_certification', '&gt;', 0)]}\">Finished</span>\n"
+"                <span class=\"o_stat_text\" attrs=\"{'invisible': [('nbr_certification', '=', 0)]}\">Certified</span>"
 msgstr ""
+"<span class=\"o_stat_text\" attrs=\"{'invisible': [('nbr_certification', '&gt;', 0)]}\">Pabaigta</span>\n"
+"                <span class=\"o_stat_text\" attrs=\"{'invisible': [('nbr_certification', '=', 0)]}\">Sertifikuota</span>"
 
 #. module: website_slides_survey
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.all_user_card
@@ -170,7 +160,6 @@ msgstr "Pridėti sertifikatą"
 #. module: website_slides_survey
 #. odoo-javascript
 #: code:addons/website_slides_survey/static/src/xml/website_slides_fullscreen.xml:0
-#, python-format
 msgid "Add Questions to this Survey"
 msgstr "Pridėti klausimus prie šios apklausos"
 
@@ -187,7 +176,6 @@ msgstr "Leisti peržiūrėti"
 #. module: website_slides_survey
 #. odoo-python
 #: code:addons/website_slides_survey/models/survey_survey.py:0
-#, python-format
 msgid ""
 "Any Survey listed below is currently used as a Course Certification and cannot be deleted:\n"
 "%s"
@@ -229,7 +217,6 @@ msgstr "Bukas"
 #. odoo-javascript
 #: code:addons/website_slides_survey/static/src/xml/website_slides_fullscreen.xml:0
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.slide_content_detailed
-#, python-format
 msgid "Begin Certification"
 msgstr "Pradėti sertifikavimą"
 
@@ -246,12 +233,10 @@ msgstr "Kategorija"
 #. module: website_slides_survey
 #. odoo-javascript
 #: code:addons/website_slides_survey/static/src/js/slides_upload.js:0
-#: code:addons/website_slides_survey/static/src/js/slides_upload.js:0
 #: code:addons/website_slides_survey/static/src/xml/website_slide_upload.xml:0
 #: model:ir.model.fields,field_description:website_slides_survey.field_slide_slide__survey_id
 #: model:ir.model.fields.selection,name:website_slides_survey.selection__slide_slide__slide_category__certification
 #: model:ir.model.fields.selection,name:website_slides_survey.selection__slide_slide__slide_type__certification
-#, python-format
 msgid "Certification"
 msgstr "Sertifikavimas"
 
@@ -263,12 +248,12 @@ msgstr ""
 #. module: website_slides_survey
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.badge_content
 msgid "Certification Badges"
-msgstr "Sertifikavimo ženkleliai"
+msgstr ""
 
 #. module: website_slides_survey
 #: model:ir.model.fields,field_description:website_slides_survey.field_survey_survey__slide_channel_ids
 msgid "Certification Courses"
-msgstr "Kursų sertifikavimas"
+msgstr ""
 
 #. module: website_slides_survey
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.slide_slide_partner_view_search
@@ -279,7 +264,7 @@ msgstr "Sertifikavimas baigtas"
 #. module: website_slides_survey
 #: model:ir.model.fields,field_description:website_slides_survey.field_survey_survey__slide_ids
 msgid "Certification Slides"
-msgstr "Mokymų sertifikavimas"
+msgstr ""
 
 #. module: website_slides_survey
 #: model:ir.model.fields,field_description:website_slides_survey.field_slide_slide_partner__survey_scoring_success
@@ -304,7 +289,6 @@ msgstr "Sertifikavimo piktograma"
 #. module: website_slides_survey
 #. odoo-python
 #: code:addons/website_slides_survey/controllers/slides.py:0
-#, python-format
 msgid "Certification slides are completed when the survey is succeeded."
 msgstr "Sertifikatas yra užpildomas, kai apklausa yra sėkmingai baigta."
 
@@ -315,11 +299,6 @@ msgstr "Sertifikatas yra užpildomas, kai apklausa yra sėkmingai baigta."
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.user_profile_content
 msgid "Certifications"
 msgstr "Sertifikatas"
-
-#. module: website_slides_survey
-#: model_terms:ir.ui.view,arch_db:website_slides_survey.display_certificate
-msgid "Certifications are exams that you successfully passed. <br/>"
-msgstr ""
 
 #. module: website_slides_survey
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.slide_content_detailed
@@ -336,7 +315,6 @@ msgstr "Kėdė"
 #. odoo-javascript
 #: code:addons/website_slides_survey/static/src/xml/website_slides_fullscreen.xml:0
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.slide_content_detailed
-#, python-format
 msgid "Congratulations, you passed the Certification!"
 msgstr "Sveikiname, išlaikėte sertifikatą!"
 
@@ -349,7 +327,6 @@ msgstr "Kursas"
 #. odoo-python
 #: code:addons/website_slides_survey/models/survey_survey.py:0
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.survey_survey_view_form
-#, python-format
 msgid "Courses"
 msgstr "Kursai"
 
@@ -361,7 +338,7 @@ msgstr "Mokymų skaičius"
 #. module: website_slides_survey
 #: model_terms:ir.actions.act_window,help:website_slides_survey.survey_survey_action_slides
 msgid "Create a Certification"
-msgstr "Sukurti sertifikatą"
+msgstr ""
 
 #. module: website_slides_survey
 #: model:slide.slide,name:website_slides_survey.slide_slide_demo_6_0
@@ -376,16 +353,13 @@ msgstr "Rašomasis stalas"
 #. module: website_slides_survey
 #. odoo-javascript
 #: code:addons/website_slides_survey/static/src/xml/website_slides_fullscreen.xml:0
-#: code:addons/website_slides_survey/static/src/xml/website_slides_fullscreen.xml:0
-#: code:addons/website_slides_survey/static/src/xml/website_slides_fullscreen.xml:0
-#, python-format
 msgid "Download certification"
 msgstr "Atsisiųsti sertifikatą"
 
 #. module: website_slides_survey
 #: model:survey.question.answer,value:website_slides_survey.furniture_certification_page_1_question_1_choice_1
 msgid "Fir"
-msgstr "Kėnis"
+msgstr ""
 
 #. module: website_slides_survey
 #: model:survey.question,title:website_slides_survey.furniture_certification_page_1
@@ -406,7 +380,6 @@ msgstr "Grįžti į mokymus"
 #. module: website_slides_survey
 #. odoo-javascript
 #: code:addons/website_slides_survey/static/src/xml/website_slide_upload.xml:0
-#, python-format
 msgid "How to upload a certification on your course?"
 msgstr "Kaip į mokymus įkelti sertifikatą?"
 
@@ -437,9 +410,8 @@ msgstr "Dar nėra sertifikatų!"
 
 #. module: website_slides_survey
 #: model_terms:slide.slide,description:website_slides_survey.slide_slide_demo_5_4
-msgid ""
-"Now that you have completed the course, it's time to test your knowledge!"
-msgstr "Dabar, kai pabaigėte kursą, laikas pasitikrinti savo žinias!"
+msgid "Now that you have completed the course, it's time to test your knowledge!"
+msgstr ""
 
 #. module: website_slides_survey
 #: model:ir.model.fields,field_description:website_slides_survey.field_slide_channel__nbr_certification
@@ -455,7 +427,6 @@ msgstr "Ąžuolas"
 #. module: website_slides_survey
 #. odoo-javascript
 #: code:addons/website_slides_survey/static/src/xml/website_slide_upload.xml:0
-#, python-format
 msgid "Please select a certification."
 msgstr "Pasirinkite sertifikatą."
 
@@ -521,9 +492,7 @@ msgstr "Sekėjų informacija"
 
 #. module: website_slides_survey
 #: model:ir.model.fields,help:website_slides_survey.field_slide_slide__slide_type
-msgid ""
-"Subtype of the slide category, allows more precision on the actual file type"
-" / source type."
+msgid "Subtype of the slide category, allows more precision on the actual file type / source type."
 msgstr ""
 
 #. module: website_slides_survey
@@ -560,7 +529,6 @@ msgstr ""
 #. odoo-javascript
 #: code:addons/website_slides_survey/static/src/xml/website_slides_fullscreen.xml:0
 #: model_terms:ir.ui.view,arch_db:website_slides_survey.slide_content_detailed
-#, python-format
 msgid "Test Certification"
 msgstr "Testinis sertifikatas"
 
@@ -572,15 +540,12 @@ msgstr "Pasitikrink savo žinias apie baldus!"
 
 #. module: website_slides_survey
 #: model:ir.model.fields,help:website_slides_survey.field_slide_slide__is_preview
-msgid ""
-"The course is accessible by anyone : the users don't need to join the "
-"channel to access the content of the course."
+msgid "The course is accessible by anyone : the users don't need to join the channel to access the content of the course."
 msgstr ""
 
 #. module: website_slides_survey
 #: model:ir.model.fields,help:website_slides_survey.field_survey_survey__slide_channel_ids
-msgid ""
-"The courses this survey is linked to through the e-learning application"
+msgid "The courses this survey is linked to through the e-learning application"
 msgstr ""
 
 #. module: website_slides_survey
@@ -606,29 +571,24 @@ msgstr ""
 #. module: website_slides_survey
 #: model:survey.question,title:website_slides_survey.furniture_certification_page_1_question_1
 msgid "What type of wood is the best for furniture?"
-msgstr "Kuris medis labiausiai tinka baldams gaminti?"
+msgstr ""
 
 #. module: website_slides_survey
 #. odoo-python
 #: code:addons/website_slides_survey/controllers/slides.py:0
-#, python-format
 msgid "You are not allowed to create a survey."
 msgstr "Jums neleidžiama sukurti naują apklausą."
 
 #. module: website_slides_survey
 #. odoo-python
 #: code:addons/website_slides_survey/controllers/slides.py:0
-#, python-format
 msgid "You are not allowed to link a certification."
 msgstr "Jums neleidžiama susieti su sertifikatu"
 
 #. module: website_slides_survey
 #. odoo-javascript
 #: code:addons/website_slides_survey/static/src/xml/website_slide_upload.xml:0
-#, python-format
-msgid ""
-"You can create your certification from here or use an existing one. Once "
-"your certification is created, you can still edit it in backend."
+msgid "You can create your certification from here or use an existing one. Once your certification is created, you can still edit it in backend."
 msgstr ""
 
 #. module: website_slides_survey
@@ -640,8 +600,7 @@ msgstr ""
 
 #. module: website_slides_survey
 #: model:mail.template,subject:website_slides_survey.mail_template_user_input_certification_failed
-msgid ""
-"You have failed the course: {{ object.slide_partner_id.channel_id.name }}"
+msgid "You have failed the course: {{ object.slide_partner_id.channel_id.name }}"
 msgstr ""
 
 #. module: website_slides_survey

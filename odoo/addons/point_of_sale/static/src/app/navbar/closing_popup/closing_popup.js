@@ -1,48 +1,66 @@
-/** @odoo-module */
-
-import { AbstractAwaitablePopup } from "@point_of_sale/app/popup/abstract_awaitable_popup";
+import { Dialog } from "@web/core/dialog/dialog";
 import { SaleDetailsButton } from "@point_of_sale/app/navbar/sale_details_button/sale_details_button";
-import { ConfirmPopup } from "@point_of_sale/app/utils/confirm_popup/confirm_popup";
+import { ConfirmationDialog, AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { MoneyDetailsPopup } from "@point_of_sale/app/utils/money_details_popup/money_details_popup";
 import { useService } from "@web/core/utils/hooks";
-import { useState } from "@odoo/owl";
-import { ErrorPopup } from "@point_of_sale/app/errors/popups/error_popup";
-import { ConnectionLostError } from "@web/core/network/rpc_service";
+import { Component, useState } from "@odoo/owl";
+import { ConnectionLostError } from "@web/core/network/rpc";
 import { _t } from "@web/core/l10n/translation";
 import { usePos } from "@point_of_sale/app/store/pos_hook";
 import { parseFloat } from "@web/views/fields/parsers";
 import { Input } from "@point_of_sale/app/generic_components/inputs/input/input";
 import { useAsyncLockedMethod } from "@point_of_sale/app/utils/hooks";
+import { ask } from "@point_of_sale/app/store/make_awaitable_dialog";
+import { deduceUrl } from "@point_of_sale/utils";
+import { FormViewDialog } from "@web/views/view_dialogs/form_view_dialog";
+import { PaymentMethodBreakdown } from "@point_of_sale/app/components/payment_method_breakdown/payment_method_breakdown";
 
-export class ClosePosPopup extends AbstractAwaitablePopup {
-    static components = { SaleDetailsButton, Input };
+export class ClosePosPopup extends Component {
+    static components = { SaleDetailsButton, Input, Dialog, PaymentMethodBreakdown };
     static template = "point_of_sale.ClosePosPopup";
     static props = [
         "orders_details",
         "opening_notes",
         "default_cash_details",
-        "other_payment_methods",
+        "non_cash_payment_methods",
         "is_manager",
         "amount_authorized_diff",
-        // TODO: set the props for all popups
-        "id",
-        "resolve",
-        "zIndex",
         "close",
-        "confirmKey",
-        "cancelKey",
     ];
 
     setup() {
-        super.setup();
         this.pos = usePos();
-        this.popup = useService("popup");
-        this.orm = useService("orm");
         this.report = useService("report");
         this.hardwareProxy = useService("hardware_proxy");
-        this.customerDisplay = useService("customer_display");
+        this.dialog = useService("dialog");
+        this.ui = useState(useService("ui"));
         this.state = useState(this.getInitialState());
         this.confirm = useAsyncLockedMethod(this.confirm);
+    }
+    autoFillCashCount() {
+        const count = this.props.default_cash_details.amount;
+        this.state.payments[this.props.default_cash_details.id].counted = count.toString();
+        this.setManualCashInput(count);
+    }
+    get cashMoveData() {
+        const { total, moves } = this.props.default_cash_details.moves.reduce(
+            (acc, move, i) => {
+                acc.total += move.amount;
+                acc.moves.push({
+                    id: i,
+                    name: move.name,
+                    amount: move.amount,
+                });
+                return acc;
+            },
+            { total: 0, moves: [] }
+        );
+        return { total, moves };
+    }
+    async cashMove() {
+        await this.pos.cashMove();
+        this.dialog.closeAll();
+        this.pos.closeSession();
     }
     getInitialState() {
         const initialState = { notes: "", payments: {} };
@@ -51,7 +69,7 @@ export class ClosePosPopup extends AbstractAwaitablePopup {
                 counted: "0",
             };
         }
-        this.props.other_payment_methods.forEach((pm) => {
+        this.props.non_cash_payment_methods.forEach((pm) => {
             if (pm.type === "bank") {
                 initialState.payments[pm.id] = {
                     counted: this.env.utils.formatCurrency(pm.amount, false),
@@ -60,38 +78,36 @@ export class ClosePosPopup extends AbstractAwaitablePopup {
         });
         return initialState;
     }
-
-    //@override
     async confirm() {
         if (!this.pos.config.cash_control || this.env.utils.floatIsZero(this.getMaxDifference())) {
             await this.closeSession();
             return;
         }
         if (this.hasUserAuthority()) {
-            const { confirmed } = await this.popup.add(ConfirmPopup, {
+            const response = await ask(this.dialog, {
                 title: _t("Payments Difference"),
                 body: _t(
-                    "Do you want to accept payments difference and post a profit/loss journal entry?"
+                    "The money counted doesn't match what we expected. Want to log the difference for the books?"
                 ),
+                confirmLabel: _t("Proceed Anyway"),
+                cancelLabel: _t("Discard"),
             });
-            if (confirmed) {
-                await this.closeSession();
+            if (response) {
+                return this.closeSession();
             }
             return;
         }
-        await this.popup.add(ConfirmPopup, {
+        this.dialog.add(ConfirmationDialog, {
             title: _t("Payments Difference"),
             body: _t(
                 "The maximum difference allowed is %s.\nPlease contact your manager to accept the closing difference.",
                 this.env.utils.formatCurrency(this.props.amount_authorized_diff)
             ),
-            confirmText: _t("OK"),
         });
     }
-    //@override
     async cancel() {
         if (this.canCancel()) {
-            super.cancel();
+            this.props.close();
         }
     }
     canConfirm() {
@@ -102,22 +118,23 @@ export class ClosePosPopup extends AbstractAwaitablePopup {
     async openDetailsPopup() {
         const action = _t("Cash control - closing");
         this.hardwareProxy.openCashbox(action);
-        const { confirmed, payload } = await this.popup.add(MoneyDetailsPopup, {
+        this.dialog.add(MoneyDetailsPopup, {
             moneyDetails: this.moneyDetails,
             action: action,
+            getPayload: (payload) => {
+                const { total, moneyDetailsNotes, moneyDetails } = payload;
+                this.state.payments[this.props.default_cash_details.id].counted =
+                    this.env.utils.formatCurrency(total, false);
+                if (moneyDetailsNotes) {
+                    this.state.notes = moneyDetailsNotes;
+                }
+                this.moneyDetails = moneyDetails;
+            },
+            context: "Closing",
         });
-        if (confirmed) {
-            const { total, moneyDetailsNotes, moneyDetails } = payload;
-            this.state.payments[this.props.default_cash_details.id].counted =
-                this.env.utils.formatCurrency(total, false);
-            if (moneyDetailsNotes) {
-                this.state.notes = moneyDetailsNotes;
-            }
-            this.moneyDetails = moneyDetails;
-        }
     }
     async downloadSalesReport() {
-        return this.report.doAction("point_of_sale.sale_details_report", [this.pos.pos_session.id]);
+        return this.report.doAction("point_of_sale.sale_details_report", [this.pos.session.id]);
     }
     setManualCashInput(amount) {
         if (this.env.utils.isValidFloat(amount) && this.moneyDetails) {
@@ -133,10 +150,11 @@ export class ClosePosPopup extends AbstractAwaitablePopup {
         const expectedAmount =
             paymentId === this.props.default_cash_details?.id
                 ? this.props.default_cash_details.amount
-                : this.props.other_payment_methods.find((pm) => pm.id === paymentId).amount;
+                : this.props.non_cash_payment_methods.find((pm) => pm.id === paymentId).amount;
 
         return parseFloat(counted) - expectedAmount;
     }
+
     getMaxDifference() {
         return Math.max(
             ...Object.keys(this.state.payments).map((id) =>
@@ -155,17 +173,30 @@ export class ClosePosPopup extends AbstractAwaitablePopup {
         return true;
     }
     async closeSession() {
-        this.customerDisplay?.update({ closeUI: true });
+        sessionStorage.removeItem("connected_cashier");
+        if (this.pos.config.customer_display_type === "proxy") {
+            const proxyIP = this.pos.getDisplayDeviceIP();
+            fetch(`${deduceUrl(proxyIP)}/hw_proxy/customer_facing_display`, {
+                method: "POST",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ params: { action: "close" } }),
+            }).catch(() => {
+                console.log("Failed to send data to customer display");
+            });
+        }
         // If there are orders in the db left unsynced, we try to sync.
         const syncSuccess = await this.pos.push_orders_with_closing_popup();
         if (!syncSuccess) {
             return;
         }
         if (this.pos.config.cash_control) {
-            const response = await this.orm.call(
+            const response = await this.pos.data.call(
                 "pos.session",
                 "post_closing_cash_details",
-                [this.pos.pos_session.id],
+                [this.pos.session.id],
                 {
                     counted_cash: parseFloat(
                         this.state.payments[this.props.default_cash_details.id].counted
@@ -179,8 +210,8 @@ export class ClosePosPopup extends AbstractAwaitablePopup {
         }
 
         try {
-            await this.orm.call("pos.session", "update_closing_control_state_session", [
-                this.pos.pos_session.id,
+            await this.pos.data.call("pos.session", "update_closing_control_state_session", [
+                this.pos.session.id,
                 this.state.notes,
             ]);
         } catch (error) {
@@ -193,45 +224,82 @@ export class ClosePosPopup extends AbstractAwaitablePopup {
         }
 
         try {
-            const bankPaymentMethodDiffPairs = this.props.other_payment_methods
+            const bankPaymentMethodDiffPairs = this.props.non_cash_payment_methods
                 .filter((pm) => pm.type == "bank")
                 .map((pm) => [pm.id, this.getDifference(pm.id)]);
-            const response = await this.orm.call("pos.session", "close_session_from_ui", [
-                this.pos.pos_session.id,
+            const response = await this.pos.data.call("pos.session", "close_session_from_ui", [
+                this.pos.session.id,
                 bankPaymentMethodDiffPairs,
             ]);
             if (!response.successful) {
                 return this.handleClosingError(response);
             }
-            this.pos.redirectToBackend();
+            location.reload();
         } catch (error) {
             if (error instanceof ConnectionLostError) {
-                // Cannot redirect to backend when offline, let error handlers show the offline popup
-                // FIXME POSREF: doing this means closing again when online will redo the beginning of the method
-                // although it's impossible to close again because this.closeSessionClicked isn't reset to false
-                // The application state is corrupted.
                 throw error;
             } else {
-                // FIXME POSREF: why are we catching errors here but not anywhere else in this method?
-                await this.popup.add(ErrorPopup, {
-                    title: _t("Closing session error"),
-                    body: _t(
-                        "An error has occurred when trying to close the session.\n" +
-                            "You will be redirected to the back-end to manually close the session."
-                    ),
-                });
-                this.pos.redirectToBackend();
+                await this.handleClosingControlError();
             }
         }
     }
+    async handleClosingControlError() {
+        this.dialog.add(AlertDialog, {
+            title: _t("Closing session error"),
+            body: _t(
+                "An error has occurred when trying to close the session.\n" +
+                    "You will be redirected to the back-end to manually close the session."
+            ),
+            onClose: () => {
+                this.dialog.add(
+                    FormViewDialog,
+                    {
+                        resModel: "pos.session",
+                        resId: this.pos.session.id,
+                    },
+                    {
+                        onClose: async () => {
+                            const session = await this.pos.data.read("pos.session", [
+                                this.pos.session.id,
+                            ]);
+                            if (session[0] && session[0].state === "closed") {
+                                location.reload();
+                            } else {
+                                this.pos.redirectToBackend();
+                            }
+                        },
+                    }
+                );
+            },
+        });
+    }
     async handleClosingError(response) {
-        await this.popup.add(ErrorPopup, {
+        this.dialog.add(ConfirmationDialog, {
             title: response.title || "Error",
             body: response.message,
-            sound: response.type !== "alert",
+            confirmLabel: _t("Review Orders"),
+            cancelLabel: _t("Cancel Orders"),
+            confirm: () => {
+                if (!response.redirect) {
+                    this.props.close();
+                    this.pos.onTicketButtonClick();
+                }
+            },
+            cancel: async () => {
+                if (!response.redirect) {
+                    const ordersDraft = this.pos.models["pos.order"].filter((o) => !o.finalized);
+                    await this.pos.deleteOrders(ordersDraft, response.open_order_ids);
+                    this.closeSession();
+                }
+            },
         });
+
         if (response.redirect) {
-            this.pos.redirectToBackend();
+            window.location.reload();
         }
+    }
+    getMovesTotalAmount() {
+        const amounts = this.props.default_cash_details.moves.map((move) => move.amount);
+        return amounts.reduce((acc, x) => acc + x, 0);
     }
 }

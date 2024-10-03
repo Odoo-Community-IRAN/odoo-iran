@@ -81,7 +81,11 @@ class IrUiView(models.Model):
                     self._copy_custom_snippet_translations(record, field)
 
         except (ValueError, TypeError):
-            raise ValidationError(_("Invalid field value for %s: %s", Model._fields[field].string, el.text_content().strip()))
+            raise ValidationError(_(
+                "Invalid field value for %(field_name)s: %(value)s",
+                field_name=Model._fields[field].string,
+                value=el.text_content().strip(),
+            ))
 
     def save_oe_structure(self, el):
         self.ensure_one()
@@ -141,8 +145,7 @@ class IrUiView(models.Model):
 
         The method takes care of read and write access of both records/fields.
         """
-        record_to.check_access_rights('write')
-        record_to.check_access_rule('write')
+        record_to.check_access('write')
         record_to.check_field_access_rights('write', [name_field_to])
 
         field_from = records_from._fields[name_field_from]
@@ -480,10 +483,7 @@ class IrUiView(models.Model):
             'type': 'qweb',
             'arch': """
                 <data inherit_id="%s">
-                    <xpath expr="//div[@id='snippet_custom']" position="attributes">
-                        <attribute name="class" remove="d-none" separator=" "/>
-                    </xpath>
-                    <xpath expr="//div[@id='snippet_custom_body']" position="inside">
+                    <xpath expr="//snippets[@id='snippet_custom']" position="inside">
                         <t t-snippet="%s" t-thumbnail="%s"/>
                     </xpath>
                 </data>

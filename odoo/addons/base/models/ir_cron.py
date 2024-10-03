@@ -4,19 +4,26 @@ import threading
 import time
 import os
 import psycopg2
+import psycopg2.errors
 import pytz
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
-from psycopg2 import sql
 
 import odoo
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
+from odoo.modules.registry import Registry
+from odoo.tools import SQL
 
 _logger = logging.getLogger(__name__)
 
 BASE_VERSION = odoo.modules.get_manifest('base')['version']
 MAX_FAIL_TIME = timedelta(hours=5)  # chosen with a fair roll of the dice
+MAX_BATCH_PER_CRON_JOB = 10
+CONSECUTIVE_TIMEOUT_FOR_FAILURE = 3
+MIN_FAILURE_COUNT_BEFORE_DEACTIVATION = 5
+MIN_DELTA_BEFORE_DEACTIVATION = timedelta(days=7)
+# crons must satisfy both minimum thresholds before deactivation
 
 # custom function to call instead of default PostgreSQL's `pg_notify`
 ODOO_NOTIFY_FUNCTION = os.getenv('ODOO_NOTIFY_FUNCTION', 'pg_notify')
@@ -36,6 +43,12 @@ _intervalTypes = {
     'months': lambda interval: relativedelta(months=interval),
     'minutes': lambda interval: relativedelta(minutes=interval),
 }
+
+
+class CompletionStatus:  # inherit from enum.StrEnum in 3.11
+    FULLY_DONE = 'fully done'
+    PARTIALLY_DONE = 'partially done'
+    FAILED = 'failed'
 
 
 class ir_cron(models.Model):
@@ -58,17 +71,25 @@ class ir_cron(models.Model):
     cron_name = fields.Char('Name', compute='_compute_cron_name', store=True)
     user_id = fields.Many2one('res.users', string='Scheduler User', default=lambda self: self.env.user, required=True)
     active = fields.Boolean(default=True)
-    interval_number = fields.Integer(default=1, help="Repeat every x.")
+    interval_number = fields.Integer(default=1, help="Repeat every x.", required=True)
     interval_type = fields.Selection([('minutes', 'Minutes'),
                                       ('hours', 'Hours'),
                                       ('days', 'Days'),
                                       ('weeks', 'Weeks'),
-                                      ('months', 'Months')], string='Interval Unit', default='months')
-    numbercall = fields.Integer(string='Number of Calls', default=1, help='How many times the method is called,\na negative number indicates no limit.')
-    doall = fields.Boolean(string='Repeat Missed', help="Specify if missed occurrences should be executed when the server restarts.")
+                                      ('months', 'Months')], string='Interval Unit', default='months', required=True)
     nextcall = fields.Datetime(string='Next Execution Date', required=True, default=fields.Datetime.now, help="Next planned execution date for this job.")
     lastcall = fields.Datetime(string='Last Execution Date', help="Previous time the cron ran successfully, provided to the job through the context on the `lastcall` key")
     priority = fields.Integer(default=5, help='The priority of the job, as an integer: 0 means higher priority, 10 means lower priority.')
+    failure_count = fields.Integer(default=0, help="The number of consecutive failures of this job. It is automatically reset on success.")
+    first_failure_date = fields.Datetime(string='First Failure Date', help="The first time the cron failed. It is automatically reset on success.")
+
+    _sql_constraints = [
+        (
+            'check_strictly_positive_interval',
+            'CHECK(interval_number > 0)',
+            'The interval number must be a strictly positive number.'
+        ),
+    ]
 
     @api.depends('ir_actions_server_id.name')
     def _compute_cron_name(self):
@@ -90,24 +111,16 @@ class ir_cron(models.Model):
             self = self.with_context(default_state='code')
         return super(ir_cron, self).default_get(fields_list)
 
-    @api.onchange('active', 'interval_number')
-    def _onchange_interval_number(self):
-        if self.active and self.interval_number <= 0:
-            self.active = False
-            return {'warning': {
-                'title': _("Scheduled action disabled"),
-                'message': _("This scheduled action has been disabled because its interval number is not a strictly positive value.")}
-            }
-
     def method_direct_trigger(self):
-        self.check_access_rights('write')
-        for cron in self:
-            cron._try_lock()
-            _logger.info('Manually starting job `%s`.', cron.name)
-            cron.with_user(cron.user_id).with_context({'lastcall': cron.lastcall}).ir_actions_server_id.run()
-            self.env.flush_all()
-            _logger.info('Job `%s` done.', cron.name)
-            cron.lastcall = fields.Datetime.now()
+        self.ensure_one()
+        self.browse().check_access('write')
+        self._try_lock()
+        _logger.info('Job %r (%s) started manually', self.name, self.id)
+        self, _ = self.with_user(self.user_id).with_context({'lastcall': self.lastcall})._add_progress()  # noqa: PLW0642
+        self.ir_actions_server_id.run()
+        self.lastcall = fields.Datetime.now()
+        self.env.flush_all()
+        _logger.info('Job %r (%s) done', self.name, self.id)
         return True
 
     @classmethod
@@ -125,7 +138,7 @@ class ir_cron(models.Model):
 
                 for job_id in (job['id'] for job in jobs):
                     try:
-                        job = cls._acquire_one_job(cron_cr, (job_id,))
+                        job = cls._acquire_one_job(cron_cr, job_id)
                     except psycopg2.extensions.TransactionRollbackError:
                         cron_cr.rollback()
                         _logger.debug("job %s has been processed by another worker, skip", job_id)
@@ -135,22 +148,19 @@ class ir_cron(models.Model):
                         continue
                     _logger.debug("job %s acquired", job_id)
                     # take into account overridings of _process_job() on that database
-                    registry = odoo.registry(db_name)
+                    registry = Registry(db_name)
                     registry[cls._name]._process_job(db, cron_cr, job)
-                    cron_cr.commit()
                     _logger.debug("job %s updated and released", job_id)
 
         except BadVersion:
             _logger.warning('Skipping database %s as its base version is not %s.', db_name, BASE_VERSION)
         except BadModuleState:
             _logger.warning('Skipping database %s because of modules to install/upgrade/remove.', db_name)
+        except psycopg2.errors.UndefinedTable:
+            # The table ir_cron does not exist; this is probably not an OpenERP database.
+            _logger.warning('Tried to poll an undefined table on database %s.', db_name)
         except psycopg2.ProgrammingError as e:
-            if e.pgcode == '42P01':
-                # Class 42 — Syntax Error or Access Rule Violation; 42P01: undefined_table
-                # The table ir_cron does not exist; this is probably not an OpenERP database.
-                _logger.warning('Tried to poll an undefined table on database %s.', db_name)
-            else:
-                raise
+            raise
         except Exception:
             _logger.warning('Exception in cron:', exc_info=True)
         finally:
@@ -206,7 +216,6 @@ class ir_cron(models.Model):
             SELECT *
             FROM ir_cron
             WHERE active = true
-              AND numbercall != 0
               AND (nextcall <= (now() at time zone 'UTC')
                 OR id in (
                     SELECT cron_id
@@ -214,48 +223,45 @@ class ir_cron(models.Model):
                     WHERE call_at <= (now() at time zone 'UTC')
                 )
               )
-            ORDER BY priority
+            ORDER BY failure_count, priority, id
         """)
         return cr.dictfetchall()
 
     @classmethod
-    def _acquire_one_job(cls, cr, job_ids):
+    def _acquire_one_job(cls, cr, job_id):
         """
-        Acquire for update one job that is ready from the job_ids tuple.
+        Acquire for update the job with id ``job_id``.
 
-        The jobs that have already been processed in this worker should
-        be excluded from the tuple.
+        The job should not have been processed yet by the current
+        worker. Another worker may process the job again, may that job
+        become ready again quickly enough (e.g. self-triggering, high
+        frequency, or partially done jobs).
 
-        This function raises a ``psycopg2.errors.SerializationFailure``
-        when the ``nextcall`` of one of the job_ids is modified in
-        another transaction. You should rollback the transaction and try
-        again later.
+        Note: It is possible that this function raises a
+              ``psycopg2.errors.SerializationFailure`` in case the job
+              has been processed in another worker. In such case it is
+              advised to roll back the transaction and to go on with the
+              other jobs.
         """
 
-        # We have to make sure ALL jobs are executed ONLY ONCE no matter
-        # how many cron workers may process them. The exlusion mechanism
-        # is twofold: (i) prevent parallel processing of the same job,
-        # and (ii) prevent re-processing jobs that have been processed
-        # already.
+        # The query must make sure that (i) two cron workers cannot
+        # process a given job at a same time. The query must also make
+        # sure that (ii) a job already processed in another worker
+        # should not be processed again by this one (or at least not
+        # before the job becomes ready again).
         #
-        # (i) is implemented via `LIMIT 1 FOR UPDATE SKIP LOCKED`, each
+        # (i) is implemented via `FOR NO KEY UPDATE SKIP LOCKED`, each
         # worker just acquire one available job at a time and lock it so
         # the other workers don't select it too.
         # (ii) is implemented via the `WHERE` statement, when a job has
-        # been processed, its nextcall is updated to a date in the
-        # future and the optional triggers are removed.
-        #
-        # Note about (ii): it is possible that a job becomes available
-        # again quickly (e.g. high frequency or self-triggering cron).
-        # This function doesn't prevent from acquiring that job multiple
-        # times at different moments. This can block a worker on
-        # executing a same job in loop. To prevent this problem, the
-        # callee is responsible of providing a `job_ids` tuple without
-        # the jobs it has executed already.
+        # been processed and is fully done, its nextcall is updated to a
+        # date in the future and the optional triggers are removed. In
+        # case a job has only been partially done, the job is left ready
+        # to be acquired again by another cron worker.
         #
         # An `UPDATE` lock type is the strongest row lock, it conflicts
         # with ALL other lock types. Among them the `KEY SHARE` row lock
-        # which is implicitely aquired by foreign keys to prevent the
+        # which is implicitly acquired by foreign keys to prevent the
         # referenced record from being removed while in use. Because we
         # never delete acquired cron jobs, foreign keys are safe to
         # concurrently reference cron jobs. Hence, the `NO KEY UPDATE`
@@ -265,10 +271,17 @@ class ir_cron(models.Model):
         # Learn more: https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS
 
         query = """
+            WITH last_cron_progress AS (
+                SELECT id as progress_id, cron_id, timed_out_counter, done, remaining
+                FROM ir_cron_progress
+                WHERE cron_id = %s
+                ORDER BY id DESC
+                LIMIT 1
+            )
             SELECT *
             FROM ir_cron
-            WHERE active = true
-              AND numbercall != 0
+            LEFT JOIN last_cron_progress lcp ON lcp.cron_id = ir_cron.id
+            WHERE ir_cron.active = true
               AND (nextcall <= (now() at time zone 'UTC')
                 OR EXISTS (
                     SELECT cron_id
@@ -277,12 +290,12 @@ class ir_cron(models.Model):
                       AND cron_id = ir_cron.id
                 )
               )
-              AND id in %s
+              AND id = %s
             ORDER BY priority
-            LIMIT 1 FOR NO KEY UPDATE SKIP LOCKED
+            FOR NO KEY UPDATE SKIP LOCKED
         """
         try:
-            cr.execute(query, [job_ids], log_exceptions=False)
+            cr.execute(query, [job_id, job_id], log_exceptions=False)
         except psycopg2.extensions.TransactionRollbackError:
             # A serialization error can occur when another cron worker
             # commits the new `nextcall` value of a cron it just ran and
@@ -292,123 +305,281 @@ class ir_cron(models.Model):
         except Exception as exc:
             _logger.error("bad query: %s\nERROR: %s", query, exc)
             raise
-        return cr.dictfetchone()
+
+        job = cr.dictfetchone()
+
+        if not job:     # Job is already taken
+            return None
+
+        for field_name in ('done', 'remaining', 'timed_out_counter'):
+            job[field_name] = job[field_name] or 0
+        return job
+
+    def _notify_admin(self, message):
+        """
+        Notify ``message`` to some administrator.
+
+        The base implementation of this method does nothing. It is
+        supposed to be overridden with some actual communication
+        mechanism.
+        """
+        _logger.warning(message)
 
     @classmethod
     def _process_job(cls, db, cron_cr, job):
-        """ Execute a cron job and re-schedule a call for later. """
+        """
+        Execute the cron's server action in a dedicated transaction.
 
-        # Compute how many calls were missed and at what time we should
-        # recall the cron next. In the example bellow, we fake a cron
-        # with an interval of 30 (starting at 0) that was last executed
-        # at 15 and that is executed again at 135.
-        #
-        #    0          60          120         180
-        #  --|-----|-----|-----|-----|-----|-----|----> time
-        #    1     2*    *     *     *  3  4
-        #
-        # 1: lastcall, the last time the cron was executed
-        # 2: past_nextcall, the cron nextcall as seen from lastcall
-        # *: missed_call, a total of 4 calls are missing
-        # 3: now
-        # 4: future_nextcall, the cron nextcall as seen from now
+        In case the previous process actually timed out, the cron's
+        server action is not executed and the cron is considered
+        ``'failed'``.
 
-        if job['interval_number'] <= 0:
-            _logger.error("Job %s %r has been disabled because its interval number is null or negative.", job['id'], job['cron_name'])
-            cron_cr.execute("UPDATE ir_cron SET active=false WHERE id=%s", [job['id']])
-            return
+        The server action can use the progress API via the method
+        :meth:`_notify_progress` to report processing progress, i.e. how
+        many records are done and how many records are remaining to
+        process.
+
+        Those progress notifications are used to determine the job's
+        ``CompletionStatus`` and to determine the next time the cron
+        will be executed:
+
+        - ``'fully done'``: the cron is rescheduled later, it'll be
+          executed again after its regular time interval or upon a new
+          trigger.
+
+        - ``'partially done'``: the cron is rescheduled ASAP, it'll be
+          executed again by this or another cron worker once the other
+          ready cron jobs have been executed.
+
+        - ``'failed'``: the cron is deactivated if it failed too many
+          times over a given time span; otherwise it is rescheduled
+          later.
+        """
+        env = api.Environment(cron_cr, job['user_id'], {})
+        ir_cron = env[cls._name]
+
+        failed_by_timeout = (
+            job['timed_out_counter'] >= CONSECUTIVE_TIMEOUT_FOR_FAILURE
+            and not job['done']
+        )
+
+        if not failed_by_timeout:
+            status = cls._run_job(job)
+        else:
+            status = CompletionStatus.FAILED
+            cron_cr.execute("""
+                UPDATE ir_cron_progress
+                SET timed_out_counter = 0
+                WHERE id = %s
+            """, (job['progress_id'],))
+            _logger.error("Job %r (%s) timed out", job['cron_name'], job['id'])
+
+        ir_cron._update_failure_count(job, status)
+
+        if status in (CompletionStatus.FULLY_DONE, CompletionStatus.FAILED):
+            ir_cron._reschedule_later(job)
+        elif status == CompletionStatus.PARTIALLY_DONE:
+            ir_cron._reschedule_asap(job)
+            if os.getenv('ODOO_NOTIFY_CRON_CHANGES'):
+                cron_cr.postcommit.add(ir_cron._notifydb)  # See: `_notifydb`
+        else:
+            raise RuntimeError("unreachable")
+
+        cron_cr.commit()
+
+    @classmethod
+    def _run_job(cls, job):
+        """
+        Execute the job's server action multiple times until it
+        completes. The completion status is returned.
+
+        It is considered completed when either:
+
+        - the server action doesn't use the progress API, or returned
+          and notified that all records has been processed: ``'fully done'``;
+
+        - the server action returned and notified that there are
+          remaining records to process, but this cron worker ran this
+          server action 10 times already: ``'partially done'``;
+
+        - the server action was able to commit and notify some work done,
+          but later crashed due to an exception: ``'partially done'``;
+
+        - the server action failed due to an exception and no progress
+          was notified: ``'failed'``.
+        """
+        timed_out_counter = job['timed_out_counter']
 
         with cls.pool.cursor() as job_cr:
-            lastcall = fields.Datetime.to_datetime(job['lastcall'])
-            interval = _intervalTypes[job['interval_type']](job['interval_number'])
-            env = api.Environment(job_cr, job['user_id'], {'lastcall': lastcall})
-            ir_cron = env[cls._name]
+            env = api.Environment(job_cr, job['user_id'], {
+                'lastcall': job['lastcall'],
+                'cron_id': job['id'],
+            })
+            cron = env[cls._name].browse(job['id'])
 
-            # Use the user's timezone to compare and compute datetimes,
-            # otherwise unexpected results may appear. For instance, adding
-            # 1 month in UTC to July 1st at midnight in GMT+2 gives July 30
-            # instead of August 1st!
-            now = fields.Datetime.context_timestamp(ir_cron, datetime.utcnow())
-            past_nextcall = fields.Datetime.context_timestamp(
-                ir_cron, fields.Datetime.to_datetime(job['nextcall']))
+            status = None
+            for i in range(MAX_BATCH_PER_CRON_JOB):
+                cron, progress = cron._add_progress(timed_out_counter=timed_out_counter)
+                job_cr.commit()
 
-            # Compute how many call were missed
-            missed_call = past_nextcall
-            missed_call_count = 0
-            while missed_call <= now:
-                missed_call += interval
-                missed_call_count += 1
-            future_nextcall = missed_call
+                try:
+                    cron._callback(job['cron_name'], job['ir_actions_server_id'])
+                except Exception:  # noqa: BLE001
+                    if progress.done and progress.remaining:
+                        # we do not consider it a failure if some progress has
+                        # been committed
+                        status = CompletionStatus.PARTIALLY_DONE
+                    else:
+                        status = CompletionStatus.FAILED
+                else:
+                    if not progress.remaining:
+                        status = CompletionStatus.FULLY_DONE
+                    elif not progress.done:
+                        # assume the server action doesn't use the progress API
+                        # and that there is nothing left to process
+                        status = CompletionStatus.FULLY_DONE
+                    else:
+                        status = CompletionStatus.PARTIALLY_DONE
 
-            # Compute how many time we should run the cron
-            effective_call_count = (
-                     1 if not missed_call_count                    # run at least once
-                else 1 if not job['doall']                         # run once for all
-                else missed_call_count if job['numbercall'] == -1  # run them all
-                else min(missed_call_count, job['numbercall'])     # run maximum numbercall times
-            )
-            call_count_left = max(job['numbercall'] - effective_call_count, -1)
+                    if status == CompletionStatus.FULLY_DONE and progress.deactivate:
+                        job['active'] = False
+                finally:
+                    progress.timed_out_counter = 0
+                    timed_out_counter = 0
+                    job_cr.commit()
+                _logger.info('Job %r (%s) processed %s records, %s records remaining',
+                             job['cron_name'], job['id'], progress.done, progress.remaining)
+                if status in (CompletionStatus.FULLY_DONE, CompletionStatus.FAILED):
+                    break
 
-            # The actual cron execution
-            for call in range(effective_call_count):
-                ir_cron._callback(job['cron_name'], job['ir_actions_server_id'], job['id'])
+        return status
 
-        # Update the cron with the information computed above
-        cron_cr.execute("""
+    def _update_failure_count(self, job, status):
+        """
+        Update cron ``failure_count`` and ``first_failure_date`` given
+        the job's completion status. Deactivate the cron when BOTH the
+        counter reaches ``MIN_FAILURE_COUNT_BEFORE_DEACTIVATION`` AND
+        the time delta reaches ``MIN_DELTA_BEFORE_DEACTIVATION``.
+
+        On ``'fully done'`` and ``'partially done'``, the counter and
+        failure date are reset.
+
+        On ``'failed'`` the counter is increased and the first failure
+        date is set if the counter was 0. In case both thresholds are
+        reached, ``active`` is set to ``False`` and both values are
+        reset.
+        """
+        now = fields.Datetime.context_timestamp(self, datetime.utcnow())
+
+        if status == CompletionStatus.FAILED:
+            failure_count = job['failure_count'] + 1
+            first_failure_date = job['first_failure_date'] or now
+            active = job['active']
+            if (
+                failure_count >= MIN_FAILURE_COUNT_BEFORE_DEACTIVATION
+                and fields.Datetime.context_timestamp(self, first_failure_date) + MIN_DELTA_BEFORE_DEACTIVATION < now
+            ):
+                failure_count = 0
+                first_failure_date = None
+                active = False
+                self._notify_admin(_(
+                    "Cron job %(name)s (%(id)s) has been deactivated after failing %(count)s times. "
+                    "More information can be found in the server logs around %(time)s.",
+                    name=repr(job['cron_name']),
+                    id=job['id'],
+                    count=MIN_FAILURE_COUNT_BEFORE_DEACTIVATION,
+                    time=datetime.replace(datetime.utcnow(), microsecond=0),
+                ))
+        else:
+            failure_count = 0
+            first_failure_date = None
+            active = job['active']
+
+        self.env.cr.execute("""
             UPDATE ir_cron
-            SET nextcall=%s,
-                numbercall=%s,
-                lastcall=%s,
-                active=%s
-            WHERE id=%s
+            SET failure_count = %s,
+                first_failure_date = %s,
+                active = %s
+            WHERE id = %s
         """, [
-            fields.Datetime.to_string(future_nextcall.astimezone(pytz.UTC)),
-            call_count_left,
-            fields.Datetime.to_string(now.astimezone(pytz.UTC)),
-            job['active'] and bool(call_count_left),
+            failure_count,
+            first_failure_date,
+            active,
             job['id'],
         ])
 
-        cron_cr.execute("""
+    def _reschedule_later(self, job):
+        """
+        Reschedule the job to be executed later, after its regular
+        interval or upon a trigger.
+        """
+        # Use the user's timezone to compare and compute datetimes, otherwise unexpected results may appear.
+        # For instance, adding 1 month in UTC to July 1st at midnight in GMT+2 gives July 30 instead of August 1st!
+        now = fields.Datetime.context_timestamp(self, datetime.utcnow())
+        nextcall = fields.Datetime.context_timestamp(self, job['nextcall'])
+        interval = _intervalTypes[job['interval_type']](job['interval_number'])
+        while nextcall <= now:
+            nextcall += interval
+
+        _logger.info('Job %r (%s) completed', job['cron_name'], job['id'])
+        self.env.cr.execute("""
+            UPDATE ir_cron
+            SET nextcall = %s,
+                lastcall = %s
+            WHERE id = %s
+        """, [
+            fields.Datetime.to_string(nextcall.astimezone(pytz.UTC)),
+            fields.Datetime.to_string(now.astimezone(pytz.UTC)),
+            job['id'],
+        ])
+
+        self.env.cr.execute("""
             DELETE FROM ir_cron_trigger
             WHERE cron_id = %s
               AND call_at < (now() at time zone 'UTC')
         """, [job['id']])
 
-    @api.model
-    def _callback(self, cron_name, server_action_id, job_id):
+    def _reschedule_asap(self, job):
+        """
+        Reschedule the job to be executed ASAP, after the other cron
+        jobs had a chance to run.
+        """
+        # leave the existing nextcall and triggers, this leave the job "ready"
+        pass
+
+    def _callback(self, cron_name, server_action_id):
         """ Run the method associated to a given job. It takes care of logging
         and exception handling. Note that the user running the server action
         is the user calling this method. """
+        self.ensure_one()
         try:
             if self.pool != self.pool.check_signaling():
                 # the registry has changed, reload self in the new registry
                 self.env.reset()
                 self = self.env()[self._name]
 
-            log_depth = (None if _logger.isEnabledFor(logging.DEBUG) else 1)
-            odoo.netsvc.log(_logger, logging.DEBUG, 'cron.object.execute', (self._cr.dbname, self._uid, '*', cron_name, server_action_id), depth=log_depth)
-            _logger.info('Starting job `%s`.', cron_name)
+            _logger.debug(
+                "cron.object.execute(%r, %d, '*', %r, %d)",
+                self.env.cr.dbname,
+                self._uid,
+                cron_name,
+                server_action_id,
+            )
+            _logger.info('Job %r (%s) starting', cron_name, self.id)
             start_time = time.time()
             self.env['ir.actions.server'].browse(server_action_id).run()
             self.env.flush_all()
             end_time = time.time()
-            _logger.info('Job done: `%s` (%.3fs).', cron_name, end_time - start_time)
+            _logger.info('Job %r (%s) done in %.3fs', cron_name, self.id, end_time - start_time)
             if start_time and _logger.isEnabledFor(logging.DEBUG):
-                _logger.debug('%.3fs (cron %s, server action %d with uid %d)', end_time - start_time, cron_name, server_action_id, self.env.uid)
+                _logger.debug('Job %r (%s) server action #%s with uid %s executed in %.3fs',
+                              cron_name, self.id, server_action_id, self.env.uid, end_time - start_time)
             self.pool.signal_changes()
-        except Exception as e:
+        except Exception:
             self.pool.reset_changes()
-            _logger.exception("Call from cron %s for server action #%s failed in Job #%s",
-                              cron_name, server_action_id, job_id)
-            self._handle_callback_exception(cron_name, server_action_id, job_id, e)
-
-    @api.model
-    def _handle_callback_exception(self, cron_name, server_action_id, job_id, job_exception):
-        """ Method called when an exception is raised by a job.
-
-        Simply logs the exception and rollback the transaction. """
-        self._cr.rollback()
+            _logger.exception('Job %r (%s) server action #%s failed', cron_name, self.id, server_action_id)
+            self.env.cr.rollback()
+            raise
 
     def _try_lock(self, lockfk=False):
         """Try to grab a dummy exclusive write-lock to the rows with the given ids,
@@ -416,7 +587,7 @@ class ir_cron(models.Model):
            to a process currently executing those cron tasks.
 
            :param lockfk: acquire a strong row lock which conflicts with
-                          the lock aquired by foreign keys when they
+                          the lock acquired by foreign keys when they
                           reference this row.
         """
         if not self:
@@ -475,17 +646,18 @@ class ir_cron(models.Model):
         Schedule a cron job to be executed soon independently of its
         ``nextcall`` field value.
 
-        By default the cron is scheduled to be executed in the next batch but
-        the optional `at` argument may be given to delay the execution later
-        with a precision down to 1 minute.
+        By default, the cron is scheduled to be executed the next time
+        the cron worker wakes up, but the optional `at` argument may be
+        given to delay the execution later, with a precision down to 1
+        minute.
 
-        The method may be called with a datetime or an iterable of datetime.
-        The actual implementation is in :meth:`~._trigger_list`, which is the
-        recommended method for overrides.
+        The method may be called with a datetime or an iterable of
+        datetime. The actual implementation is in :meth:`~._trigger_list`,
+        which is the recommended method for overrides.
 
         :param Optional[Union[datetime.datetime, list[datetime.datetime]]] at:
-            When to execute the cron, at one or several moments in time instead
-            of as soon as possible.
+            When to execute the cron, at one or several moments in time
+            instead of as soon as possible.
         :return: the created triggers records
         :rtype: recordset
         """
@@ -524,7 +696,7 @@ class ir_cron(models.Model):
         ])
         if _logger.isEnabledFor(logging.DEBUG):
             ats = ', '.join(map(str, at_list))
-            _logger.debug("will execute '%s' at %s", self.sudo().name, ats)
+            _logger.debug('Job %r (%s) will execute at %s', self.sudo().name, self.id, ats)
 
         if min(at_list) <= now or os.getenv('ODOO_NOTIFY_CRON_CHANGES'):
             self._cr.postcommit.add(self._notifydb)
@@ -536,9 +708,46 @@ class ir_cron(models.Model):
         ir_cron modification and on trigger creation (regardless of call_at)
         """
         with odoo.sql_db.db_connect('postgres').cursor() as cr:
-            query = sql.SQL("SELECT {}('cron_trigger', %s)").format(sql.Identifier(ODOO_NOTIFY_FUNCTION))
-            cr.execute(query, [self.env.cr.dbname])
+            cr.execute(SQL("SELECT %s('cron_trigger', %s)", SQL.identifier(ODOO_NOTIFY_FUNCTION), self.env.cr.dbname))
         _logger.debug("cron workers notified")
+
+    def _add_progress(self, *, timed_out_counter=None):
+        """
+        Create a progress record for the given cron and add it to its
+        context.
+
+        :param int timed_out_counter: the number of times the cron has
+            consecutively timed out
+        :return: a pair ``(cron, progress)``, where the progress has
+            been injected inside the cron's context
+        """
+        progress = self.env['ir.cron.progress'].create([{
+            'cron_id': self.id,
+            'remaining': 0,
+            'done': 0,
+            # we use timed_out_counter + 1 so that if the current execution
+            # times out, the counter already takes it into account
+            'timed_out_counter': 0 if timed_out_counter is None else timed_out_counter + 1,
+        }])
+        return self.with_context(ir_cron_progress_id=progress.id), progress
+
+    def _notify_progress(self, *, done, remaining, deactivate=False):
+        """
+        Log the progress of the cron job.
+
+        :param int done: the number of tasks already processed
+        :param int remaining: the number of tasks left to process
+        :param bool deactivate: whether the cron will be deactivated
+        """
+        if not (progress_id := self.env.context.get('ir_cron_progress_id')):
+            return
+        if done < 0 or remaining < 0:
+            raise ValueError("`done` and `remaining` must be positive integers.")
+        self.env['ir.cron.progress'].browse(progress_id).write({
+            'remaining': remaining,
+            'done': done,
+            'deactivate': deactivate,
+        })
 
 
 class ir_cron_trigger(models.Model):
@@ -553,3 +762,19 @@ class ir_cron_trigger(models.Model):
     @api.autovacuum
     def _gc_cron_triggers(self):
         self.search([('call_at', '<', datetime.now() + relativedelta(weeks=-1))]).unlink()
+
+
+class ir_cron_progress(models.Model):
+    _name = 'ir.cron.progress'
+    _description = 'Progress of Scheduled Actions'
+    _rec_name = 'cron_id'
+
+    cron_id = fields.Many2one("ir.cron", required=True, index=True, ondelete='cascade')
+    remaining = fields.Integer(default=0)
+    done = fields.Integer(default=0)
+    deactivate = fields.Boolean()
+    timed_out_counter = fields.Integer(default=0)
+
+    @api.autovacuum
+    def _gc_cron_progress(self):
+        self.search([('create_date', '<', datetime.now() - relativedelta(weeks=1))]).unlink()

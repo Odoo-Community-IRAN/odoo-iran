@@ -24,3 +24,34 @@ class ProductProduct(models.Model):
                             "There are unsubmitted expenses linked to this category. Updating the category cost will change expense amounts. "
                             "Make sure it is what you want to do."
                         )
+
+    def write(self, vals):
+        result = super().write(vals)
+        if 'standard_price' in vals:
+            expenses_sudo = self.env['hr.expense'].sudo().search([
+                ('company_id', '=', self.env.company.id),
+                ('product_id', 'in', self.ids),
+                ('state', 'in', ['reported', 'draft']),
+            ])
+            for expense_sudo in expenses_sudo:
+                expense_product_sudo = expense_sudo.product_id
+                tax_domain = self.env['account.tax']._check_company_domain(expense_sudo.company_id)
+                product_has_cost = (
+                        expense_product_sudo
+                        and not expense_sudo.company_currency_id.is_zero(expense_product_sudo.standard_price)
+                )
+                expense_vals = {
+                    'product_has_cost': product_has_cost,
+                    'product_has_tax': bool(expense_product_sudo.supplier_taxes_id.filtered_domain(tax_domain)),
+                }
+                if product_has_cost:
+                    expense_vals.update({
+                        'price_unit': expense_product_sudo.standard_price,
+                    })
+                else:
+                    expense_vals.update({
+                        'quantity': 1,
+                        'price_unit': expense_sudo.total_amount
+                    })
+                expense_sudo.write(expense_vals)
+        return result

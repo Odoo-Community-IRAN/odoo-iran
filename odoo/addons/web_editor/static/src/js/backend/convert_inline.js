@@ -12,7 +12,7 @@ const RE_OFFSET_MATCH = /(^| )offset(-[\w\d]+)*( |$)/;
 const RE_PADDING_MATCH = /[ ]*padding[^;]*;/g;
 const RE_PADDING = /([\d.]+)/;
 const RE_WHITESPACE = /[\s\u200b]*/;
-const SELECTORS_IGNORE = /(^\*$|:hover|:before|:after|:active|:link|::|'|\([^(),]+[,(])/;
+const SELECTORS_IGNORE = /(^\*$|:hover|:before|:after|:active|:link|::|'|\([^(),]+[,(])|@page/;
 // CSS properties relating to font, which Outlook seem to have trouble inheriting.
 const FONT_PROPERTIES_TO_INHERIT = [
     'color',
@@ -675,18 +675,16 @@ function enforceImagesResponsivity(editable) {
  * will be computed for the editable element's owner document.
  *
  * @param {JQuery} $editable
- * @param {Object[]} [cssRules] Array<{selector: string;
- *                                   style: {[styleName]: string};
- *                                   specificity: number;}>
- * @param {JQuery} [$iframe] the iframe containing the editable, if any
+ * @param {Object} options {$iframe: JQuery;
+ *                          wysiwyg: Object}
  */
-export async function toInline($editable, cssRules, $iframe) {
+export async function toInline($editable, options) {
     $editable.removeClass('odoo-editor-editable');
     const editable = $editable.get(0);
-    const iframe = $iframe && $iframe.get(0);
-    const wysiwyg = $editable.data('wysiwyg');
+    const iframe = options.$iframe && options.$iframe.get(0);
+    const wysiwyg = $editable.data('wysiwyg') || options.wysiwyg;
     const doc = editable.ownerDocument;
-    cssRules = cssRules || wysiwyg && wysiwyg._rulesCache;
+    let cssRules = wysiwyg && wysiwyg._rulesCache;
     if (!cssRules) {
         cssRules = getCSSRules(doc);
         if (wysiwyg) {

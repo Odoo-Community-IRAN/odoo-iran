@@ -1,6 +1,7 @@
 /** @odoo-module **/
 
 import publicWidget from "@web/legacy/js/public/public_widget";
+import { rpc } from "@web/core/network/rpc";
 import { renderToElement } from "@web/core/utils/render";
 
 publicWidget.registry.websiteEventCreateMeetingRoom = publicWidget.Widget.extend({
@@ -9,33 +10,24 @@ publicWidget.registry.websiteEventCreateMeetingRoom = publicWidget.Widget.extend
         'click': '_onClickCreate',
     },
 
-    init() {
-        this._super(...arguments);
-        this.rpc = this.bindService("rpc");
-    },
-
     //--------------------------------------------------------------------------
     // Handlers
     //--------------------------------------------------------------------------
 
     _onClickCreate: async function () {
-        if (!this.$createModal) {
-            const langs = await this.rpc("/event/active_langs");
+        if (!this.createModalEl) {
+            const langs = await rpc("/event/active_langs");
 
-            this.$createModal = $(renderToElement(
-                'event_meet_create_room_modal',
-                {
-                    csrf_token: odoo.csrf_token,
-                    eventId: this.$el.data("eventId"),
-                    defaultLangCode: this.$el.data("defaultLangCode"),
-                    langs: langs,
-                }
-            ));
-
-            this.$createModal.appendTo(this.$el.parentNode);
+            this.createModalEl = renderToElement("event_meet_create_room_modal", {
+                csrf_token: odoo.csrf_token,
+                eventId: this.el.dataset.eventId,
+                defaultLangCode: this.el.dataset.defaultLangCode,
+                langs: langs,
+            });
+            this.el.parentNode.append(this.createModalEl);
         }
 
-        this.$createModal.modal('show');
+        Modal.getOrCreateInstance(this.createModalEl).show();
     },
 
     //--------------------------------------------------------------------------
@@ -49,7 +41,10 @@ publicWidget.registry.websiteEventCreateMeetingRoom = publicWidget.Widget.extend
      * @override
      */
     destroy: function () {
-        $('.o_wevent_create_meeting_room_modal').remove();
+        const modalEl = document.querySelector(".o_wevent_create_meeting_room_modal");
+        if (modalEl) {
+            modalEl.remove();
+        }
         this._super.apply(this, arguments);
     },
 });

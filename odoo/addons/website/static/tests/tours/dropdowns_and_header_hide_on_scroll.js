@@ -1,40 +1,60 @@
 /** @odoo-module */
 
-import wTourUtils from "@website/js/tours/tour_utils";
+import {
+    clickOnSave,
+    changeOption,
+    checkIfVisibleOnScreen,
+    insertSnippet,
+    registerWebsitePreviewTour,
+    selectHeader,
+} from "@website/js/tours/tour_utils";
 
 const checkIfUserMenuNotMasked = function () {
     return [
         {
             content: "Click on the user dropdown",
-            trigger: "iframe #wrapwrap header .o_header_hide_on_scroll li.dropdown > a",
+            trigger: ":iframe #wrapwrap header li.dropdown > a:contains(mitchell admin)",
+            run: "click",
         },
-        wTourUtils.checkIfVisibleOnScreen("iframe #wrapwrap header .o_header_hide_on_scroll li.dropdown .dropdown-menu.show a[href='/my/home']"),
+        checkIfVisibleOnScreen(
+            ":iframe #wrapwrap header li.dropdown .dropdown-menu.show a[href='/my/home']"
+        ),
     ];
 };
 
 const scrollDownToMediaList = function () {
     return {
         content: "Scroll down the page a little to leave the dropdown partially visible",
-        trigger: "iframe #wrapwrap .s_media_list",
-        run: function () {
+        trigger: ":iframe #wrapwrap .s_media_list",
+        run() {
             // Scroll down to the media list snippet.
-            this.$anchor[0].scrollIntoView(true);
+            this.anchor.scrollIntoView({ behavior: "instant" });
         },
     };
 };
 
-wTourUtils.registerWebsitePreviewTour("dropdowns_and_header_hide_on_scroll", {
+registerWebsitePreviewTour("dropdowns_and_header_hide_on_scroll", {
     test: true,
     url: "/",
     edition: true,
+    checkDelay: 100,
 }, () => [
-    wTourUtils.dragNDrop({id: "s_media_list", name: "Media List"}),
-    wTourUtils.selectHeader(),
-    wTourUtils.changeOption("undefined", 'we-select[data-variable="header-scroll-effect"]'),
-    wTourUtils.changeOption("undefined", 'we-button[data-name="header_effect_fixed_opt"]'),
-    wTourUtils.changeOption("HeaderLayout", 'we-select[data-variable="header-template"] we-toggler'),
-    wTourUtils.changeOption("HeaderLayout", 'we-button[data-name="header_sales_two_opt"]'),
-    ...wTourUtils.clickOnSave(undefined, 30000),
+    ...insertSnippet({id: "s_media_list", name: "Media List", groupName: "Content"}),
+    selectHeader(),
+    changeOption("undefined", 'we-select[data-variable="header-scroll-effect"]'),
+    changeOption("undefined", 'we-button[data-name="header_effect_fixed_opt"]'),
+    {
+        trigger: ":iframe #wrapwrap header.o_header_fixed",
+    },
+    selectHeader(),
+    changeOption("WebsiteLevelColor", 'we-select[data-variable="header-template"] we-toggler'),
+    changeOption("WebsiteLevelColor", 'we-button[data-name="header_sales_two_opt"]'),
+    {
+        content: "check that header_sales_two_opt is well selected before save",
+        trigger: ":iframe #wrapwrap header.o_header_fixed div[aria-label=Middle] div[role=search]",
+        timeout: 30000,
+    },
+    ...clickOnSave(undefined, 30000),
     ...checkIfUserMenuNotMasked(),
     // We scroll the page a little because when clicking on the dropdown, the
     // page needs to scroll to the top first and then open the dropdown menu.
@@ -46,8 +66,8 @@ wTourUtils.registerWebsitePreviewTour("dropdowns_and_header_hide_on_scroll", {
     scrollDownToMediaList(),
     {
         content: "Type a search query into the searchbar input",
-        trigger: "iframe #wrapwrap header .s_searchbar_input input.search-query",
-        run: "text a",
+        trigger: ":iframe #wrapwrap header .s_searchbar_input input.search-query",
+        run: "edit a",
     },
-    wTourUtils.checkIfVisibleOnScreen("iframe #wrapwrap header .s_searchbar_input.show .o_dropdown_menu.show"),
+    checkIfVisibleOnScreen(":iframe #wrapwrap header .s_searchbar_input.show .o_dropdown_menu.show"),
 ]);

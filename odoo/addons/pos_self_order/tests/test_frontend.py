@@ -33,14 +33,16 @@ class TestFrontendMobile(SelfOrderCommonTest):
 
         self.pos_config.write({
             'self_ordering_mode': 'kiosk',
+            'takeaway': True,
             'self_ordering_takeaway': True,
-            'self_ordering_alternative_fp_id': alternative_fp.id,
+            'takeaway_fp_id': alternative_fp.id,
         })
 
         self.pos_config.open_ui()
+        self.pos_config.current_session_id.set_opening_control(0, "")
 
         response = self.url_open(
-            "/pos-self-order/process-new-order/kiosk",
+            "/pos-self-order/process-order/kiosk",
             data=json.dumps({
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -49,17 +51,19 @@ class TestFrontendMobile(SelfOrderCommonTest):
                     "access_token": self.pos_config.access_token,
                     "order": {
                         "id": None,
-                        "pos_config_id": self.pos_config.id,
+                        "config_id": self.pos_config.id,
+                        "session_id": self.pos_config.current_session_id.id,
                         "access_token": None,
                         "pos_reference": None,
                         "state": "draft",
-                        "date": None,
                         "amount_total": 0,
                         "amount_tax": 0,
+                        "amount_paid": 0,
+                        "amount_return": 0,
                         "lines": [],
                         "tracking_number": None,
-                        "take_away": True,
-                        "lastChangesSent": {},
+                        "takeaway": True,
+                        "uuid": str(uuid4()),
                     },
                     "table_identifier": None,
                 }
@@ -68,5 +72,5 @@ class TestFrontendMobile(SelfOrderCommonTest):
         )
 
         result = response.json()
-        order_id = result['result']['id']
+        order_id = result['result']['pos.order'][0]['id']
         self.assertEqual(self.env['pos.order'].browse(order_id).fiscal_position_id.id, alternative_fp.id)

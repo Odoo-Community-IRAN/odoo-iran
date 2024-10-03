@@ -4,6 +4,7 @@
 from collections import defaultdict
 
 from odoo import api, fields, models
+from odoo.tools import format_date
 
 from .project_task import CLOSED_STATES
 
@@ -20,15 +21,15 @@ class ProjectMilestone(models.Model):
     project_id = fields.Many2one('project.project', required=True, default=_get_default_project_id, ondelete='cascade')
     deadline = fields.Date(tracking=True, copy=False)
     is_reached = fields.Boolean(string="Reached", default=False, copy=False)
-    reached_date = fields.Date(compute='_compute_reached_date', store=True)
-    task_ids = fields.One2many('project.task', 'milestone_id', 'Tasks')
+    reached_date = fields.Date(compute='_compute_reached_date', store=True, export_string_translation=False)
+    task_ids = fields.One2many('project.task', 'milestone_id', 'Tasks', export_string_translation=False)
 
     # computed non-stored fields
-    is_deadline_exceeded = fields.Boolean(compute="_compute_is_deadline_exceeded")
-    is_deadline_future = fields.Boolean(compute="_compute_is_deadline_future")
-    task_count = fields.Integer('# of Tasks', compute='_compute_task_count', groups='project.group_project_milestone')
-    done_task_count = fields.Integer('# of Done Tasks', compute='_compute_task_count', groups='project.group_project_milestone')
-    can_be_marked_as_done = fields.Boolean(compute='_compute_can_be_marked_as_done', groups='project.group_project_milestone')
+    is_deadline_exceeded = fields.Boolean(compute="_compute_is_deadline_exceeded", export_string_translation=False)
+    is_deadline_future = fields.Boolean(compute="_compute_is_deadline_future", export_string_translation=False)
+    task_count = fields.Integer('# of Tasks', compute='_compute_task_count', groups='project.group_project_milestone, export_string_translation=False')
+    done_task_count = fields.Integer('# of Done Tasks', compute='_compute_task_count', groups='project.group_project_milestone', export_string_translation=False)
+    can_be_marked_as_done = fields.Boolean(compute='_compute_can_be_marked_as_done', export_string_translation=False)
 
     @api.depends('is_reached')
     def _compute_reached_date(self):
@@ -61,7 +62,7 @@ class ProjectMilestone(models.Model):
     def _compute_can_be_marked_as_done(self):
         if not any(self._ids):
             for milestone in self:
-                milestone.can_be_marked_as_done = not milestone.is_reached and all(milestone.task_ids.mapped(lambda t: t.state in CLOSED_STATES))
+                milestone.can_be_marked_as_done = not milestone.is_reached and all(milestone.task_ids.mapped(lambda t: t.is_closed))
             return
 
         unreached_milestones = self.filtered(lambda milestone: not milestone.is_reached)
@@ -110,12 +111,19 @@ class ProjectMilestone(models.Model):
     def _get_data_list(self):
         return [ms._get_data() for ms in self]
 
-    @api.returns('self', lambda value: value.id)
     def copy(self, default=None):
-        if default is None:
-            default = {}
-        milestone_copy = super(ProjectMilestone, self).copy(default)
-        if self.project_id.allow_milestones:
-            milestone_mapping = self.env.context.get('milestone_mapping', {})
-            milestone_mapping[self.id] = milestone_copy.id
-        return milestone_copy
+        default = dict(default or {})
+        new_milestones = super().copy(default)
+        milestone_mapping = self.env.context.get('milestone_mapping', {})
+        for old_milestone, new_milestone in zip(self, new_milestones):
+            if old_milestone.project_id.allow_milestones:
+                milestone_mapping[old_milestone.id] = new_milestone.id
+        return new_milestones
+
+    def _compute_display_name(self):
+        super()._compute_display_name()
+        if not self._context.get('display_milestone_deadline'):
+            return
+        for milestone in self:
+            if milestone.deadline:
+                milestone.display_name = f'{milestone.display_name} - {format_date(self.env, milestone.deadline)}'

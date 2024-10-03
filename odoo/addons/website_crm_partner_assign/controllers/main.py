@@ -1,17 +1,15 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-import datetime
 import werkzeug.urls
 
-from collections import OrderedDict
 from werkzeug.exceptions import NotFound
 
 from odoo import fields
 from odoo import http
 from odoo.http import request
-from odoo.addons.http_routing.models.ir_http import slug, unslug
 from odoo.addons.portal.controllers.portal import CustomerPortal
+from odoo.addons.website_google_map.controllers.main import GoogleMap
 from odoo.addons.website_partner.controllers.main import WebsitePartnerPage
 
 from odoo.tools.translate import _
@@ -37,13 +35,13 @@ class WebsiteAccount(CustomerPortal):
         if 'lead_count' in counters:
             values['lead_count'] = (
                 CrmLead.search_count(self.get_domain_my_lead(request.env.user))
-                if CrmLead.check_access_rights('read', raise_exception=False)
+                if CrmLead.has_access('read')
                 else 0
             )
         if 'opp_count' in counters:
             values['opp_count'] = (
                 CrmLead.search_count(self.get_domain_my_opp(request.env.user))
-                if CrmLead.check_access_rights('read', raise_exception=False)
+                if CrmLead.has_access('read')
                 else 0
             )
         return values
@@ -98,14 +96,16 @@ class WebsiteAccount(CustomerPortal):
         domain = self.get_domain_my_opp(request.env.user)
 
         today = fields.Date.today()
-        this_week_end_date = fields.Date.to_string(fields.Date.from_string(today) + datetime.timedelta(days=7))
 
         searchbar_filters = {
             'all': {'label': _('Active'), 'domain': []},
+            'no_activities': {
+                'label': _('No Activities'),
+                'domain': [('activity_ids', 'not any', [('user_id', '=', request.env.user.id)]), ('stage_id.is_won', '=', False)]
+            },
+            'overdue': {'label': _('Late Activities'), 'domain': [('activity_date_deadline', '<', today)]},
             'today': {'label': _('Today Activities'), 'domain': [('activity_date_deadline', '=', today)]},
-            'week': {'label': _('This Week Activities'),
-                     'domain': [('activity_date_deadline', '>=', today), ('activity_date_deadline', '<=', this_week_end_date)]},
-            'overdue': {'label': _('Overdue Activities'), 'domain': [('activity_date_deadline', '<', today)]},
+            'future': {'label': _('Future Activities'), 'domain': [('activity_date_deadline', '>', today)]},
             'won': {'label': _('Won'), 'domain': [('stage_id.is_won', '=', True)]},
             'lost': {'label': _('Lost'), 'domain': [('active', '=', False), ('probability', '=', 0)]},
         }
@@ -153,7 +153,7 @@ class WebsiteAccount(CustomerPortal):
             'pager': pager,
             'searchbar_sortings': searchbar_sortings,
             'sortby': sortby,
-            'searchbar_filters': OrderedDict(sorted(searchbar_filters.items())),
+            'searchbar_filters': searchbar_filters,
             'filterby': filterby,
         })
         return request.render("website_crm_partner_assign.portal_my_opportunities", values)
@@ -182,12 +182,32 @@ class WebsiteAccount(CustomerPortal):
             })
 
 
-class WebsiteCrmPartnerAssign(WebsitePartnerPage):
+class WebsiteCrmPartnerAssign(WebsitePartnerPage, GoogleMap):
     _references_per_page = 40
+
+    def _get_gmap_domains(self, **kw):
+        if kw.get('dom', '') != "website_crm_partner_assign.partners":
+            return super()._get_gmap_domains(**kw)
+        current_grade = kw.get('current_grade')
+        current_country = kw.get('current_country')
+
+        domain = [('grade_id', '!=', False), ('is_company', '=', True)]
+        if not request.env.user.has_group('website.group_website_restricted_editor'):
+            domain += [('grade_id.website_published', '=', True)]
+
+        if current_country:
+            domain += [('country_id', '=', int(current_country))]
+
+        if current_grade:
+            domain += [('grade_id', '=', int(current_grade))]
+
+        return domain
 
     def sitemap_partners(env, rule, qs):
         if not qs or qs.lower() in '/partners':
             yield {'loc': '/partners'}
+
+        slug = env['ir.http']._slug
         base_partner_domain = [
             ('is_company', '=', True),
             ('grade_id', '!=', False),
@@ -227,7 +247,7 @@ class WebsiteCrmPartnerAssign(WebsitePartnerPage):
         search = post.get('search', '')
 
         base_partner_domain = [('is_company', '=', True), ('grade_id', '!=', False), ('website_published', '=', True), ('grade_id.active', '=', True)]
-        if not request.env['res.users'].has_group('website.group_website_restricted_editor'):
+        if not request.env.user.has_group('website.group_website_restricted_editor'):
             base_partner_domain += [('grade_id.website_published', '=', True)]
         if search:
             base_partner_domain += ['|', ('name', 'ilike', search), ('website_description', 'ilike', search)]
@@ -246,9 +266,11 @@ class WebsiteCrmPartnerAssign(WebsitePartnerPage):
             ["id", "country_id"],
             groupby="country_id", orderby="country_id")
 
-        # Fallback: Show all partners when country has no associates.
+        # Fallback on all countries if no partners found for the country and
+        # there are matching partners for other countries.
         country_ids = [c['country_id'][0] for c in countries]
-        if country and country.id not in country_ids:
+        fallback_all_countries = country and country.id not in country_ids
+        if fallback_all_countries:
             country = None
 
         # Group by grade
@@ -285,6 +307,7 @@ class WebsiteCrmPartnerAssign(WebsitePartnerPage):
             base_partner_domain += [('country_id', '=', country.id)]
 
         # format pager
+        slug = request.env['ir.http']._slug
         if grade and not country:
             url = '/partners/grade/' + slug(grade)
         elif country and not grade:
@@ -310,7 +333,6 @@ class WebsiteCrmPartnerAssign(WebsitePartnerPage):
             offset=pager['offset'], limit=self._references_per_page)
         partners = partner_ids.sudo()
 
-        google_map_partner_ids = ','.join(str(p.id) for p in partners)
         google_maps_api_key = request.website.google_maps_api_key
 
         values = {
@@ -320,11 +342,11 @@ class WebsiteCrmPartnerAssign(WebsitePartnerPage):
             'grades': grades,
             'current_grade': grade,
             'partners': partners,
-            'google_map_partner_ids': google_map_partner_ids,
             'pager': pager,
             'searches': post,
             'search_path': "%s" % werkzeug.urls.url_encode(post),
             'google_maps_api_key': google_maps_api_key,
+            'fallback_all_countries': fallback_all_countries,
         }
         return request.render("website_crm_partner_assign.index", values, status=partners and 200 or 404)
 
@@ -333,7 +355,7 @@ class WebsiteCrmPartnerAssign(WebsitePartnerPage):
     @http.route()
     def partners_detail(self, partner_id, **post):
         current_slug = partner_id
-        _, partner_id = unslug(partner_id)
+        _, partner_id = request.env['ir.http']._unslug(partner_id)
         current_grade, current_country = None, None
         grade_id = post.get('grade_id')
         country_id = post.get('country_id')
@@ -343,10 +365,11 @@ class WebsiteCrmPartnerAssign(WebsitePartnerPage):
             current_country = request.env['res.country'].browse(int(country_id)).exists()
         if partner_id:
             partner = request.env['res.partner'].sudo().browse(partner_id)
-            is_website_restricted_editor = request.env['res.users'].has_group('website.group_website_restricted_editor')
+            is_website_restricted_editor = request.env.user.has_group('website.group_website_restricted_editor')
             if partner.exists() and (partner.website_published or is_website_restricted_editor):
-                if slug(partner) != current_slug:
-                    return request.redirect('/partners/%s' % slug(partner))
+                partner_slug = request.env['ir.http']._slug(partner)
+                if partner_slug != current_slug:
+                    return request.redirect('/partners/%s' % partner_slug)
                 values = {
                     'main_object': partner,
                     'partner': partner,

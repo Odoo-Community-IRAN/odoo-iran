@@ -292,7 +292,7 @@ class Digest(models.Model):
                     continue
                 margin = self._get_margin_value(compute_value, previous_value)
                 if self._fields['%s_value' % field_name].type == 'monetary':
-                    converted_amount = tools.format_decimalized_amount(compute_value)
+                    converted_amount = tools.misc.format_decimalized_amount(compute_value)
                     compute_value = self._format_currency_amount(converted_amount, company.currency_id)
                 elif self._fields['%s_value' % field_name].type == 'float':
                     compute_value = "%.2f" % compute_value
@@ -331,7 +331,7 @@ class Digest(models.Model):
         """ Give an optional action to display in digest email linked to some KPIs.
 
         :return dict: key: kpi name (field name), value: an action that will be
-          concatenated with /web#action={action}
+          concatenated with /odoo/action-{action}
         """
         return {}
 
@@ -356,7 +356,7 @@ class Digest(models.Model):
         if user.has_group('base.group_erp_manager'):
             preferences.append(Markup('<p>%s<br /><a href="%s" target="_blank" style="color:#017e84; font-weight: bold;">%s</a></p>') % (
                 _('Want to customize this email?'),
-                f'/web#view_type=form&model={self._name}&id={self.id:d}',
+                f'/odoo/{self._name}/{self.id:d}',
                 _('Choose the metrics you care about')
             ))
 

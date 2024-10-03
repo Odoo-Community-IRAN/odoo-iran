@@ -9,6 +9,20 @@
             <ImageCrop t-props="this.imageCropProps"/>
         </div>
         <div t-ref="el"/>
+        <!--
+            trigger_up does not use .bind as this somehow bypasses patches to it
+            and currently the test snippets_all_drag_and_drop patches it.
+        -->
+        <div t-ref="snippets-menu-container">
+            <t t-if="this.state.showSnippetsMenu" t-component="this.snippetsMenuComponent"
+                options="this.snippetsMenuOptions"
+                folded="this.state.snippetsMenuFolded"
+                setCSSVariables.bind="this.setCSSVariables"
+                trigger_up="(ev) => this._trigger_up(ev)"
+                mountedProm="this.state.snippetsMenuMountedProm"
+                bus="this.snippetsMenuBus"
+            />
+        </div>
     </t>
 
     <!--=================-->
@@ -17,8 +31,7 @@
 
     <!-- Link Dialog (allows to choose a style and content for a link on the page) -->
     <div t-name="web_editor.LinkDialog">
-        <t t-set="title">Insert a Link / Button</t>
-        <Dialog size="'xl'" title="title">
+        <Dialog size="'xl'" title.translate="Insert a Link / Button">
             <div  class="o_link_dialog">
                 <div class="row" t-ref="linkComponentWrapper">
                     <form class="col-lg-8">
@@ -31,7 +44,7 @@
                         <div t-attf-class="mb-3 row o_url_input#{state.isButton ? ' d-none' : ''}">
                             <label class="col-form-label col-md-3" for="o_link_dialog_url_input">URL or Email</label>
                             <div class="col-md-9">
-                                <input type="text" name="url" class="form-control" id="o_link_dialog_url_input" required="required" t-ref="inputUrl"/>
+                                <input type="text" name="url" class="form-control" id="o_link_dialog_url_input" required="required" t-ref="inputUrl" t-on-keydown="ev => ev.key === 'Enter' &amp;&amp; this.onSave(ev)"/>
                                 <div class="form-check o_strip_domain d-none">
                                     <input type="checkbox" id="o_link_dialog_url_strip_domain" checked="checked" class="form-check-input"/>
                                     <label for="o_link_dialog_url_strip_domain" class="form-check-label fw-normal">
@@ -41,16 +54,18 @@
                             </div>
                         </div>
                         <div class="mb-3 row">
-                            <label class="col-form-label col-md-3">Type</label>
+                            <label class="col-form-label col-md-3">Style</label>
                             <div class="col-md-9 d-flex align-items-center">
                                 <div t-attf-class="#{this.colorCombinationClass ? ('p-2 ' + this.colorCombinationClass) : ''}">
-                                    <t t-foreach="this.colorsData" t-as="colorData" t-key="colorData.type">
-                                        <label role="button" class="m-0 me-2" t-if="colorData.type !== 'custom'">
-                                            <input type="radio" name="link_style_color" class="d-none link-style" t-att-value="colorData.type"/>
-                                            <span t-esc="colorData.label"
-                                                    t-attf-class="o_btn_preview btn btn-sm btn-#{colorData.btnPreview} #{colorData.type ? '' : 'px-0'}"/>
-                                        </label>
-                                    </t>
+                                    <select name="link_style_color" class="form-select link-style">
+                                        <t t-foreach="this.colorsData" t-as="colorData" t-key="colorData.type">
+                                            <t t-if="colorData.type !== 'custom'">
+                                                <option t-att-value="colorData.type" t-attf-class="o_btn_preview dropdown-item">
+                                                    <span t-esc="colorData.label"/>
+                                                </option>
+                                            </t>
+                                        </t>
+                                    </select>
                                 </div>
                             </div>
                         </div>
@@ -66,7 +81,7 @@
                                 </div>
                             </div>
                             <div class="mb-3 row">
-                                <label class="col-form-label col-md-3">Style</label>
+                                <label class="col-form-label col-md-3">Layout</label>
                                 <div class="col-md-9">
                                     <select name="link_style_shape" class="form-select link-style">
                                         <option value="" selected="selected">Default</option>
@@ -101,8 +116,8 @@
                     </div>
                 </div>
                 <t t-set-slot="footer">
-                    <button class="btn btn-primary" t-on-click="this.onSave">Insert</button>
-                    <button class="btn btn-secondary" t-on-click="this.onDiscard">Discard</button>
+                    <button class="btn btn-primary" t-on-click="this.onSave" data-hotkey="c">Apply</button>
+                    <button class="btn btn-secondary" t-on-click="this.onDiscard" data-hotkey="j">Discard</button>
                 </t>
             </div>
         </Dialog>
@@ -115,12 +130,13 @@
                     <we-title class="o_short_title"></we-title>
                     <div class="o_url_input">
                         <input name="url" id="o_link_dialog_url_input" type="text" placeholder="Your URL"/>
+                        <we-button class="o_we_user_value_widget fa fa-file" t-on-click="this.openDocumentDialog" data-tooltip="Link to an uploaded document"></we-button>
                     </div>
                 </we-input>
             </we-row>
             <we-row class="o_strip_domain d-none" t-attf-class="#{state.isButton ? ' d-none' : ''}">
                 <we-button class="o_we_user_value_widget o_we_checkbox_wrapper o_we_sublevel_1 active">
-                    <we-title class="o_long_title">Autoconvert to relative link</we-title>
+                    <we-title class="o_long_title">Autoconvert to Relative Link</we-title>
                         <div class="o_switch">
                             <we-checkbox name="do_strip_domain"/>
                         </div>
@@ -290,10 +306,18 @@
             </we-row>
             <we-row  t-if="!state.isButton and !props.forceNewWindow">
                 <we-button t-attf-class="o_we_user_value_widget o_we_checkbox_wrapper o_we_sublevel_1 #{this.initialNewWindow ? 'active' : ''}">
-                    <we-title class="o_long_title">Open in new window</we-title>
+                    <we-title class="o_long_title">Open in New Window</we-title>
                         <div class="o_switch">
                             <we-checkbox name="is_new_window" t-att-checked="this.initialNewWindow ? 'checked' : undefined"/>
                         </div>
+                </we-button>
+            </we-row>
+            <we-row  t-if="!state.isButton and state.isDocument">
+                <we-button t-attf-class="o_we_user_value_widget o_we_checkbox_wrapper o_we_sublevel_1 #{state.directDownload ? 'active' : ''}">
+                    <we-title class="o_long_title">Direct Download</we-title>
+                    <div class="o_switch">
+                        <we-checkbox name="direct_download" t-att-checked="state.directDownload ? 'checked' : undefined"/>
+                    </div>
                 </we-button>
             </we-row>
         </div>

@@ -464,7 +464,7 @@ ZeroDivisionError: division by zero""" % self.test_server_action.id
     def test_80_permission(self):
         self.action.write({
             'state': 'code',
-            'code': """record.write({'date': datetime.date.today()})""",
+            'code': """record.write({'name': str(datetime.date.today())})""",
         })
 
         user_demo = self.user_demo
@@ -472,10 +472,10 @@ ZeroDivisionError: division by zero""" % self.test_server_action.id
 
         # can write on contact partner
         self.test_partner.type = "contact"
-        self.test_partner.with_user(user_demo.id).check_access_rule("write")
+        self.test_partner.with_user(user_demo.id).check_access("write")
 
         self_demo.with_context(self.context).run()
-        self.assertEqual(self.test_partner.date, date.today())
+        self.assertEqual(self.test_partner.name, str(date.today()))
 
     def test_90_webhook(self):
         self.action.write({
@@ -559,7 +559,7 @@ class TestCommonCustomFields(common.TransactionCase):
         return self.env['ir.ui.view'].create({
             'name': 'yet another view',
             'model': self.MODEL,
-            'arch': '<tree string="X"><field name="%s"/></tree>' % name,
+            'arch': '<list string="X"><field name="%s"/></list>' % name,
         })
 
 
@@ -751,7 +751,7 @@ class TestCustomFields(TestCommonCustomFields):
 
         # create a non-computed field, and assert how many queries it takes
         model_id = self.env['ir.model']._get_id('res.partner')
-        query_count = 48
+        query_count = 49
         with self.assertQueryCount(query_count):
             self.env.registry.clear_cache()
             self.env['ir.model.fields'].create({

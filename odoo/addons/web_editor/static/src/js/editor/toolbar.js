@@ -6,8 +6,13 @@ import { ColorPalette } from "@web_editor/js/wysiwyg/widgets/color_palette";
 import {
     Component,
     onMounted,
+    onWillStart,
     useRef,
+    useState,
 } from "@odoo/owl";
+
+import { useService } from "@web/core/utils/hooks";
+import { loadLanguages } from "@web/core/l10n/translation";
 
 export class Toolbar extends Component {
     static template = 'web_editor.toolbar';
@@ -20,6 +25,7 @@ export class Toolbar extends Component {
         showFontSize: { type: Boolean, optional: true },
         useFontSizeInput: { type: Boolean, optional: true },
         showHistory: { type: Boolean, optional: true },
+        showRemoveFormat: { type: Boolean, optional: true },
 
         showStyle: { type: Boolean, optional: true },
         showJustify: { type: Boolean, optional: true },
@@ -53,6 +59,7 @@ export class Toolbar extends Component {
         showFontSize: true,
         useFontSizeInput: false,
         showHistory: false,
+        showRemoveFormat: true,
 
         showStyle: true,
         showJustify: true,
@@ -81,6 +88,8 @@ export class Toolbar extends Component {
     }
 
     setup() {
+        this.orm = useService("orm");
+        this.state = useState({ languages : [] });
         onMounted(() => {
             for (const [colorType, ref] of Object.entries(this.colorDropdownRef)) {
                 const dropdown = ref.el;
@@ -96,9 +105,14 @@ export class Toolbar extends Component {
                 $dropdown.on('hide.bs.dropdown', (ev) => this.props.onColorpaletteDropdownHide(ev));
             }
         });
+        onWillStart(() => {
+            loadLanguages(this.orm).then(res => {
+                this.state.languages = res;
+            });
+        });
     }
 
-    isMobile() {
+    isSmall() {
         return uiUtils.isSmall();
     }
 }

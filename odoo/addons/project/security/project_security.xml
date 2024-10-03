@@ -2,7 +2,7 @@
 <odoo>
 
     <record id="base.module_category_services_project" model="ir.module.category">
-        <field name="description">Helps you manage your projects and tasks by tracking them, generating plannings, etc...</field>
+        <field name="description" />
         <field name="sequence">3</field>
     </record>
 
@@ -15,12 +15,13 @@
     <record id="group_project_manager" model="res.groups">
         <field name="name">Administrator</field>
         <field name="category_id" ref="base.module_category_services_project"/>
-        <field name="implied_ids" eval="[(4, ref('group_project_user')), (4, ref('mail.group_mail_template_editor'))]"/>
+        <field name="implied_ids" eval="[(4, ref('group_project_user')), (4, ref('mail.group_mail_template_editor')), (4, ref('mail.group_mail_canned_response_admin'))]"/>
         <field name="users" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
     </record>
 
     <record id="group_project_rating" model="res.groups">
         <field name="name">Use Rating on Project</field>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
         <field name="category_id" ref="base.module_category_hidden"/>
     </record>
 
@@ -87,6 +88,9 @@
     <record model="ir.rule" id="task_visibility_rule">
         <field name="name">Project/Task: employees: follow required for follower-only projects</field>
         <field name="model_id" ref="model_project_task"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
         <field name="domain_force">[
             '|',
                 '&amp;',
@@ -148,6 +152,25 @@
         <field name="domain_force">[('user_id', '=', user.id)]</field>
     </record>
 
+    <record model="ir.rule" id="task_visibility_rule_project_user">
+        <field name="name">Project/Task: project users: follow required for follower-only projects</field>
+        <field name="model_id" ref="model_project_task"/>
+        <field name="perm_read" eval="False"/>
+        <field name="domain_force">[
+            '|',
+                '&amp;',
+                    ('project_id', '!=', False),
+                    '|',
+                        ('project_id.privacy_visibility', '!=', 'followers'),
+                        ('project_id.message_partner_ids', 'in', [user.partner_id.id]),
+                '|',
+                    ('message_partner_ids', 'in', [user.partner_id.id]),
+                    # to subscribe check access to the record, follower is not enough at creation
+                    ('user_ids', 'in', user.id)
+        ]</field>
+        <field name="groups" eval="[(4,ref('project.group_project_user'))]"/>
+    </record>
+
     <record id="ir_rule_private_task" model="ir.rule">
         <field name="name">Project: See private tasks</field>
         <field name="model_id" ref="project.model_project_task"/>
@@ -183,14 +206,17 @@
     </record>
 
     <record id="project_task_rule_portal" model="ir.rule">
-        <field name="name">Project/Task: portal users: (portal and following project) or (portal and following task)</field>
+        <field name="name">Project/Task: portal users: can only see a task if he's a collaborator of the project and a follower of the task</field>
         <field name="model_id" ref="project.model_project_task"/>
         <field name="domain_force">[
-        ('project_id.privacy_visibility', '=', 'portal'),
-        ('active', '=', True),
-        '|',
-            ('project_id.message_partner_ids', 'child_of', [user.partner_id.commercial_partner_id.id]),
-            ('message_partner_ids', 'child_of', [user.partner_id.commercial_partner_id.id]),
+            ('project_id.privacy_visibility', '=', 'portal'),
+            ('active', '=', True),
+            '|',
+                ('message_partner_ids', 'child_of', [user.partner_id.commercial_partner_id.id]),
+                ('project_id.collaborator_ids', 'any', [
+                    ('partner_id', '=', user.partner_id.id),
+                    ('limited_access', '=', False),
+                ]),
         ]</field>
         <field name="perm_read" eval="True"/>
         <field name="perm_write" eval="False"/>
@@ -207,9 +233,11 @@
             ('project_id.privacy_visibility', '=', 'portal'),
             ('active', '=', True),
             '|',
-                ('project_id.message_partner_ids', 'child_of', [user.partner_id.commercial_partner_id.id]),
                 ('message_partner_ids', 'child_of', [user.partner_id.commercial_partner_id.id]),
-            ('project_id.collaborator_ids.partner_id', 'in', [user.partner_id.id]),
+                ('project_id.collaborator_ids', 'any', [
+                    ('partner_id', '=', user.partner_id.id),
+                    ('limited_access', '=', False),
+                ]),
         ]</field>
         <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
         <field name="perm_read" eval="False"/>

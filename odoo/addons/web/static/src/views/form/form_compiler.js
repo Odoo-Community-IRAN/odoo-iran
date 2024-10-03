@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { registry } from "@web/core/registry";
 import { SIZES } from "@web/core/ui/ui_service";
 import {
@@ -18,6 +16,7 @@ import {
     makeSeparator,
 } from "@web/views/view_compiler";
 import { ViewCompiler } from "../view_compiler";
+import { exprToBoolean } from "@web/core/utils/strings";
 
 const compilersRegistry = registry.category("form_compilers");
 
@@ -52,6 +51,7 @@ export class FormCompiler extends ViewCompiler {
         this.compilers.push(
             ...compilersRegistry.getAll(),
             { selector: "div[name='button_box']", fn: this.compileButtonBox },
+            { selector: "footer", fn: this.compileFooter },
             { selector: "form", fn: this.compileForm, doNotCopyAttributes: true },
             { selector: "group", fn: this.compileGroup },
             { selector: "header", fn: this.compileHeader },
@@ -163,7 +163,7 @@ export class FormCompiler extends ViewCompiler {
                 );
             }
             if (child.tagName === "field") {
-                child.classList.add("d-inline-block", "mb-0", "z-index-0");
+                child.classList.add("d-inline-block", "mb-0", "z-0");
             }
             append(mainSlot, this.compileNode(child, params, false));
             append(buttonBox, mainSlot);
@@ -214,7 +214,7 @@ export class FormCompiler extends ViewCompiler {
     compileForm(el, params) {
         const sheetNode = el.querySelector("sheet");
         const displayClasses = sheetNode
-            ? `d-flex {{ __comp__.uiService.size < ${SIZES.XXL} ? "flex-column" : "flex-nowrap h-100" }}`
+            ? `d-flex d-print-block {{ __comp__.uiService.size < ${SIZES.XXL} ? "flex-column" : "flex-nowrap h-100" }}`
             : "d-block";
         const stateClasses =
             "{{ __comp__.props.record.dirty ? 'o_form_dirty' : !__comp__.props.record.isNew ? 'o_form_saved' : '' }}";
@@ -247,6 +247,32 @@ export class FormCompiler extends ViewCompiler {
             append(form, compiledList);
         }
         return form;
+    }
+
+    /**
+     * @param {Element} el
+     * @param {Record<string, any>} params
+     * @returns {Element}
+     */
+    compileFooter(el, params) {
+        const footer = createElement("t");
+        const replace = el.getAttribute("replace");
+        if (replace && !exprToBoolean(replace)) {
+            footer.append(
+                createElement("t", {
+                    "t-call": "web.DefaultButtonsSlot",
+                    "t-call-context": "{ props: __comp__.props }",
+                })
+            );
+        }
+        copyAttributes(el, footer);
+        for (const child of el.childNodes) {
+            const compiled = this.compileNode(child, params);
+            if (compiled) {
+                footer.append(compiled);
+            }
+        }
+        return footer;
     }
 
     /**
@@ -416,7 +442,7 @@ export class FormCompiler extends ViewCompiler {
             if (!compiled || isTextNode(compiled)) {
                 continue;
             }
-            if (getTag(child, true) === "field") {
+            if (getTag(child, true) === "field" && !child.classList.contains("btn")) {
                 compiled.setAttribute("showTooltip", true);
                 others.push(compiled);
             } else {
@@ -427,7 +453,14 @@ export class FormCompiler extends ViewCompiler {
             }
         }
         let slotId = 0;
-        const statusBarButtons = createElement("StatusBarButtons");
+        let statusBarButtons;
+        if (params.asDropdownItems) {
+            statusBarButtons = createElement("StatusBarDropdownItems");
+        } else {
+            statusBarButtons = createElement("StatusBarButtons", {
+                "t-if": "!__comp__.env.isSmall or __comp__.env.inDialog",
+            });
+        }
         for (const button of buttons) {
             const slot = createElement("t", {
                 "t-set-slot": `button_${slotId++}`,
@@ -435,6 +468,9 @@ export class FormCompiler extends ViewCompiler {
             });
             append(slot, button);
             append(statusBarButtons, slot);
+        }
+        if (params.asDropdownItems) {
+            return statusBarButtons;
         }
         append(statusBar, statusBarButtons);
         append(statusBar, others);
@@ -593,6 +629,9 @@ export class FormCompiler extends ViewCompiler {
             documentation: toStringExpression(el.getAttribute("documentation") || ""),
             record: `__comp__.props.record`,
         });
+        if (el.getAttribute("id")) {
+            setting.setAttribute("id", toStringExpression(el.getAttribute("id")));
+        }
         let string = toStringExpression(el.getAttribute("string") || "");
         let addLabel = true;
         Array.from(el.children).forEach((child, index) => {

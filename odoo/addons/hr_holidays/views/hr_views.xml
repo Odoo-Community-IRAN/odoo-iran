@@ -4,10 +4,11 @@
    <record id="hr_employee_action_from_department" model="ir.actions.act_window">
        <field name="name">Absent Employees</field>
        <field name="res_model">hr.employee</field>
-       <field name="view_mode">tree,kanban,form</field>
+       <field name="view_mode">list,kanban,form</field>
        <field name="context">{
            'search_default_on_timeoff': 1,
            'searchpanel_default_department_id': active_id,
+           'search_default_department_id': active_id,
            'default_department_id': active_id}
        </field>
        <field name="search_view_id" ref="hr.view_employee_filter"/>
@@ -22,50 +23,42 @@
             <data>
                 <xpath expr="//templates" position="before">
                     <t groups="hr_holidays.group_hr_holidays_user">
-                        <field name="leave_to_approve_count"/>
-                        <field name="allocation_to_approve_count"/>
                         <field name="total_employee"/>
                         <field name="absence_of_today"/>
                     </t>
                 </xpath>
 
-                <xpath expr="//div[hasclass('o_kanban_primary_right')]" position="inside">
-                    <t groups="hr_holidays.group_hr_holidays_user">
-                        <div t-if="record.leave_to_approve_count.raw_value > 0" class="row ml16">
-                            <div class="col">
-                                <a name="action_open_leave_department" type="object">
-                                    <field name="leave_to_approve_count"/> Time Off Requests
-                                </a>
-                            </div>
-                        </div>
-                        <div t-if="record.allocation_to_approve_count.raw_value > 0" class="row ml16">
-                            <div class="col">
-                                <a name="action_open_allocation_department" type="object">
-                                    <field name="allocation_to_approve_count"/> Allocation Requests
-                                </a>
-                            </div>
-                        </div>
-                    </t>
+                <xpath expr="//div[@name='kanban_primary_right']" position="inside">
+                    <div t-if="record.leave_to_approve_count.raw_value > 0" class="row ml32 g-0" groups="hr_holidays.group_hr_holidays_user">
+                        <a name="action_open_leave_department" class="col" type="object">
+                            <field name="leave_to_approve_count" groups="hr_holidays.group_hr_holidays_user"/> Time Off Requests
+                        </a>
+                    </div>
+                    <div t-if="record.allocation_to_approve_count.raw_value > 0" class="row ml32 g-0" groups="hr_holidays.group_hr_holidays_user">
+                        <a name="action_open_allocation_department" class="col" type="object">
+                            <field name="allocation_to_approve_count" groups="hr_holidays.group_hr_holidays_user"/> Allocation Requests
+                        </a>
+                    </div>
                 </xpath>
 
-                <xpath expr="//div[hasclass('o_kanban_card_lower_content')]" position="inside">
-                    <t groups="hr_holidays.group_hr_holidays_user">
-                        <div class="row o_kanban_primary_bottom bottom_block bg-view"
-                             t-if="record.absence_of_today.raw_value > 0">
-                            <div class="col-3">
-                                <a name="%(hr_employee_action_from_department)d" type="action" title="Absent Employee(s), Whose time off requests are either confirmed or validated on today">Absence</a>
-                            </div>
-                            <div class="col-9">
-                                <field name="absence_of_today" widget="progressbar" options="{'current_value': 'absence_of_today', 'max_value': 'total_employee', 'editable': false}"/>
-                            </div>
+                <xpath expr="//div[@name='kanban_card_lower_content']" position="inside">
+                    <div class="row g-0 border-top border-1 mt-2 pt-2 mx-n2 bg-view"
+                            t-if="record.absence_of_today.raw_value > 0" groups="hr_holidays.group_hr_holidays_user">
+                        <div class="col-3 ms-3">
+                            <a name="%(hr_employee_action_from_department)d" type="action" title="Absent Employee(s), Whose time off requests are either confirmed or validated on today">Absence</a>
                         </div>
-                    </t>
+                        <div class="col-7">
+                            <field name="absence_of_today" widget="progressbar" options="{'current_value': 'absence_of_today', 'max_value': 'total_employee', 'editable': false}"/>
+                        </div>
+                    </div>
                 </xpath>
 
                 <xpath expr="//div[hasclass('o_kanban_manage_reports')]" position="inside">
-                    <a role="menuitem" class="dropdown-item" name="%(hr_leave_action_action_department)d" type="action" groups="hr_holidays.group_hr_holidays_user">
-                        Time Off
-                    </a>
+                    <div role="menuitem">
+                        <a class="dropdown-item" name="%(hr_leave_report_action)d" type="action">
+                            Time Off
+                        </a>
+                    </div>
                 </xpath>
             </data>
         </field>
@@ -78,8 +71,8 @@
         <field name="inherit_id" ref="hr.view_employee_filter"/>
         <field name="arch" type="xml">
             <xpath expr="//filter[@name='my_team']" position="before">
-                <filter name="on_timeoff" string="On Time Off" domain="[('is_absent', '=', True)]"/>
                 <filter name="at_work" string="At work" domain="[('is_absent', '=', False)]"/>
+                <filter name="on_timeoff" string="On Time Off" domain="[('is_absent', '=', True)]"/>
                 <separator/>
             </xpath>
         </field>
@@ -138,12 +131,12 @@
                         context="{'search_default_employee_ids': id}"
                         invisible="not is_absent">
                         <div invisible="hr_icon_display != 'presence_holiday_present'"
-                              role="img" class="fa fa-fw fa-plane o_button_icon text-success" aria-label="Off Till" title="Off Till"/>
+                              role="img" class="fa fa-fw fa-plane o_button_icon text-success" aria-label="Back On" title="Back On"/>
                         <div invisible="hr_icon_display != 'presence_holiday_absent'" role="img"
-                             class="fa fa-fw fa-plane o_button_icon text-warning" aria-label="Off Till" title="Off Till"/>
+                             class="fa fa-fw fa-plane o_button_icon text-warning" aria-label="Back On" title="Back On"/>
                     <div class="o_field_widget o_stat_info">
                         <span class="o_stat_text">
-                            Off Till
+                            Back On
                         </span>
                         <span class="o_stat_value">
                             <field name="leave_date_to"/>
@@ -177,7 +170,7 @@
     </record>
 
     <record id="view_employee_tree_inherit_leave" model="ir.ui.view">
-        <field name="name">hr.employee.tree.leave</field>
+        <field name="name">hr.employee.list.leave</field>
         <field name="model">hr.employee</field>
         <field name="inherit_id" ref="hr.view_employee_tree"/>
         <field name="arch" type="xml">
@@ -203,12 +196,12 @@
                         class="oe_stat_button"
                         invisible="not is_absent">
                         <div role="img" invisible="hr_icon_display != 'presence_holiday_present'"
-                             class="fa fa-fw fa-plane o_button_icon text-success" aria-label="Off Till" title="Off Till"/>
+                             class="fa fa-fw fa-plane o_button_icon text-success" aria-label="Back On" title="Back On"/>
                         <div invisible="hr_icon_display != 'presence_holiday_absent'" role="img"
-                             class="fa fa-fw fa-plane o_button_icon text-warning" aria-label="Off Till" title="Off Till"/>
+                             class="fa fa-fw fa-plane o_button_icon text-warning" aria-label="Back On" title="Back On"/>
                     <div class="o_field_widget o_stat_info">
                         <span class="o_stat_text">
-                            Off Till
+                            Back On
                         </span>
                         <span class="o_stat_value">
                             <field name="leave_date_to"/>
@@ -249,14 +242,14 @@
                         class="oe_stat_button"
                         invisible="context.get('from_my_profile', False) or not is_absent">
                         <div invisible="hr_icon_display != 'presence_holiday_present'"
-                             role="img" class="fa fa-fw fa-plane o_button_icon text-success" aria-label="Off Till"
-                             title="Off Till"/>
+                             role="img" class="fa fa-fw fa-plane o_button_icon text-success" aria-label="Back On"
+                             title="Back On"/>
                         <div invisible="hr_icon_display != 'presence_holiday_absent'"
-                             role="img" class="fa fa-fw fa-plane o_button_icon text-warning" aria-label="Off Till"
-                             title="Off Till"/>
+                             role="img" class="fa fa-fw fa-plane o_button_icon text-warning" aria-label="Back On"
+                             title="Back On"/>
                     <div class="o_field_widget o_stat_info">
                         <span class="o_stat_text">
-                            Off Till
+                            Back On
                         </span>
                         <span class="o_stat_value">
                             <field name="leave_date_to"/>

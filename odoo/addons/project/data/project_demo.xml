@@ -35,6 +35,39 @@
         <record id="project_tags_05" model="project.tags">
             <field name="name">External</field>
         </record>
+        <record id="project_tags_06" model="project.tags">
+            <field name="name">Construction</field>
+        </record>
+        <record id="project_tags_07" model="project.tags">
+            <field name="name">Architecture</field>
+        </record>
+        <record id="project_tags_08" model="project.tags">
+            <field name="name">Design</field>
+        </record>
+        <record id="project_tags_09" model="project.tags">
+            <field name="name">Interior</field>
+        </record>
+        <record id="project_tags_10" model="project.tags">
+            <field name="name">Office</field>
+        </record>
+        <record id="project_tags_11" model="project.tags">
+            <field name="name">Finance</field>
+        </record>
+        <record id="project_tags_12" model="project.tags">
+            <field name="name">Social</field>
+        </record>
+        <record id="project_tags_13" model="project.tags">
+            <field name="name">Home</field>
+        </record>
+        <record id="project_tags_14" model="project.tags">
+            <field name="name">Work</field>
+        </record>
+        <record id="project_tags_15" model="project.tags">
+            <field name="name">Meeting</field>
+        </record>
+        <record id="project_tags_16" model="project.tags">
+            <field name="name">Priority</field>
+        </record>
 
         <!-- Analytic Accounts -->
         <!-- Needed so that we can have the same analytic accounts on hr_timesheet and project_account_budget -->
@@ -52,6 +85,12 @@
 
         <record id="analytic_renovations" model="account.analytic.account">
             <field name="name">Renovations</field>
+            <field name="plan_id" ref="analytic.analytic_plan_projects"/>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <record id="analytic_construction" model="account.analytic.account">
+            <field name="name">Home Construction</field>
             <field name="plan_id" ref="analytic.analytic_plan_projects"/>
             <field name="company_id" eval="False"/>
         </record>
@@ -74,11 +113,11 @@
         <record id="project_stage_2" model="project.task.type">
             <field name="sequence">20</field>
             <field name="name">Done</field>
-            <field name="fold" eval="True"/>
+            <field name="fold" eval="False"/>
         </record>
         <record id="project_stage_3" model="project.task.type">
             <field name="sequence">30</field>
-            <field name="name">Canceled</field>
+            <field name="name">Cancelled</field>
             <field name="fold" eval="True"/>
         </record>
 
@@ -94,7 +133,7 @@
             <field name="favorite_user_ids" eval="[Command.link(ref('base.user_admin'))]"/>
             <field name="tag_ids" eval="[Command.link(ref('project.project_tags_05'))]"/>
             <field name="stage_id" ref="project.project_project_stage_1"/>
-            <field name="analytic_account_id" ref="project.analytic_office_design"/>
+            <field name="account_id" ref="project.analytic_office_design"/>
         </record>
         <record id="project_1_follower_admin" model="mail.followers">
             <field name="res_model">project.project</field>
@@ -110,7 +149,7 @@
             <field name="favorite_user_ids" eval="[Command.link(ref('base.user_admin'))]"/>
             <field name="tag_ids" eval="[Command.link(ref('project.project_tags_04'))]"/>
             <field name="stage_id" ref="project.project_project_stage_1"/>
-            <field name="analytic_account_id" ref="project.analytic_research_development"/>
+            <field name="account_id" ref="project.analytic_research_development"/>
         </record>
         <record id="project_2_activity_1" model="mail.activity">
             <field name="res_id" ref="project_project_2"/>
@@ -133,7 +172,7 @@
             <field name="favorite_user_ids" eval="[Command.link(ref('base.user_admin'))]"/>
             <field name="tag_ids" eval="[Command.link(ref('project_tags_04')), Command.link(ref('project_tags_02'))]"/>
             <field name="stage_id" ref="project.project_project_stage_2"/>
-            <field name="analytic_account_id" ref="project.analytic_renovations"/>
+            <field name="account_id" ref="project.analytic_renovations"/>
             <field name="privacy_visibility">employees</field>
         </record>
 
@@ -154,6 +193,22 @@
             <field name="favorite_user_ids" eval="[Command.link(ref('base.user_admin'))]"/>
             <field name="tag_ids" eval="[Command.link(ref('project_tags_04')), Command.link(ref('project_tags_02'))]"/>
             <field name="stage_id" ref="project.project_project_stage_2"/>
+        </record>
+
+        <record id="project_home_construction" model="project.project">
+            <field name="date_start" eval="(DateTime.today() + relativedelta(months=-2)).strftime('%Y-%m-%d 10:00:00')"/>
+            <field name="date" eval="(DateTime.today() + relativedelta(days=-5)).strftime('%Y-%m-%d 17:00:00')"/>
+            <field name="name">Home Construction</field>
+            <field name="partner_id" ref="base.res_partner_2"/>
+            <field name="description">Designing and construction of an appealing, comfortable, safe and well-built home that fits the needs and wants of you and your family.</field>
+            <field name="color">5</field>
+            <field name="user_id" ref="base.user_demo"/>
+            <field name="type_ids" eval="[Command.link(ref('project_stage_0')), Command.link(ref('project_stage_1')), Command.link(ref('project_stage_2')), Command.link(ref('project_stage_3'))]"/>
+            <field name="favorite_user_ids" eval="[Command.link(ref('base.user_admin'))]"/>
+            <field name="tag_ids" eval="[Command.link(ref('project_tags_06')), Command.link(ref('project_tags_07')), Command.link(ref('project_tags_08')), Command.link(ref('project_tags_09'))]"/>
+            <field name="stage_id" ref="project.project_project_stage_2"/>
+            <field name="account_id" ref="project.analytic_construction"/>
+            <field name="privacy_visibility">portal</field>
         </record>
 
         <!-- Personal Stages: Mitchell Admin-->
@@ -190,7 +245,7 @@
         </record>
         <record id="project_personal_stage_admin_6" model="project.task.type">
             <field name="sequence">7</field>
-            <field name="name">Canceled</field>
+            <field name="name">Cancelled</field>
             <field name="fold" eval="True"/>
             <field name="user_id" ref="base.user_admin"/>
         </record>
@@ -229,7 +284,7 @@
         </record>
         <record id="project_personal_stage_demo_6" model="project.task.type">
             <field name="sequence">7</field>
-            <field name="name">Canceled</field>
+            <field name="name">Cancelled</field>
             <field name="fold" eval="True"/>
             <field name="user_id" ref="base.user_demo"/>
         </record>
@@ -253,6 +308,27 @@
             <field name="deadline" eval="(DateTime.now() + relativedelta(years=2)).strftime('%Y-%m-%d')"/>
             <field name="name">Final Phase</field>
             <field name="project_id" ref="project.project_project_1"/>
+        </record>
+
+        <!-- Project Home Construction -->
+        <record id="project_home_construction_milestone_1" model="project.milestone">
+            <field name="is_reached" eval="True"/>
+            <field name="deadline" eval="time.strftime('%Y-%m-2')"/>
+            <field name="name">Piping Installation</field>
+            <field name="reached_date" eval="time.strftime('%Y-%m-2')"/>
+            <field name="project_id" ref="project.project_home_construction"/>
+        </record>
+        <record id="project_home_construction_milestone_2" model="project.milestone">
+            <field name="is_reached" eval="False"/>
+            <field name="deadline" eval="time.strftime('%Y-%m-5')"/>
+            <field name="name">Door and Window Framing</field>
+            <field name="project_id" ref="project.project_home_construction"/>
+        </record>
+        <record id="project_home_construction_milestone_3" model="project.milestone">
+            <field name="is_reached" eval="False"/>
+            <field name="deadline" eval="time.strftime('%Y-%m-10')"/>
+            <field name="name">Wiring</field>
+            <field name="project_id" ref="project.project_home_construction"/>
         </record>
 
         <!-- Project 1 Tasks -->
@@ -885,7 +961,7 @@ Send it ASAP, its urgent.</field>
             <field name="priority">1</field>
             <field name="project_id" ref="project.project_project_2"/>
             <field name="name">Social network integration</field>
-            <field name="description">Facebook and Twitter integration</field>
+            <field name="description">Facebook and X integration</field>
             <field name="stage_id" ref="project_stage_1"/>
             <field name="create_date" eval="DateTime.now() - relativedelta(months=5)"/>
             <field name="depend_on_ids" eval="[Command.link(ref('project.project_2_task_3'))]"/>
@@ -1140,21 +1216,144 @@ Send it ASAP, its urgent.</field>
             <field name="user_ids" eval="[Command.link(ref('base.user_admin'))]"/>
             <field name="project_id"/>
             <field name="name">Buy a gift for Marc Demo's birthday</field>
+            <field name="description">Select a thoughtful gift for Marc Demo's birthday .</field>
+            <field name="tag_ids" eval="[Command.set([ref('project_tags_16')])]"/>
         </record>
         <record id="project_private_task_2" model="project.task">
             <field name="user_ids" eval="[Command.link(ref('base.user_admin'))]"/>
             <field name="project_id"/>
             <field name="name">Change left screen cable</field>
+            <field name="description">Perform a replacement of the left screen cable to address any issues with connectivity or display quality.</field>
+            <field name="tag_ids" eval="[Command.set([ref('project_tags_14')])]"/>
         </record>
         <record id="project_private_task_3" model="project.task">
             <field name="user_ids" eval="[Command.link(ref('base.user_demo'))]"/>
             <field name="project_id"/>
             <field name="name">Clean kitchen fridge</field>
+            <field name="tag_ids" eval="[Command.set([ref('project_tags_13')])]"/>
         </record>
         <record id="project_private_task_4" model="project.task">
             <field name="user_ids" eval="[Command.link(ref('base.user_demo'))]"/>
             <field name="project_id"/>
             <field name="name">Check employees lunch accounts</field>
+            <field name="tag_ids" eval="[Command.set([ref('project_tags_10')])]"/>
+        </record>
+
+        <!-- demo data for Today-->
+        <record id="project_private_task_5" model="project.task">
+            <field name="user_ids" eval="[Command.link(ref('base.user_admin')), Command.link(ref('base.user_demo'))]"/>
+            <field name="project_id"/>
+            <field name="name">Attend a project status meeting</field>
+            <field name="description">Join the scheduled project status meeting to provide updates, discuss progress, and align with team members.</field>
+            <field name="tag_ids" eval="[Command.set([ref('project_tags_15')])]"/>
+        </record>
+        <record id="project_private_task_6" model="project.task">
+            <field name="user_ids" eval="[Command.link(ref('base.user_admin'))]"/>
+            <field name="project_id"/>
+            <field name="name">Review and reply to emails</field>
+            <field name="description">Spend time going through inbox, reviewing and replying to important emails to stay organized and maintain communication.</field>
+            <field name="tag_ids" eval="[Command.set([ref('project_tags_10')])]"/>
+        </record>
+
+        <!-- demo data  for This week-->
+        <record id="project_private_task_7" model="project.task">
+            <field name="user_ids" eval="[Command.link(ref('base.user_admin')), Command.link(ref('base.user_demo'))]"/>
+            <field name="project_id"/>
+            <field name="name">Empty Trash Bins</field>
+            <field name="description">Take a few minutes to empty and replace the trash bins in the office. Keeping living space clean and odor-free.</field>
+            <field name="tag_ids" eval="[Command.set([ref('project_tags_14')])]"/>
+        </record>
+
+        <!-- demo data  for This month-->
+        <record id="project_private_task_8" model="project.task">
+            <field name="user_ids" eval="[Command.link(ref('base.user_admin')), Command.link(ref('base.user_demo'))]"/>
+            <field name="project_id"/>
+            <field name="name">Conduct a training session</field>
+            <field name="description">Conduct a training session to enhance team members proficiency and productivity.</field>
+            <field name="tag_ids" eval="[Command.set([ref('project_tags_10')])]"/>
+        </record>
+        <record id="project_private_task_9" model="project.task">
+            <field name="user_ids" eval="[Command.link(ref('base.user_admin'))]"/>
+            <field name="project_id"/>
+            <field name="name">Review Finances</field>
+            <field name="description">Take a comprehensive look at finances, including budgeting, savings, and investments.</field>
+            <field name="tag_ids" eval="[Command.set([ref('project_tags_11')])]"/>
+        </record>
+
+        <!-- demo data  for Later-->
+        <record id="project_private_task_10" model="project.task">
+            <field name="user_ids" eval="[Command.link(ref('base.user_admin'))]"/>
+            <field name="project_id"/>
+            <field name="name">Research Investment Options</field>
+            <field name="description">Conduct thorough research on various investment options to make informed decisions about growing your financial portfolio.</field>
+            <field name="tag_ids" eval="[Command.set([ref('project_tags_11')])]"/>
+        </record>
+        <record id="project_private_task_11" model="project.task">
+            <field name="user_ids" eval="[Command.link(ref('base.user_admin')), Command.link(ref('base.user_demo'))]"/>
+            <field name="project_id"/>
+            <field name="name">Explore Charitable Opportunities</field>
+            <field name="description">Explore various charitable organizations and opportunities to contribute to meaningful causes and make a positive impact on the community.</field>
+            <field name="tag_ids" eval="[Command.set([ref('project_tags_12')])]"/>
+        </record>
+
+        <!-- demo data  for Cancel-->
+        <record id="project_private_task_12" model="project.task">
+            <field name="user_ids" eval="[Command.link(ref('base.user_admin'))]"/>
+            <field name="project_id"/>
+            <field name="name">Attend a Local Event</field>
+            <field name="description">Participate in a local event to connect with the community</field>
+            <field name="tag_ids" eval="[Command.set([ref('project_tags_12')])]"/>
+        </record>
+        <record id="project_private_task_13" model="project.task">
+            <field name="user_ids" eval="[Command.link(ref('base.user_admin'))]"/>
+            <field name="project_id"/>
+            <field name="name">Review Document</field>
+            <field name="description">Thoroughly review and provide feedback on an important document.</field>
+            <field name="tag_ids" eval="[Command.set([ref('project_tags_10')])]"/>
+        </record>
+
+        <!-- Demo data Archived tasks  -->
+        <record id="project_private_task_14" model="project.task">
+            <field name="user_ids" eval="[Command.link(ref('base.user_admin'))]"/>
+            <field name="project_id"/>
+            <field name="name">Lead a Team Discussion</field>
+            <field name="description">Facilitate a team discussion to encourage idea sharing and decision-making.</field>
+            <field name="tag_ids" eval="[Command.set([ref('project_tags_16'), ref('project_tags_15')])]"/>
+            <field name="active" eval="False"/>
+        </record>
+        <record id="project_private_task_15" model="project.task">
+            <field name="user_ids" eval="[Command.link(ref('base.user_admin'))]"/>
+            <field name="project_id"/>
+            <field name="name">Attend a Training or Workshop</field>
+            <field name="description">Participate in a training session or workshop to develop new skills or gain knowledge relevant to your work.</field>
+            <field name="tag_ids" eval="[Command.set([ref('project_tags_14')])]"/>
+            <field name="active" eval="False"/>
+        </record>
+        <record id="project_private_task_16" model="project.task">
+            <field name="user_ids" eval="[Command.link(ref('base.user_admin'))]"/>
+            <field name="project_id"/>
+            <field name="name">Review and Provide Feedback</field>
+            <field name="description">Attend a meeting to review documents, proposals, or reports and provide constructive feedback.</field>
+            <field name="tag_ids" eval="[Command.set([ref('project_tags_10')])]"/>
+            <field name="active" eval="False"/>
+        </record>
+
+        <!-- Demo data for Done which are Closed/Mark as Done tasks -->
+        <record id="project_private_task_17" model="project.task">
+            <field name="user_ids" eval="[Command.link(ref('base.user_admin'))]"/>
+            <field name="project_id"/>
+            <field name="name">Participate in a Design Review</field>
+            <field name="description">Join a meeting where the team reviews and discusses the design or user experience aspects of a project.</field>
+            <field name="tag_ids" eval="[Command.set([ref('project_tags_15')])]"/>
+            <field name="state">1_done</field>
+        </record>
+        <record id="project_private_task_18" model="project.task">
+            <field name="user_ids" eval="[Command.link(ref('base.user_admin'))]"/>
+            <field name="project_id"/>
+            <field name="name">Share Research Findings</field>
+            <field name="description">Present findings from research you conducted to inform a project or decision.</field>
+            <field name="tag_ids" eval="[Command.set([ref('project_tags_14')])]"/>
+            <field name="state">1_done</field>
         </record>
 
         <!-- Tasks personal stages -->
@@ -1274,6 +1473,94 @@ Send it ASAP, its urgent.</field>
             <value eval="{'stage_id': ref('project_personal_stage_demo_6')}"/>
         </function>
 
+        <!-- demo data functions for Demo  -->
+        <function model="project.task.stage.personal" name="write">
+            <value model="project.task.stage.personal" search="[('task_id', '=', ref('project_private_task_5')), ('user_id', '=', ref('base.user_demo'))]"/>
+            <value eval="{'stage_id': ref('project_personal_stage_demo_1')}"/>
+        </function>
+        <function model="project.task.stage.personal" name="write">
+            <value model="project.task.stage.personal" search="[('task_id', '=', ref('project_private_task_7')), ('user_id', '=', ref('base.user_demo'))]"/>
+            <value eval="{'stage_id': ref('project_personal_stage_demo_2')}"/>
+        </function>
+        <function model="project.task.stage.personal" name="write">
+            <value model="project.task.stage.personal" search="[('task_id', '=', ref('project_private_task_8')), ('user_id', '=', ref('base.user_demo'))]"/>
+            <value eval="{'stage_id': ref('project_personal_stage_demo_3')}"/>
+        </function>
+        <function model="project.task.stage.personal" name="write">
+            <value model="project.task.stage.personal" search="[('task_id', '=', ref('project_private_task_11')), ('user_id', '=', ref('base.user_demo'))]"/>
+            <value eval="{'stage_id': ref('project_personal_stage_demo_4')}"/>
+        </function>
+
+        <!-- demo data fuctions for today -->
+        <function model="project.task.stage.personal" name="write">
+            <value model="project.task.stage.personal" search="[('task_id', '=', ref('project_private_task_5')), ('user_id', '=', ref('base.user_admin'))]"/>
+            <value eval="{'stage_id': ref('project_personal_stage_admin_1')}"/>
+        </function>
+        <function model="project.task.stage.personal" name="write">
+            <value model="project.task.stage.personal" search="[('task_id', '=', ref('project_private_task_6')), ('user_id', '=', ref('base.user_admin'))]"/>
+            <value eval="{'stage_id': ref('project_personal_stage_admin_1')}"/>
+        </function>
+
+        <!-- demo data functions for this week -->
+        <function model="project.task.stage.personal" name="write">
+            <value model="project.task.stage.personal" search="[('task_id', '=', ref('project_private_task_7')), ('user_id', '=', ref('base.user_admin'))]"/>
+            <value eval="{'stage_id': ref('project_personal_stage_admin_2')}"/>
+        </function>
+
+        <!-- demo data functions for this month -->
+        <function model="project.task.stage.personal" name="write">
+            <value model="project.task.stage.personal" search="[('task_id', '=', ref('project_private_task_8')), ('user_id', '=', ref('base.user_admin'))]"/>
+            <value eval="{'stage_id': ref('project_personal_stage_admin_3')}"/>
+        </function>
+        <function model="project.task.stage.personal" name="write">
+            <value model="project.task.stage.personal" search="[('task_id', '=', ref('project_private_task_9')), ('user_id', '=', ref('base.user_admin'))]"/>
+            <value eval="{'stage_id': ref('project_personal_stage_admin_3')}"/>
+        </function>
+
+        <!-- demo data functions for Later -->
+        <function model="project.task.stage.personal" name="write">
+            <value model="project.task.stage.personal" search="[('task_id', '=', ref('project_private_task_10')), ('user_id', '=', ref('base.user_admin'))]"/>
+            <value eval="{'stage_id': ref('project_personal_stage_admin_4')}"/>
+        </function>
+        <function model="project.task.stage.personal" name="write">
+            <value model="project.task.stage.personal" search="[('task_id', '=', ref('project_private_task_11')), ('user_id', '=', ref('base.user_admin'))]"/>
+            <value eval="{'stage_id': ref('project_personal_stage_admin_4')}"/>
+        </function>
+
+        <!-- demo data functions for Cancel -->
+        <function model="project.task.stage.personal" name="write">
+            <value model="project.task.stage.personal" search="[('task_id', '=', ref('project_private_task_12')), ('user_id', '=', ref('base.user_admin'))]"/>
+            <value eval="{'stage_id': ref('project_personal_stage_admin_6')}"/>
+        </function>
+        <function model="project.task.stage.personal" name="write">
+            <value model="project.task.stage.personal" search="[('task_id', '=', ref('project_private_task_13')), ('user_id', '=', ref('base.user_admin'))]"/>
+            <value eval="{'stage_id': ref('project_personal_stage_admin_6')}"/>
+        </function>
+
+        <!-- demo data function for Archived tasks  -->
+        <function model="project.task.stage.personal" name="write">
+            <value model="project.task.stage.personal" search="[('task_id', '=', ref('project_private_task_14')), ('user_id', '=', ref('base.user_admin'))]"/>
+            <value eval="{'stage_id': ref('project_personal_stage_admin_1')}"/>
+        </function>
+        <function model="project.task.stage.personal" name="write">
+            <value model="project.task.stage.personal" search="[('task_id', '=', ref('project_private_task_15')), ('user_id', '=', ref('base.user_admin'))]"/>
+            <value eval="{'stage_id': ref('project_personal_stage_admin_2')}"/>
+        </function>
+        <function model="project.task.stage.personal" name="write">
+            <value model="project.task.stage.personal" search="[('task_id', '=', ref('project_private_task_16')), ('user_id', '=', ref('base.user_admin'))]"/>
+            <value eval="{'stage_id': ref('project_personal_stage_admin_3')}"/>
+        </function>
+
+        <!-- Demo data function for Done which are Closed/Mark as Done tasks -->
+        <function model="project.task.stage.personal" name="write">
+            <value model="project.task.stage.personal" search="[('task_id', '=', ref('project_private_task_17')), ('user_id', '=', ref('base.user_admin'))]"/>
+            <value eval="{'stage_id': ref('project_personal_stage_admin_5')}"/>
+        </function>
+        <function model="project.task.stage.personal" name="write">
+            <value model="project.task.stage.personal" search="[('task_id', '=', ref('project_private_task_18')), ('user_id', '=', ref('base.user_admin'))]"/>
+            <value eval="{'stage_id': ref('project_personal_stage_admin_5')}"/>
+        </function>
+
         <!-- Change task creation notifications date -->
         <function model="mail.message" name="write">
             <value model="mail.message"
@@ -1368,6 +1655,40 @@ Send it ASAP, its urgent.</field>
             <field name="user_id" eval="ref('base.user_admin')"/>
             <field name="progress" eval="100"/>
             <field name="status">done</field>
+        </record>
+        <!-- Home Construction Project Update -->
+        <record id="project_update_construction_1" model="project.update" context="{'default_project_id': ref('project.project_home_construction')}">
+            <field name="name">Design Approval</field>
+            <field name="user_id" eval="ref('base.user_admin')"/>
+            <field name="progress" eval="65"/>
+            <field name="status">on_track</field>
+            <field name="date" eval="time.strftime('%Y-%m-5')"/>
+        </record>
+        <record id="project_update_construction_2" model="project.update" context="{'default_project_id': ref('project.project_home_construction')}">
+            <field name="name">Construction</field>
+            <field name="user_id" eval="ref('base.user_admin')"/>
+            <field name="progress" eval="30"/>
+            <field name="status">on_track</field>
+            <field name="date" eval="time.strftime('%Y-%m-1')"/>
+        </record>
+        <!-- Scheduled activity for Todo Task   -->
+        <record id="project_private_task_9_mail" model="mail.activity">
+            <field name="res_id" ref="project_private_task_9"/>
+            <field name="res_model_id" ref="project.model_project_task"/>
+            <field name="activity_type_id" ref="mail.mail_activity_data_email"/>
+            <field name="date_deadline" eval="(DateTime.today() + relativedelta(days=20)).strftime('%Y-%m-%d %H:%M')"/>
+            <field name="summary">Collect data regarding finances</field>
+            <field name="create_uid" ref="base.user_admin"/>
+            <field name="user_id" ref="base.user_admin"/>
+        </record>
+        <record id="project_private_task_6_mail" model="mail.activity">
+            <field name="res_id" ref="project_private_task_6"/>
+            <field name="res_model_id" ref="project.model_project_task"/>
+            <field name="activity_type_id" ref="mail.mail_activity_data_email"/>
+            <field name="date_deadline" eval="(DateTime.today() + relativedelta(hours=3)).strftime('%Y-%m-%d %H:%M')"/>
+            <field name="summary">Review Mark as Important Emails First</field>
+            <field name="create_uid" ref="base.user_admin"/>
+            <field name="user_id" ref="base.user_admin"/>
         </record>
     </data>
 </odoo>

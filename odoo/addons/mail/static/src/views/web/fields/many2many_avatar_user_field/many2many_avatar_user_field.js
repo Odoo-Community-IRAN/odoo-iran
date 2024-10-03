@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { useAssignUserCommand } from "@mail/views/web/fields/assign_user_command_hook";
 
 import { registry } from "@web/core/registry";
@@ -16,8 +14,9 @@ import {
     KanbanMany2ManyTagsAvatarFieldTagsList,
 } from "@web/views/fields/many2many_tags_avatar/many2many_tags_avatar_field";
 
-export class Many2ManyAvatarUserTagsList extends TagsList {}
-Many2ManyAvatarUserTagsList.template = "mail.Many2ManyAvatarUserTagsList";
+export class Many2ManyAvatarUserTagsList extends TagsList {
+    static template = "mail.Many2ManyAvatarUserTagsList";
+}
 
 const WithUserChatter = (T) =>
     class UserChatterMixin extends T {
@@ -29,11 +28,21 @@ const WithUserChatter = (T) =>
             this.avatarCard = usePopover(AvatarCardPopover);
         }
 
+        displayAvatarCard(record) {
+            return this.relation === "res.users";
+        }
+
+        getAvatarCardProps(record) {
+            return {
+                id: record.resId,
+            };
+        }
+
         getTagProps(record) {
             return {
                 ...super.getTagProps(...arguments),
                 onImageClicked: (ev) => {
-                    if (this.relation !== "res.users") {
+                    if (!this.displayAvatarCard(record)) {
                         return;
                     }
                     const target = ev.currentTarget;
@@ -41,9 +50,7 @@ const WithUserChatter = (T) =>
                         !this.avatarCard.isOpen ||
                         (this.lastOpenedId && record.resId !== this.lastOpenedId)
                     ) {
-                        this.avatarCard.open(target, {
-                            id: record.resId,
-                        });
+                        this.avatarCard.open(target, this.getAvatarCardProps(record));
                         this.lastOpenedId = record.resId;
                     }
                 },

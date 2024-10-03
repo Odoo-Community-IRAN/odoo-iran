@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
 import { PropertyValue } from "./property_value";
 import { CheckBox } from "@web/core/checkbox/checkbox";
@@ -18,6 +16,36 @@ import { uuid } from "../../utils";
 import { Component, useState, onWillUpdateProps, useEffect, useRef } from "@odoo/owl";
 
 export class PropertyDefinition extends Component {
+    static template = "web.PropertyDefinition";
+    static components = {
+        CheckBox,
+        DomainSelector,
+        Dropdown,
+        DropdownItem,
+        PropertyValue,
+        Many2XAutocomplete,
+        ModelSelector,
+        PropertyDefinitionSelection,
+        PropertyTags,
+    };
+    static props = {
+        readonly: { type: Boolean, optional: true },
+        canChangeDefinition: { type: Boolean, optional: true },
+        checkDefinitionWriteAccess: { type: Function, optional: true },
+        propertyDefinition: { optional: true },
+        context: { type: Object },
+        isNewlyCreated: { type: Boolean, optional: true },
+        // index and number of properties, to hide the move arrows when needed
+        propertyIndex: { type: Number },
+        propertiesSize: { type: Number },
+        // events
+        onChange: { type: Function, optional: true },
+        onDelete: { type: Function, optional: true },
+        onPropertyMove: { type: Function, optional: true },
+        // prop needed by the popover service
+        close: { type: Function, optional: true },
+    };
+
     setup() {
         this.orm = useService("orm");
 
@@ -383,33 +411,3 @@ export class PropertyDefinition extends Component {
         return allTypes.find((type) => type[0] === propertyType)[1];
     }
 }
-
-PropertyDefinition.template = "web.PropertyDefinition";
-PropertyDefinition.components = {
-    CheckBox,
-    DomainSelector,
-    Dropdown,
-    DropdownItem,
-    PropertyValue,
-    Many2XAutocomplete,
-    ModelSelector,
-    PropertyDefinitionSelection,
-    PropertyTags,
-};
-PropertyDefinition.props = {
-    readonly: { type: Boolean, optional: true },
-    canChangeDefinition: { type: Boolean, optional: true },
-    checkDefinitionWriteAccess: { type: Function, optional: true },
-    propertyDefinition: { optional: true },
-    context: { type: Object },
-    isNewlyCreated: { type: Boolean, optional: true },
-    // index and number of properties, to hide the move arrows when needed
-    propertyIndex: { type: Number },
-    propertiesSize: { type: Number },
-    // events
-    onChange: { type: Function, optional: true },
-    onDelete: { type: Function, optional: true },
-    onPropertyMove: { type: Function, optional: true },
-    // prop needed by the popover service
-    close: { type: Function, optional: true },
-};

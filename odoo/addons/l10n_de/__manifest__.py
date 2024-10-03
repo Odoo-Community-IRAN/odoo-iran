@@ -7,7 +7,7 @@
     'countries': ['de'],
     'author': 'openbig.org (http://www.openbig.org)',
     'version': '2.0',
-    'website': 'https://www.odoo.com/documentation/17.0/applications/finance/fiscal_localizations/germany.html',
+    'website': 'https://www.odoo.com/documentation/master/applications/finance/fiscal_localizations/germany.html',
     'category': 'Accounting/Localizations/Account Charts',
     'description': """
 Dieses  Modul beinhaltet einen deutschen Kontenrahmen basierend auf dem SKR03 oder SKR04.
@@ -19,14 +19,18 @@ German accounting chart and localization.
         'base_iban',
         'base_vat',
         'l10n_din5008',
+        'account',
     ],
+    'auto_install': ['account'],
     'data': [
         'data/account_account_tags_data.xml',
         'views/account_view.xml',
         'views/res_company_views.xml',
+        'wizard/account_secure_entries_wizard.xml',
     ],
     'demo': [
         'demo/demo_company.xml',
     ],
+    'post_init_hook': '_post_init_hook',
     'license': 'LGPL-3',
 }

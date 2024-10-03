@@ -2,7 +2,7 @@
 
 from odoo import api, models
 
-from odoo.addons.spreadsheet.utils import (
+from odoo.addons.spreadsheet.utils.formatting import (
     strftime_format_to_spreadsheet_date_format,
     strftime_format_to_spreadsheet_time_format,
 )
@@ -35,4 +35,5 @@ class Lang(models.Model):
             "dateFormat": strftime_format_to_spreadsheet_date_format(self.date_format),
             "timeFormat": strftime_format_to_spreadsheet_time_format(self.time_format),
             "formulaArgSeparator": ";" if self.decimal_point == "," else ",",
+            "weekStart": int(self.week_start),
         }

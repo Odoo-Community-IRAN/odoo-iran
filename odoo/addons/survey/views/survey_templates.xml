@@ -59,7 +59,7 @@
                         <t t-set="_message"></t>
                         <t t-set="_utm_medium" t-valuef="survey"/>
                     </div>
-                    <div class="o_survey_navigation_wrapper d-inline-block d-print-none" t-call="survey.survey_navigation">
+                    <div t-if="not no_survey_navigation" class="o_survey_navigation_wrapper d-inline-block d-print-none" t-call="survey.survey_navigation">
                     </div>
                 </div>
             </div>
@@ -191,10 +191,21 @@
             t-att-data-timer="timer_start"
             t-att-data-time-limit-minutes="time_limit_minutes"/>
         <t t-if="survey.questions_layout == 'one_page'">
-            <t t-foreach='survey.question_and_page_ids' t-as='question'>
-                <h2 t-if="question.is_page" t-field='question.title' class="o_survey_title pb16 text-break"/>
-                <div t-if="question.is_page" t-field='question.description' class="text-break"/>
-                <t t-if="not question.is_page and question in answer.predefined_question_ids" t-call="survey.question_container"/>
+            <!-- Questions without section -->
+            <t t-foreach="survey.question_ids.filtered(lambda q: not q.page_id)" t-as="question">
+                <t t-if="question in answer.predefined_question_ids" t-call="survey.question_container"/>
+            </t>
+            <!-- Questions with section -->
+            <t t-foreach="survey.page_ids" t-as="page">
+                <t t-set="display_section" t-value="page.description or any(not q.triggering_answer_ids for q in page.question_ids)
+                    or (survey.questions_selection == 'random' and page.question_ids and page.random_questions_count > 0)"/>
+                <div t-attf-class="js_section_wrapper #{'d-none' if not display_section else ''}">
+                    <h2 t-field="page.title" class="o_survey_title pb16 text-break"/>
+                    <div t-field="page.description" class="o_survey_description text-break"/>
+                    <t t-foreach="page.question_ids" t-as="question">
+                        <t t-if="question in answer.predefined_question_ids" t-call="survey.question_container"/>
+                    </t>
+                </div>
             </t>
 
             <div class="text-center mt16 mb256">
@@ -278,12 +289,16 @@
     <template id="survey_fill_form_done" name="Survey: finished">
         <div class="wrap">
             <div class="o_survey_finished mt32 mb32">
-                <h1 class="fs-2">Thank you!</h1>
+                <h1 class="fs-2">
+                    <t t-if="survey.scoring_type != 'no_scoring'">
+                        You scored <t t-out="answer.scoring_percentage"/>%
+                    </t>
+                    <t t-else="">Thank you!</t>
+                </h1>
                 <div t-field="survey.description_done" class="oe_no_empty" />
                 <div class="row">
                     <div class="col">
                         <t t-if="survey.scoring_type != 'no_scoring' and survey.scoring_success_min">
-                            <div>You scored <t t-esc="answer.scoring_percentage" />%</div>
                             <t t-if="answer.scoring_success">
                                 <div>Congratulations, you have passed the test!</div>
 
@@ -300,9 +315,14 @@
                                 <div>Unfortunately, you have failed the test.</div>
                             </t>
                         </t>
-                        <t t-call="survey.survey_button_retake"/>
-                        <div t-if="survey.scoring_type != 'scoring_without_answers'" class="o_survey_review">
-                            If you wish, you can <a t-att-href="'/survey/print/%s?answer_token=%s&amp;review=True' % (survey.access_token, answer.access_token)">review your answers</a>
+                        <div class="d-flex gap-3 mt-3">
+                            <t t-call="survey.survey_button_retake"/>
+                            <p t-if="survey.scoring_type != 'scoring_without_answers'">
+                                <a role="button" class="o_survey_review btn btn-secondary btn-lg"
+                                    t-att-href="'/survey/print/%s?answer_token=%s&amp;review=True' % (survey.access_token, answer.access_token)">
+                                    Review your answers
+                                </a>
+                            </p>
                         </div>
                     </div>
                     <div class="col-6 text-center" t-if="survey.certification_give_badge and answer.scoring_success">
@@ -356,6 +376,7 @@
             <t t-if="question.question_type == 'date'" t-call="survey.question_date"/>
             <t t-if="question.question_type == 'datetime'" t-call="survey.question_datetime"/>
             <t t-if="question.question_type == 'simple_choice'" t-call="survey.question_simple_choice"/>
+            <t t-if="question.question_type == 'scale'" t-call="survey.question_scale"/>
             <t t-if="question.question_type == 'multiple_choice'" t-call="survey.question_multiple_choice"/>
             <t t-if="question.question_type == 'matrix'" t-call="survey.question_matrix"/>
             <div t-attf-class="o_survey_question_error d-flex align-items-center justify-content-between overflow-hidden
@@ -396,6 +417,51 @@
         </div>
     </template>
 
+    <template id="question_scale" name="Question: scale">
+        <!-- A question already answered that the user resets is marked as skipped and not deleted, -->
+        <!-- so we use the flag skipped to restore or not the answer state. -->
+        <t t-set="answer_line" t-value="answer_lines and not answer_lines[0].skipped and answer_lines[0]"/>
+        <div class="o_survey_answer_wrapper o_survey_form_choice"
+             t-att-data-name="question.id"
+             t-att-data-is-skipped-question="is_skipped_question or None"
+             data-question-type="scale">
+            <div role="radiogroup" class="btn-group d-flex mb-2" t-att-aria-label="">
+                <t t-foreach="range(question.scale_min, question.scale_max + 1)" t-as="value">
+                    <t t-set="answer_selected" t-value="answer_line and answer_line.value_scale == value"/>
+                    <label t-attf-class="o_survey_choice_btn flex-shrink-1 rounded text-nowrap #{'me-2' if not value_last else ''} #{'o_survey_selected' if answer_selected else ''}"
+                           t-attf-for="{{ question.id }}_{{ value }}">
+                        <div class="d-none d-md-flex align-items-center fs-5">
+                            <div class="fw-bold my-3 flex-fill align-self-center text-center" t-out="value"/>
+                            <i class="fa fa-check-circle me-1 my-3"/>
+                            <i class="fa fa-circle-thin me-1 my-3"/>
+                        </div>
+                        <div class="d-block d-md-none my-3 text-center fs-5">
+                            <div class="fw-bold" t-out="value"/>
+                            <i class="fa fa-check-circle"/>
+                            <i class="fa fa-circle-thin"/>
+                        </div>
+                        <input autocomplete="off"
+                               class="btn-check"
+                               type="radio"
+                               t-attf-class="o_survey_form_choice_item invisible position-absolute #{'o_survey_form_choice_item_selected' if answer_selected else ''}"
+                               t-att-data-selection-key="letters[value_index] if useKeySelection else ''"
+                               t-attf-name="{{ question.id }}"
+                               t-att-checked="'checked' if answer_selected else None"
+                               t-attf-value="{{ value }}"
+                               t-attf-id="{{ question.id }}_{{ value }}"
+                        />
+                    </label>
+                </t>
+            </div>
+            <div t-if="question.scale_min_label or question.scale_mid_label or question.scale_max_label"
+                 class="d-flex justify-content-between text-primary">
+                <div class="text-start" t-out="question.scale_min_label"/>
+                <div class="text-center" t-out="question.scale_mid_label"/>
+                <div class="text-end" t-out="question.scale_max_label"/>
+            </div>
+        </div>
+    </template>
+
     <template id="question_date" name="Question: date box">
         <div class="input-group o_survey_form_date o_survey_answer_wrapper p-1 rounded">
             <input type="text" class="form-control datetimepicker-input o_survey_question_date bg-transparent rounded-0 p-0"
@@ -405,7 +471,7 @@
                    data-widget="datetime-picker" data-widget-type="date"
                    t-att-data-min-date="question.validation_min_date"
                    t-att-data-max-date="question.validation_max_date"/>
-            <div t-if="not survey_form_readonly" class="position-absolute input-group-text text-primary border-0 bg-transparent p-0 end-0 pe-none"><i class="fa fa-calendar"></i></div>
+            <div t-if="not survey_form_readonly" class="position-absolute input-group-text o_input_group_date_icon text-primary border-0 bg-transparent p-0 end-0"><i class="fa fa-calendar"></i></div>
         </div>
     </template>
 
@@ -418,7 +484,7 @@
                    data-widget="datetime-picker" data-widget-type="datetime"
                    t-att-data-min-date="question.validation_min_datetime"
                    t-att-data-max-date="question.validation_max_datetime"/>
-            <div t-if="not survey_form_readonly" class="position-absolute input-group-text text-primary border-0 bg-transparent p-0 end-0 pe-none"><i class="fa fa-calendar"></i></div>
+            <div t-if="not survey_form_readonly" class="position-absolute input-group-text o_input_group_date_icon text-primary border-0 bg-transparent p-0 end-0"><i class="fa fa-calendar"></i></div>
         </div>
     </template>
 

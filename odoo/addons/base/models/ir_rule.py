@@ -5,7 +5,7 @@ import logging
 from odoo import api, fields, models, tools, _
 from odoo.exceptions import AccessError, ValidationError
 from odoo.osv import expression
-from odoo.tools import config
+from odoo.tools import config, SQL
 from odoo.tools.safe_eval import safe_eval, time
 
 _logger = logging.getLogger(__name__)
@@ -119,16 +119,17 @@ class IrRule(models.Model):
         if self.env.su:
             return self.browse(())
 
-        query = """ SELECT r.id FROM ir_rule r JOIN ir_model m ON (r.model_id=m.id)
-                    WHERE m.model=%s AND r.active AND r.perm_{mode}
-                    AND (r.id IN (SELECT rule_group_id FROM rule_group_rel rg
-                                  JOIN res_groups_users_rel gu ON (rg.group_id=gu.gid)
-                                  WHERE gu.uid=%s)
-                         OR r.global)
-                    ORDER BY r.id
-                """.format(mode=mode)
-        self._cr.execute(query, (model_name, self._uid))
-        return self.browse(row[0] for row in self._cr.fetchall())
+        sql = SQL("""
+            SELECT r.id FROM ir_rule r
+            JOIN ir_model m ON (r.model_id=m.id)
+            WHERE m.model = %s AND r.active AND r.perm_%s
+                AND (r.global OR r.id IN (
+                    SELECT rule_group_id FROM rule_group_rel rg
+                    WHERE rg.group_id IN %s
+                ))
+            ORDER BY r.id
+        """, model_name, SQL(mode), tuple(self.env.user._get_group_ids()) or (None,))
+        return self.browse(v for v, in self.env.execute_query(sql))
 
     @api.model
     @tools.conditional(
@@ -213,16 +214,11 @@ class IrRule(models.Model):
         }
         user_description = f"{self.env.user.name} (id={self.env.user.id})"
         operation_error = _("Uh-oh! Looks like you have stumbled upon some top-secret records.\n\n" \
-            "Sorry, %s doesn't have '%s' access to:", user_description, operations[operation])
-        failing_model = _("- %s (%s)", description, model)
+            "Sorry, %(user)s doesn't have '%(operation)s' access to:", user=user_description, operation=operations[operation])
+        failing_model = _("- %(description)s (%(model)s)", description=description, model=model)
 
         resolution_info = _("If you really, really need access, perhaps you can win over your friendly administrator with a batch of freshly baked cookies.")
 
-        if not self.user_has_groups('base.group_no_one') or not self.env.user.has_group('base.group_user'):
-            records.invalidate_recordset()
-            return AccessError(f"{operation_error}\n{failing_model}\n\n{resolution_info}")
-
-        # This extended AccessError is only displayed in debug mode.
         # Note that by default, public and portal users do not have
         # the group "base.group_no_one", even if debug mode is enabled,
         # so it is relatively safe here to include the list of rules and record names.
@@ -238,19 +234,33 @@ class IrRule(models.Model):
                 return f'{description}, {rec.display_name} ({model}: {rec.id}, company={rec.company_id.display_name})'
             return f'{description}, {rec.display_name} ({model}: {rec.id})'
 
-        failing_records = '\n '.join(f'- {get_record_description(rec)}' for rec in records_sudo)
-
-        rules_description = '\n'.join(f'- {rule.name}' for rule in rules)
-        failing_rules = _("Blame the following rules:\n%s", rules_description)
-
+        context = None
         if company_related:
-            failing_rules += "\n\n" + _('Note: this might be a multi-company issue. Switching company may help - in Odoo, not in real life!')
+            suggested_companies = records_sudo._get_redirect_suggested_company()
+            if suggested_companies and len(suggested_companies) != 1:
+                resolution_info += _('\n\nNote: this might be a multi-company issue. Switching company may help - in Odoo, not in real life!')
+            elif suggested_companies and suggested_companies in self.env.user.company_ids:
+                context = {'suggested_company': {'id': suggested_companies.id, 'display_name': suggested_companies.display_name}}
+                resolution_info += _('\n\nThis seems to be a multi-company issue, you might be able to access the record by switching to the company: %s.', suggested_companies.display_name)
+            elif suggested_companies:
+                resolution_info += _('\n\nThis seems to be a multi-company issue, but you do not have access to the proper company to access the record anyhow.')
+
+        if not self.env.user.has_group('base.group_no_one') or not self.env.user._is_internal():
+            msg = f"{operation_error}\n{failing_model}\n\n{resolution_info}"
+        else:
+            # This extended AccessError is only displayed in debug mode.
+            failing_records = '\n'.join(f'- {get_record_description(rec)}' for rec in records_sudo)
+            rules_description = '\n'.join(f'- {rule.name}' for rule in rules)
+            failing_rules = _("Blame the following rules:\n%s", rules_description)
+            msg = f"{operation_error}\n{failing_records}\n\n{failing_rules}\n\n{resolution_info}"
 
         # clean up the cache of records prefetched with display_name above
         records_sudo.invalidate_recordset()
 
-        msg = f"{operation_error}\n{failing_records}\n\n{failing_rules}\n\n{resolution_info}"
-        return AccessError(msg)
+        exception = AccessError(msg)
+        if context:
+            exception.context = context
+        return exception
 
 
 #

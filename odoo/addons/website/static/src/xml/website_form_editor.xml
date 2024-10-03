@@ -5,17 +5,11 @@
     <t t-name="website.s_website_form_end_message">
         <div class="s_website_form_end_message d-none">
             <div class="oe_structure">
-                <section class="s_text_block pt64 pb64 o_colored_level o_cc o_cc2" data-snippet="s_text_block">
-                    <div class="container">
-                        <h2 class="text-center">
-                            <span class="fa fa-check-circle"/>
-                                Thank You For Your Feedback
-                        </h2>
-                        <p class="text-center">
-                            Our team will message you back as soon as possible.<br/>
-                            In the meantime we invite you to visit our <a href="/">website</a>.<br/>
-                        </p>
-                    </div>
+                <section class="s_text_block o_colored_level rounded px-5 text-center" data-snippet="s_text_block">
+                    <i class="fa fa-paper-plane fa-2x mb-3 rounded-circle text-bg-success" role="img" aria-hidden="true" title="Success"/>
+                    <h1 class="fw-bolder">Thank you for your feedback!</h1>
+                    <p class="lead mb-0">Our team will message you back as soon as possible.</p>
+                    <p class="lead">In the meantime we invite you to visit our <a href="/">website</a>.</p>
                 </section>
             </div>
         </div>
@@ -196,7 +190,7 @@
                         t-att-placeholder="field.placeholder"
                         t-att-id="field.id"
                 />
-                <div class="input-group-text pe-none"><i class="fa fa-calendar"></i></div>
+                <div class="input-group-text o_input_group_date_icon"><i class="fa fa-calendar"></i></div>
             </div>
         </t>
     </t>
@@ -214,7 +208,7 @@
                         t-att-placeholder="field.placeholder"
                         t-att-id="field.id"
                 />
-                <div class="input-group-text pe-none"><i class="fa fa-calendar"></i></div>
+                <div class="input-group-text o_input_group_date_icon"><i class="fa fa-calendar"></i></div>
             </div>
         </t>
     </t>
@@ -287,17 +281,11 @@
         <!-- Generic one2many -->
         <t t-if="field.relation != 'ir.attachment'">
             <t t-call="website.form_field">
-                <select class="form-select s_website_form_input" t-att-name="field.name" t-att-required="field.required || field.modelRequired || None" t-att-id="field.id" style="display: none">
+                <select class="form-select s_website_form_input" t-att-name="field.name" t-att-required="field.required || field.modelRequired || None" t-att-id="field.id">
                     <t t-foreach="field.records" t-as="record" t-key="record_index">
-                        <option t-esc="record.display_name" t-att-value="record.id" t-att="{selected: record.selected and 'selected' or None}"/>
+                        <option t-esc="record.display_name" t-att-id="field.id + record_index" t-att-value="record.id" t-att="{selected: record.selected and 'selected' or None}"/>
                     </t>
                 </select>
-                <div id="editable_select" class="form-control s_website_form_input">
-                    <t t-foreach="field.records" t-as="record" t-key="record_index">
-                        <t t-set="noValueLabel">no value</t>
-                        <div t-esc="record.display_name" t-attf-data-empty-value="&lt;#{noValueLabel}&gt;" t-att-id="record.id" t-attf-class="s_website_form_select_item #{record.selected and 'selected' or ''}"/>
-                    </t>
-                </div>
             </t>
         </t>
     </t>

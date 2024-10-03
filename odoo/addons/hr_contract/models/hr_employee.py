@@ -1,7 +1,10 @@
+# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+from collections import defaultdict
 from pytz import timezone, UTC
 from datetime import date, datetime, time
+from dateutil.relativedelta import relativedelta
 
 from odoo import _, api, fields, models
 from odoo.osv import expression
@@ -33,15 +36,22 @@ class EmployeeBase(models.AbstractModel):
 class Employee(models.Model):
     _inherit = "hr.employee"
 
+    legal_name = fields.Char(compute='_compute_legal_name', store=True, readonly=False, groups="hr.group_hr_user")
     vehicle = fields.Char(string='Company Vehicle', groups="hr.group_hr_user")
-    contract_ids = fields.One2many('hr.contract', 'employee_id', string='Employee Contracts')
+    contract_ids = fields.One2many('hr.contract', 'employee_id', string='Employee Contracts', groups="hr.group_hr_user")
     contract_id = fields.Many2one(
         'hr.contract', string='Current Contract', groups="hr.group_hr_user",
         domain="[('company_id', '=', company_id), ('employee_id', '=', id)]", help='Current contract of the employee', copy=False)
-    calendar_mismatch = fields.Boolean(related='contract_id.calendar_mismatch')
-    contracts_count = fields.Integer(compute='_compute_contracts_count', string='Contract Count')
+    calendar_mismatch = fields.Boolean(related='contract_id.calendar_mismatch', groups="base.group_system,hr.group_hr_user")
+    contracts_count = fields.Integer(compute='_compute_contracts_count', string='Contract Count', groups="hr.group_hr_user")
     contract_warning = fields.Boolean(string='Contract Warning', store=True, compute='_compute_contract_warning', groups="hr.group_hr_user")
     first_contract_date = fields.Date(compute='_compute_first_contract_date', groups="hr.group_hr_user", store=True)
+
+    @api.depends('name')
+    def _compute_legal_name(self):
+        for employee in self:
+            if not employee.legal_name:
+                employee.legal_name = employee.name
 
     def _get_first_contracts(self):
         self.ensure_one()
@@ -76,7 +86,7 @@ class Employee(models.Model):
             contracts = remove_gap(contracts)
         return min(contracts.mapped('date_start')) if contracts else False
 
-    @api.depends('contract_ids.state', 'contract_ids.date_start', 'contract_ids.active')
+    @api.depends('contract_ids.state', 'contract_ids.date_start')
     def _compute_first_contract_date(self):
         for employee in self:
             employee.first_contract_date = employee._get_first_contract_date()
@@ -112,8 +122,8 @@ class Employee(models.Model):
     def _get_incoming_contracts(self, date_from, date_to):
         return self._get_contracts(date_from, date_to, states=['draft'], kanban_state=['done'])
 
-    def _get_calendar(self, date_from=None):
-        res = super()._get_calendar()
+    def _get_calendars(self, date_from=None):
+        res = super()._get_calendars(date_from=date_from)
         if not date_from:
             return res
         contracts = self.env['hr.contract'].sudo().search([
@@ -122,15 +132,59 @@ class Employee(models.Model):
                 '&',
                     ('state', '=', 'draft'),
                     ('kanban_state', '=', 'done'),
-            ('employee_id', '=', self.id),
+            ('employee_id', 'in', self.ids),
             ('date_start', '<=', date_from),
             '|',
                 ('date_end', '=', False),
                 ('date_end', '>=', date_from)
         ])
-        if not contracts:
-            return res
-        return contracts[0].resource_calendar_id.sudo(False)
+        contracts_by_employee = defaultdict(lambda: self.env['hr.contract'])
+        for contract in contracts:
+            contracts_by_employee[contract.employee_id] += contract
+        for employee in self:
+            employee_contracts = contracts_by_employee[employee.id]
+            if employee_contracts:
+                res[employee.id] = contracts[0].resource_calendar_id.sudo(False)
+        return res
+
+    def _get_calendar_periods(self, start, stop):
+        """
+        :param datetime start: the start of the period
+        :param datetime stop: the stop of the period
+        """
+        calendar_periods_by_employee = defaultdict(list)
+        contracts_by_employee = self.env['hr.contract'].sudo()._read_group(domain=[
+            '|',
+                ('state', 'in', ['open', 'close']),
+                '&',
+                    ('state', '=', 'draft'),
+                    ('kanban_state', '=', 'done'),
+            ('date_start', '<=', stop),
+            '|',
+                ('date_end', '=', False),
+                ('date_end', '>=', start),
+            ('employee_id', 'in', self.ids),
+        ], groupby=['employee_id'], aggregates=['id:recordset'])
+        for employee, contracts in contracts_by_employee:
+            for contract in contracts:
+                # if employee is under fully flexible contract, use timezone of the employee
+                calendar_tz = timezone(contract.resource_calendar_id.tz) if contract.resource_calendar_id else timezone(employee.resource_id.tz)
+                utc = timezone('UTC')
+                date_start = datetime.combine(
+                    contract.date_start,
+                    time(0, 0, 0)
+                ).replace(tzinfo=calendar_tz).astimezone(utc)
+                if contract.date_end:
+                    date_end = datetime.combine(
+                        contract.date_end + relativedelta(days=1),
+                        time(0, 0, 0)
+                    ).replace(tzinfo=calendar_tz).astimezone(utc)
+                else:
+                    date_end = stop
+                calendar_periods_by_employee[employee].append(
+                    (max(date_start, start), min(date_end, stop), contract.resource_calendar_id)
+                )
+        return calendar_periods_by_employee
 
     @api.model
     def _get_all_contracts(self, date_from, date_to, states=['open']):
@@ -158,7 +212,8 @@ class Employee(models.Model):
             tmp_date_to = min(date_to_date, contract.date_end) if contract.date_end else date_to_date
             unusual_days.update(contract.resource_calendar_id.sudo(False)._get_unusual_days(
                 datetime.combine(fields.Date.from_string(tmp_date_from), time.min).replace(tzinfo=UTC),
-                datetime.combine(fields.Date.from_string(tmp_date_to), time.max).replace(tzinfo=UTC)
+                datetime.combine(fields.Date.from_string(tmp_date_to), time.max).replace(tzinfo=UTC),
+                self.company_id,
             ))
         return unusual_days
 
@@ -230,8 +285,7 @@ class Employee(models.Model):
         if vals.get('contract_id'):
             for employee in self:
                 employee.resource_calendar_id.transfer_leaves_to(employee.contract_id.resource_calendar_id, employee.resource_id)
-                if employee.resource_calendar_id:
-                    employee.resource_calendar_id = employee.contract_id.resource_calendar_id
+                employee.resource_calendar_id = employee.contract_id.resource_calendar_id
         return res
 
     @api.ondelete(at_uninstall=False)
@@ -246,8 +300,11 @@ class Employee(models.Model):
         if not self.contract_ids:
             action['context'] = {
                 'default_employee_id': self.id,
+                # display current resource_calendar_id as the default one if it exists (if False, fully flexible calendar)
+                'default_resource_calendar_id': self.resource_calendar_id.id or False,
+                'from_action_open_contract': True,
             }
-            action['target'] = 'new'
+            action['target'] = 'current'
             return action
 
         target_contract = self.contract_id

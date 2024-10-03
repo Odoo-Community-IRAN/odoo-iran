@@ -177,6 +177,7 @@ class O2MRef(models.Model):
 
     value = fields.Integer(default=1)
     subs = fields.One2many('test_testing_utilities.ref.sub', 'parent_id')
+    x = fields.Integer()
 
 class O2MRefSub(models.Model):
     _name = 'test_testing_utilities.ref.sub'
@@ -185,6 +186,7 @@ class O2MRefSub(models.Model):
     a = fields.Integer()
     b = fields.Integer()
     c = fields.Integer()
+    z = fields.Integer()
     parent_id = fields.Many2one('test_testing_utilities.ref')
 
 class O2MDefault(models.Model):
@@ -352,3 +354,28 @@ class ResConfigTest(models.Model):
     param2 = fields.Many2one(
         'res.config',
         config_parameter="resConfigTest.parameter2")
+
+
+class Wide(models.Model):
+    _name = _description = 'test_testing_utilities.wide'
+    _log_access = False
+
+    account_id = fields.Float()
+    amount_currency = fields.Float()
+    credit = fields.Float()
+    currency_id = fields.Float()
+    date_maturity = fields.Float()
+    debit = fields.Float()
+    discount = fields.Float()
+    name = fields.Float()
+    partner_id = fields.Float()
+    price_subtotal = fields.Float()
+    price_total = fields.Float()
+    price_unit = fields.Float()
+    product_id = fields.Float()
+    product_uom_id = fields.Float()
+    quantity = fields.Float()
+    tax_base_amount = fields.Float()
+    tax_ids = fields.Float()
+    tax_line_id = fields.Float()
+    tax_tag_invert = fields.Float()

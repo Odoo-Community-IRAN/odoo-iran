@@ -28,7 +28,7 @@ This module allows to manage onboardings and their progress
         ],
         'web._assets_primary_variables': [
             'onboarding/static/src/scss/onboarding.variables.scss',
-        ]
+        ],
     },
     'license': 'LGPL-3',
 }

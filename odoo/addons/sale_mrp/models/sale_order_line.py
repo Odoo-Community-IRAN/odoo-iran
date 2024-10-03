@@ -119,10 +119,26 @@ class SaleOrderLine(models.Model):
         :return: Dictionary with incoming moves and outgoing moves
         :rtype: dict
         """
+        # The first move created was the one created from the intial rule that started it all.
+        sorted_moves = self.move_ids.sorted('id')
+        triggering_rule_ids = []
+        seen_wh_ids = set()
+        for move in sorted_moves:
+            if move.warehouse_id.id not in seen_wh_ids:
+                triggering_rule_ids.append(move.rule_id.id)
+                seen_wh_ids.add(move.warehouse_id.id)
+
         return {
-            'incoming_moves': lambda m: m.location_dest_id.usage == 'customer' and \
-                        (not m.origin_returned_move_id or (m.origin_returned_move_id and m.to_refund)),
-            'outgoing_moves': lambda m: m.location_dest_id.usage != 'customer' and m.to_refund
+            'incoming_moves': lambda m: (
+                m.state != 'cancel' and not m.scrapped
+                and m.rule_id.id in triggering_rule_ids
+                and m.location_final_id.usage == 'customer'
+                and (not m.origin_returned_move_id or (m.origin_returned_move_id and m.to_refund)
+            )),
+            'outgoing_moves': lambda m: (
+                m.state != 'cancel' and not m.scrapped
+                and m.location_dest_id.usage != 'customer' and m.to_refund
+            ),
         }
 
     def _get_qty_procurement(self, previous_product_uom_qty=False):

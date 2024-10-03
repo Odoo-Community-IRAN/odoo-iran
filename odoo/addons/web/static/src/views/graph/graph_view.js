@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
 import { GraphArchParser } from "./graph_arch_parser";
@@ -12,9 +10,6 @@ const viewRegistry = registry.category("views");
 
 export const graphView = {
     type: "graph",
-    display_name: _t("Graph"),
-    icon: "fa fa-area-chart",
-    multiRecord: true,
     Controller: GraphController,
     Renderer: GraphRenderer,
     Model: GraphModel,

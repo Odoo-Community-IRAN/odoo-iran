@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 # core models (required for mixins)
@@ -7,6 +6,7 @@ from . import mail_alias_domain
 from . import models
 
 # mixin
+from . import bus_listener_mixin
 from . import mail_activity_mixin
 from . import mail_alias_mixin_optional
 from . import mail_alias_mixin
@@ -36,12 +36,15 @@ from . import mail_message_subtype
 from . import mail_message_translation
 from . import mail_message
 from . import mail_mail
+from . import mail_push
+from . import mail_push_device
+from . import mail_scheduled_message
 from . import mail_tracking_value
 from . import mail_template
 
 # discuss
 from . import mail_ice_server
-from . import mail_shortcode
+from . import mail_canned_response
 from . import res_users_settings
 from . import res_users_settings_volumes
 
@@ -51,18 +54,18 @@ from . import ir_action_act_window
 from . import ir_actions_server
 from . import ir_attachment
 from . import ir_config_parameter
+from . import ir_cron
 from . import ir_http
 from . import ir_mail_server
 from . import ir_model
 from . import ir_model_fields
+from . import ir_ui_menu
 from . import ir_ui_view
 from . import ir_qweb
 from . import res_company
 from . import res_config_settings
 from . import res_users
 from . import update
-from . import web_push
-from . import partner_devices
 
 # after mail specifically as discuss module depends on mail
 from . import discuss

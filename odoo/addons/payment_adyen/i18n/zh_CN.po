@@ -3,17 +3,16 @@
 # 	* payment_adyen
 # 
 # Translators:
-# Wil Odoo, 2023
-# 山西清水欧度(QQ:54773801) <54773801@qq.com>, 2023
-# 湘子 南 <1360857908@qq.com>, 2024
+# Wil Odoo, 2024
+# Chloe Wang, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:56+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: 湘子 南 <1360857908@qq.com>, 2024\n"
+"POT-Creation-Date: 2024-09-26 08:56+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Chloe Wang, 2024\n"
 "Language-Team: Chinese (China) (https://app.transifex.com/odoo/teams/41243/zh_CN/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -33,9 +32,10 @@ msgstr ""
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
-msgid "A request was sent to void the transaction with reference %s (%s)."
-msgstr "已请求将交易作废，参考编号为 %s （%s）。"
+msgid ""
+"A request was sent to void the transaction with reference %(reference)s "
+"(%(provider)s)."
+msgstr "已发送交易作废请求，参考：%(reference)s（%(provider)s）。"
 
 #. module: payment_adyen
 #: model:ir.model.fields,field_description:payment_adyen.field_payment_provider__adyen_api_key
@@ -55,7 +55,6 @@ msgstr "Adyen"
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid ""
 "An error occurred during the processing of your payment. Please try again."
 msgstr "在处理您的付款过程中发生了一个错误。请再试一次。"
@@ -63,7 +62,6 @@ msgstr "在处理您的付款过程中发生了一个错误。请再试一次。
 #. module: payment_adyen
 #. odoo-javascript
 #: code:addons/payment_adyen/static/src/js/payment_form.js:0
-#, python-format
 msgid "Cannot display the payment form"
 msgstr "无法显示付款表单"
 
@@ -80,7 +78,6 @@ msgstr "代码"
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_provider.py:0
-#, python-format
 msgid "Could not establish the connection to the API."
 msgstr "无法建立与API的连接。"
 
@@ -97,7 +94,6 @@ msgstr "有 Adyen Tx"
 #. module: payment_adyen
 #. odoo-javascript
 #: code:addons/payment_adyen/static/src/js/payment_form.js:0
-#, python-format
 msgid "Incorrect payment details"
 msgstr "付款信息不正确"
 
@@ -114,7 +110,6 @@ msgstr "商业帐户"
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "No transaction found matching reference %s."
 msgstr "没有发现与参考文献%s相匹配的交易。"
 
@@ -141,44 +136,36 @@ msgstr "付款交易"
 #. module: payment_adyen
 #. odoo-javascript
 #: code:addons/payment_adyen/static/src/js/payment_form.js:0
-#: code:addons/payment_adyen/static/src/js/payment_form.js:0
-#: code:addons/payment_adyen/static/src/js/payment_form.js:0
-#, python-format
 msgid "Payment processing failed"
 msgstr "付款处理失败"
 
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "Received data for child transaction with missing transaction values"
 msgstr "收到的下级交易数据缺少交易值"
 
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with invalid payment state: %s"
 msgstr "收到的数据为无效的支付状态:%s"
 
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with missing merchant reference"
 msgstr "收到的数据中缺少商户参考信息"
 
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with missing payment state."
 msgstr "收到的数据中缺少支付状态。"
 
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/controllers/main.py:0
-#, python-format
 msgid "Received tampered payment request data."
 msgstr "收到了被篡改的付款请求数据。"
 
@@ -200,7 +187,6 @@ msgstr "Webhook的HMAC密钥"
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid ""
 "The amount processed by Adyen for the transaction %s is different than the "
 "one requested. Another transaction is created with the correct amount."
@@ -214,8 +200,6 @@ msgstr "应用程序接口端点的基本 URL"
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "The capture of the transaction with reference %s failed."
 msgstr "捕获引用 %s 的事务失败。"
 
@@ -226,12 +210,11 @@ msgid ""
 "                    processed by Adyen and reflected in Odoo."
 msgstr ""
 "交易生效或作废可能需要几分钟时间\n"
-"才能由 Adyen 处理并反馈在 ERP 中."
+"才能由 Adyen 处理并反馈在 Odoo 中。"
 
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid ""
 "The capture request of %(amount)s for the transaction with reference %(ref)s"
 " has been requested (%(provider_name)s)."
@@ -250,7 +233,6 @@ msgstr "该提供商的商户账户代码"
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_provider.py:0
-#, python-format
 msgid "The communication with the API failed. Details: %s"
 msgstr "与 API 通信失败。详情：%s"
 
@@ -262,7 +244,6 @@ msgstr "该支付提供商的技术代码。"
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "The transaction is not linked to a token."
 msgstr "该交易没有与令牌挂钩。"
 
@@ -274,14 +255,11 @@ msgstr "拥有此令牌的合作伙伴的唯一编号"
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "The void of the transaction with reference %s failed."
 msgstr "引用 %s 的事务无效失败。"
 
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "Your payment was refused. Please try again."
 msgstr "您的付款被拒绝。请再试一次。"

@@ -3,7 +3,6 @@
 
 {
     'name': 'France - VAT Anti-Fraud Certification for Point of Sale (CGI 286 I-3 bis)',
-    'countries': ['fr'],
     'version': '1.0',
     'category': 'Accounting/Localizations/Point of Sale',
     'description': """
@@ -22,7 +21,7 @@ The module adds following features:
 
     Access to download the mandatory Certificate of Conformity delivered by Odoo SA (only for Odoo Enterprise users)
 """,
-    'depends': ['l10n_fr', 'point_of_sale'],
+    'depends': ['l10n_fr_account', 'point_of_sale'],
     'installable': True,
     'auto_install': True,
     'data': [

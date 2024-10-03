@@ -17,15 +17,6 @@ class StockMove(models.Model):
     sale_line_id = fields.Many2one('sale.order.line', 'Sale Line', index='btree_not_null')
 
     @api.model
-    def default_get(self, fields_list):
-        defaults = super().default_get(fields_list)
-        model = self.env.context.get('active_model')
-        so_id = self.env.context.get('active_id')
-        if model == 'sale.order' and so_id:
-            defaults['group_id'] = self.env[model].browse(so_id).procurement_group_id.id
-        return defaults
-
-    @api.model
     def _prepare_merge_moves_distinct_fields(self):
         distinct_fields = super(StockMove, self)._prepare_merge_moves_distinct_fields()
         distinct_fields.append('sale_line_id')
@@ -91,7 +82,27 @@ class StockRule(models.Model):
 class StockPicking(models.Model):
     _inherit = 'stock.picking'
 
-    sale_id = fields.Many2one(related="group_id.sale_id", string="Sales Order", store=True, index='btree_not_null')
+    sale_id = fields.Many2one('sale.order', compute="_compute_sale_id", inverse="_set_sale_id", string="Sales Order", store=True, index='btree_not_null')
+
+    @api.depends('group_id')
+    def _compute_sale_id(self):
+        for picking in self:
+            picking.sale_id = picking.group_id.sale_id
+
+    def _set_sale_id(self):
+        if self.group_id:
+            self.group_id.sale_id = self.sale_id
+        else:
+            if self.sale_id:
+                vals = {
+                    'sale_id': self.sale_id.id,
+                    'name': self.sale_id.name,
+                }
+            else:
+                vals = {}
+
+            pg = self.env['procurement.group'].create(vals)
+            self.group_id = pg
 
     def _auto_init(self):
         """
@@ -112,16 +123,23 @@ class StockPicking(models.Model):
             sale_order = move.picking_id.sale_id
             # Creates new SO line only when pickings linked to a sale order and
             # for moves with qty. done and not already linked to a SO line.
-            if not sale_order or move.location_dest_id.usage != 'customer' or move.sale_line_id or not move.picked:
+            if not sale_order \
+                or (move.location_dest_id.usage != 'customer' and not (move.location_id.usage == 'customer' and move.to_refund)) \
+                or move.sale_line_id \
+                or not move.picked:
                 continue
             product = move.product_id
+            quantity = move.quantity
+            if move.to_refund:
+                quantity *= -1
+
             so_line_vals = {
                 'move_ids': [(4, move.id, 0)],
                 'name': product.display_name,
                 'order_id': sale_order.id,
                 'product_id': product.id,
                 'product_uom_qty': 0,
-                'qty_delivered': move.quantity,
+                'qty_delivered': quantity,
                 'product_uom': move.product_uom.id,
             }
             if product.invoice_policy == 'delivery':
@@ -177,6 +195,11 @@ class StockPicking(models.Model):
 
         return super(StockPicking, self)._log_less_quantities_than_expected(moves)
 
+    def _can_return(self):
+        self.ensure_one()
+        return super()._can_return() or self.sale_id
+
+
 class StockLot(models.Model):
     _inherit = 'stock.lot'
 
@@ -188,7 +211,7 @@ class StockLot(models.Model):
         sale_orders = defaultdict(lambda: self.env['sale.order'])
         for move_line in self.env['stock.move.line'].search([('lot_id', 'in', self.ids), ('state', '=', 'done')]):
             move = move_line.move_id
-            if move.picking_id.location_dest_id.usage == 'customer' and move.sale_line_id.order_id:
+            if move.picking_id.location_dest_id.usage in ('customer', 'transit') and move.sale_line_id.order_id:
                 sale_orders[move_line.lot_id.id] |= move.sale_line_id.order_id
         for lot in self:
             lot.sale_order_ids = sale_orders[lot.id]

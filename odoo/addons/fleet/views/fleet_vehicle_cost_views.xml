@@ -7,11 +7,7 @@
             <form string="Contract logs">
                 <field name="company_id" invisible="1"/>
                 <header>
-                    <button name="action_open" invisible="state != 'futur'" type="object" string="Start Contract" class="oe_highlight" groups="fleet.fleet_group_manager"/>
-                    <button name="action_close" invisible="state != 'futur'" type="object" string="Cancel" groups="fleet.fleet_group_manager"/>
-                    <button name="action_close" invisible="state not in ('open', 'expired', 'futur')" type="object" string="Close Contract" groups="fleet.fleet_group_manager"/>
-                    <button name="action_draft" invisible="state != 'closed'" type="object" string="Reset To Draft" groups="fleet.fleet_group_manager"/>
-                    <field name="state" widget="statusbar" />
+                    <field name="state" widget="statusbar" options="{'clickable': '1'}"/>
                 </header>
                 <sheet>
                     <field name="active" invisible="1"/>
@@ -61,22 +57,18 @@
                     <separator string="Terms and Conditions"/>
                     <field name="notes" nolabel="1" placeholder="Write here all other information relative to this contract" />
                 </sheet>
-                <div class="oe_chatter">
-                    <field name="message_follower_ids"/>
-                    <field name="activity_ids"/>
-                    <field name="message_ids"/>
-                </div>
+                <chatter/>
             </form>
         </field>
     </record>
 
     <record id='fleet_vehicle_log_contract_view_tree' model='ir.ui.view'>
-        <field name="name">fleet.vehicle.log.contract.tree</field>
+        <field name="name">fleet.vehicle.log.contract.list</field>
         <field name="model">fleet.vehicle.log.contract</field>
         <field name="arch" type="xml">
-            <tree string="Contract logs"
+            <list string="Contract logs"
                 decoration-warning="expires_today"
-                decoration-danger="days_left==0 and not expires_today"
+                decoration-danger="days_left==0 and not expires_today and not has_open_contract"
                 decoration-muted="state=='closed'"
                 default_order="expiration_date"
                 sample="1">
@@ -92,9 +84,9 @@
                 <field name="cost_generated" widget="monetary"/>
                 <field name="currency_id" column_invisible="True"/>
                 <field name="cost_frequency"/>
-                <field name="state" widget="badge" decoration-info="state == 'open'" decoration-danger="state == 'expired'" />
+                <field name="state" widget="badge" decoration-info="state == 'open'" decoration-danger="state == 'expired' and not has_open_contract" />
                 <field name="activity_exception_decoration" widget="activity_exception"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -103,27 +95,16 @@
         <field name="model">fleet.vehicle.log.contract</field>
         <field name="arch" type="xml">
             <kanban class="o_kanban_mobile" sample="1">
-                <field name="activity_state"/>
                 <progressbar field="activity_state" colors='{"planned": "success", "today": "warning", "overdue": "danger"}'/>
                 <templates>
-                    <t t-name="kanban-box">
-                        <div t-attf-class="oe_kanban_global_click">
-                            <div>
-                                <strong>
-                                    <field name="vehicle_id" widget="res_partner_many2one"/>
-                                    <span class="float-end badge text-bg-secondary">
-                                        <field name="state"/>
-                                    </span>
-                                </strong>
-                            </div>
-                            <div>
-                                <t t-if="luxon.DateTime.fromISO(record.expiration_date.raw_value) &lt; luxon.DateTime.local()" t-set="expiration_class" t-value="'oe_kanban_text_red'"/>
-                                <span t-att-class="expiration_class"><field name="start_date"/> - <field name="expiration_date"/></span>
-                            </div>
-                            <div>
-                                <field name="insurer_id" widget="res_partner_many2one"/>
-                            </div>
+                    <t t-name="card">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <field name="vehicle_id" class="fw-bold" widget="res_partner_many2one"/>
+                            <field class="badge text-bg-secondary" name="state"/>
                         </div>
+                        <t t-if="luxon.DateTime.fromISO(record.expiration_date.raw_value) &lt; luxon.DateTime.local()" t-set="expiration_class" t-value="'text-danger fw-bold'"/>
+                        <span t-att-class="expiration_class"><field name="start_date"/> - <field name="expiration_date"/></span>
+                        <field name="insurer_id" widget="res_partner_many2one"/>
                     </t>
                 </templates>
             </kanban>
@@ -174,10 +155,9 @@
         <field name="model">fleet.vehicle.log.contract</field>
         <field name="arch" type="xml">
             <activity string="Vehicles Contracts">
-                <field name="purchaser_id"/>
                 <templates>
                     <div t-name="activity-box">
-                        <img t-att-src="activity_image('res.partner', 'avatar_128', record.purchaser_id.raw_value)" t-att-title="record.purchaser_id.value" t-att-alt="record.purchaser_id.value"/>
+                        <field name="user_id" widget="many2one_avatar_user"/>
                         <div class="ms-2">
                             <field name="vehicle_id" display="full" class="o_text_block"/>
                         </div>
@@ -201,7 +181,7 @@
     <record id='fleet_vehicle_log_contract_action' model='ir.actions.act_window'>
         <field name="name">Contracts</field>
         <field name="res_model">fleet.vehicle.log.contract</field>
-        <field name="view_mode">tree,kanban,form,graph,pivot,activity</field>
+        <field name="view_mode">list,kanban,form,graph,pivot,activity</field>
         <field name="context">{'search_default_open': 1}</field>
         <field name="help" type="html">
           <p class="o_view_nocontent_smiling_face">
@@ -252,20 +232,16 @@
                     <separator string="Notes"/>
                     <field nolabel="1" name="notes" placeholder="Write here any other information related to the service completed."/>
                 </sheet>
-                <div class="oe_chatter">
-                    <field name="message_follower_ids"/>
-                    <field name="activity_ids"/>
-                    <field name="message_ids"/>
-                </div>
+                <chatter/>
             </form>
         </field>
     </record>
 
     <record id='fleet_vehicle_log_services_view_tree' model='ir.ui.view'>
-        <field name="name">fleet.vehicle.log.services.tree</field>
+        <field name="name">fleet.vehicle.log.services.list</field>
         <field name="model">fleet.vehicle.log.services</field>
         <field name="arch" type="xml">
-            <tree string="Services Logs" multi_edit="1" expand="1">
+            <list string="Services Logs" multi_edit="1" expand="1">
                 <field name="date" readonly="1" />
                 <field name="description" />
                 <field name="service_type_id" />
@@ -277,7 +253,7 @@
                 <field name="amount" sum="Total" widget="monetary"/>
                 <field name="currency_id" column_invisible="True"/>
                 <field name="state" readonly="1" widget="badge" decoration-success="state == 'done'" decoration-warning="state == 'new'"  decoration-info="state == 'running'" />
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -287,49 +263,30 @@
         <field name="arch" type="xml">
             <kanban default_group_by="state">
                 <field name="currency_id"/>
-                <field name="activity_ids"/>
-                <field name="activity_state"/>
-                <field name="purchaser_id"/>
-                <field name="vendor_id"/>
-                <field name="amount"/>
                 <progressbar field="activity_state" colors='{"planned": "success", "today": "warning", "overdue": "danger"}'/>
                 <templates>
-                    <t t-name="kanban-box">
-                        <div t-attf-class="oe_kanban_global_click container" class="o_kanban_record_has_image_fill">
-                            <div class="oe_kanban_details">
-                                <div class="o_kanban_record_top">
-                                    <img t-att-src="kanban_image('fleet.vehicle', 'image_128', record.vehicle_id.raw_value)" t-att-alt="record.vehicle_id.value" class="o_image_24_cover float-start"/>
-                                    <div class="o_kanban_record_headings ps-2 pe-2">
-                                        <div class="text-truncate">
-                                            <strong class="o_kanban_record_title">
-                                                <field name="vehicle_id"/>
-                                                <span t-attf-class="float-end badge #{['todo', 'running'].indexOf(record.state.raw_value) > -1 ? 'text-bg-secondary' : ['cancelled'].indexOf(record.state.raw_value) > -1 ? 'text-bg-danger' : 'text-bg-success'}">
-                                                    <field name="state"/>
-                                                </span>
-                                            </strong>
-                                        </div>
-                                        <div class="text-truncate">
-                                            <em><field name="service_type_id"/></em>
-                                        </div>
-                                    </div>
-                                </div>
+                    <t t-name="card">
+                        <div class="flex-row">
+                            <field name="vehicle_id" widget="image" options="{'preview_image': 'image_128'}" class="float-start col-2 pe-2"/>
+                            <div class="col-10 pe-2 text-truncate">
+                                <field class="fw-bolder" name="vehicle_id"/>
+                                <span t-attf-class="float-end badge #{['todo', 'running'].indexOf(record.state.raw_value) > -1 ? 'text-bg-secondary' : ['cancelled'].indexOf(record.state.raw_value) > -1 ? 'text-bg-danger' : 'text-bg-success'}">
+                                    <field name="state"/>
+                                </span>
                                 <div class="text-truncate">
-                                    <field name="purchaser_id"/>
-                                    <span class="float-end"><field name="date"/></span>
-                                </div>
-                                <div class="text-truncate">
-                                    <field name="vendor_id"/>
-                                </div>
-                                <div class="o_kanban_record_bottom">
-                                    <div class="oe_kanban_bottom_left">
-                                        <field name="amount" widget="monetary" options="{'currency_field': 'currency_id'}"/>
-                                    </div>
-                                    <div class="oe_kanban_bottom_right">
-                                        <field name="activity_ids" widget="kanban_activity"/>
-                                    </div>
+                                    <em><field name="service_type_id"/></em>
                                 </div>
                             </div>
                         </div>
+                        <div class="text-truncate">
+                            <field name="purchaser_id"/>
+                            <field class="float-end" name="date"/>
+                        </div>
+                        <field class="text-truncate" name="vendor_id"/>
+                        <footer class="pt-0">
+                            <field name="amount" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                            <field name="activity_ids" widget="kanban_activity" class="ms-auto"/>
+                        </footer>
                     </t>
                 </templates>
             </kanban>
@@ -398,7 +355,7 @@
     <record id='fleet_vehicle_log_services_action' model='ir.actions.act_window'>
         <field name="name">Services</field>
         <field name="res_model">fleet.vehicle.log.services</field>
-        <field name="view_mode">tree,kanban,form,graph,pivot,activity</field>
+        <field name="view_mode">list,kanban,form,graph,pivot,activity</field>
         <field name="context">{'search_default_groupby_service_type_id': 1}</field>
         <field name="help" type="html">
           <p class="o_view_nocontent_smiling_face">

@@ -1,16 +1,16 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from decorator import decorator
 import logging
 import random
 import time
 
-from odoo.addons.base.tests.common import TransactionCaseWithUserDemo
-from odoo.fields import Command
+from decorator import decorator
 
+from odoo.fields import Command
 from odoo.tests import tagged
 from odoo.tests.common import users, warmup
+
+from odoo.addons.base.tests.common import TransactionCaseWithUserDemo
 
 _logger = logging.getLogger(__name__)
 
@@ -97,7 +97,7 @@ class TestPERF(TransactionCaseWithUserDemo):
         # + 2 SQL insert
         # + 2 queries to get analytic default tags
         # + 9 follower queries ?
-        with self.assertQueryCount(admin=49):  # com 46
+        with self.assertQueryCount(admin=50):  # com 46
             self.env['sale.order'].create([{
                 'partner_id': self.partners[0].id,
                 'user_id': self.salesmans[0].id,
@@ -134,16 +134,6 @@ class TestPERF(TransactionCaseWithUserDemo):
         # (Seems to be a time-based problem, everytime happening around 10PM)
         self._test_complex_sales_orders_batch_creation_perf(1504)
 
-    @users('admin')
-    @warmup
-    def ___test_complex_sales_orders_batch_creation_perf_with_discount_computation(self):
-        """Cover the "complex" logic triggered inside the `_compute_discount`"""
-        self.env['product.pricelist'].search([]).discount_policy = 'without_discount'
-        self.env.user.groups_id += self.env.ref('product.group_discount_per_so_line')
-
-        # Verify any modification to this count on nightly runbot builds
-        self._test_complex_sales_orders_batch_creation_perf(1546)
-
     def _test_complex_sales_orders_batch_creation_perf(self, query_count):
         MSG = "Model %s, %i records, %s, time %.2f"
 
@@ -171,9 +161,6 @@ class TestPERF(TransactionCaseWithUserDemo):
         """Make sure the price and discounts computation are complexified
         and do not gain from any prefetch/batch gains during the price computation
         """
-        # Enable discounts
-        self.env['product.pricelist'].search([]).discount_policy = 'without_discount'
-        self.env.user.groups_id += self.env.ref('product.group_discount_per_so_line')
 
         vals_list = [{
             "partner_id": self.partners[i].id,

@@ -55,26 +55,17 @@
                             <field name="member_ids" mode="kanban"
                                 class="w-100">
                                 <kanban>
-                                    <field name="id"/>
-                                    <field name="name"/>
-                                    <field name="email"/>
-                                    <field name="avatar_128"/>
                                     <templates>
-                                        <t t-name="kanban-box">
-                                            <div class="oe_kanban_card oe_kanban_global_click">
-                                                <div class="o_kanban_card_content d-flex">
-                                                    <div>
-                                                        <img t-att-src="kanban_image('res.users', 'avatar_128', record.id.raw_value)"
-                                                            class="o_kanban_image o_image_64_cover" alt="Avatar"/>
-                                                    </div>
-                                                    <div class="oe_kanban_details d-flex flex-column ms-3">
-                                                        <strong class="o_kanban_record_title oe_partner_heading"><field name="name"/></strong>
-                                                        <div class="d-flex align-items-baseline text-break">
-                                                            <i class="fa fa-envelope me-1" role="img" aria-label="Email" title="Email"/><field name="email"/>
-                                                        </div>
-                                                    </div>
+                                        <t t-name="card" class="flex-row">
+                                            <aside>
+                                                <field name="avatar_128" widget="image" class="o_image_64_cover" alt="Avatar"/>
+                                            </aside>
+                                            <main class="ms-3">
+                                                <field name="name" class="fw-bold fs-5"/>
+                                                <div class="d-flex align-items-baseline text-break">
+                                                    <i class="fa fa-envelope me-1" role="img" aria-label="Email" title="Email"/><field name="email"/>
                                                 </div>
-                                            </div>
+                                            </main>
                                         </t>
                                     </templates>
                                 </kanban>
@@ -85,32 +76,29 @@
                                 context="{
                                     'kanban_view_ref': 'sales_team.crm_team_member_view_kanban_from_team',
                                     'form_view_ref': 'sales_team.crm_team_member_view_form_from_team',
-                                    'tree_view_ref': 'sales_team.crm_team_member_view_tree_from_team',
+                                    'list_view_ref': 'sales_team.crm_team_member_view_tree_from_team',
                                     'default_crm_team_id': id,
                                 }"/>
                         </page>
                     </notebook>
                 </sheet>
-                <div class="oe_chatter">
-                    <field name="message_follower_ids" help="Follow this salesteam to automatically track the events associated to users of this team."/>
-                    <field name="message_ids"/>
-                </div>
+                <chatter/>
             </form>
         </field>
     </record>
 
-    <!-- SALES TEAMS TREE VIEW + MUTI_EDIT -->
+    <!-- SALES TEAMS LIST VIEW + MUTI_EDIT -->
     <record id="crm_team_view_tree" model="ir.ui.view">
-        <field name="name">crm.team.tree</field>
+        <field name="name">crm.team.list</field>
         <field name="model">crm.team</field>
         <field name="arch" type="xml">
-            <tree string="Sales Team" sample="1" multi_edit="1">
+            <list string="Sales Team" sample="1" multi_edit="1">
                 <field name="sequence" widget="handle"/>
                 <field name="name" readonly="1"/>
                 <field name="active" column_invisible="True"/>
                 <field name="user_id" domain="[('share', '=', False)]" widget="many2one_avatar_user"/>
                 <field name="company_id" groups="base.group_multi_company"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -120,16 +108,10 @@
         <field name="arch" type="xml">
             <kanban class="o_kanban_mobile" sample="1">
                 <templates>
-                    <t t-name="kanban-box">
-                        <div t-attf-class="oe_kanban_content oe_kanban_global_click">
-                            <div class="row">
-                                <div class="col-6">
-                                    <strong><field name="name"/></strong>
-                                </div>
-                                <div class="col-6">
-                                    <span class="float-end"><field name="user_id"/></span>
-                                </div>
-                            </div>
+                    <t t-name="card" class="row g-0">
+                        <field name="name" class="col-6 fw-bold"/>
+                        <div class="col-6">
+                            <field name="user_id" class="float-end"/>
                         </div>
                     </t>
                 </templates>
@@ -143,28 +125,22 @@
         <field name="model">crm.team</field>
         <field name="priority">10</field>
         <field name="arch" type="xml">
-            <kanban class="o_kanban_dashboard o_crm_team_kanban" create="0" sample="1">
-                <field name="name"/>
-                <field name="user_id"/>
-                <field name="member_ids"/>
-                <field name="color"/>
-                <field name="currency_id"/>
-                <field name="is_favorite"/>
+            <kanban class="o_crm_team_kanban" highlight_color="color" create="0" can_open="0" sample="1">
                 <templates>
-                    <t t-name="kanban-menu">
+                    <t t-name="menu">
                         <div class="container">
                             <div class="row">
-                                <div class="col-4 o_kanban_card_manage_section o_kanban_manage_view">
+                                <div name="manage_view" class="col-4">
                                     <h5 role="menuitem" class=" o_kanban_card_manage_title">
                                         <span>View</span>
                                     </h5>
                                 </div>
-                                <div class="col-4 o_kanban_card_manage_section o_kanban_manage_new">
+                                <div name="manage_new" class="col-4">
                                     <h5 role="menuitem" class="o_kanban_card_manage_title">
                                         <span>New</span>
                                     </h5>
                                 </div>
-                                <div class="col-4 o_kanban_card_manage_section o_kanban_manage_reports">
+                                <div name="manage_reports" class="col-4">
                                     <h5 role="menuitem" class="o_kanban_card_manage_title">
                                         <span>Reporting</span>
                                     </h5>
@@ -174,44 +150,34 @@
 
                             <div t-if="widget.editable" class="o_kanban_card_manage_settings row" groups="sales_team.group_sale_manager">
                                 <div role="menuitem" aria-haspopup="true" class="col-8">
-                                    <ul class="oe_kanban_colorpicker" data-field="color" role="menu"/>
+                                    <field name="color" widget="kanban_color_picker"/>
                                 </div>
                                 <div role="menuitem" class="col-4">
-                                    <a class="dropdown-item" type="edit">Configuration</a>
+                                    <a class="dropdown-item" type="open">Configuration</a>
                                 </div>
                             </div>
                         </div>
                     </t>
-                    <t t-name="kanban-box">
-                        <div t-attf-class="#{!selection_mode ? kanban_color(record.color.raw_value) : ''}">
-                            <div t-attf-class="o_kanban_card_header">
-                                <div class="o_kanban_card_header_title">
-                                    <div class="o_primary o_text_overflow"><field name="name"/></div>
-                                </div>
+                    <t t-name="card">
+                        <field name="name" class="fw-bold text-truncate fs-4 ms-2"/>
+                        <div class="row mt-3 px-2">
+                            <div class="col-4" name="to_replace_in_sale_crm">
+                                <button type="object" class="btn text-wrap btn-primary" name="action_primary_channel_button"><field name="dashboard_button_name"/></button>
                             </div>
-                            <div class="container o_kanban_card_content">
-                                <div class="row o_kanban_card_upper_content">
-                                    <div class="col-4 o_kanban_primary_left" name="to_replace_in_sale_crm">
-                                        <button type="object" class="btn btn-primary" name="action_primary_channel_button"><field name="dashboard_button_name"/></button>
-                                    </div>
-                                    <div class="col-8 o_kanban_primary_right" style="padding-bottom:0;">
-                                        <t name="first_options"/>
-                                        <t name="second_options"/>
-                                        <t name="third_options"/>
-                                    </div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-12 o_kanban_primary_bottom">
-                                        <t t-call="SalesTeamDashboardGraph"/>
-                                    </div>
-                                </div>
+                            <div class="col-8 mb-2 text-truncate">
+                                <t name="first_options"/>
+                                <t name="second_options"/>
+                                <t name="third_options"/>
+                            </div>
+                        </div>
+                        <div class="row px-2 mt-auto mb-n2">
+                            <div name="o_kanban_primary_bottom" class="col-12">
+                                <t t-call="SalesTeamDashboardGraph"/>
                             </div>
                         </div>
                     </t>
                     <t t-name="SalesTeamDashboardGraph">
-                        <div t-if="record.dashboard_graph_data.raw_value" class="o_sales_team_kanban_graph_section">
-                            <field name="dashboard_graph_data" widget="dashboard_graph" t-att-graph_type="'bar'"/>
-                        </div>
+                        <field t-if="record.dashboard_graph_data.raw_value" name="dashboard_graph_data" widget="dashboard_graph" t-att-graph_type="'bar'"/>
                     </t>
                 </templates>
             </kanban>
@@ -252,7 +218,7 @@
     <record id="crm_team_action_config" model="ir.actions.act_window">
         <field name="name">Sales Teams</field>
         <field name="res_model">crm.team</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
         <field name="context">{}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">

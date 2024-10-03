@@ -1,20 +1,22 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import base64
 import json
-import re
 
 from markupsafe import Markup
 from psycopg2 import IntegrityError
+import re
 from werkzeug.exceptions import BadRequest
 
-from odoo import http, SUPERUSER_ID, _, _lt
+from odoo import http, SUPERUSER_ID
 from odoo.addons.base.models.ir_qweb_fields import nl2br, nl2br_enclose
 from odoo.http import request
 from odoo.tools import plaintext2html
 from odoo.exceptions import AccessDenied, ValidationError, UserError
 from odoo.tools.misc import hmac, consteq
+from odoo.tools.translate import _, LazyTranslate
+
+_lt = LazyTranslate(__name__)
 
 
 class WebsiteForm(http.Controller):
@@ -128,6 +130,13 @@ class WebsiteForm(http.Controller):
     def many2many(self, field_label, field_input, *args):
         return [(args[0] if args else (6, 0)) + (self.one2many(field_label, field_input),)]
 
+    def tags(self, field_label, field_input):
+        # Unescape ',' and '\'
+        return [
+            tag.replace('\\,', ',').replace('\\/', '\\')
+            for tag in re.split(r'(?<!\\),', field_input)
+        ]
+
     _input_filters = {
         'char': identity,
         'text': identity,
@@ -143,6 +152,8 @@ class WebsiteForm(http.Controller):
         'float': floating,
         'binary': binary,
         'monetary': floating,
+        # Properties
+        'tags': tags,
     }
 
     # Extract all data sent by the form and sort its on several properties
@@ -156,20 +167,13 @@ class WebsiteForm(http.Controller):
             'meta': '',         # Add metadata if enabled
         }
 
-        authorized_fields = model.with_user(SUPERUSER_ID)._get_form_writable_fields()
+        authorized_fields = model.with_user(SUPERUSER_ID)._get_form_writable_fields(values)
         error_fields = []
         custom_fields = []
 
         for field_name, field_value in values.items():
             # First decode the field_name encoded at the client side.
-            html_entities = {
-                '&quot;': '"',
-                '&apos;': "'",
-                '&lsquo;': '`',
-                '&bsol;': '\\',
-            }
-            pattern = '|'.join(html_entities.keys())
-            field_name = re.sub(pattern, lambda match: html_entities[match.group(0)], field_name)
+            field_name = re.sub('&quot;', '"', field_name)
 
             # If the value of the field if a file
             if hasattr(field_value, 'filename'):
@@ -190,8 +194,23 @@ class WebsiteForm(http.Controller):
             # If it's a known field
             elif field_name in authorized_fields:
                 try:
-                    input_filter = self._input_filters[authorized_fields[field_name]['type']]
-                    data['record'][field_name] = input_filter(self, field_name, field_value)
+                    if '_property' in authorized_fields[field_name]:
+                        # Collect all properties for a given property field in
+                        # a list.
+                        field_data = authorized_fields[field_name]
+                        properties_field_name = field_data['_property']['field']
+                        del field_data['_property']
+                        properties = data['record'].setdefault(properties_field_name, [])
+                        property_type = authorized_fields[field_name]['type']
+                        # For properties, many2many is stored as an array of
+                        # integers like one2many
+                        filter_type = 'one2many' if property_type == 'many2many' else property_type
+                        input_filter = self._input_filters[filter_type]
+                        field_data['value'] = input_filter(self, field_name, field_value)
+                        properties.append(field_data)
+                    else:
+                        input_filter = self._input_filters[authorized_fields[field_name]['type']]
+                        data['record'][field_name] = input_filter(self, field_name, field_value)
                 except ValueError:
                     error_fields.append(field_name)
 
@@ -235,23 +254,51 @@ class WebsiteForm(http.Controller):
 
         return data
 
+    def _should_log_authenticate_message(self, record):
+        return True
+
     def insert_record(self, request, model, values, custom, meta=None):
         model_name = model.sudo().model
         if model_name == 'mail.mail':
-            email_from = _('"%s form submission" <%s>') % (request.env.company.name, request.env.company.email)
+            email_from = _('"%(company)s form submission" <%(email)s>', company=request.env.company.name, email=request.env.company.email)
             values.update({'reply_to': values.get('email_from'), 'email_from': email_from})
         record = request.env[model_name].with_user(SUPERUSER_ID).with_context(
             mail_create_nosubscribe=True,
         ).create(values)
-        if custom or meta:
+
+        authenticate_message = False
+        email_field_name = request.env[model_name]._mail_get_primary_email_field()
+        if email_field_name and hasattr(record, '_message_log'):
+            warning_icon = ""
+            if request.session.uid:
+                user_email = request.env.user.email
+                form_email = values[email_field_name]
+                if user_email != form_email:
+                    authenticate_message = _("This %(model_name)s was submitted by %(user_name)s (%(user_email)s) on behalf of %(form_email)s",
+                        model_name=model.name, user_name=request.env.user.name, user_email=user_email, form_email=form_email)
+            else:
+                warning_icon = "/!\\ "
+                authenticate_message = _("EXTERNAL SUBMISSION - Customer not verified")
+            if authenticate_message and self._should_log_authenticate_message(record):
+                record._message_log(
+                    body=Markup('<div class="alert alert-info" role="alert">{warning_icon}{message}</div>').format(warning_icon=warning_icon, message=authenticate_message),
+                )
+
+        if custom or meta or authenticate_message:
             _custom_label = "%s\n___________\n\n" % _("Other Information:")  # Title for custom fields
             if model_name == 'mail.mail':
                 _custom_label = "%s\n___________\n\n" % _("This message has been posted on your website!")
             default_field = model.website_form_default_field_id
             default_field_data = values.get(default_field.name, '')
-            custom_content = (default_field_data + "\n\n" if default_field_data else '') \
-                + (_custom_label + custom + "\n\n" if custom else '') \
-                + (self._meta_label + "\n________\n\n" + meta if meta else '')
+            custom_label = _custom_label + custom if custom else ''
+            meta_label = self._meta_label + "\n________\n\n" + meta if meta else ''
+            custom_content = ''
+            for text in [authenticate_message, default_field_data, custom_label, meta_label]:
+                if not text:
+                    continue
+                if custom_content:
+                    custom_content += '\n\n'
+                custom_content += text
 
             # If there is a default field configured for this model, use it.
             # If there isn't, put the custom data in a message instead

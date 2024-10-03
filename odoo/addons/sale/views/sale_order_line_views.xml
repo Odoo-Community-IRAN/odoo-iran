@@ -2,10 +2,10 @@
 <odoo>
 
     <record id="view_order_line_tree" model="ir.ui.view">
-        <field name="name">sale.order.line.tree</field>
+        <field name="name">sale.order.line.list</field>
         <field name="model">sale.order.line</field>
         <field name="arch" type="xml">
-            <tree string="Sales Order Lines" create="false">
+            <list string="Sales Order Lines" create="false">
                 <field name="order_id"/>
                 <field name="order_partner_id"/>
                 <field name="name"/>
@@ -17,7 +17,7 @@
                 <field name="product_uom" string="Unit of Measure" groups="uom.group_uom"/>
                 <field name="price_subtotal" sum="Total" widget="monetary"/>
                 <field name="currency_id" column_invisible="True"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -48,7 +48,7 @@
                                 widget="many2one_barcode"/>
                             <field name="name"/>
                             <field name="product_uom_qty"/>
-                            <field name="qty_delivered" 
+                            <field name="qty_delivered"
                                 invisible="state not in ['sale', 'done']"
                                 readonly="qty_delivered_method != 'manual'"/>
                             <field name="qty_invoiced" invisible="state not in ['sale', 'done']"/>
@@ -67,8 +67,17 @@
                             <field name="company_id" invisible="1"/>
                             <field name="tax_country_id" invisible="1"/>
                             <field name="price_unit"/>
-                            <field name="discount" groups="product.group_discount_per_so_line"/>
-                            <field name="price_subtotal" widget="monetary"/>
+                            <field name="discount" groups="sale.group_discount_per_so_line"/>
+                            <field name="price_subtotal"
+                                   string="Amount"
+                                   widget="monetary"
+                                   invisible="company_price_include == 'tax_included'"
+                                />
+                            <field name="price_total"
+                                   string="Amount"
+                                   widget="monetary"
+                                   invisible="company_price_include == 'tax_excluded'"
+                                />
                             <field name="tax_id"
                                 widget="many2many_tags"
                                 options="{'no_create': True}"
@@ -76,7 +85,6 @@
                                 domain="[('type_tax_use', '=', 'sale'), ('company_id', '=', company_id), ('country_id', '=', tax_country_id)]"
                                 readonly="qty_invoiced &gt; 0"/>
                             <field name="price_tax" widget="monetary"/>
-                            <field name="price_total" widget="monetary"/>
                             <field name="currency_id" invisible="1"/>
                         </group>
                     </group>
@@ -118,14 +126,8 @@
         <field name="arch" type="xml">
             <kanban class="o_kanban_mobile">
                 <templates>
-                    <t t-name="kanban-box">
-                        <div class="oe_kanban_content oe_kanban_global_click">
-                            <div class="row">
-                                <div class="col-12">
-                                <field name="display_name"/>
-                                </div>
-                            </div>
-                        </div>
+                    <t t-name="card">
+                        <field name="display_name"/>
                     </t>
                 </templates>
             </kanban>

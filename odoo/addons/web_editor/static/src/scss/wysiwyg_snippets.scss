@@ -10,10 +10,6 @@
             height: initial !important;
             top: initial !important;
             left: initial !important;
-
-            .note-popover .popover {
-                right: 0 !important;
-            }
         }
     }
 }
@@ -37,6 +33,7 @@
 
     .oe_snippet_thumbnail {
         width: 100%;
+        overflow: hidden;
 
         .oe_snippet_thumbnail_img {
             width: 100%;
@@ -389,8 +386,13 @@
                     @include o-position-absolute(8px, 6px, auto, auto);
                 }
 
+                &.o_disabled {
+                    pointer-events: initial;
+                }
+
                 &.o_snippet_install {
                     .btn.o_install_btn {
+                        z-index: 1;
                         @include o-position-absolute($top: 10px);
                     }
 
@@ -400,6 +402,7 @@
                 }
 
                 &.o_disabled, &.o_snippet_install {
+                    cursor: default;
                     background-color: rgba($o-we-sidebar-blocks-content-snippet-bg, .2);
 
                     .oe_snippet_thumbnail_img {
@@ -505,11 +508,13 @@
                 "typo typo style style colors"
                 "size align list list link"
                 "ai animate animate hilight hilight"
+                "translate translate . . ."
                 "options options options options options"
                 "options2 options2 options2 options2 options2"
                 "options3 options3 options3 options3 options3";
             grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
             grid-template-rows:
+                minmax($o-we-sidebar-content-field-height, auto)
                 minmax($o-we-sidebar-content-field-height, auto)
                 minmax($o-we-sidebar-content-field-height, auto)
                 minmax($o-we-sidebar-content-field-height, auto)
@@ -761,6 +766,9 @@
             #chatgpt {
                 grid-area: ai;
             }
+            #translate {
+                grid-area: translate;
+            }
             #animate {
                 grid-area: animate;
             }
@@ -873,14 +881,6 @@
         we-title {
             display: block;
             text-align: left;
-        }
-
-        // TODO in master, remove the text-transform rule entirely and rely on
-        // developers writing their label with the intended "design". The
-        // "where" change here was added as a way to minimize the impact of this
-        // fix in stable. That CSS style was breaking translations.
-        we-title:where(:lang(en)) {
-            text-transform: capitalize;
         }
 
         we-customizeblock-options {
@@ -1323,40 +1323,6 @@
                     width: 100%;
                     aspect-ratio: 1;
                     object-fit: contain;
-                }
-            }
-            // A modifier applied on `<we-select/>` to give it a grid appearance.
-            &.o_we_select_grid {
-                we-selection-items {
-                    we-button {
-                        padding: $o-we-sidebar-content-padding-base * 2 $o-we-sidebar-content-padding-base / 2;
-                        border: $o-we-item-border-width solid $o-we-bg-darkest;
-                        border-radius: 2px;
-                        justify-content: center;
-
-                        &.active {
-                            border: 2px solid $o-we-color-success !important;
-                        }
-                        // Text highlight related style.
-                        &[data-set-text-highlight] {
-                            --text-highlight-width: .15em;
-                            --text-highlight-color: #{$o-we-fg-light};
-
-                            > div {
-                                flex: none;
-                                position: relative;
-                                width: 60%;
-                                font-size: $o-we-sidebar-font-size * 1.3;
-                                font-weight: bold;
-                                overflow: visible;
-                                isolation: isolate;
-
-                                svg {
-                                    z-index: -1;
-                                }
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -2027,7 +1993,9 @@
     @extend %o-preview-alpha-background;
     font-family: sans-serif !important;
     font-size: 15px !important;
-    padding: $o-we-sidebar-content-field-spacing $o-we-sidebar-content-field-spacing $o-we-sidebar-content-field-spacing*.8;
+    // Include border in padding to avoid that gradient background color gets
+    // redrawn on each side.
+    padding: $o-we-item-border-width + $o-we-sidebar-content-field-spacing $o-we-item-border-width + $o-we-sidebar-content-field-spacing $o-we-item-border-width + $o-we-sidebar-content-field-spacing * .8;
 }
 .o_we_cc_preview_wrapper > * {
     margin-bottom: 0 !important;
@@ -2237,6 +2205,10 @@ we-select.o_we_border_preview_aligned_select {
         outline-offset: -$o-we-dropzone-border-width;
         z-index: $o-we-overlay-zindex;
     }
+    &.o_dropzone_highlighted {
+        filter: brightness(1.5);
+        transition: 200ms;
+    }
 }
 
 .oe_drop_zone:not(.oe_grid_zone) {
@@ -2262,7 +2234,7 @@ we-select.o_we_border_preview_aligned_select {
 
 // MANIPULATORS
 #oe_manipulators {
-    position: relative;
+    position: fixed; // Allows to not consider the inner overlays as overflowing the page content
     z-index: $o-we-overlay-zindex;
     pointer-events: none;
 
@@ -2828,5 +2800,189 @@ we-select.o_grid we-toggler {
         @include o-position-absolute(0, 0, 0, 0);
         animation: highlightPadding 2s;
         pointer-events: none;
+    }
+}
+
+// Add snippets dialog.
+.o_add_snippet_dialog {
+    max-height: $modal-lg !important;
+
+    .modal-body {
+        display: flex;
+        padding: 0;
+
+        aside {
+            input[type="search"] {
+                // Chromium-based browsers render a "cancel" button by default.
+                // When visible, adapt its position in order to visually
+                // "replace" the magnify icon.
+                &::-webkit-search-cancel-button {
+                    transform: translateX(map-get($spacers, 3));
+                }
+
+                &:not(:placeholder-shown) + .input-group-text {
+                    display: none;
+
+                    // Preserve Firefox from chromium adaptations
+                    @media screen and (min--moz-device-pixel-ratio:0) {
+                        display: block;
+                    }
+                }
+            }
+        }
+
+        .list-group {
+            --list-group-border-radius: 0;
+
+            min-width: 200px;
+            max-width: 250px;
+
+            button.active {
+                background-color: $o-brand-primary;
+                border-color: $o-brand-primary;
+            }
+        }
+    }
+}
+
+// Add snippets dialog iframe.
+.o_add_snippets_preview {
+    overflow: hidden;
+
+    > body {
+        overflow-x: hidden;
+        overflow-y: auto;
+        width: 30%;
+        height: 30%;
+        background-color: unset;
+        scrollbar-gutter: stable both-edges;
+    }
+    .o_snippets_preview_row {
+        position: absolute; // Needed for RTL
+        transform: scale(0.3);
+        transform-origin: top left;
+        width: 333%;
+        height: 100%;
+
+        .o_snippet_preview_wrap {
+            min-height: 100px;
+            box-shadow: 0 0 6rem rgba(0, 0, 0, 0.16);
+            margin: map-get($spacers, 5) (map-get($spacers, 5) * .5) (map-get($spacers, 3) * 4);
+            background-color: var(--body-bg);
+            transform: scale(.98);
+            cursor: pointer;
+
+            [data-snippet="s_carousel"],
+            [data-snippet="s_carousel_intro"],
+            [data-snippet="s_quotes_carousel_minimal"],
+            [data-snippet="s_quotes_carousel"] {
+                height: 550px;
+            }
+            [data-snippet="s_three_columns"] .figure-img[style*="height:50vh"] {
+                /* In Travel theme. */
+                height: 500px !important;
+            }
+            [data-snippet="s_numbers_charts"] .s_chart {
+                display: none;
+            }
+            .o_full_screen_height, .o_half_screen_height {
+                height: unset !important;
+                min-height: unset !important;
+            }
+            .o_full_screen_height {
+                aspect-ratio: 4 / 3;
+            }
+            .o_half_screen_height {
+                aspect-ratio: 8 / 3;
+            }
+            > [data-snippet] {
+                isolation: isolate;
+                pointer-events: none;
+                user-select: none;
+
+                &[data-snippet="s_text_block"] {
+                    font-size: 1.6rem;
+                }
+
+                &.s_popup {
+                    min-height: 660px;
+
+                    > .modal {
+                        --black-50: rgba(0, 0, 0, 0.25) !important;
+                        display: block;
+                        opacity: 1;
+                        position: absolute;
+
+                        .modal-dialog {
+                            transform: none;
+                        }
+                        .modal-content {
+                            box-shadow: 0rem 3.5rem 12rem rgba(0, 0, 0, 0.6);
+                        }
+                    }
+                }
+            }
+            &::after {
+                content: "";
+                @include o-position-absolute(0, 0, 0, 0);
+                outline: 6px solid transparent;
+                z-index: 1;
+            }
+            &:hover {
+                box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.2);
+                &::after {
+                    outline: 6px solid $o-we-handles-accent-color;
+                }
+            }
+            &.o_snippet_preview_install {
+                .s_dialog_preview_image {
+                    filter: saturate(0) blur(5px);
+                }
+                &:hover {
+                    .s_dialog_preview_image {
+                        opacity: 1;
+                        filter: saturate(0) brightness(0.6) blur(5px);
+                    }
+                     > .o_snippet_preview_install_btn {
+                        opacity: 1;
+                     }
+                }
+                > .o_snippet_preview_install_btn {
+                    z-index: 1;
+                    @include o-position-absolute(auto, 0, 0, 0);
+                    opacity: 0;
+                    transform: scale(3.33);
+                    width: max-content;
+                    font-size: 14px;
+                    font-family: $o-we-font-family;
+                    background-color: $o-we-color-info;
+                    transition: 0.3s;
+                }
+            }
+            .s_dialog_preview_image {
+                display: flex;
+                flex-direction: column;
+                img {
+                    max-width: 100%;
+                }
+            }
+        }
+        .o_custom_snippet_wrap {
+            margin-bottom: 96px !important;
+
+            .o_snippet_preview_wrap {
+                margin-bottom: 0px !important;
+            }
+            .o_custom_snippet_edit {
+                 > * {
+                    color: rgba(0, 0, 0, 0.6);
+                    font-size: 50px;
+                    font-family: $o-we-font-family;
+                 }
+                 .btn:hover {
+                    color: rgba(0, 0, 0, 0.8);
+                 }
+            }
+        }
     }
 }

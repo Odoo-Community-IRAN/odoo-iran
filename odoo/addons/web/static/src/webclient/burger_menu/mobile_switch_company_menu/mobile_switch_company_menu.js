@@ -1,9 +1,20 @@
-/** @odoo-module **/
-import { SwitchCompanyMenu, SwitchCompanyItem } from "@web/webclient/switch_company_menu/switch_company_menu";
+import { SwitchCompanyMenu } from "@web/webclient/switch_company_menu/switch_company_menu";
 
-export class MobileSwitchCompanyItem extends SwitchCompanyItem {}
-MobileSwitchCompanyItem.components = {...SwitchCompanyItem, MobileSwitchCompanyItem}
-MobileSwitchCompanyItem.template = "web.MobileSwitchCompanyItem";
-export class MobileSwitchCompanyMenu extends SwitchCompanyMenu {}
-MobileSwitchCompanyMenu.template = "web.MobileSwitchCompanyMenu";
-MobileSwitchCompanyMenu.components = {...SwitchCompanyMenu, MobileSwitchCompanyItem}
+export class MobileSwitchCompanyMenu extends SwitchCompanyMenu {
+    static template = "web.MobileSwitchCompanyMenu";
+
+    setup() {
+        super.setup();
+        this.state.isOpen = false;
+    }
+
+    get show() {
+        return !this.hasLotsOfCompanies || this.state.isOpen === true;
+    }
+
+    toggleCollapsible() {
+        if (this.hasLotsOfCompanies) {
+            this.state.isOpen = !this.state.isOpen;
+        }
+    }
+}

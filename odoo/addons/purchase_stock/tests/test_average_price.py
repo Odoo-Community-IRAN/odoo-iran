@@ -20,7 +20,7 @@ class TestAveragePrice(ValuationReconciliationTestCommon):
         product_cable_management_box = self.env['product.product'].create({
             'default_code': 'AVG',
             'name': 'Average Ice Cream',
-            'type': 'product',
+            'is_storable': True,
             'categ_id': self.stock_account_product_categ.id,
             'list_price': 100.0,
             'standard_price': 60.0,
@@ -133,7 +133,7 @@ class TestAveragePrice(ValuationReconciliationTestCommon):
 
         avco_product = self.env['product.product'].create({
             'name': 'Average Ice Cream',
-            'type': 'product',
+            'is_storable': True,
             'categ_id': self.stock_account_product_categ.id,
             'purchase_method': 'purchase',
         })
@@ -170,7 +170,7 @@ class TestAveragePrice(ValuationReconciliationTestCommon):
 
         avco_product = self.env['product.product'].create({
             'name': 'Average Ice Cream',
-            'type': 'product',
+            'is_storable': True,
             'categ_id': self.stock_account_product_categ.id,
             'purchase_method': 'purchase',
         })
@@ -214,7 +214,7 @@ class TestAveragePrice(ValuationReconciliationTestCommon):
 
         avco_product = self.env['product.product'].create({
             'name': 'Average Ice Cream',
-            'type': 'product',
+            'type': 'consu',
             'categ_id': self.stock_account_product_categ.id,
             'purchase_method': 'purchase',
         })
@@ -250,7 +250,7 @@ class TestAveragePrice(ValuationReconciliationTestCommon):
         self.stock_account_product_categ.property_cost_method = 'average'
         avco_product = self.env['product.product'].create({
             'name': 'test_rounding_in_valuation product',
-            'type': 'product',
+            'is_storable': True,
             'categ_id': self.stock_account_product_categ.id,
             'purchase_method': 'purchase',
             'standard_price': 2.0,
@@ -261,7 +261,7 @@ class TestAveragePrice(ValuationReconciliationTestCommon):
             'type_tax_use': 'purchase',
             'amount_type': 'percent',
             'amount': 10,
-            'price_include': True,
+            'price_include_override': 'tax_included',
             'invoice_repartition_line_ids': [
                 (0, 0, {'repartition_type': 'base'}),
                 (0, 0, {

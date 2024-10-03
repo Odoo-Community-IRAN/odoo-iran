@@ -17,6 +17,7 @@ msgstr ""
 
 #. module: l10n_es_edi_tbai
 #: model_terms:ir.ui.view,arch_db:l10n_es_edi_tbai.template_LROE_240_inner
+#: model_terms:ir.ui.view,arch_db:l10n_es_edi_tbai.template_LROE_240_inner_recibidas
 msgid "1.0"
 msgstr ""
 
@@ -27,14 +28,8 @@ msgstr ""
 
 #. module: l10n_es_edi_tbai
 #: model_terms:ir.ui.view,arch_db:l10n_es_edi_tbai.template_LROE_240_inner
+#: model_terms:ir.ui.view,arch_db:l10n_es_edi_tbai.template_LROE_240_inner_recibidas
 msgid "240"
-msgstr ""
-
-#. module: l10n_es_edi_tbai
-#: model_terms:ir.ui.view,arch_db:l10n_es_edi_tbai.res_config_settings_view_form
-msgid ""
-"<span class=\"o_form_label\">Registro de Libros connection "
-"SII/TicketBAI</span>"
 msgstr ""
 
 #. module: l10n_es_edi_tbai
@@ -109,6 +104,15 @@ msgid "Hacienda Foral de Gipuzkoa"
 msgstr ""
 
 #. module: l10n_es_edi_tbai
+#: model:ir.model.fields,help:l10n_es_edi_tbai.field_account_bank_statement_line__l10n_es_tbai_reversed_ids
+#: model:ir.model.fields,help:l10n_es_edi_tbai.field_account_move__l10n_es_tbai_reversed_ids
+#: model:ir.model.fields,help:l10n_es_edi_tbai.field_account_payment__l10n_es_tbai_reversed_ids
+msgid ""
+"In the case where a vendor refund has multiple original invoices, you can "
+"set them here. "
+msgstr ""
+
+#. module: l10n_es_edi_tbai
 #. odoo-python
 #: code:addons/l10n_es_edi_tbai/models/account_edi_format.py:0
 #, python-format
@@ -154,14 +158,12 @@ msgstr ""
 #. module: l10n_es_edi_tbai
 #. odoo-python
 #: code:addons/l10n_es_edi_tbai/models/res_company.py:0
-#, python-format
 msgid "Licence NIF"
 msgstr ""
 
 #. module: l10n_es_edi_tbai
 #. odoo-python
 #: code:addons/l10n_es_edi_tbai/models/res_company.py:0
-#, python-format
 msgid "Licence number"
 msgstr ""
 
@@ -173,7 +175,6 @@ msgstr ""
 #. module: l10n_es_edi_tbai
 #. odoo-python
 #: code:addons/l10n_es_edi_tbai/models/account_edi_format.py:0
-#, python-format
 msgid "No XML response received from LROE."
 msgstr ""
 
@@ -190,28 +191,24 @@ msgstr ""
 #. module: l10n_es_edi_tbai
 #. odoo-python
 #: code:addons/l10n_es_edi_tbai/models/account_edi_format.py:0
-#, python-format
 msgid "Please configure the Tax ID on your company for TicketBAI."
 msgstr ""
 
 #. module: l10n_es_edi_tbai
 #. odoo-python
 #: code:addons/l10n_es_edi_tbai/models/account_edi_format.py:0
-#, python-format
 msgid "Please configure the certificate for TicketBAI/SII."
 msgstr ""
 
 #. module: l10n_es_edi_tbai
 #. odoo-python
 #: code:addons/l10n_es_edi_tbai/models/account_edi_format.py:0
-#, python-format
 msgid "Please specify a tax agency on your company for TicketBAI."
 msgstr ""
 
 #. module: l10n_es_edi_tbai
 #. odoo-python
 #: code:addons/l10n_es_edi_tbai/models/res_company.py:0
-#, python-format
 msgid "Production license"
 msgstr ""
 
@@ -253,40 +250,42 @@ msgstr ""
 #. module: l10n_es_edi_tbai
 #. odoo-python
 #: code:addons/l10n_es_edi_tbai/models/account_edi_format.py:0
-#, python-format
 msgid "Refund reason cannot be R5 for non-simplified invoices (TicketBAI)"
 msgstr ""
 
 #. module: l10n_es_edi_tbai
 #. odoo-python
 #: code:addons/l10n_es_edi_tbai/models/account_edi_format.py:0
-#, python-format
 msgid "Refund reason must be R5 for simplified invoices (TicketBAI)"
 msgstr ""
 
 #. module: l10n_es_edi_tbai
 #. odoo-python
 #: code:addons/l10n_es_edi_tbai/models/account_edi_format.py:0
-#, python-format
 msgid "Refund reason must be specified (TicketBAI)"
 msgstr ""
 
 #. module: l10n_es_edi_tbai
-#: model:ir.model,name:l10n_es_edi_tbai.model_ir_actions_report
-msgid "Report Action"
+#: model:ir.model.fields,field_description:l10n_es_edi_tbai.field_account_bank_statement_line__l10n_es_tbai_reversed_ids
+#: model:ir.model.fields,field_description:l10n_es_edi_tbai.field_account_move__l10n_es_tbai_reversed_ids
+#: model:ir.model.fields,field_description:l10n_es_edi_tbai.field_account_payment__l10n_es_tbai_reversed_ids
+msgid "Refunded Vendor Bills"
+msgstr ""
+
+#. module: l10n_es_edi_tbai
+#: model_terms:ir.ui.view,arch_db:l10n_es_edi_tbai.res_config_settings_view_form
+msgid "Registro de Libros connection SII/TicketBAI"
 msgstr ""
 
 #. module: l10n_es_edi_tbai
 #. odoo-python
 #: code:addons/l10n_es_edi_tbai/models/res_company.py:0
-#, python-format
 msgid "Software name"
 msgstr ""
 
 #. module: l10n_es_edi_tbai
 #. odoo-python
 #: code:addons/l10n_es_edi_tbai/models/res_company.py:0
-#, python-format
 msgid "Software version"
 msgstr ""
 
@@ -325,21 +324,18 @@ msgstr ""
 #. module: l10n_es_edi_tbai
 #. odoo-python
 #: code:addons/l10n_es_edi_tbai/models/res_company.py:0
-#, python-format
 msgid "Test license (Araba)"
 msgstr ""
 
 #. module: l10n_es_edi_tbai
 #. odoo-python
 #: code:addons/l10n_es_edi_tbai/models/res_company.py:0
-#, python-format
 msgid "Test license (Bizkaia)"
 msgstr ""
 
 #. module: l10n_es_edi_tbai
 #. odoo-python
 #: code:addons/l10n_es_edi_tbai/models/res_company.py:0
-#, python-format
 msgid "Test license (Gipuzkoa)"
 msgstr ""
 
@@ -358,7 +354,6 @@ msgstr ""
 #. module: l10n_es_edi_tbai
 #. odoo-python
 #: code:addons/l10n_es_edi_tbai/models/res_company.py:0
-#, python-format
 msgid "TicketBAI is not configured"
 msgstr ""
 
@@ -399,14 +394,12 @@ msgstr ""
 #. module: l10n_es_edi_tbai
 #. odoo-python
 #: code:addons/l10n_es_edi_tbai/models/account_move.py:0
-#, python-format
 msgid "You cannot delete a move that has a TicketBAI chain id."
 msgstr ""
 
 #. module: l10n_es_edi_tbai
 #. odoo-python
 #: code:addons/l10n_es_edi_tbai/models/account_move.py:0
-#, python-format
 msgid ""
 "You cannot reset to draft an entry that has been posted to TicketBAI's chain"
 msgstr ""

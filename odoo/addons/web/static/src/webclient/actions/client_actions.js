@@ -1,13 +1,10 @@
-/** @odoo-module **/
-
-import { _t } from "@web/core/l10n/translation";
 import { browser } from "@web/core/browser/browser";
-import { routeToUrl } from "@web/core/browser/router_service";
+import { router } from "@web/core/browser/router";
+import { rpc } from "@web/core/network/rpc";
 import { registry } from "@web/core/registry";
-import { useService } from "@web/core/utils/hooks";
 import { escape, sprintf } from "@web/core/utils/strings";
 
-import { Component, markup, onMounted, xml } from "@odoo/owl";
+import { markup } from "@odoo/owl";
 
 export function displayNotificationAction(env, action) {
     const params = action.params || {};
@@ -27,21 +24,6 @@ export function displayNotificationAction(env, action) {
 
 registry.category("actions").add("display_notification", displayNotificationAction);
 
-class InvalidAction extends Component {
-    setup() {
-        this.notification = useService("notification");
-        onMounted(this.onMounted);
-    }
-
-    onMounted() {
-        const message = _t("No action with id '%s' could be found", this.props.actionId);
-        this.notification.add(message, { type: "danger" });
-    }
-}
-InvalidAction.template = xml`<div class="o_invalid_action"></div>`;
-
-registry.category("actions").add("invalid_action", InvalidAction);
-
 /**
  * Client action to reload the whole interface.
  * If action.params.menu_id, it opens the given menu entry.
@@ -49,31 +31,20 @@ registry.category("actions").add("invalid_action", InvalidAction);
  */
 function reload(env, action) {
     const { menu_id, action_id } = action.params || {};
-    const { router } = env.services;
-    const route = { ...router.current };
+    let route = { ...router.current };
 
     if (menu_id || action_id) {
-        route.hash = {};
+        route = {};
         if (menu_id) {
-            route.hash.menu_id = menu_id;
+            route.menu_id = menu_id;
         }
         if (action_id) {
-            route.hash.action = action_id;
+            route.action = action_id;
         }
     }
 
-    // We want to force location.assign(...) to do a page reload.
-    // To do this, we need to make sure that the url is different.
-    route.search = { ...route.search };
-    if ("reload" in route.search) {
-        delete route.search.reload;
-    } else {
-        route.search.reload = true;
-    }
-    const url = browser.location.origin + routeToUrl(route);
-
     env.bus.trigger("CLEAR-CACHES");
-    browser.location.assign(url);
+    router.pushState(route, { replace: true, reload: true });
 }
 
 registry.category("actions").add("reload", reload);
@@ -81,12 +52,11 @@ registry.category("actions").add("reload", reload);
 /**
  * Client action to go back home.
  */
-async function home(env) {
+async function home() {
     await new Promise((resolve) => {
         const waitForServer = (delay) => {
             browser.setTimeout(async () => {
-                env.services
-                    .rpc("/web/webclient/version_info", {})
+                rpc("/web/webclient/version_info", {})
                     .then(resolve)
                     .catch(() => waitForServer(250));
             }, delay);
@@ -106,7 +76,7 @@ registry.category("actions").add("home", home);
  */
 async function reloadContext(env, action) {
     // side-effect of get_session_info is to refresh the session context
-    await env.services.rpc("/web/session/get_session_info");
+    await rpc("/web/session/get_session_info");
     reload(env, action);
 }
 

@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 from odoo import models, fields, api, _
-from odoo.tools import SQL
+from odoo.tools import SQL, Query, unique
 from odoo.tools.float_utils import float_round, float_compare
-from odoo.tools.misc import flatten
 from odoo.exceptions import UserError, ValidationError
 
 class AnalyticMixin(models.AbstractModel):
@@ -14,14 +13,13 @@ class AnalyticMixin(models.AbstractModel):
         'Analytic Distribution',
         compute="_compute_analytic_distribution", store=True, copy=True, readonly=False,
     )
-    # Json non stored to be able to search on analytic_distribution.
-    analytic_distribution_search = fields.Json(
-        store=False,
-        search="_search_analytic_distribution"
-    )
     analytic_precision = fields.Integer(
         store=False,
         default=lambda self: self.env['decimal.precision'].precision_get("Percentage Analytic"),
+    )
+    distribution_analytic_account_ids = fields.Many2many(
+        comodel_name='account.analytic.account',
+        compute='_compute_distribution_analytic_account_ids',
     )
 
     def init(self):
@@ -38,60 +36,101 @@ class AnalyticMixin(models.AbstractModel):
             self.env.cr.execute(query)
         super().init()
 
-    @api.model
-    def fields_get(self, allfields=None, attributes=None):
-        """ Hide analytic_distribution_search from filterable/searchable fields"""
-        res = super().fields_get(allfields, attributes)
-        if res.get('analytic_distribution_search'):
-            res['analytic_distribution_search']['searchable'] = False
-        return res
-
     def _compute_analytic_distribution(self):
         pass
 
-    def _search_analytic_distribution(self, operator, value):
-        if operator == 'in' and isinstance(value, (tuple, list)):
-            account_ids = value
-            operator_inselect = 'inselect'
-        elif operator in ('=', '!=', 'ilike', 'not ilike') and isinstance(value, (str, bool)):
-            operator_name_search = '=' if operator in ('=', '!=') else 'ilike'
-            account_ids = list(self.env['account.analytic.account']._name_search(name=value, operator=operator_name_search))
-            operator_inselect = 'inselect' if operator in ('=', 'ilike') else 'not inselect'
-        else:
-            raise UserError(_('Operation not supported'))
-
-        query = SQL(
-            fr"""
-            SELECT id
-            FROM {self._table}
-            WHERE %s && %s
-            """,
-            [str(account_id) for account_id in account_ids],
-            self._query_analytic_accounts(),
-        )
-
-        return [('id', operator_inselect, query)]
-
     def _query_analytic_accounts(self, table=False):
         return SQL(
-            r"""regexp_split_to_array(jsonb_path_query_array(%s.analytic_distribution, '$.keyvalue()."key"')::text, '\D+')""",
-            SQL(table or self._table),
+            r"""regexp_split_to_array(jsonb_path_query_array(%s, '$.keyvalue()."key"')::text, '\D+')""",
+            self._field_to_sql(table or self._table, 'analytic_distribution'),
         )
 
-    @api.model
-    def _search(self, domain, offset=0, limit=None, order=None, access_rights_uid=None):
-        domain = self._apply_analytic_distribution_domain(domain)
-        return super()._search(domain, offset, limit, order, access_rights_uid)
+    @api.depends('analytic_distribution')
+    def _compute_distribution_analytic_account_ids(self):
+        all_ids = {int(_id) for rec in self for key in (rec.analytic_distribution or {}) for _id in key.split(',')}
+        existing_accounts_ids = set(self.env['account.analytic.account'].browse(all_ids).exists().ids)
+        for rec in self:
+            ids = list(unique(int(_id) for key in (rec.analytic_distribution or {}) for _id in key.split(',') if int(_id) in existing_accounts_ids))
+            rec.distribution_analytic_account_ids = self.env['account.analytic.account'].browse(ids)
 
-    @api.model
-    def read_group(self, domain, fields, groupby, offset=0, limit=None, orderby=False, lazy=True):
-        domain = self._apply_analytic_distribution_domain(domain)
-        return super().read_group(domain, fields, groupby, offset, limit, orderby, lazy)
+    def _condition_to_sql(self, alias: str, fname: str, operator: str, value, query: Query) -> SQL:
+        # Don't use this override when account_report_analytic_groupby is truly in the context
+        # Indeed, when account_report_analytic_groupby is in the context it means that `analytic_distribution`
+        # doesn't have the same format and the table is a temporary one, see _prepare_lines_for_analytic_groupby
+        if fname != 'analytic_distribution' or self.env.context.get('account_report_analytic_groupby'):
+            return super()._condition_to_sql(alias, fname, operator, value, query)
+
+        if operator not in ('=', '!=', 'ilike', 'not ilike', 'in', 'not in'):
+            raise UserError(_('Operation not supported'))
+
+        if operator in ('=', '!=') and isinstance(value, bool):
+            return super()._condition_to_sql(alias, fname, operator, value, query)
+
+        if isinstance(value, str) and operator in ('=', '!=', 'ilike', 'not ilike'):
+            value = list(self.env['account.analytic.account']._search(
+                [('display_name', '=' if operator in ('=', '!=') else 'ilike', value)]
+            ))
+            operator = 'in' if operator in ('=', 'ilike') else 'not in'
+
+        # keys can be comma-separated ids, we will split those into an array and then make an array comparison with the list of ids to check
+        analytic_accounts_query = self._query_analytic_accounts()
+        value = [str(id_) for id_ in value if id_]  # list of ids -> list of string
+        if operator == 'in':
+            return SQL(
+                "%s && %s",
+                analytic_accounts_query,
+                value,
+            )
+        if operator == 'not in':
+            return SQL(
+                "(NOT %s && %s OR %s IS NULL)",
+                analytic_accounts_query,
+                value,
+                self._field_to_sql(alias, 'analytic_distribution', query),
+            )
+        raise UserError(_('Operation not supported'))
+
+    def _read_group_groupby(self, groupby_spec: str, query: Query) -> SQL:
+        """To group by `analytic_distribution`, we first need to separate the analytic_ids and associate them with the ids to be counted
+        Do note that only '__count' can be passed in the `aggregates`"""
+        if groupby_spec == 'analytic_distribution':
+            query._tables = {
+                'distribution': SQL(
+                    r"""(SELECT DISTINCT %s, (regexp_matches(jsonb_object_keys(%s), '\d+', 'g'))[1]::int AS account_id FROM %s WHERE %s)""",
+                    self._get_count_id(query),
+                    self._field_to_sql(self._table, 'analytic_distribution', query),
+                    query.from_clause,
+                    query.where_clause,
+                )
+            }
+
+            # After using the from and where clauses in the nested query, they are no longer needed in the main one
+            query._joins = {}
+            query._where_clauses = []
+            return SQL("account_id")
+
+        return super()._read_group_groupby(groupby_spec, query)
+
+    def _read_group_select(self, aggregate_spec: str, query: Query) -> SQL:
+        if query.table == 'distribution' and aggregate_spec != '__count':
+            raise ValueError(f"analytic_distribution grouping does not accept {aggregate_spec} as aggregate.")
+        return super()._read_group_select(aggregate_spec, query)
+
+    def _get_count_id(self, query):
+        ids = {
+            'account_move_line': "move_id",
+            'purchase_order_line': "order_id",
+            'account_asset': "id",
+            'hr_expense': "id",
+        }
+        if query.table not in ids:
+            raise ValueError(f"{query.table} does not support analytic_distribution grouping.")
+        return SQL(ids.get(query.table))
 
     def mapped(self, func):
         # Get the related analytic accounts as a recordset instead of the distribution
         if func == 'analytic_distribution' and self.env.context.get('distribution_ids'):
-            return self.env['account.analytic.account'].browse(flatten(record._get_analytic_account_ids() for record in self))
+            return self.distribution_analytic_account_ids
         return super().mapped(func)
 
     def filtered_domain(self, domain):
@@ -134,16 +173,3 @@ class AnalyticMixin(models.AbstractModel):
             vals['analytic_distribution'] = vals.get('analytic_distribution') and {
                 account_id: float_round(distribution, decimal_precision) for account_id, distribution in vals['analytic_distribution'].items()}
         return vals
-
-    def _apply_analytic_distribution_domain(self, domain):
-        return [
-            ('analytic_distribution_search', leaf[1], leaf[2])
-            if len(leaf) == 3 and leaf[0] == 'analytic_distribution' and isinstance(leaf[2], (str, tuple, list))
-            else leaf
-            for leaf in domain
-        ]
-
-    def _get_analytic_account_ids(self) -> list[int]:
-        """ Get the analytic account ids from the analytic_distribution dict """
-        self.ensure_one()
-        return [int(account_id) for ids in (self.analytic_distribution or {}) for account_id in ids.split(',')]

@@ -5,6 +5,7 @@ from odoo import http
 from odoo.http import request
 from odoo.addons.google_calendar.utils.google_calendar import GoogleCalendarService
 from odoo.addons.calendar.controllers.main import CalendarController
+from odoo.addons.google_account.models.google_service import _get_client_secret
 
 
 class GoogleCalendarController(CalendarController):
@@ -62,8 +63,5 @@ class GoogleCalendarController(CalendarController):
     @http.route()
     def check_calendar_credentials(self):
         res = super().check_calendar_credentials()
-        get_param = request.env['ir.config_parameter'].sudo().get_param
-        client_id = get_param('google_calendar_client_id')
-        client_secret = get_param('google_calendar_client_secret')
-        res['google_calendar'] = bool(client_id and client_secret)
+        res['google_calendar'] = request.env['res.users']._has_setup_credentials()
         return res

@@ -3,43 +3,21 @@
 # 	* mass_mailing_sms
 # 
 # Translators:
-# Wil Odoo, 2023
-# Malaz Abuidris <msea@odoo.com>, 2024
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-08-13 10:26+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Malaz Abuidris <msea@odoo.com>, 2024\n"
+"POT-Creation-Date: 2024-09-25 08:39+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Arabic (https://app.transifex.com/odoo/teams/41243/ar/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: \n"
 "Language: ar\n"
 "Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
-
-#. module: mass_mailing_sms
-#. odoo-javascript
-#: code:addons/mass_mailing_sms/static/src/components/sms_widget/fields_sms_widget.js:0
-#, python-format
-msgid " (including link trackers and opt-out link) "
-msgstr ""
-
-#. module: mass_mailing_sms
-#. odoo-javascript
-#: code:addons/mass_mailing_sms/static/src/components/sms_widget/fields_sms_widget.js:0
-#, python-format
-msgid " (including link trackers) "
-msgstr ""
-
-#. module: mass_mailing_sms
-#. odoo-javascript
-#: code:addons/mass_mailing_sms/static/src/components/sms_widget/fields_sms_widget.js:0
-#, python-format
-msgid " (including opt-out link) "
-msgstr ""
 
 #. module: mass_mailing_sms
 #: model_terms:ir.ui.view,arch_db:mass_mailing_sms.mailing_sms_test_view_form
@@ -53,7 +31,6 @@ msgstr ""
 #. module: mass_mailing_sms
 #. odoo-python
 #: code:addons/mass_mailing_sms/models/mailing_mailing.py:0
-#, python-format
 msgid "24H Stats of %(mailing_type)s \"%(mailing_name)s\""
 msgstr "إحصائيات الـ24 ساعة لـ %(mailing_type)s \"%(mailing_name)s\" "
 
@@ -74,7 +51,7 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:mass_mailing_sms.mailing_mailing_view_form_sms
 msgid ""
 "<span name=\"canceled_text_sms\" invisible=\"mailing_type != 'sms'\">SMS "
-"Text Message have been canceled and will not be sent.</span>"
+"Text Message have been cancelled and will not be sent.</span>"
 msgstr ""
 "<span name=\"canceled_text_sms\" invisible=\"mailing_type != 'sms'\">تم "
 "إلغاء الرسائل النصية القصيرة ولن يتم إرسالها.</span> "
@@ -186,7 +163,6 @@ msgstr "اختبار A/B للرسائل النصية القصيرة # "
 #. module: mass_mailing_sms
 #. odoo-python
 #: code:addons/mass_mailing_sms/models/mailing_mailing.py:0
-#, python-format
 msgid "A/B Test: %s"
 msgstr "اختبار A/B: %s "
 
@@ -215,24 +191,18 @@ msgstr "متوسط عدد النقرات "
 #. module: mass_mailing_sms
 #. odoo-python
 #: code:addons/mass_mailing_sms/models/mailing_mailing.py:0
-#, python-format
 msgid "BOUNCED (%i)"
 msgstr "مرتدة (%i)"
 
 #. module: mass_mailing_sms
-#: model:utm.tag,name:mass_mailing_sms.mailing_tag_0
-msgid "Bioutifoul SMS"
-msgstr "رسائل نصية قصيرة رائعة "
-
-#. module: mass_mailing_sms
 #. odoo-python
 #: code:addons/mass_mailing_sms/controllers/main.py:0
-#, python-format
 msgid ""
-"Blacklist through SMS Marketing unsubscribe (mailing ID: %s - model: %s)"
+"Blacklist through SMS Marketing unsubscribe (mailing ID: %(mailing_id)s - "
+"model: %(model)s)"
 msgstr ""
 "إدراج في القائمة السوداء عن طريق إلغاء الاشتراك من التسويق عبر الرسائل "
-"النصية القصيرة (معرف المراسلة: %s - النموذج: %s) "
+"النصية القصيرة (معرف المراسلة: %(mailing_id)s - النموذج: %(model)s) "
 
 #. module: mass_mailing_sms
 #: model:ir.model.fields.selection,name:mass_mailing_sms.selection__mailing_trace__failure_type__sms_blacklist
@@ -263,7 +233,6 @@ msgstr "المرتدة (%) "
 #. module: mass_mailing_sms
 #. odoo-python
 #: code:addons/mass_mailing_sms/models/mailing_mailing.py:0
-#, python-format
 msgid "CLICKED (%i)"
 msgstr "تم الضغط (%i) "
 
@@ -367,7 +336,6 @@ msgstr "إنشاء نسخة مطابقة "
 #. module: mass_mailing_sms
 #. odoo-python
 #: code:addons/mass_mailing_sms/models/res_users.py:0
-#, python-format
 msgid "Email Marketing"
 msgstr "التسويق بالبريد الإلكتروني"
 
@@ -518,7 +486,6 @@ msgstr "الوجهة غير صالحة "
 #. module: mass_mailing_sms
 #. odoo-python
 #: code:addons/mass_mailing_sms/controllers/main.py:0
-#, python-format
 msgid "Invalid number %s"
 msgstr "الرقم غير صالح %s "
 
@@ -679,7 +646,6 @@ msgstr "عدد "
 #. module: mass_mailing_sms
 #. odoo-python
 #: code:addons/mass_mailing_sms/controllers/main.py:0
-#, python-format
 msgid "Number %s not found"
 msgstr "لم يتم العثور على الرقم %s "
 
@@ -712,6 +678,15 @@ msgstr "عدد الرسائل الحادث بها خطأ في التسليم"
 #: model:ir.model.fields,field_description:mass_mailing_sms.field_mailing_sms_test__numbers
 msgid "Number(s)"
 msgstr "الرقم (الأرقام) "
+
+#. module: mass_mailing_sms
+#: model_terms:ir.ui.view,arch_db:mass_mailing_sms.mailing_mailing_view_form_sms
+msgid ""
+"Once you send these text messages, they'll be making a grand entrance in all"
+" pockets, creating quite the bzzzzz!"
+msgstr ""
+"بمجرد إرسال الرسائل النصية القصيرة هذه، ستصل إلى جيوب الجميع وستثير ضجة "
+"كبيرة! "
 
 #. module: mass_mailing_sms
 #: model_terms:ir.ui.view,arch_db:mass_mailing_sms.mailing_trace_view_tree_sms
@@ -751,7 +726,6 @@ msgstr "يرجى إدخال رقم هاتفك "
 #. module: mass_mailing_sms
 #. odoo-python
 #: code:addons/mass_mailing_sms/models/mailing_mailing.py:0
-#, python-format
 msgid "RECEIVED (%i)"
 msgstr "تم الاستلام (%i) "
 
@@ -774,7 +748,6 @@ msgstr "تم الرفض "
 #. module: mass_mailing_sms
 #. odoo-python
 #: code:addons/mass_mailing_sms/models/mailing_mailing.py:0
-#, python-format
 msgid "Report for %(expected)i %(mailing_type)s Sent"
 msgstr "تم إرسال التقرير لـ %(expected)i %(mailing_type)s "
 
@@ -826,7 +799,6 @@ msgstr "معرف الرسائل النصية القصيرة "
 #: model:ir.ui.menu,name:mass_mailing_sms.mass_mailing_sms_menu_mass_sms
 #: model:ir.ui.menu,name:mass_mailing_sms.mass_mailing_sms_menu_root
 #: model_terms:ir.ui.view,arch_db:mass_mailing_sms.mailing_mailing_view_tree_sms
-#, python-format
 msgid "SMS Marketing"
 msgstr "التسويق عبر الرسائل النصية القصيرة "
 
@@ -849,7 +821,6 @@ msgstr "قالب الرسائل النصية القصيرة "
 #. module: mass_mailing_sms
 #. odoo-python
 #: code:addons/mass_mailing_sms/models/mailing_mailing.py:0
-#, python-format
 msgid "SMS Text Message"
 msgstr "الرسائة النصية القصيرة "
 
@@ -877,9 +848,8 @@ msgstr "اختيار الفائز عن طريق الرسائل النصية ال
 #. module: mass_mailing_sms
 #. odoo-python
 #: code:addons/mass_mailing_sms/wizard/sms_composer.py:0
-#, python-format
-msgid "STOP SMS: %(unsubscribe_url)s"
-msgstr "إيقاف الرسائل النصية القصيرة: %(unsubscribe_url)s "
+msgid "STOP SMS: %s"
+msgstr "إيقاف الرسائل النصية القصيرة: %s"
 
 #. module: mass_mailing_sms
 #: model:ir.model.fields,field_description:mass_mailing_sms.field_mailing_contact__phone_sanitized
@@ -946,7 +916,6 @@ msgstr "الحالة"
 #. odoo-python
 #: code:addons/mass_mailing_sms/models/mailing_mailing.py:0
 #: model:ir.actions.act_window,name:mass_mailing_sms.mailing_sms_test_action
-#, python-format
 msgid "Test Mailing"
 msgstr "اختبار المراسلات"
 
@@ -958,21 +927,19 @@ msgstr "اختبار مراسلة الرسائل النصية القصيرة "
 #. module: mass_mailing_sms
 #. odoo-python
 #: code:addons/mass_mailing_sms/wizard/mailing_sms_test.py:0
-#, python-format
-msgid "Test SMS could not be sent to %s: %s"
-msgstr "تعذر إرسال الرسالة النصية القصيرة التجريبية إلى %s: %s "
+msgid "Test SMS could not be sent to %(destination)s: %(state)s"
+msgstr ""
+"تعذر إرسال الرسالة النصية القصيرة التجريبية إلى %(destination)s: %(state)s  "
 
 #. module: mass_mailing_sms
 #. odoo-python
 #: code:addons/mass_mailing_sms/wizard/mailing_sms_test.py:0
-#, python-format
 msgid "Test SMS successfully sent to %s"
 msgstr "تم إرسال الرسالة النصية القصيرة التجريبية بنجاح إلى %s "
 
 #. module: mass_mailing_sms
 #. odoo-python
 #: code:addons/mass_mailing_sms/models/utm.py:0
-#, python-format
 msgid ""
 "The UTM medium '%s' cannot be deleted as it is used in some main functional "
 "flows, such as the SMS Marketing."
@@ -983,7 +950,6 @@ msgstr ""
 #. module: mass_mailing_sms
 #. odoo-python
 #: code:addons/mass_mailing_sms/wizard/mailing_sms_test.py:0
-#, python-format
 msgid "The following numbers are not correctly encoded: %s"
 msgstr "لم يتم ترميز الأرقام التالية بشكل صحيح: %s "
 
@@ -999,21 +965,6 @@ msgid ""
 msgstr ""
 "لقد تم إدراج هذا الرقم في القائمة السوداء للتسويق عبر الرسائل النصية "
 "القصيرة. انقر لإزالته من القائمة السوداء. "
-
-#. module: mass_mailing_sms
-#: model_terms:ir.ui.view,arch_db:mass_mailing_sms.mailing_mailing_view_form_sms
-msgid ""
-"This will send SMS to all recipients now. Do you still want to proceed?"
-msgstr ""
-"سيقوم هذا بإرسال الرسالة النصية القصيرة إلى كافة المستلمين الآن. هل ترغب "
-"بالاستمرار؟ "
-
-#. module: mass_mailing_sms
-#: model_terms:ir.ui.view,arch_db:mass_mailing_sms.mailing_mailing_view_form_sms
-msgid "This will send SMS to all recipients. Do you still want to proceed?"
-msgstr ""
-"سيقوم هذا بإرسال الرسالة النصية القصيرة إلى كافة المستلمين. هل ترغب "
-"بالاستمرار؟ "
 
 #. module: mass_mailing_sms
 #: model:ir.model.fields,field_description:mass_mailing_sms.field_mailing_mailing__sms_subject
@@ -1067,7 +1018,6 @@ msgstr "إلغاء اشتراكي"
 #. module: mass_mailing_sms
 #. odoo-python
 #: code:addons/mass_mailing_sms/models/mailing_mailing.py:0
-#, python-format
 msgid "Unsupported %s for mass SMS"
 msgstr "%s غير مدعوم للرسائل النصية القصيرة الجماعية "
 
@@ -1107,11 +1057,6 @@ msgstr "قم بكتابة رسالة نصية قصيرة جذابة، وحدد �
 #: model:ir.model.fields.selection,name:mass_mailing_sms.selection__mailing_trace__failure_type__sms_number_format
 msgid "Wrong Number Format"
 msgstr "صيغة الرقم خطأ "
-
-#. module: mass_mailing_sms
-#: model:utm.campaign,title:mass_mailing_sms.utm_campaign_0
-msgid "XMas Promo"
-msgstr "العرض الترويجي للعيد "
 
 #. module: mass_mailing_sms
 #: model_terms:ir.ui.view,arch_db:mass_mailing_sms.mailing_mailing_view_form_sms

@@ -1,20 +1,32 @@
 /** @odoo-module */
-import * as spreadsheet from "@odoo/o-spreadsheet";
 import { globalFiltersFieldMatchers } from "@spreadsheet/global_filters/plugins/global_filters_core_plugin";
 import { checkFilterFieldMatching } from "@spreadsheet/global_filters/helpers";
 import { CommandResult } from "../../o_spreadsheet/cancelled_reason";
 import { Domain } from "@web/core/domain";
-
-const { CorePlugin } = spreadsheet;
+import { OdooCorePlugin } from "@spreadsheet/plugins";
+import { _t } from "@web/core/l10n/translation";
 
 /**
  * @typedef {Object} Chart
  * @property {Object} fieldMatching
  *
- * @typedef {import("@spreadsheet/global_filters/plugins/global_filters_core_plugin").FieldMatching} FieldMatching
+ * @typedef {import("@spreadsheet").FieldMatching} FieldMatching
  */
 
-export class OdooChartCorePlugin extends CorePlugin {
+const CHART_PLACEHOLDER_DISPLAY_NAME = {
+    odoo_bar: _t("Odoo Bar Chart"),
+    odoo_line: _t("Odoo Line Chart"),
+    odoo_pie: _t("Odoo Pie Chart"),
+};
+
+export class OdooChartCorePlugin extends OdooCorePlugin {
+    static getters = /** @type {const} */ ([
+        "getOdooChartIds",
+        "getChartFieldMatch",
+        "getOdooChartDisplayName",
+        "getOdooChartFieldMatching",
+    ]);
+
     constructor(config) {
         super(config);
 
@@ -103,9 +115,9 @@ export class OdooChartCorePlugin extends CorePlugin {
      * @returns {string}
      */
     getOdooChartDisplayName(chartId) {
-        return `(#${this.getOdooChartIds().indexOf(chartId) + 1}) ${
-            this.getters.getChart(chartId).title
-        }`;
+        const { title, type } = this.getters.getChart(chartId);
+        const name = title.text || CHART_PLACEHOLDER_DISPLAY_NAME[type];
+        return `(#${this.getOdooChartIds().indexOf(chartId) + 1}) ${name}`;
     }
 
     /**
@@ -194,10 +206,3 @@ export class OdooChartCorePlugin extends CorePlugin {
         this.history.update("charts", charts);
     }
 }
-
-OdooChartCorePlugin.getters = [
-    "getOdooChartIds",
-    "getChartFieldMatch",
-    "getOdooChartDisplayName",
-    "getOdooChartFieldMatching",
-];

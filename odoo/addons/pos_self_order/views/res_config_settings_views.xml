@@ -5,11 +5,6 @@
         <field name="model">res.config.settings</field>
         <field name="inherit_id" ref="point_of_sale.res_config_settings_view_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//setting[@id='payment_methods_new']" position="before">
-                <div class="o_notification_alert alert alert-warning" role="alert" invisible="not is_kiosk_mode">
-                    <span>Please note that the kiosk only works with Adyen &amp; Stripe terminals</span>
-                </div>
-            </xpath>
             <block id="restaurant_section" position="after">
                 <block title="Mobile self-order &amp; Kiosk" id="self_ordering_section">
                     <setting string="QR menu &amp; Kiosk activation" help="Let your customers order using their mobile or a kiosk.">a
@@ -28,7 +23,7 @@
                             <label for="pos_self_ordering_service_mode" class="col-lg-4" string="Service at" />
                             <field name="pos_self_ordering_service_mode" readonly="not pos_module_pos_restaurant and pos_self_ordering_mode != 'kiosk'" />
                         </div>
-                        <div class="content-group row" groups="base.group_no_one" invisible="not pos_self_ordering_mode in ['kiosk', 'mobile']">
+                        <div class="content-group row" groups="base.group_no_one" invisible="pos_self_ordering_mode == 'nothing'">
                             <label for="pos_self_ordering_default_user_id" class="col-lg-4" string="Default User"/>
                             <field name="pos_self_ordering_default_user_id" />
                         </div>
@@ -59,15 +54,8 @@
                         <field name="pos_self_ordering_image_brand_name" invisible ="1"/>
                         <field name="pos_self_ordering_image_brand" class="w-100" filename="pos_self_ordering_image_brand_name"/>
                     </setting>
-                    <setting string="Eat in / Take out" help="Adjust the tax rate based on whether customers are dining in or opting for takeout." invisible="not pos_self_ordering_mode in ['mobile', 'kiosk']">
+                    <setting string="Allow takeout order" help="Allow self-order customers to set their order for takeout." invisible="not pos_self_ordering_mode in ['mobile', 'kiosk'] or not pos_takeaway">
                         <field name="pos_self_ordering_takeaway"/>
-                        <div class="content-group" invisible="not pos_self_ordering_takeaway">
-                            <label string="" for="pos_self_ordering_alternative_fp_id" class="me-2"/>
-                            <field name="pos_self_ordering_alternative_fp_id" placeholder="Alternative Fiscal Position"/>
-                            <div>
-                                <button name="%(account.action_account_fiscal_position_form)d" icon="oi-arrow-right" type="action" string="Fiscal Positions" class="btn-link"/>
-                            </div>
-                        </div>
                     </setting>
                 </block>
             </block>
@@ -105,7 +93,7 @@
             </setting>
 
             <setting id="flexible_taxes" position="attributes">
-                <attribute name="invisible">is_kiosk_mode</attribute>
+                <attribute name="invisible">is_kiosk_mode or pos_takeaway</attribute>
             </setting>
         </field>
     </record>

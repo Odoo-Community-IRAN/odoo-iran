@@ -11,18 +11,24 @@ registry.category("web_tour.tours").add("blog_autocomplete_with_date", {
     steps: () => [{
     content: "Select first month",
     trigger: 'select[name=archive]',
-    run: 'text option 2',
-}, {
+    run: "selectByIndex 1",
+}, 
+{
+    trigger: '#o_wblog_posts_loop span:has(i.fa-calendar-o):has(a[href="/blog"])',
+},
+{
     content: "Enter search term",
     trigger: '.o_searchbar_form input',
-    extra_trigger: '#o_wblog_posts_loop span:has(i.fa-calendar-o):has(a[href="/blog"])',
-    run: 'text a',
-}, {
+    run: "edit a",
+}, 
+{
+    trigger: ".o_searchbar_form .o_dropdown_menu .o_search_result_item",
+},
+{
     content: "Wait for suggestions then click on search icon",
-    extra_trigger: '.o_searchbar_form .o_dropdown_menu .o_search_result_item',
     trigger: '.o_searchbar_form button:has(i.oi-search)',
+    run: "click",
 }, {
     content: "Ensure both filters are applied",
-    trigger: '#o_wblog_posts_loop:has(span:has(i.fa-calendar-o):has(a[href="/blog?search=a"])):has(span:has(i.fa-search):has(a[href^="/blog?date_begin"]))',
-    run: () => {}, // This is a check.
+    trigger: `#o_wblog_posts_loop:has(span a[href="/blog?search=a"]):has(span i.fa-calendar-o):has(span a[href^="/blog?date_begin"]):has(span i.fa-search)`,
 }]});

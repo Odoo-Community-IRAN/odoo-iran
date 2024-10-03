@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 
 
 class TrackStage(models.Model):
@@ -18,9 +18,9 @@ class TrackStage(models.Model):
     # legends
     color = fields.Integer(string='Color')
     description = fields.Text(string='Description', translate=True)
-    legend_blocked = fields.Char('Red Kanban Label', default=lambda s: _('Blocked'), translate=True)
-    legend_done = fields.Char('Green Kanban Label', default=lambda s: _('Ready for Next Stage'), translate=True)
-    legend_normal = fields.Char('Grey Kanban Label', default=lambda s: _('In Progress'), translate=True)
+    legend_blocked = fields.Char('Red Kanban Label', default=lambda s: s.env._('Blocked'), translate=True)
+    legend_done = fields.Char('Green Kanban Label', default=lambda s: s.env._('Ready for Next Stage'), translate=True)
+    legend_normal = fields.Char('Grey Kanban Label', default=lambda s: s.env._('In Progress'), translate=True)
     # pipe
     fold = fields.Boolean(
         string='Folded in Kanban',
@@ -31,7 +31,7 @@ class TrackStage(models.Model):
     is_fully_accessible = fields.Boolean(
         string='Fully accessible', compute='_compute_is_fully_accessible', store=True,
         help='If checked, automatically publish tracks so that access links to customers are provided.')
-    is_cancel = fields.Boolean(string='Canceled Stage')
+    is_cancel = fields.Boolean(string='Cancelled Stage')
 
     @api.depends('is_cancel', 'is_fully_accessible')
     def _compute_is_visible_in_agenda(self):

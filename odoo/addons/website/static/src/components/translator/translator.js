@@ -10,6 +10,9 @@ import { useEffect, useRef, Component, xml } from "@odoo/owl";
 const localStorageNoDialogKey = 'website_translator_nodialog';
 
 export class AttributeTranslateDialog extends Component {
+    static components = { WebsiteDialog };
+    static template = "website.AttributeTranslateDialog";
+    static props = ["node", "close"];
     setup() {
         this.title = _t("Translate Attribute");
 
@@ -44,12 +47,26 @@ export class AttributeTranslateDialog extends Component {
         }, () => [this.props.node]);
     }
 }
-AttributeTranslateDialog.components = { WebsiteDialog };
-AttributeTranslateDialog.template = 'website.AttributeTranslateDialog';
 
 // Used to translate the text of `<select/>` options since it should not be
 // possible to interact with the content of `.o_translation_select` elements.
 export class SelectTranslateDialog extends Component {
+    static components = { WebsiteDialog };
+    static template = xml`
+    <WebsiteDialog close="props.close"
+        title="title"
+        showSecondaryButton="false">
+        <input
+            t-ref="input"
+            type="text" class="form-control my-3"
+            t-att-value="optionEl.textContent or ''"
+            t-on-keyup="onInputKeyup"/>
+    </WebsiteDialog>
+    `;
+    static props = {
+        node: String,
+        close: Function,
+    };
     setup() {
         this.title = _t("Translate Selection Option");
         this.inputEl = useRef('input');
@@ -65,20 +82,13 @@ export class SelectTranslateDialog extends Component {
         );
     }
 }
-SelectTranslateDialog.components = {WebsiteDialog};
-SelectTranslateDialog.template = xml`
-<WebsiteDialog close="props.close"
-    title="title"
-    showSecondaryButton="false">
-    <input
-        t-ref="input"
-        type="text" class="form-control my-3"
-        t-att-value="optionEl.textContent or ''"
-        t-on-keyup="onInputKeyup"/>
-</WebsiteDialog>
-`;
 
 export class TranslatorInfoDialog extends Component {
+    static components = { WebsiteDialog };
+    static template = "website.TranslatorInfoDialog";
+    static props = {
+        close: Function,
+    };
     setup() {
         this.strongOkButton = _t("Ok, never show me this again");
         this.okButton = _t("Ok");
@@ -88,16 +98,14 @@ export class TranslatorInfoDialog extends Component {
         browser.localStorage.setItem(localStorageNoDialogKey, true);
     }
 }
-TranslatorInfoDialog.components = { WebsiteDialog };
-TranslatorInfoDialog.template = 'website.TranslatorInfoDialog';
 
-const savableSelector = '[data-oe-translation-initial-sha], ' +
+const savableSelector = '[data-oe-translation-source-sha], ' +
     '[data-oe-model][data-oe-id][data-oe-field], ' +
-    '[placeholder*="data-oe-translation-initial-sha="], ' +
-    '[title*="data-oe-translation-initial-sha="], ' +
-    '[value*="data-oe-translation-initial-sha="], ' +
-    'textarea:contains(data-oe-translation-initial-sha), ' +
-    '[alt*="data-oe-translation-initial-sha="]';
+    '[placeholder*="data-oe-translation-source-sha="], ' +
+    '[title*="data-oe-translation-source-sha="], ' +
+    '[value*="data-oe-translation-source-sha="], ' +
+    'textarea:contains(data-oe-translation-source-sha), ' +
+    '[alt*="data-oe-translation-source-sha="]';
 
 export class WebsiteTranslator extends WebsiteEditorComponent {
     setup() {
@@ -161,10 +169,10 @@ export class WebsiteTranslator extends WebsiteEditorComponent {
         const self = this;
         var attrs = ['placeholder', 'title', 'alt', 'value'];
         const $editable = this.getEditableArea();
-        const translationRegex = /<span [^>]*data-oe-translation-initial-sha="([^"]+)"[^>]*>(.*)<\/span>/;
+        const translationRegex = /<span [^>]*data-oe-translation-source-sha="([^"]+)"[^>]*>(.*)<\/span>/;
         let $edited = $();
         attrs.forEach((attr) => {
-            const attrEdit = $editable.filter('[' + attr + '*="data-oe-translation-initial-sha="]').filter(':empty, input, select, textarea, img');
+            const attrEdit = $editable.filter('[' + attr + '*="data-oe-translation-source-sha="]').filter(':empty, input, select, textarea, img');
             attrEdit.each(function () {
                 var $node = $(this);
                 var translation = $node.data('translation') || {};
@@ -187,7 +195,7 @@ export class WebsiteTranslator extends WebsiteEditorComponent {
             });
             $edited = $edited.add(attrEdit);
         });
-        const textEdit = $editable.filter('textarea:contains(data-oe-translation-initial-sha)');
+        const textEdit = $editable.filter('textarea:contains(data-oe-translation-source-sha)');
         textEdit.each(function () {
             var $node = $(this);
             var translation = $node.data('translation') || {};
@@ -204,24 +212,11 @@ export class WebsiteTranslator extends WebsiteEditorComponent {
             $node.addClass('o_translatable_text').removeClass('o_text_content_invisible')
                 .data('translation', translation);
         });
-        $edited = $edited.add(textEdit);
-
-        $edited.each(function () {
-            var $node = $(this);
-            var select2 = $node.data('select2');
-            if (select2) {
-                select2.blur();
-                $node.on('translate', function () {
-                    select2.blur();
-                });
-                $node = select2.container.find('input');
-            }
-        });
 
         // Hack: we add a temporary element to handle option's text
         // translations from the linked <select/>. The final values are
         // copied to the original element right before save.
-        $editable.filter('[data-oe-translation-initial-sha] > select').each((index, select) => {
+        $editable.filter('[data-oe-translation-source-sha] > select').each((index, select) => {
             const selectTranslationEl = document.createElement('div');
             selectTranslationEl.className = 'o_translation_select';
             const optionNames = [...select.options].map(option => option.text);
@@ -286,17 +281,17 @@ export class WebsiteTranslator extends WebsiteEditorComponent {
             if (translationEl.closest('.s_table_of_content_navbar_wrap')) {
                 // Make sure the same translation ids are used.
                 const href = translationEl.closest('a').getAttribute('href');
-                const headerEl = translationEl.closest('.s_table_of_content').querySelector(`${href} [data-oe-translation-initial-sha]`);
+                const headerEl = translationEl.closest('.s_table_of_content').querySelector(`${href} [data-oe-translation-source-sha]`);
                 if (headerEl) {
-                    if (translationEl.dataset.oeTranslationInitialSha !== headerEl.dataset.oeTranslationInitialSha) {
+                    if (translationEl.dataset.oeTranslationSourceSha !== headerEl.dataset.oeTranslationSourceSha) {
                         // Use the same identifier for the generated navigation
                         // label and its associated header so that the general
                         // synchronization mechanism kicks in.
                         // The initial value is kept to be restored before save
                         // in order to keep the translation of the unstyled
                         // label distinct from the one of the header.
-                        translationEl.dataset.oeTranslationSaveSha = translationEl.dataset.oeTranslationInitialSha;
-                        translationEl.dataset.oeTranslationInitialSha = headerEl.dataset.oeTranslationInitialSha;
+                        translationEl.dataset.oeTranslationSaveSha = translationEl.dataset.oeTranslationSourceSha;
+                        translationEl.dataset.oeTranslationSourceSha = headerEl.dataset.oeTranslationSourceSha;
                     }
                     translationEl.classList.add('o_translation_without_style');
                 }

@@ -1,8 +1,10 @@
-/* @odoo-module */
+import { markup } from "@odoo/owl";
 
 import { parseVersion } from "@mail/utils/common/misc";
 import { browser } from "@web/core/browser/browser";
 import { registry } from "@web/core/registry";
+import { escape, sprintf } from "@web/core/utils/strings";
+import { _t } from "@web/core/l10n/translation";
 
 export const pttExtensionHookService = {
     start(env) {
@@ -30,9 +32,9 @@ export const pttExtensionHookService = {
                 case "push-to-talk-pressed":
                     {
                         voiceActivated = false;
-                        const isFirstPress = !rtc.state.selfSession?.isTalking;
+                        const isFirstPress = !rtc.selfSession?.isTalking;
                         rtc.onPushToTalk();
-                        if (rtc.state.selfSession?.isTalking) {
+                        if (rtc.selfSession?.isTalking) {
                             // Second key press is slow to come thus, the first timeout
                             // must be greater than the following ones.
                             rtc.setPttReleaseTimeout(
@@ -90,6 +92,18 @@ export const pttExtensionHookService = {
             },
             get isEnabled() {
                 return isEnabled;
+            },
+            downloadURL: `https://chromewebstore.google.com/detail/discuss-push-to-talk/${EXT_ID}`,
+            get downloadText() {
+                const translation = _t(
+                    `The Push-to-Talk feature is only accessible within tab focus. To enable the Push-to-Talk functionality outside of this tab, we recommend downloading our %(anchor_start)sextension%(anchor_end)s.`
+                );
+                return markup(
+                    sprintf(escape(translation), {
+                        anchor_start: `<a href="${this.downloadURL}" target="_blank" class="text-reset text-decoration-underline">`,
+                        anchor_end: "</a>",
+                    })
+                );
             },
         };
     },

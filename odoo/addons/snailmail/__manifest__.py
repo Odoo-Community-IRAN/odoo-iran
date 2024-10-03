@@ -12,6 +12,7 @@ Allows users to send documents by post
         'mail'
     ],
     'data': [
+        'data/iap_service_data.xml',
         'data/snailmail_data.xml',
         'views/report_assets.xml',
         'views/snailmail_views.xml',
@@ -23,22 +24,16 @@ Allows users to send documents by post
     'assets': {
         'web.assets_backend': [
             'snailmail/static/src/**/*',
-            ('remove', 'snailmail/static/src/js/**/*'),
-            ('remove', 'snailmail/static/src/scss/**/*'),
         ],
         'snailmail.report_assets_snailmail': [
             ('include', 'web._assets_helpers'),
             'web/static/src/scss/pre_variables.scss',
             'web/static/lib/bootstrap/scss/_variables.scss',
-            'snailmail/static/src/scss/**/*',
-            'snailmail/static/src/js/**/*',
+            'web/static/lib/bootstrap/scss/_variables-dark.scss',
+            'web/static/lib/bootstrap/scss/_maps.scss',
         ],
-        'web.tests_assets': [
-            'snailmail/static/tests/helpers/**/*',
-        ],
-        'web.qunit_suite_tests': [
+        'web.assets_unit_tests': [
             'snailmail/static/tests/**/*',
-            ('remove', 'snailmail/static/tests/helpers/**/*'),
         ],
     },
     'license': 'LGPL-3',

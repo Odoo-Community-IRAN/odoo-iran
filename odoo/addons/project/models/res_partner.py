@@ -10,9 +10,9 @@ class ResPartner(models.Model):
     """ Inherits partner and adds Tasks information in the partner form """
     _inherit = 'res.partner'
 
-    project_ids = fields.One2many('project.project', 'partner_id', string='Projects')
-    task_ids = fields.One2many('project.task', 'partner_id', string='Tasks')
-    task_count = fields.Integer(compute='_compute_task_count', string='# Tasks')
+    project_ids = fields.One2many('project.project', 'partner_id', string='Projects', export_string_translation=False)
+    task_ids = fields.One2many('project.task', 'partner_id', string='Tasks', export_string_translation=False)
+    task_count = fields.Integer(compute='_compute_task_count', string='# Tasks', export_string_translation=False)
 
     @api.constrains('company_id', 'project_ids')
     def _ensure_same_company_than_projects(self):
@@ -61,3 +61,22 @@ class ResPartner(models.Model):
                 'active': True,
             })
         return created_users
+
+    def action_view_tasks(self):
+        self.ensure_one()
+        action = {
+            **self.env["ir.actions.actions"]._for_xml_id("project.project_task_action_from_partner"),
+            'display_name': _("%(partner_name)s's Tasks", partner_name=self.name),
+            'context': {
+                'default_partner_id': self.id,
+            },
+        }
+        all_child = self.with_context(active_test=False).search([('id', 'child_of', self.ids)])
+        search_domain = [('partner_id', 'in', (self | all_child).ids)]
+        if self.task_count <= 1:
+            task_id = self.env['project.task'].search(search_domain, limit=1)
+            action['res_id'] = task_id.id
+            action['views'] = [(view_id, view_type) for view_id, view_type in action['views'] if view_type == "form"]
+        else:
+            action['domain'] = search_domain
+        return action

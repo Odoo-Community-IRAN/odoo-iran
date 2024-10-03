@@ -9,12 +9,13 @@ from odoo.addons.base.models.ir_mail_server import extract_rfc2822_addresses
 from odoo.addons.base.models.ir_qweb_fields import nl2br_enclose
 from odoo.tests import tagged
 from odoo.tests.common import BaseCase
-from odoo.tools import (
-    is_html_empty, html_to_inner_content, html_sanitize, append_content_to_html, plaintext2html,
+from odoo.tools import misc
+from odoo.tools.mail import (
+    is_html_empty, html2plaintext, html_to_inner_content, html_sanitize, append_content_to_html, plaintext2html,
     email_domain_normalize, email_normalize, email_re,
     email_split, email_split_and_format, email_split_tuples,
-    single_email_re, html2plaintext,
-    misc, formataddr,
+    single_email_re,
+    formataddr,
     prepend_html_content,
 )
 
@@ -843,7 +844,7 @@ class TestMailTools(BaseCase):
     """ Test mail utility methods. """
 
     def test_html2plaintext(self):
-        self.assertEqual(html2plaintext(False), 'False')
+        self.assertEqual(html2plaintext(False), '')
         self.assertEqual(html2plaintext('\t'), '')
         self.assertEqual(html2plaintext('  '), '')
         self.assertEqual(html2plaintext("""<h1>Title</h1>

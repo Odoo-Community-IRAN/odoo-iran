@@ -3,15 +3,15 @@
 # 	* payment_mercado_pago
 # 
 # Translators:
-# Wil Odoo, 2023
+# Wil Odoo, 2024
 # Junko Augias, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0+e\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-02-06 13:57+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
+"POT-Creation-Date: 2024-09-26 08:56+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
 "Last-Translator: Junko Augias, 2024\n"
 "Language-Team: Japanese (https://app.transifex.com/odoo/teams/41243/ja/)\n"
 "MIME-Version: 1.0\n"
@@ -28,7 +28,6 @@ msgstr "アクセストークン"
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/const.py:0
-#, python-format
 msgid ""
 "Call your card issuer to activate your card or use another payment method. "
 "The phone number is on the back of your card."
@@ -37,28 +36,24 @@ msgstr "カード発行会社に電話してカードを有効化するか、別
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/const.py:0
-#, python-format
 msgid "Check expiration date."
-msgstr "有効期限を確認して下さい。"
+msgstr "有効期限をチェック"
 
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/const.py:0
-#, python-format
 msgid "Check the card number."
 msgstr "カード番号を確認して下さい。"
 
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/const.py:0
-#, python-format
 msgid "Check the card security code."
 msgstr "カードのセキュリティコードを確認して下さい。"
 
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/const.py:0
-#, python-format
 msgid "Check the data."
 msgstr "データをを確認して下さい。"
 
@@ -70,7 +65,6 @@ msgstr "コード"
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/models/payment_provider.py:0
-#, python-format
 msgid "Could not establish the connection to the API."
 msgstr "APIへの接続を確立できませんでした。"
 
@@ -87,7 +81,6 @@ msgstr "Mercado Pago アクセストークン"
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/models/payment_transaction.py:0
-#, python-format
 msgid "No transaction found matching reference %s."
 msgstr "参照に一致する取引が見つかりません%s。"
 
@@ -104,58 +97,52 @@ msgstr "決済トランザクション"
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/const.py:0
-#, python-format
 msgid "Payment was not processed, use another card or contact issuer."
 msgstr "支払が処理されませんでした。別のカードを使用するか、発行会社に連絡して下さい。"
 
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/models/payment_transaction.py:0
-#, python-format
 msgid "Prices in the currency %s must be expressed in integer values."
 msgstr "通貨の価格%sは整数値で表して下さい。"
 
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with invalid status: %s"
 msgstr "無効なステータスの受信データ: %s"
 
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with missing payment id."
 msgstr "支払IDが欠落しているデータを受信しました。"
 
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with missing reference."
 msgstr "参照が欠落しているデータを受信しました。"
 
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with missing status."
 msgstr "ステータスが欠落しているデータを受信しました。"
 
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/models/payment_provider.py:0
-#, python-format
 msgid ""
 "The communication with the API failed. Mercado Pago gave us the following "
-"information: '%s' (code %s)"
-msgstr "APIとのコミュニケーションに失敗しました。 Mercado Pagoは以下の情報を提供しています: '%s' (コード %s)"
+"information: '%(error_message)s' (code %(error_code)s)"
+msgstr ""
+"APIとのコミュニケーションに失敗しました。 Mercado Pagoは以下の情報を提供しています: '%(error_message)s' (コード "
+"%(error_code)s)"
 
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/models/payment_provider.py:0
-#, python-format
 msgid ""
 "The communication with the API failed. The response is empty. Please verify "
 "your access token."
@@ -169,23 +156,20 @@ msgstr "この決済プロバイダーのテクニカルコード。"
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/const.py:0
-#, python-format
 msgid "This payment method does not process payments in installments."
 msgstr "この支払方法では、分割払いは処理されません。"
 
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/const.py:0
-#, python-format
 msgid ""
 "We are processing your payment. Don't worry, in less than 2 business days, "
 "we will notify you by e-mail if your payment has been credited."
-msgstr "お客様のお支払を処理中です。2営業日以内に、支払いが入金されたかどうかをEメールでお知らせいたします。"
+msgstr "お客様のお支払を処理中です。2営業日以内に、支払いが入金されたかどうかをEメールでお知らせいたしますので、ご安心下さい。"
 
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/const.py:0
-#, python-format
 msgid ""
 "We are processing your payment. Don't worry, less than 2 business days we "
 "will notify you by e-mail if your payment has been credited or if we need "
@@ -195,7 +179,6 @@ msgstr "お客様のお支払を処理中です。2営業日以内に、お支�
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/const.py:0
-#, python-format
 msgid ""
 "We were unable to process your payment, please check your card information."
 msgstr "お支払を処理できませんでした。カード情報をご確認下さい。"
@@ -203,15 +186,12 @@ msgstr "お支払を処理できませんでした。カード情報をご確認
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/const.py:0
-#: code:addons/payment_mercado_pago/const.py:0
-#, python-format
 msgid "We were unable to process your payment, please use another card."
 msgstr "支払いを処理できませんでしたので、他のカードをご利用下さい。"
 
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/const.py:0
-#, python-format
 msgid ""
 "You have already made a payment for that value. If you need to pay again, "
 "use another card or another payment method."
@@ -220,7 +200,6 @@ msgstr "その金額分の支払はすでに完了しています。再度お支
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/const.py:0
-#, python-format
 msgid ""
 "You have reached the limit of allowed attempts. Choose another card or other"
 " means of payment."
@@ -229,21 +208,18 @@ msgstr "ご利用可能回数に達しました。他のカードまたは他の
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/const.py:0
-#, python-format
 msgid "You must authorize the payment with this card."
 msgstr "このカードでの支払いを承認する必要があります。"
 
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/const.py:0
-#, python-format
 msgid "Your card has not enough funds."
 msgstr "カードの残高が不足しています。"
 
 #. module: payment_mercado_pago
 #. odoo-python
 #: code:addons/payment_mercado_pago/const.py:0
-#, python-format
 msgid ""
 "Your payment has been credited. In your summary you will see the charge as a"
 " statement descriptor."

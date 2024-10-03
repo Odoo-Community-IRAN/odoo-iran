@@ -4,12 +4,12 @@ import logging
 
 import werkzeug
 from psycopg2.errorcodes import SERIALIZATION_FAILURE
-from psycopg2 import OperationalError
+from psycopg2.errors import SerializationFailure
 
 from odoo import http
 from odoo.exceptions import AccessError, UserError
 from odoo.http import request
-from odoo.tools import replace_exceptions
+from odoo.tools import replace_exceptions, str2bool
 
 from odoo.addons.web.controllers.utils import ensure_db
 
@@ -24,28 +24,38 @@ WSGI_SAFE_KEYS = {'PATH_INFO', 'QUERY_STRING', 'RAW_URI', 'SCRIPT_NAME', 'wsgi.u
 should_fail = None
 
 
-class SerializationFailureError(OperationalError):
-    pgcode = SERIALIZATION_FAILURE
-
-
 class TestHttp(http.Controller):
+    def _readonly(self):
+        return str2bool(request.httprequest.args.get('readonly', True))
+
+    def _max_content_length_1kiB(self):
+        return 1024
 
     # =====================================================
     # Greeting
     # =====================================================
+
     @http.route(['/test_http/greeting', '/test_http/greeting-none'], type='http', auth='none')
     def greeting_none(self):
         return "Tek'ma'te"
 
-    @http.route('/test_http/greeting-public', type='http', auth='public')
-    def greeting_public(self):
+    @http.route('/test_http/greeting-public', type='http', auth='public', readonly=_readonly)
+    def greeting_public(self, readonly=True):
         assert request.env.user, "ORM should be initialized"
+        assert request.env.cr.readonly == str2bool(readonly)
         return "Tek'ma'te"
 
-    @http.route('/test_http/greeting-user', type='http', auth='user')
-    def greeting_user(self):
+    @http.route('/test_http/greeting-user', type='http', auth='user', readonly=_readonly)
+    def greeting_user(self, readonly=True):
         assert request.env.user, "ORM should be initialized"
+        assert request.env.cr.readonly == str2bool(readonly)
         return "Tek'ma'te"
+
+    @http.route('/test_http/greeting-bearer', type='http', auth='bearer', readonly=_readonly)
+    def greeting_bearer(self, readonly=True):
+        assert request.env.user, "ORM should be initialized"
+        assert request.env.cr.readonly == str2bool(readonly)
+        return f"Tek'ma'te; user={request.env.user.login}"
 
     @http.route('/test_http/wsgi_environ', type='http', auth='none')
     def wsgi_environ(self):
@@ -87,7 +97,7 @@ class TestHttp(http.Controller):
     def echo_json(self, **kwargs):
         return kwargs
 
-    @http.route('/test_http/echo-json-context', type='json', auth='user', methods=['POST'], csrf=False)
+    @http.route('/test_http/echo-json-context', type='json', auth='user', methods=['POST'], csrf=False, readonly=True)
     def echo_json_context(self, **kwargs):
         return request.env.context
 
@@ -102,7 +112,7 @@ class TestHttp(http.Controller):
     # =====================================================
     # Models
     # =====================================================
-    @http.route('/test_http/<model("test_http.galaxy"):galaxy>', auth='public')
+    @http.route('/test_http/<model("test_http.galaxy"):galaxy>', auth='public', readonly=True)
     def galaxy(self, galaxy):
         if not galaxy.exists():
             raise UserError('The Ancients did not settle there.')
@@ -114,7 +124,14 @@ class TestHttp(http.Controller):
             ]),
         })
 
-    @http.route('/test_http/<model("test_http.galaxy"):galaxy>/<model("test_http.stargate"):gate>', auth='user')
+    @http.route('/test_http/<model("test_http.galaxy"):galaxy>/setname',
+                methods=['GET', 'POST'], type='http', auth='user', readonly=_readonly,
+                max_content_length=_max_content_length_1kiB)
+    def galaxy_set_name(self, galaxy, name, readonly=True):
+        galaxy.name = name
+        return galaxy.name
+
+    @http.route('/test_http/<model("test_http.galaxy"):galaxy>/<model("test_http.stargate"):gate>', auth='user', readonly=True)
     def stargate(self, galaxy, gate):
         if not gate.exists():
             raise UserError("The goa'uld destroyed the gate")
@@ -207,7 +224,9 @@ class TestHttp(http.Controller):
         data = ufile.read()
         if should_fail:
             should_fail = False  # Fail once
-            raise SerializationFailureError()
+            sf = SerializationFailure()
+            sf.__setstate__({'pgcode': SERIALIZATION_FAILURE})
+            raise sf
 
         return data.decode()
 

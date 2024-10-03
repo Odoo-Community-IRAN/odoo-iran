@@ -220,9 +220,9 @@ class WebsiteSaleLoyaltyTestUi(TestSaleProductAttributeValueCommon, HttpCase):
     def test_03_admin_shop_ewallet_tour(self):
         public_category = self.env['product.public.category'].create({'name': 'Public Category'})
         self.env['product.product'].create({
-            'name': 'TEST - Small Drawer',
+            'name': "TEST - Gift Card",
             'list_price': 50,
-            'type': 'consu',
+            'type': 'service',
             'is_published': True,
             'sale_ok': True,
             'public_categ_ids': [(4, public_category.id)],
@@ -410,6 +410,7 @@ class TestWebsiteSaleCoupon(HttpCase):
             1. Raise an error
             2. Not delete the coupon
         """
+        self.env['product.pricelist'].with_context(active_test=False).search([]).unlink()
         website = self.env['website'].browse(1)
 
         # Create product

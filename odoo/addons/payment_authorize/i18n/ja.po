@@ -3,15 +3,15 @@
 # 	* payment_authorize
 # 
 # Translators:
-# Wil Odoo, 2023
+# Wil Odoo, 2024
 # Junko Augias, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:56+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
+"POT-Creation-Date: 2024-09-26 08:56+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
 "Last-Translator: Junko Augias, 2024\n"
 "Language-Team: Japanese (https://app.transifex.com/odoo/teams/41243/ja/)\n"
 "MIME-Version: 1.0\n"
@@ -43,7 +43,7 @@ msgstr "ABAルーティングナンバ"
 #. module: payment_authorize
 #: model:ir.model.fields,field_description:payment_authorize.field_payment_provider__authorize_client_key
 msgid "API Client Key"
-msgstr "API顧客キー"
+msgstr "APIクライアントキー"
 
 #. module: payment_authorize
 #: model:ir.model.fields,field_description:payment_authorize.field_payment_provider__authorize_login
@@ -58,7 +58,7 @@ msgstr "API署名キー"
 #. module: payment_authorize
 #: model:ir.model.fields,field_description:payment_authorize.field_payment_provider__authorize_transaction_key
 msgid "API Transaction Key"
-msgstr "API取引キー"
+msgstr "APIトランザクションキー"
 
 #. module: payment_authorize
 #: model_terms:ir.ui.view,arch_db:payment_authorize.inline_form
@@ -103,7 +103,6 @@ msgstr "コード"
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/models/payment_provider.py:0
-#, python-format
 msgid ""
 "Could not fetch merchant details:\n"
 "%s"
@@ -114,11 +113,11 @@ msgstr ""
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/models/payment_transaction.py:0
-#, python-format
 msgid ""
-"Could not retrieve the transaction details. (error code: %s; error_details: "
-"%s)"
-msgstr "取引の詳細を取得できませんでした。 (エラーコード: %s; error_details: %s)"
+"Could not retrieve the transaction details. (error code: %(error_code)s; "
+"error_details: %(error_message)s)"
+msgstr ""
+"取引の詳細を取得できませんでした。 (エラーコード: %(error_code)s; error_details: %(error_message)s)"
 
 #. module: payment_authorize
 #: model_terms:ir.ui.view,arch_db:payment_authorize.inline_form
@@ -128,7 +127,6 @@ msgstr "有効期限日"
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/models/payment_provider.py:0
-#, python-format
 msgid ""
 "Failed to authenticate.\n"
 "%s"
@@ -159,14 +157,12 @@ msgstr "アカウント名"
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/models/payment_transaction.py:0
-#, python-format
 msgid "No transaction found matching reference %s."
 msgstr "参照に一致する取引が見つかりません%s。"
 
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/models/payment_provider.py:0
-#, python-format
 msgid "Only one currency can be selected by Authorize.Net account."
 msgstr "Authorize.Netアカウントでは1通貨のみ選択することができます。"
 
@@ -188,22 +184,18 @@ msgstr "決済トランザクション"
 #. module: payment_authorize
 #. odoo-javascript
 #: code:addons/payment_authorize/static/src/js/payment_form.js:0
-#: code:addons/payment_authorize/static/src/js/payment_form.js:0
-#, python-format
 msgid "Payment processing failed"
 msgstr "支払処理に失敗しました"
 
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with status code \"%(status)s\" and error code \"%(error)s\""
 msgstr "ステータスコード \"%(status)s\" とエラーコード \"%(error)s\"のデータを受信しました。"
 
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/controllers/main.py:0
-#, python-format
 msgid "Received tampered payment request data."
 msgstr "改ざんされた支払依頼データを受信しました。"
 
@@ -222,7 +214,7 @@ msgstr "Authorize.Netでアカウントを識別するためにのみ使用さ�
 msgid ""
 "The public client key. To generate directly from Odoo or from Authorize.Net "
 "backend."
-msgstr "公開顧客キー。ODooからまたはAuthorize.Netバックエンドから直接生成されます。"
+msgstr "公開クライアントキー。ODooからまたはAuthorize.Netバックエンドから直接生成されます。"
 
 #. module: payment_authorize
 #: model:ir.model.fields,help:payment_authorize.field_payment_provider__code
@@ -232,15 +224,14 @@ msgstr "この決済プロバイダーのテクニカルコード。"
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/models/payment_transaction.py:0
-#, python-format
 msgid ""
-"The transaction is not in a status to be refunded. (status: %s, details: %s)"
-msgstr "この取引はは返金可能な状態ではありません。 (ステータス: %s、詳細: %s)"
+"The transaction is not in a status to be refunded. (status: %(status)s, "
+"details: %(message)s)"
+msgstr "この取引はは返金可能な状態ではありません。 (ステータス: %(status)s、詳細: %(message)s)"
 
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/models/payment_transaction.py:0
-#, python-format
 msgid "The transaction is not linked to a token."
 msgstr "取引はトークンにリンクしていません。"
 
@@ -254,7 +245,6 @@ msgstr "Authorize.netバックエンドの取引先/トークンの組み合わ�
 #. module: payment_authorize
 #. odoo-python
 #: code:addons/payment_authorize/models/payment_provider.py:0
-#, python-format
 msgid "This action cannot be performed while the provider is disabled."
 msgstr "プロバイダが無効になっている間は、この操作は実行できません。"
 

@@ -43,17 +43,6 @@ according to the enabled options.
                     <t t-if="search_count &lt; 2">Article</t>
                     <t t-else="">Articles</t>
                 </div>
-                <!-- TODO: in master, remove the next useless lines. They have
-                    to be kept in the stable versions in case of a potential
-                    customization that would do a 'xpath' on them.-->
-                <t t-set="posts_save" t-value="posts"/>
-                <t t-set="posts" t-value="False"/>
-                <div t-if="posts" class="h4 mb-3">
-                    <t t-esc="len(posts)"/>
-                    <t t-if="len(posts) &lt; 2">Article</t>
-                    <t t-else="">Articles</t>
-                </div>
-                <t t-set="posts" t-value="posts_save"/>
                 <span t-if="search" class="align-items-baseline border d-inline-flex ps-2 rounded mb-2">
                     <i class="fa fa-search me-2 text-muted"/>
                     <t t-esc="search"/>
@@ -222,7 +211,7 @@ according to the enabled options.
     <div t-if="len(blog_post.tag_ids)" class="o_wblog_post_short_tag_section d-flex align-items-center flex-wrap pt-2">
         <t t-foreach="blog_post.tag_ids" t-as="one_tag">
             <a t-attf-href="#{blog_url(tag=tags_list(active_tag_ids, one_tag.id))}"
-               t-attf-class="badge mb-2 me-1 text-truncate #{one_tag.id in active_tag_ids and 'bg-primary text-light' or 'border text-primary'} post_link"
+               t-attf-class="badge mb-2 me-1 text-truncate o_tag o_color_#{one_tag.color} post_link"
                t-att-rel="len(active_tag_ids) and 'nofollow'"
                t-esc="one_tag.name"/>
         </t>

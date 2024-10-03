@@ -1,13 +1,13 @@
 /** @odoo-module **/
 
 import publicWidget from "@web/legacy/js/public/public_widget";
-import VariantMixin from "@website_sale/js/variant_mixin";
+import VariantMixin from "@website_sale/js/sale_variant_mixin";
 import wSaleUtils from "@website_sale/js/website_sale_utils";
 const cartHandlerMixin = wSaleUtils.cartHandlerMixin;
 import "@website/libs/zoomodoo/zoomodoo";
 import {extraMenuUpdateCallbacks} from "@website/js/content/menu";
 import { ProductImageViewer } from "@website_sale/js/components/website_sale_image_viewer";
-import { jsonrpc } from "@web/core/network/rpc_service";
+import { rpc } from "@web/core/network/rpc";
 import { debounce, throttleForAnimation } from "@web/core/utils/timing";
 import { listenSizeChange, SIZES, utils as uiUtils } from "@web/core/ui/ui_service";
 import { isBrowserFirefox, hasTouch } from "@web/core/browser/feature_detection";
@@ -27,13 +27,10 @@ export const WebsiteSale = publicWidget.Widget.extend(VariantMixin, cartHandlerM
         'mouseup form.js_add_cart_json label': '_onMouseupAddCartLabel',
         'touchend form.js_add_cart_json label': '_onMouseupAddCartLabel',
         'submit .o_wsale_products_searchbar_form': '_onSubmitSaleSearch',
-        'change select[name="country_id"]': '_onChangeCountry',
-        'change #shipping_use_same': '_onChangeShippingUseSame',
         'click .toggle_summary': '_onToggleSummary',
         'click #add_to_cart, .o_we_buy_now, #products_grid .o_wsale_product_btn .a-submit': 'async _onClickAdd',
         'click input.js_product_change': 'onChangeVariant',
         'change .js_main_product [data-attribute_exclusions]': 'onChangeVariant',
-        'change oe_advanced_configurator_modal [data-attribute_exclusions]': 'onChangeVariant',
         'click .o_product_page_reviews_link': '_onClickReviewsLink',
         'mousedown .o_wsale_filmstip_wrapper': '_onMouseDown',
         'mouseleave .o_wsale_filmstip_wrapper': '_onMouseLeave',
@@ -41,7 +38,6 @@ export const WebsiteSale = publicWidget.Widget.extend(VariantMixin, cartHandlerM
         'mousemove .o_wsale_filmstip_wrapper': '_onMouseMove',
         'click .o_wsale_filmstip_wrapper' : '_onClickHandler',
         'submit': '_onClickConfirmOrder',
-        "change select[name='state_id']": "_onChangeState",
     }),
 
     /**
@@ -51,7 +47,6 @@ export const WebsiteSale = publicWidget.Widget.extend(VariantMixin, cartHandlerM
         this._super.apply(this, arguments);
 
         this._changeCartQuantity = debounce(this._changeCartQuantity.bind(this), 500);
-        this._changeCountry = debounce(this._changeCountry.bind(this), 500);
 
         this.isWebsite = true;
         this.filmStripStartX = 0;
@@ -59,10 +54,7 @@ export const WebsiteSale = publicWidget.Widget.extend(VariantMixin, cartHandlerM
         this.filmStripScrollLeft = 0;
         this.filmStripMoved = false;
 
-        delete this.events['change .main_product:not(.in_cart) input.js_quantity'];
         delete this.events['change [data-attribute_exclusions]'];
-
-        this.rpc = this.bindService("rpc");
     },
     /**
      * @override
@@ -70,18 +62,10 @@ export const WebsiteSale = publicWidget.Widget.extend(VariantMixin, cartHandlerM
     start() {
         const def = this._super(...arguments);
 
-        this._applyHashFromSearch();
-
-        this.$("div.js_product")
-            .toArray()
-            .forEach((product) => {
-            $('input.js_product_change', product).first().trigger('change');
-        });
+        this._applyHash();
 
         // This has to be triggered to compute the "out of stock" feature and the hash variant changes
         this.triggerVariantChange(this.$el);
-
-        this.$('select[name="country_id"]').change();
 
         listenSizeChange(() => {
             if (uiUtils.getSize() === SIZES.XL) {
@@ -90,11 +74,6 @@ export const WebsiteSale = publicWidget.Widget.extend(VariantMixin, cartHandlerM
         })
 
         this._startZoom();
-
-        window.addEventListener('hashchange', () => {
-            this._applyHash();
-            this.triggerVariantChange(this.$el);
-        });
 
         // This allows conditional styling for the filmstrip
         const filmstripContainer = this.el.querySelector('.o_wsale_filmstip_container');
@@ -171,15 +150,18 @@ export const WebsiteSale = publicWidget.Widget.extend(VariantMixin, cartHandlerM
     },
     _applyHash: function () {
         const params = new URLSearchParams(window.location.hash.substring(1));
-        if (params.get("attr")) {
-            var attributeIds = params.get("attr").split(',');
-            var $inputs = this.$('input.js_variant_change, select.js_variant_change option');
-            attributeIds.forEach((id) => {
-                var $toSelect = $inputs.filter('[data-value_id="' + id + '"]');
-                if ($toSelect.is('input[type="radio"]')) {
-                    $toSelect.prop('checked', true);
-                } else if ($toSelect.is('option')) {
-                    $toSelect.prop('selected', true);
+        if (params.get("attribute_values")) {
+            const attributeValueIds = params.get("attribute_values").split(',');
+            const inputs = document.querySelectorAll(
+                'input.js_variant_change, select.js_variant_change option'
+            );
+            inputs.forEach((element) => {
+                if (attributeValueIds.includes(element.dataset.attributeValueId)) {
+                    if (element.tagName === "INPUT") {
+                        element.checked = true;
+                    } else if (element.tagName === "OPTION") {
+                        element.selected = true;
+                    }
                 }
             });
             this._changeAttribute(['.css_attribute_color', '.o_variant_pills']);
@@ -192,12 +174,14 @@ export const WebsiteSale = publicWidget.Widget.extend(VariantMixin, cartHandlerM
      * @private
      */
     _setUrlHash: function ($parent) {
-        var $attributes = $parent.find('input.js_variant_change:checked, select.js_variant_change option:selected');
-        if (!$attributes.length) {
-            return;
+        const inputs = document.querySelectorAll(
+            'input.js_variant_change:checked, select.js_variant_change option:checked'
+        );
+        let attributeIds = [];
+        inputs.forEach((element) => attributeIds.push(element.dataset.attributeValueId));
+        if (attributeIds.length > 0) {
+            window.location.hash = `attribute_values=${attributeIds.join(',')}`;
         }
-        var attributeIds = $attributes.toArray().map((elem) => $(elem).data("value_id"));
-        window.location.replace('#attr=' + attributeIds.join(','));
     },
     /**
      * Set the checked values active.
@@ -220,7 +204,7 @@ export const WebsiteSale = publicWidget.Widget.extend(VariantMixin, cartHandlerM
         });
         $input.data('update_change', true);
 
-        this.rpc("/shop/cart/update_json", {
+        rpc("/shop/cart/update_json", {
             line_id: line_id,
             product_id: parseInt($input.data('product-id'), 10),
             set_qty: value,
@@ -245,63 +229,6 @@ export const WebsiteSale = publicWidget.Widget.extend(VariantMixin, cartHandlerM
             wSaleUtils.showWarning(data.notification_info.warning);
             // Propagating the change to the express checkout forms
             Component.env.bus.trigger('cart_amount_changed', [data.amount, data.minor_amount]);
-        });
-    },
-    /**
-     * @private
-     */
-    _changeCountry: function () {
-        if (!$("#country_id").val()) {
-            return;
-        }
-        return this.rpc("/shop/country_infos/" + $("#country_id").val(), {
-            mode: $("#country_id").attr('mode'),
-        }).then(function (data) {
-            // placeholder phone_code
-            $("input[name='phone']").attr('placeholder', data.phone_code !== 0 ? '+'+ data.phone_code : '');
-
-            // populate states and display
-            var selectStates = $("select[name='state_id']");
-            // dont reload state at first loading (done in qweb)
-            if (selectStates.data('init')===0 || selectStates.find('option').length===1) {
-                if (data.states.length || data.state_required) {
-                    selectStates.html('');
-                    data.states.forEach((x) => {
-                        var opt = $('<option>').text(x[1])
-                            .attr('value', x[0])
-                            .attr('data-code', x[2]);
-                        selectStates.append(opt);
-                    });
-                    selectStates.parent('div').show();
-                } else {
-                    selectStates.val('').parent('div').hide();
-                }
-                selectStates.data('init', 0);
-            } else {
-                selectStates.data('init', 0);
-            }
-
-            // manage fields order / visibility
-            if (data.fields) {
-                if ($.inArray('zip', data.fields) > $.inArray('city', data.fields)){
-                    $(".div_zip").before($(".div_city"));
-                } else {
-                    $(".div_zip").after($(".div_city"));
-                }
-                var all_fields = ["street", "zip", "city", "country_name"]; // "state_code"];
-                all_fields.forEach((field) => {
-                    $(".checkout_autoformat .div_" + field.split('_')[0]).toggle($.inArray(field, data.fields)>=0);
-                });
-            }
-
-            if ($("label[for='zip']").length) {
-                $("label[for='zip']").toggleClass('label-optional', !data.zip_required);
-                $("label[for='zip']").get(0).toggleAttribute('required', !!data.zip_required);
-            }
-            if ($("label[for='zip']").length) {
-                $("label[for='state_id']").toggleClass('label-optional', !data.state_required);
-                $("label[for='state_id']").get(0).toggleAttribute('required', !!data.state_required);
-            }
         });
     },
     /**
@@ -428,6 +355,11 @@ export const WebsiteSale = publicWidget.Widget.extend(VariantMixin, cartHandlerM
             $images.after($newImages);
             $images.remove();
             $images = $newImages;
+            // Update the sharable image (only work for Pinterest).
+            const shareImageSrc = $images[0].querySelector('img').src;
+            document.querySelector('meta[property="og:image"]')
+                .setAttribute('content', shareImageSrc);
+
             if ($images.attr('id') === 'o-carousel-product') {
                 $images.carousel(0);
             }
@@ -470,21 +402,22 @@ export const WebsiteSale = publicWidget.Widget.extend(VariantMixin, cartHandlerM
             'input[type="radio"][name="product_id"]:checked'
         ];
 
+        const productTemplateId =
+            parseInt($form.find('input[type="hidden"][name="product_template_id"]').first().val());
         var productReady = this.selectOrCreateProduct(
             $form,
             parseInt($form.find(productSelector.join(', ')).first().val(), 10),
-            $form.find('.product_template_id').val(),
-            false
+            productTemplateId,
         );
 
         return productReady.then(function (productId) {
             $form.find(productSelector.join(', ')).val(productId);
-            self._updateRootProduct($form, productId);
-            return self._onProductReady();
+            self._updateRootProduct($form, productId, productTemplateId);
+            return self._onProductReady($form.closest('.o_wsale_product_page').length > 0);
         });
     },
 
-    _onProductReady: function () {
+    _onProductReady(isOnProductPage = false) {
         return this._submitForm();
     },
 
@@ -564,12 +497,12 @@ export const WebsiteSale = publicWidget.Widget.extend(VariantMixin, cartHandlerM
      * @private
      * @param {Event} ev
      */
-    _onClickSubmit: function (ev, forceSubmit) {
-        if ($(ev.currentTarget).is('#add_to_cart, #products_grid .a-submit') && !forceSubmit) {
+    _onClickSubmit: function (ev) {
+        if ($(ev.currentTarget).is('#add_to_cart, #products_grid .a-submit')) {
             return;
         }
         var $aSubmit = $(ev.currentTarget);
-        if (!ev.isDefaultPrevented() && !$aSubmit.is(".disabled")) {
+        if (!ev.defaultPrevented && !$aSubmit.is(".disabled")) {
             ev.preventDefault();
             $aSubmit.closest('form').submit();
         }
@@ -591,7 +524,7 @@ export const WebsiteSale = publicWidget.Widget.extend(VariantMixin, cartHandlerM
      * @param {Event} ev
      */
     _onChangeAttribute: function (ev) {
-        if (!ev.isDefaultPrevented()) {
+        if (!ev.defaultPrevented) {
             ev.preventDefault();
             const productGrid = this.el.querySelector(".o_wsale_products_grid_table_wrapper");
             if (productGrid) {
@@ -624,7 +557,7 @@ export const WebsiteSale = publicWidget.Widget.extend(VariantMixin, cartHandlerM
             return;
         }
         var $this = $(ev.currentTarget);
-        if (!ev.isDefaultPrevented() && !$this.is(".disabled")) {
+        if (!ev.defaultPrevented && !$this.is(".disabled")) {
             ev.preventDefault();
             var oldurl = $this.attr('action');
             oldurl += (oldurl.indexOf("?")===-1) ? "?" : "";
@@ -634,30 +567,6 @@ export const WebsiteSale = publicWidget.Widget.extend(VariantMixin, cartHandlerM
             var search = $this.find('input.search-query');
             window.location = oldurl + '&' + search.attr('name') + '=' + encodeURIComponent(search.val());
         }
-    },
-    /**
-     * @private
-     * @param {Event} ev
-     */
-    _onChangeCountry: function (ev) {
-        if (!this.$('.checkout_autoformat').length) {
-            return;
-        }
-        return this._changeCountry();
-    },
-    /**
-     * @private
-     * @param {Event} ev
-     */
-    _onChangeState: function (ev) {
-        return Promise.resolve();
-    },
-    /**
-     * @private
-     * @param {Event} ev
-     */
-    _onChangeShippingUseSame: function (ev) {
-        $('.ship_to_other').toggle(!$(ev.currentTarget).prop('checked'));
     },
     /**
      * Toggles the add to cart button depending on the possibility of the
@@ -701,27 +610,6 @@ export const WebsiteSale = publicWidget.Widget.extend(VariantMixin, cartHandlerM
     /**
      * @private
      */
-    _applyHashFromSearch() {
-        const params =  new URL(window.location).searchParams;
-        if (params.get("attrib")) {
-            const dataValueIds = [];
-            for (const attrib of [].concat(params.get("attrib"))) {
-                const attribSplit = attrib.split('-');
-                const attribValueSelector = `.js_variant_change[name="ptal-${attribSplit[0]}"][value="${attribSplit[1]}"]`;
-                const attribValue = this.el.querySelector(attribValueSelector);
-                if (attribValue !== null) {
-                    dataValueIds.push(attribValue.dataset.value_id);
-                }
-            }
-            if (dataValueIds.length) {
-                window.location.hash = `attr=${dataValueIds.join(',')}`;
-            }
-        }
-        this._applyHash();
-    },
-    /**
-     * @private
-     */
     _onClickReviewsLink: function () {
         $('#o_product_page_reviews_content').collapse('show');
     },
@@ -731,6 +619,8 @@ export const WebsiteSale = publicWidget.Widget.extend(VariantMixin, cartHandlerM
      * @private
      */
     _onClickConfirmOrder: function () {
+        // FIXME ANVFE this should only be triggered when we effectively click on that specific button no?
+        // should not impact the address page at least
         const submitFormButton = $('form[name="o_wsale_confirm_order"]').find('button[type="submit"]');
         submitFormButton.attr('disabled', true);
         setTimeout(() => submitFormButton.attr('disabled', false), 5000);
@@ -745,10 +635,12 @@ export const WebsiteSale = publicWidget.Widget.extend(VariantMixin, cartHandlerM
      * @private
      * @param {Object} $form
      * @param {Number} productId
+     * @param {Number} productTemplateId
      */
-    _updateRootProduct($form, productId) {
+    _updateRootProduct($form, productId, productTemplateId) {
         this.rootProduct = {
             product_id: productId,
+            product_template_id: productTemplateId,
             quantity: parseFloat($form.find('input[name="add_qty"]').val() || 1),
             product_custom_attribute_values: this.getCustomVariantValues($form.find('.js_product')),
             variant_values: this.getSelectedVariantValues($form.find('.js_product')),
@@ -782,7 +674,7 @@ publicWidget.registry.WebsiteSaleLayout = publicWidget.Widget.extend({
         var clickedValue = $(ev.target).val();
         var isList = clickedValue === 'list';
         if (!this.editableMode) {
-            jsonrpc('/shop/save_shop_layout_mode', {
+            rpc('/shop/save_shop_layout_mode', {
                 'layout_mode': isList ? 'list' : 'grid',
             });
         }
@@ -807,68 +699,32 @@ publicWidget.registry.WebsiteSaleLayout = publicWidget.Widget.extend({
     },
 });
 
-publicWidget.registry.websiteSaleCart = publicWidget.Widget.extend({
-    selector: '.oe_website_sale .oe_cart',
-    events: {
-        'click .js_change_billing': '_onClickChangeBilling',
-        'click .js_change_shipping': '_onClickChangeShipping',
-        'click .js_edit_address': '_onClickEditAddress',
-        'click .js_delete_product': '_onClickDeleteProduct',
-    },
-
-    //--------------------------------------------------------------------------
-    // Handlers
-    //--------------------------------------------------------------------------
+publicWidget.registry.WebsiteSaleAccordionProduct = publicWidget.Widget.extend({
+    selector: "#product_accordion",
 
     /**
-     * @private
-     * @param {Event} ev
+     * @override
      */
-    _onClickChangeBilling: function (ev) {
-        this._onClickChangeAddress(ev, 'all_billing', 'js_change_billing');
+    async start() {
+        await this._super(...arguments);
+        this._updateAccordionActiveItem();
     },
-    /**
-     * @private
-     * @param {Event} ev
-     */
-    _onClickChangeShipping: function (ev) {
-        this._onClickChangeAddress(ev, 'all_shipping', 'js_change_shipping');
-    },
-    /**
-     * @private
-     * @param {Event} ev
-     */
-    _onClickChangeAddress: function (ev, rowAddrClass, cardClass) {
-        var $old = $(`.${rowAddrClass}`).find('.card.border.border-primary');
-        $old.find('.btn-addr').toggle();
-        $old.addClass(cardClass);
-        $old.removeClass('bg-primary border border-primary');
 
-        var $new = $(ev.currentTarget).parent('div.one_kanban').find('.card');
-        $new.find('.btn-addr').toggle();
-        $new.removeClass(cardClass);
-        $new.addClass('bg-primary border border-primary');
+    /**
+     * Replace the .SCSS styling applied awaiting Js for the default bootstrap classes,
+     * opening the first accordion entry and restoring flush behavior.
+     *
+     * @private
+     */
+    _updateAccordionActiveItem() {
+        const firstAccordionItemEl = this.el.querySelector('.accordion-item');
+        if (!firstAccordionItemEl) return;
 
-        // TODO this should not be a form, but a clean rpc to /shop/cart/update_address
-        var $form = $(ev.currentTarget).parent('div.one_kanban').find('form.d-none');
-        $.post($form.attr('action'), $form.serialize()+'&xhr=1');
-    },
-    /**
-     * @private
-     * @param {Event} ev
-     */
-    _onClickEditAddress: function (ev) {
-        // Do not trigger _onClickChangeBilling or _onClickChangeShipping when customer
-        // clicks on the pencil to update the address
-        ev.stopPropagation();
-    },
-    /**
-     * @private
-     * @param {Event} ev
-     */
-    _onClickDeleteProduct: function (ev) {
-        ev.preventDefault();
-        $(ev.currentTarget).closest('.o_cart_product').find('.js_quantity').val(0).trigger('change');
+        const firstAccordionItemButtonEl = firstAccordionItemEl.querySelector('.accordion-button');
+        firstAccordionItemButtonEl.classList.remove('collapsed');
+        firstAccordionItemButtonEl.setAttribute('aria-expanded', 'true');
+        firstAccordionItemEl.querySelector('.accordion-collapse').classList.add('show');
+        this.target.classList.remove('o_accordion_not_initialized');
     },
 });
 
@@ -1015,7 +871,7 @@ publicWidget.registry.websiteSaleProductPageReviews = publicWidget.Widget.extend
 export default {
     WebsiteSale: publicWidget.registry.WebsiteSale,
     WebsiteSaleLayout: publicWidget.registry.WebsiteSaleLayout,
-    websiteSaleCart: publicWidget.registry.websiteSaleCart,
+    WebsiteSaleProductPage: publicWidget.registry.WebsiteSaleAccordionProduct,
     WebsiteSaleCarouselProduct: publicWidget.registry.websiteSaleCarouselProduct,
     WebsiteSaleProductPageReviews: publicWidget.registry.websiteSaleProductPageReviews,
 };

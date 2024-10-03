@@ -20,7 +20,7 @@ class TestPackingNeg(TransactionCase):
         # Create a new "negative" storable product
         product_neg = self.env['product.product'].create({
             'name': 'Negative product',
-            'type': 'product',
+            'is_storable': True,
             'categ_id': self.ref('product.product_category_1'),
             'list_price': 100.0,
             'standard_price': 70.0,
@@ -59,7 +59,7 @@ class TestPackingNeg(TransactionCase):
 
         # Put 120 pieces on Palneg 1 (package), 120 pieces on Palneg 2 with lot A and 60 pieces on Palneg 3
         # create lot A
-        lot_a = self.env['stock.lot'].create({'name': 'Lot neg', 'product_id': product_neg.id, 'company_id': self.env.company.id})
+        lot_a = self.env['stock.lot'].create({'name': 'Lot neg', 'product_id': product_neg.id})
         # create package
         package1 = self.env['stock.quant.package'].create({'name': 'Palneg 1'})
         package2 = self.env['stock.quant.package'].create({'name': 'Palneg 2'})

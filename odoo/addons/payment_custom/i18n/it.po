@@ -3,16 +3,15 @@
 # 	* payment_custom
 # 
 # Translators:
-# Wil Odoo, 2023
-# Marianna Ciofani, 2023
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:56+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Marianna Ciofani, 2023\n"
+"POT-Creation-Date: 2024-09-26 08:56+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Italian (https://app.transifex.com/odoo/teams/41243/it/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -21,7 +20,7 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;\n"
 
 #. module: payment_custom
-#: model_terms:ir.ui.view,arch_db:payment_custom.custom_transaction_status
+#: model_terms:ir.ui.view,arch_db:payment_custom.custom_state_header
 msgid ""
 "<small class=\"text-center text-wrap lh-sm\">Scan me in your banking "
 "app</small>"
@@ -30,7 +29,7 @@ msgstr ""
 " banca</small>"
 
 #. module: payment_custom
-#: model_terms:ir.ui.view,arch_db:payment_custom.custom_transaction_status
+#: model_terms:ir.ui.view,arch_db:payment_custom.custom_state_header
 msgid "<strong class=\"mt-auto\">Communication: </strong>"
 msgstr "<strong class=\"mt-auto\">Causale: </strong>"
 
@@ -60,19 +59,18 @@ msgid "Enable the use of QR-codes when paying by wire transfer."
 msgstr "Enable the use of QR-codes when paying by wire transfer."
 
 #. module: payment_custom
-#: model_terms:ir.ui.view,arch_db:payment_custom.custom_transaction_status
+#: model_terms:ir.ui.view,arch_db:payment_custom.custom_state_header
 msgid "Finalize your payment"
 msgstr "Completa il pagamento"
 
 #. module: payment_custom
 #. odoo-python
 #: code:addons/payment_custom/models/payment_transaction.py:0
-#, python-format
 msgid "No transaction found matching reference %s."
 msgstr "Nessuna transazione trovata corrispondente al riferimento %s."
 
 #. module: payment_custom
-#: model_terms:ir.ui.view,arch_db:payment_custom.custom_transaction_status
+#: model_terms:ir.ui.view,arch_db:payment_custom.custom_state_header
 msgid "OR"
 msgstr "OPPURE"
 
@@ -100,7 +98,6 @@ msgstr "Ricarica messaggio in attesa"
 #. module: payment_custom
 #. odoo-python
 #: code:addons/payment_custom/models/payment_transaction.py:0
-#, python-format
 msgid "The customer has selected %(provider_name)s to make the payment."
 msgstr "Il cliente ha scelto %(provider_name)s per effettuare il pagamento."
 
@@ -111,5 +108,6 @@ msgstr "Codice tecnico del fornitore di pagamenti."
 
 #. module: payment_custom
 #: model:ir.model.fields.selection,name:payment_custom.selection__payment_provider__custom_mode__wire_transfer
+#: model:payment.method,name:payment_custom.payment_method_wire_transfer
 msgid "Wire Transfer"
 msgstr "Bonifico bancario"

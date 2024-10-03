@@ -24,3 +24,5 @@ from . import test_stock_return_picking
 from . import test_stock_lot
 from . import test_picking_tours
 from . import test_replenish
+from . import test_old_rules
+from . import test_overview_graph

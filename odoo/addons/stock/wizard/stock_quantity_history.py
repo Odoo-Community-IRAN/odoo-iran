@@ -17,7 +17,7 @@ class StockQuantityHistory(models.TransientModel):
     def open_at_date(self):
         tree_view_id = self.env.ref('stock.view_stock_product_tree').id
         form_view_id = self.env.ref('stock.product_form_view_procurement_button').id
-        domain = [('type', '=', 'product')]
+        domain = [('is_storable', '=', True)]
         product_id = self.env.context.get('product_id', False)
         product_tmpl_id = self.env.context.get('product_tmpl_id', False)
         if product_id:
@@ -28,8 +28,8 @@ class StockQuantityHistory(models.TransientModel):
         # moves until date.
         action = {
             'type': 'ir.actions.act_window',
-            'views': [(tree_view_id, 'tree'), (form_view_id, 'form')],
-            'view_mode': 'tree,form',
+            'views': [(tree_view_id, 'list'), (form_view_id, 'form')],
+            'view_mode': 'list,form',
             'name': _('Products'),
             'res_model': 'product.product',
             'domain': domain,

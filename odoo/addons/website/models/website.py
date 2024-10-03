@@ -9,25 +9,23 @@ import logging
 import re
 import requests
 import threading
+import uuid
 
 from lxml import etree, html
-from psycopg2 import sql
 from werkzeug import urls
-from werkzeug.datastructures import OrderedMultiDict
 from werkzeug.exceptions import NotFound
 
-from odoo import api, fields, models, tools, http, release, registry
-from odoo.addons.http_routing.models.ir_http import RequestUID, slugify, url_for
+from odoo import api, fields, models, tools, release
 from odoo.addons.website.models.ir_http import sitemap_qs2dom
 from odoo.addons.website.tools import similarity_score, text_from_html, get_base_domain
 from odoo.addons.portal.controllers.portal import pager
 from odoo.addons.iap.tools import iap_tools
-from odoo.exceptions import AccessError, MissingError, UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.http import request
 from odoo.modules.module import get_manifest
-from odoo.osv.expression import AND, OR, FALSE_DOMAIN, get_unaccent_wrapper
+from odoo.osv.expression import AND, OR, FALSE_DOMAIN
+from odoo.tools import SQL, Query, sql as sqltools
 from odoo.tools.translate import _, xml_translate
-from odoo.tools import escape_psql, pycompat
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +43,52 @@ DEFAULT_CDN_FILTERS = [
 DEFAULT_WEBSITE_ENDPOINT = 'https://website.api.odoo.com'
 DEFAULT_OLG_ENDPOINT = 'https://olg.api.odoo.com'
 
+DEFAULT_BLOCKED_THIRD_PARTY_DOMAINS = '\n'.join([  # noqa: FLY002
+    'youtu.be', 'youtube.com', 'youtube-nocookie.com',
+    'instagram.com', 'instagr.am', 'ig.me',
+    'vimeo.com',  # 'player.vimeo.com', 'vimeo.com',
+    'dailymotion.com', 'dai.ly',
+    'youku.com',  # 'player.youku.com', 'youku.com',
+    'tudou.com',
+    'facebook.com', 'facebook.net', 'fb.com', 'fb.me', 'fb.watch',
+    'tiktok.com',
+    'x.com', 'twitter.com', 't.co',
+    'googletagmanager.com', 'google-analytics.com',
+    # List from https://www.google.com/supported_domains
+    'google.com', 'google.ad', 'google.ae', 'google.com.af', 'google.com.ag', 'google.al',
+    'google.am', 'google.co.ao', 'google.com.ar', 'google.as', 'google.at', 'google.com.au',
+    'google.az', 'google.ba', 'google.com.bd', 'google.be', 'google.bf', 'google.bg',
+    'google.com.bh', 'google.bi', 'google.bj', 'google.com.bn', 'google.com.bo', 'google.com.br',
+    'google.bs', 'google.bt', 'google.co.bw', 'google.by', 'google.com.bz', 'google.ca',
+    'google.cd', 'google.cf', 'google.cg', 'google.ch', 'google.ci', 'google.co.ck', 'google.cl',
+    'google.cm', 'google.cn', 'google.com.co', 'google.co.cr', 'google.com.cu', 'google.cv',
+    'google.com.cy', 'google.cz', 'google.de', 'google.dj', 'google.dk', 'google.dm',
+    'google.com.do', 'google.dz', 'google.com.ec', 'google.ee', 'google.com.eg', 'google.es',
+    'google.com.et', 'google.fi', 'google.com.fj', 'google.fm', 'google.fr', 'google.ga',
+    'google.ge', 'google.gg', 'google.com.gh', 'google.com.gi', 'google.gl', 'google.gm',
+    'google.gr', 'google.com.gt', 'google.gy', 'google.com.hk', 'google.hn', 'google.hr',
+    'google.ht', 'google.hu', 'google.co.id', 'google.ie', 'google.co.il', 'google.im',
+    'google.co.in', 'google.iq', 'google.is', 'google.it', 'google.je', 'google.com.jm',
+    'google.jo', 'google.co.jp', 'google.co.ke', 'google.com.kh', 'google.ki', 'google.kg',
+    'google.co.kr', 'google.com.kw', 'google.kz', 'google.la', 'google.com.lb', 'google.li',
+    'google.lk', 'google.co.ls', 'google.lt', 'google.lu', 'google.lv', 'google.com.ly',
+    'google.co.ma', 'google.md', 'google.me', 'google.mg', 'google.mk', 'google.ml',
+    'google.com.mm', 'google.mn', 'google.com.mt', 'google.mu', 'google.mv', 'google.mw',
+    'google.com.mx', 'google.com.my', 'google.co.mz', 'google.com.na', 'google.com.ng',
+    'google.com.ni', 'google.ne', 'google.nl', 'google.no', 'google.com.np', 'google.nr',
+    'google.nu', 'google.co.nz', 'google.com.om', 'google.com.pa', 'google.com.pe', 'google.com.pg',
+    'google.com.ph', 'google.com.pk', 'google.pl', 'google.pn', 'google.com.pr', 'google.ps',
+    'google.pt', 'google.com.py', 'google.com.qa', 'google.ro', 'google.ru', 'google.rw',
+    'google.com.sa', 'google.com.sb', 'google.sc', 'google.se', 'google.com.sg', 'google.sh',
+    'google.si', 'google.sk', 'google.com.sl', 'google.sn', 'google.so', 'google.sm', 'google.sr',
+    'google.st', 'google.com.sv', 'google.td', 'google.tg', 'google.co.th', 'google.com.tj',
+    'google.tl', 'google.tm', 'google.tn', 'google.to', 'google.com.tr', 'google.tt',
+    'google.com.tw', 'google.co.tz', 'google.com.ua', 'google.co.ug', 'google.co.uk',
+    'google.com.uy', 'google.co.uz', 'google.com.vc', 'google.co.ve', 'google.co.vi',
+    'google.com.vn', 'google.vu', 'google.ws', 'google.rs', 'google.co.za', 'google.co.zm',
+    'google.co.zw', 'google.cat',
+])
+
 
 class Website(models.Model):
 
@@ -61,7 +105,7 @@ class Website(models.Model):
 
     def _default_language(self):
         lang_code = self.env['ir.default']._get('res.partner', 'lang')
-        def_lang_id = self.env['res.lang']._lang_get_id(lang_code)
+        def_lang_id = self.env['res.lang']._get_data(code=lang_code).id
         return def_lang_id or self._active_languages()[0]
 
     name = fields.Char('Website Name', required=True)
@@ -76,6 +120,17 @@ class Website(models.Model):
     auto_redirect_lang = fields.Boolean('Autoredirect Language', default=True, help="Should users be redirected to their browser's language")
     cookies_bar = fields.Boolean('Cookies Bar', help="Display a customizable cookies bar on your website.")
     configurator_done = fields.Boolean(help='True if configurator has been completed or ignored')
+    block_third_party_domains = fields.Boolean(
+        'Block 3rd-party domains',
+        help="Block 3rd-party domains that may track users (YouTube, Google Maps, etc.).",
+        default=True)
+    custom_blocked_third_party_domains = fields.Text(
+        'User list of blocked 3rd-party domains',
+        groups='website.group_website_designer',
+        translate=False)
+    blocked_third_party_domains = fields.Text(
+        'List of blocked 3rd-party domains',
+        compute='_compute_blocked_third_party_domains')
 
     def _default_social_facebook(self):
         return self.env.ref('base.main_company').social_facebook
@@ -103,7 +158,7 @@ class Website(models.Model):
             return base64.b64encode(f.read())
 
     logo = fields.Binary('Website Logo', default=_default_logo, help="Display this logo on the website.")
-    social_twitter = fields.Char('Twitter Account', default=_default_social_twitter)
+    social_twitter = fields.Char('X Account', default=_default_social_twitter)
     social_facebook = fields.Char('Facebook Account', default=_default_social_facebook)
     social_github = fields.Char('GitHub Account', default=_default_social_github)
     social_linkedin = fields.Char('LinkedIn Account', default=_default_social_linkedin)
@@ -184,6 +239,19 @@ class Website(models.Model):
             top_menus = menus.filtered(lambda m: not m.parent_id)
             website.menu_id = top_menus and top_menus[0].id or False
 
+    @api.depends('custom_blocked_third_party_domains')
+    def _compute_blocked_third_party_domains(self):
+        for website in self:
+            custom_list = website.sudo().custom_blocked_third_party_domains
+            if custom_list:
+                full_list = f'{DEFAULT_BLOCKED_THIRD_PARTY_DOMAINS}\n{custom_list}'
+            else:
+                full_list = DEFAULT_BLOCKED_THIRD_PARTY_DOMAINS
+            website.blocked_third_party_domains = full_list
+
+    def _get_blocked_third_party_domains_list(self):
+        return self.blocked_third_party_domains.split('\n')
+
     # self.env.uid for ir.rule groups on menu
     @tools.ormcache('self.env.uid', 'self.id', cache='templates')
     def _get_menu_ids(self):
@@ -196,8 +264,8 @@ class Website(models.Model):
         :return: True if the menu contains a record like url
         """
         return any(self.env['website.menu'].browse(self._get_menu_ids()).filtered(
-            lambda menu: menu.url and re.search(r"[/](([^/=?&]+-)?[0-9]+)([/]|$)", menu.url))
-        )
+            lambda menu: (menu.url and re.search(r"[/](([^/=?&]+-)?[0-9]+)([/]|$)", menu.url)) or menu.group_ids
+        ))
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -279,9 +347,19 @@ class Website(models.Model):
     @api.model
     def _handle_domain(self, vals):
         if 'domain' in vals and vals['domain']:
-            if not vals['domain'].startswith('http'):
-                vals['domain'] = 'https://%s' % vals['domain']
-            vals['domain'] = vals['domain'].rstrip('/')
+            vals['domain'] = self._normalize_domain_url(vals['domain'])
+
+    def _normalize_domain_url(self, url):
+        """
+        This method:
+        - Prefixes 'https://' if it doesn't start with 'http'
+        - Strips any tailing '/'
+        """
+        normalized_url = url
+        if not normalized_url.startswith('http'):
+            normalized_url = 'https://%s' % normalized_url
+        normalized_url = normalized_url.rstrip('/')
+        return normalized_url
 
     @api.model
     def _handle_homepage_url(self, vals):
@@ -363,7 +441,7 @@ class Website(models.Model):
     @api.model
     def get_theme_configurator_snippets(self, theme_name):
         return {
-            **get_manifest('theme_default')['configurator_snippets'],
+            **get_manifest('website')['configurator_snippets'],
             **get_manifest(theme_name).get('configurator_snippets', {}),
         }
 
@@ -403,7 +481,7 @@ class Website(models.Model):
         return r
 
     @api.model
-    def configurator_recommended_themes(self, industry_id, palette):
+    def configurator_recommended_themes(self, industry_id, palette, result_nbr_max=3):
         Module = request.env['ir.module.module']
         domain = Module.get_themes_domain()
         domain = AND([[('name', '!=', 'theme_default')], domain])
@@ -411,7 +489,10 @@ class Website(models.Model):
         client_themes_img = {t: get_manifest(t).get('images_preview_theme', {}) for t in client_themes if get_manifest(t)}
         themes_suggested = self._website_api_rpc(
             '/api/website/2/configurator/recommended_themes/%s' % (industry_id if industry_id > 0 else ''),
-            {'client_themes': client_themes_img}
+            {
+                'client_themes': client_themes_img,
+                'result_nbr_max': result_nbr_max,
+            }
         )
         process_svg = self.env['website.configurator.feature']._process_svg
         for theme in themes_suggested:
@@ -438,11 +519,7 @@ class Website(models.Model):
         website = self.get_current_website()
         theme_name = kwargs['theme_name']
         theme = self.env['ir.module.module'].search([('name', '=', theme_name)])
-        theme._generate_primary_snippet_templates()
         redirect_url = theme.button_choose_theme()
-
-        # Force to refresh env after install of module
-        assert self.env.registry is registry()
 
         website.configurator_done = True
 
@@ -555,7 +632,6 @@ class Website(models.Model):
 
         if modules:
             modules.button_immediate_install()
-            assert self.env.registry is registry()
 
         self.env['website'].browse(website.id).configurator_set_menu_links(menu_company, module_data)
 
@@ -603,9 +679,81 @@ class Website(models.Model):
         IrQweb = self.env['ir.qweb'].with_context(website_id=website.id, lang=website.default_lang_id.code)
         snippets_cache = {}
         translated_content = {}
+        hashes_to_tags_and_attributes = {}
+        html_string_to_wrapping_tags = {}
 
-        def _compute_placeholder(term):
-            return xml_translate.get_text_content(term).strip()
+        def _compute_placeholder(html_string):
+            """
+            Transforms an HTML string by converting specific HTML tags into a
+            custom pseudo-markdown format.
+
+            The function wraps the input `html_string` with a root `<div>`
+            element, parses it into a tree, and iterates through the HTML
+            elements. It replaces recognized HTML tags with a custom pseudo-
+            markdown format like `#[text](hash_value)`, where `text` is the
+            content of the tag and `hash_value` is the key to fetch the tag name
+            and the attributes.
+
+            Args:
+                html_string (str): The input HTML string to be transformed.
+
+            Returns:
+                str: The transformed string with HTML tags replaced by
+                     pseudo-markdown.
+            """
+            tree = etree.fromstring(f'<div>{html_string}</div>')
+
+            # Identifying one or more wrapping tags that enclose the entire HTML
+            # content e.g., <strong><em>text ...</em></strong>. Store them to
+            # reapply them after processing with chatGPT.
+            wrapping_html = []
+            for element in tree.iter():
+                wrapping_html.append({"tag": element.tag, "attr": element.attrib})
+                if len(element) != 1 \
+                        or (element.text and element.text.strip()) \
+                        or (element[-1].tail and element[-1].tail.strip()):
+                    break
+            # Remove the wrapping element used for parsing into a tree
+            wrapping_html = wrapping_html[1:]
+
+            # Loop through all nodes, ignoring wrapping ones, to mark them with
+            # a pseudo-markdown identifier if they are leaf nodes.
+            nb_tags_to_skip = len(wrapping_html) + 1
+            for cursor, element in enumerate(tree.iter()):
+                if cursor < nb_tags_to_skip or len(element) > 0:
+                    continue
+
+                # Generate a unique hash based on the element's text, tag
+                # and attributes.
+                attrib_string = ','.join(f'{key}={value}' for key, value in sorted(element.attrib.items()))
+                combined_string = f'{element.text or ""}-{element.tag}-{attrib_string}'
+                unique_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, combined_string)
+                hash_value = unique_uuid.hex[:12]
+
+                hashes_to_tags_and_attributes[hash_value] = {"tag": element.tag, "attr": element.attrib}
+                element.text = f'#[{element.text or "0"}]({hash_value})'
+
+            res = tree.xpath('string()')
+
+            # If there is at least one wrapping tag, save the way it needs to
+            # be re-applied.
+            if wrapping_html:
+                tags = [
+                    (
+                        f'<{tag}{" " if attrs else ""}{attrs}>',
+                        f'</{tag}>'
+                    )
+                    for el in wrapping_html
+                    for tag, attrs in [(el["tag"], " ".join([f'{k}="{v}"' for k, v in el["attr"].items()]))]
+                ]
+                opening_tags, closing_tags = zip(*tags)
+                html_string_to_wrapping_tags[html_string] = f'{"".join(opening_tags)}$0{"".join(closing_tags[::-1])}'
+
+            # Note that `get_text_content` here is still needed despite the use
+            # of `string()` in the XPath expression above. Indeed, it allows to
+            # strip newlines and double-spaces, which would confuse IAP (without
+            # this, it does not perform any replacement for some reason).
+            return xml_translate.get_text_content(res.strip())
 
         def _render_snippet(key):
             # Using this avoids rendering the same snippet multiple times
@@ -626,7 +774,11 @@ class Website(models.Model):
                     {text_generation_target_lang: str(render)},
                 )
                 # Remove all numeric keys.
-                translation_dictionary = {k: v for k, v in translation_dictionary.items() if not _compute_placeholder(k).isnumeric()}
+                translation_dictionary = {
+                    k: v
+                    for k, v in translation_dictionary.items()
+                    if not xml_translate.get_text_content(k).strip().isnumeric()
+                }
                 for from_lang_term, to_lang_terms in translation_dictionary.items():
                     translated_content[from_lang_term] = to_lang_terms[text_generation_target_lang]
 
@@ -673,6 +825,58 @@ class Website(models.Model):
         else:
             logger.info("Skip AI text generation because translation coverage is too low (%s%%)", translated_ratio * 100)
 
+        def _format_replacement(html_string):
+            """
+            Reapplies original HTML formatting by replacing pseudo-markdown
+            with corresponding HTML tags.
+
+            The function searches for the replacement of the given HTML string
+            then processes it by identifying and replacing pseudo-markdown
+            in the form of `#[string](hash)` with actual HTML tags. It uses
+            stored tag and attribute information and reconstructs the correct
+            HTML structure. Additionally, it handles any wrapping tags that was
+            identified for the given HTML.
+
+            Args:
+                html_string (str): The source HTML whose replacement has to
+                    receive original formatting
+
+            Returns:
+                str: The text with HTML tags re-applied.
+            """
+            replacement = generated_content.get(_compute_placeholder(html_string))
+            if not replacement:
+                return html_string
+
+            # Replace #[string](hash) with <tag>...</tag> based on stored tag
+            # and attribute information
+            def _replace_tag(match):
+                content = match.group(1)  # The string inside the square brackets
+                hash_value = match.group(2)  # The hash value inside the parentheses
+                if hash_value not in hashes_to_tags_and_attributes:
+                    return content
+
+                tag = hashes_to_tags_and_attributes[hash_value]['tag']
+                attr = hashes_to_tags_and_attributes[hash_value]['attr']
+                attr_string = (" " + " ".join([f'{key}="{value}"' for key, value in attr.items()])) if attr else ''
+
+                # Handle self-closing tag if content is "0"
+                if content == "0":
+                    return f'<{tag}{attr_string}/>'
+
+                return f'<{tag}{attr_string}>{content}</{tag}>'
+
+            # Use regular expression to find instances of #[string](hash) and
+            # replace them
+            tag_pattern = r'#\[([^\]]+)\]\(([^)]+)\)'
+            replacement = re.sub(tag_pattern, _replace_tag, replacement)
+
+            # Handle possible wrapping tags identified
+            if html_string in html_string_to_wrapping_tags:
+                replacement = html_string_to_wrapping_tags[html_string].replace('$0', replacement)
+
+            return replacement
+
         # Configure the pages
         for page_code in requested_pages:
             snippet_list = configurator_snippets.get(page_code, [])
@@ -685,18 +889,19 @@ class Website(models.Model):
             for i, snippet in enumerate(snippet_list, start=1):
                 try:
                     render, placeholders = _render_snippet(f'website.configurator_{page_code}_{snippet}')
-
                     # Fill rendered block with AI text
-                    render = xml_translate(
-                        lambda x: generated_content.get(_compute_placeholder(x), x),
-                        render
-                    )
+                    render = xml_translate(_format_replacement, render)
 
                     el = html.fromstring(render)
 
                     # Add the data-snippet attribute to identify the snippet
                     # for compatibility code
                     el.attrib['data-snippet'] = snippet
+
+                    # Remove the previews needed for the snippets dialog
+                    dialog_preview_els = el.find_class('s_dialog_preview')
+                    for preview_el in dialog_preview_els:
+                        preview_el.getparent().remove(preview_el)
 
                     # Tweak the shape of the first snippet to connect it
                     # properly with the header color in some themes
@@ -711,7 +916,7 @@ class Website(models.Model):
                         shape_el = el.xpath("//*[hasclass('o_we_shape')]")
                         if shape_el:
                             shape_el[0].attrib['class'] += ' o_footer_extra_shape_mapping'
-                    rendered_snippet = pycompat.to_text(etree.tostring(el))
+                    rendered_snippet = etree.tostring(el, encoding='unicode')
                     rendered_snippets.append(rendered_snippet)
                 except ValueError as e:
                     logger.warning(e)
@@ -781,8 +986,44 @@ class Website(models.Model):
         try:
             # TODO: Remove this try/except, safety net because it was merged
             #       to close to OXP.
+            fallback_create_missing_industry_image('s_intro_pill_default_image', 'library_image_10')
+            fallback_create_missing_industry_image('s_intro_pill_default_image_2', 'library_image_14')
             fallback_create_missing_industry_image('s_banner_default_image_2', 's_image_text_default_image')
             fallback_create_missing_industry_image('s_banner_default_image_3', 's_product_list_default_image_1')
+            fallback_create_missing_industry_image('s_striped_top_default_image', 's_picture_default_image')
+            fallback_create_missing_industry_image('s_text_cover_default_image', 's_cover_default_image')
+            fallback_create_missing_industry_image('s_showcase_default_image', 's_image_text_default_image')
+            fallback_create_missing_industry_image('s_image_hexagonal_default_image', 's_cover_default_image')
+            fallback_create_missing_industry_image('s_image_hexagonal_default_image_1', 's_company_team_image_1')
+            fallback_create_missing_industry_image('s_accordion_image_default_image', 's_image_text_default_image')
+            fallback_create_missing_industry_image('s_pricelist_boxed_default_background', 's_product_catalog_default_image')
+            fallback_create_missing_industry_image('s_image_title_default_image', 's_cover_default_image')
+            fallback_create_missing_industry_image('s_key_images_default_image_1', 's_media_list_default_image_1')
+            fallback_create_missing_industry_image('s_key_images_default_image_2', 's_image_text_default_image')
+            fallback_create_missing_industry_image('s_key_images_default_image_3', 's_media_list_default_image_2')
+            fallback_create_missing_industry_image('s_key_images_default_image_4', 's_text_image_default_image')
+            fallback_create_missing_industry_image('s_kickoff_default_image', 's_cover_default_image')
+            fallback_create_missing_industry_image('s_quadrant_default_image_1', 'library_image_03')
+            fallback_create_missing_industry_image('s_quadrant_default_image_2', 'library_image_10')
+            fallback_create_missing_industry_image('s_quadrant_default_image_3', 'library_image_13')
+            fallback_create_missing_industry_image('s_quadrant_default_image_4', 'library_image_05')
+            fallback_create_missing_industry_image('s_sidegrid_default_image_1', 'library_image_03')
+            fallback_create_missing_industry_image('s_sidegrid_default_image_2', 'library_image_10')
+            fallback_create_missing_industry_image('s_sidegrid_default_image_3', 'library_image_13')
+            fallback_create_missing_industry_image('s_sidegrid_default_image_4', 'library_image_05')
+            fallback_create_missing_industry_image('s_cta_box_default_image', 'library_image_02')
+            fallback_create_missing_industry_image('s_image_punchy_default_image', 's_cover_default_image')
+            fallback_create_missing_industry_image('s_image_frame_default_image', 's_carousel_default_image_2')
+            fallback_create_missing_industry_image('s_carousel_intro_default_image_1', 's_cover_default_image')
+            fallback_create_missing_industry_image('s_carousel_intro_default_image_2', 's_image_text_default_image')
+            fallback_create_missing_industry_image('s_carousel_intro_default_image_3', 's_text_image_default_image')
+
+            fallback_create_missing_industry_image('s_framed_intro_default_image', 's_cover_default_image')
+            fallback_create_missing_industry_image('s_wavy_grid_default_image_1', 's_cover_default_image')
+            fallback_create_missing_industry_image('s_wavy_grid_default_image_2', 's_image_text_default_image')
+            fallback_create_missing_industry_image('s_wavy_grid_default_image_3', 's_text_image_default_image')
+            fallback_create_missing_industry_image('s_wavy_grid_default_image_4', 's_carousel_default_image_1')
+
         except Exception:
             pass
 
@@ -856,9 +1097,9 @@ class Website(models.Model):
             template_module = namespace
         else:
             template_module, _ = template.split('.')
-        page_url = '/' + slugify(name, max_length=1024, path=True)
+        page_url = '/' + self.env['ir.http']._slugify(name, max_length=1024, path=True)
         page_url = self.get_unique_path(page_url)
-        page_key = slugify(name)
+        page_key = self.env['ir.http']._slugify(name)
         result = {'url': page_url}
 
         if not name:
@@ -1002,80 +1243,37 @@ class Website(models.Model):
             search_criteria.append((url, website.website_domain()))
 
         # Search the URL in every relevant field
-        html_fields_attributes = self._get_html_fields_attributes() + [
-            ('website.menu', 'website_menu', 'url', False),
+        html_fields = self._get_html_fields() + [
+            ('website.menu', 'url'),
         ]
-        for model, _table, column, _translate in html_fields_attributes:
-            Model = self.env[model]
-            if not Model.check_access_rights('read', raise_exception=False):
+        for model_name, field_name in html_fields:
+            Model = self.env[model_name]
+            if not Model.has_access('read'):
                 continue
 
             # Generate the exact domain to search for the URL in this field
             domains = []
             for url, website_domain in search_criteria:
                 domains.append(AND([
-                    [(column, 'ilike', url)],
+                    [(field_name, 'ilike', url)],
                     website_domain if hasattr(Model, 'website_id') else [],
                 ]))
 
             dependency_records = Model.search(OR(domains))
-            if model == 'ir.ui.view':
+            if model_name == 'ir.ui.view':
                 dependency_records = _handle_views_and_pages(dependency_records)
             if dependency_records:
-                model_name = self.env['ir.model']._display_name_for([model])[0]['display_name']
-                field_name = Model.fields_get()[column]['string']
+                model_name = self.env['ir.model']._display_name_for([model_name])[0]['display_name']
+                field_string = Model.fields_get()[field_name]['string']
                 dependencies.setdefault(model_name, [])
                 dependencies[model_name] += [{
-                    'field_name': field_name,
+                    'field_name': field_string,
                     'record_name': rec.display_name,
-                    'link': 'website_url' in rec and rec.website_url or f'/web#id={rec.id}&view_type=form&model={model}',
+                    'link': 'website_url' in rec and rec.website_url or f'/odoo/{model_name}/{rec.id}',
                     'model_name': model_name,
                 } for rec in dependency_records]
 
         return dependencies
-
-    # ----------------------------------------------------------
-    # Languages
-    # ----------------------------------------------------------
-
-    def _get_alternate_languages(self, canonical_params):
-        self.ensure_one()
-
-        if not self._is_canonical_url(canonical_params=canonical_params):
-            # no hreflang on non-canonical pages
-            return []
-
-        languages = self.language_ids
-        if len(languages) <= 1:
-            # no hreflang if no alternate language
-            return []
-
-        langs = []
-        shorts = []
-
-        self_prefetch_langs = self.with_context(prefetch_langs=True)
-        for lg in languages:
-            lg_codes = lg.code.split('_')
-            short = lg_codes[0]
-            shorts.append(short)
-            langs.append({
-                'hreflang': ('-'.join(lg_codes)).lower(),
-                'short': short,
-                'href': self_prefetch_langs._get_canonical_url_localized(lang=lg, canonical_params=canonical_params),
-            })
-
-        # if there is only one region for a language, use only the language code
-        for lang in langs:
-            if shorts.count(lang['short']) == 1:
-                lang['hreflang'] = lang['short']
-
-        # add the default
-        langs.append({
-            'hreflang': 'x-default',
-            'href': self._get_canonical_url_localized(lang=self.default_lang_id, canonical_params=canonical_params),
-        })
-
-        return langs
 
     # ----------------------------------------------------------
     # Utilities
@@ -1414,7 +1612,7 @@ class Website(models.Model):
         return pages
 
     def search_pages(self, needle=None, limit=None):
-        name = slugify(needle, max_length=50, path=True)
+        name = self.env['ir.http']._slugify(needle, max_length=50, path=True)
         res = []
         for page in self._enumerate_pages(query_string=name, force=True):
             res.append(page)
@@ -1428,8 +1626,8 @@ class Website(models.Model):
             Where icon can be a module name, or a path
         """
         suggested_controllers = [
-            (_('Homepage'), url_for('/'), 'website'),
-            (_('Contact Us'), url_for('/contactus'), 'website_crm'),
+            (_('Homepage'), self.env['ir.http']._url_for('/'), 'website'),
+            (_('Contact Us'), self.env['ir.http']._url_for('/contactus'), 'website_crm'),
         ]
         return suggested_controllers
 
@@ -1454,18 +1652,18 @@ class Website(models.Model):
 
     @api.model
     def action_dashboard_redirect(self):
-        if self.env.user.has_group('base.group_system') or self.env.user.has_group('website.group_website_designer'):
+        if (self.env.user.has_group('base.group_system')
+                or self.env.user.has_group('website.group_website_designer')):
             return self.env["ir.actions.actions"]._for_xml_id("website.backend_dashboard")
         return self.env["ir.actions.actions"]._for_xml_id("website.action_website")
 
     def get_client_action_url(self, url, mode_edit=False):
         action_params = {
-            "action": "website.website_preview",
             "path": url,
         }
         if mode_edit:
             action_params["enable_editor"] = 1
-        return "/web#" + urls.url_encode(action_params)
+        return "/odoo/action-website.website_preview?" + urls.url_encode(action_params)
 
     def get_client_action(self, url, mode_edit=False, website_id=False):
         action = self.env["ir.actions.actions"]._for_xml_id("website.website_preview")
@@ -1478,66 +1676,18 @@ class Website(models.Model):
         }
         return action
 
-    def button_go_website(self, path='/', mode_edit=False):
-        # TODO: adapt in master as 'mode_edit' is always set to False
+    def button_go_website(self, path='/'):
         self._force()
-        if mode_edit:
-            # If the user gets on a translated page (e.g /fr) the editor will
-            # never start. Forcing the default language fixes this issue.
-            path = url_for(path, self.default_lang_id.url_code)
-        return self.get_client_action(path, mode_edit)
+        return self.get_client_action(path)
 
-    def _get_canonical_url_localized(self, lang, canonical_params):
-        """Returns the canonical URL for the current request with translatable
-        elements appropriately translated in `lang`.
-
-        If it is not possible to rebuild a path, use the current one instead.
-
-        `url_quote_plus` is applied on the returned path.
-        """
-        self.ensure_one()
-        try:
-            # Re-match the controller where the request path routes.
-            rule, args = self.env['ir.http']._match(request.httprequest.path)
-            for key, val in list(args.items()):
-                if isinstance(val, models.BaseModel):
-                    if isinstance(val._uid, RequestUID):
-                        args[key] = val = val.with_user(request.uid)
-                    if val.env.context.get('lang') != lang.code:
-                        args[key] = val = val.with_context(lang=lang.code)
-                    if self.env.context.get('prefetch_langs'):
-                        args[key] = val = val.with_context(prefetch_langs=True)
-
-            router = http.root.get_db_router(request.db).bind('')
-            path = router.build(rule.endpoint, args)
-        except (NotFound, AccessError, MissingError):
-            # The build method returns a quoted URL so convert in this case for consistency.
-            path = urls.url_quote_plus(request.httprequest.path, safe='/')
-        if lang != self.default_lang_id:
-            path = f'/{lang.url_code}{path if path != "/" else ""}'
-        canonical_query_string = f'?{urls.url_encode(canonical_params)}' if canonical_params else ''
-        return self.get_base_url() + path + canonical_query_string
-
-    def _get_canonical_url(self, canonical_params):
-        """Returns the canonical URL for the current request."""
-        self.ensure_one()
-        lang = getattr(request, 'lang', self.env['ir.http']._get_default_lang())
-        return self._get_canonical_url_localized(lang=lang, canonical_params=canonical_params)
-
-    def _is_canonical_url(self, canonical_params):
+    def _is_canonical_url(self):
         """Returns whether the current request URL is canonical."""
         self.ensure_one()
-        # Compare OrderedMultiDict because the order is important, there must be
-        # only one canonical and not params permutations.
-        params = request.httprequest.args
-        canonical_params = canonical_params or OrderedMultiDict()
-        if params != canonical_params:
-            return False
         # Compare URL at the first routing iteration because it's the one with
         # the language in the path. It is important to also test the domain of
         # the current URL.
         current_url = request.httprequest.url_root[:-1] + request.httprequest.environ['REQUEST_URI']
-        canonical_url = self._get_canonical_url_localized(lang=request.lang, canonical_params=None)
+        canonical_url = self.env['ir.http']._url_localized(lang_code=request.lang.code, canonical_domain=self.get_base_url())
         # A request path with quotable characters (such as ",") is never
         # canonical because request.httprequest.base_url is always unquoted,
         # and canonical url is always quoted, so it is never possible to tell
@@ -1557,18 +1707,17 @@ class Website(models.Model):
     def _get_cached(self, field):
         return self._get_cached_values()[field]
 
-    def _get_html_fields_attributes_blacklist(self):
+    def _get_html_fields_blacklist(self):
         return (
             'mail.message', 'mail.activity', 'digest.tip',
         )
 
-    def _get_html_fields_attributes(self):
-        html_fields = [('ir.ui.view', 'ir_ui_view', 'arch_db', True)]
+    def _get_html_fields(self):
+        html_fields = [('ir.ui.view', 'arch_db')]
         cr = self.env.cr
         cr.execute("""
             SELECT f.model,
-                   f.name,
-                   f.translate
+                   f.name
               FROM ir_model_fields f
               JOIN ir_model m
                 ON m.id = f.model_id
@@ -1577,14 +1726,20 @@ class Website(models.Model):
                AND m.transient = false
                AND f.model NOT LIKE 'ir.actions%%'
                AND f.model NOT IN %s
-        """, ([self._get_html_fields_attributes_blacklist()]))
-        for model, name, translate in cr.fetchall():
-            table = self.env[model]._table
-            if tools.table_exists(cr, table) and tools.column_exists(cr, table, name):
-                html_fields.append((model, table, name, translate))
+        """, ([self._get_html_fields_blacklist()]))
+        for model_name, field_name, in cr.fetchall():
+            try:
+                model = self.env[model_name]
+                field = model._fields[field_name]
+                if model._abstract or model._table_query is not None or not field.store:
+                    continue
+            except KeyError:
+                continue
+
+            html_fields.append((model_name, field_name))
         return html_fields
 
-    def _is_snippet_used(self, snippet_module, snippet_id, asset_version, asset_type, html_fields_attributes):
+    def _is_snippet_used(self, snippet_module, snippet_id, asset_version, asset_type, html_fields):
         snippet_occurences = []
         # Check snippet template definition to avoid disabling its related assets.
         # This special case is needed because snippet template definitions do not
@@ -1597,15 +1752,16 @@ class Website(models.Model):
         if self._check_snippet_used(snippet_occurences, asset_type, asset_version):
             return True
 
+        html_fields = [(self.env[model_name], field_name) for model_name, field_name in html_fields]
         # As well as every snippet dropped in html fields
-        self.env.cr.execute(sql.SQL(" UNION ").join(
-            sql.SQL("SELECT regexp_matches({}{}, {}, 'g') FROM {}").format(
-                sql.Identifier(column),
-                sql.SQL("->>'en_US'" if translate else ''),
-                sql.Placeholder('snippet_regex'),
-                sql.Identifier(table)
-            ) for _model, table, column, translate in html_fields_attributes
-        ), {'snippet_regex': f'<([^>]*data-snippet="{snippet_id}"[^>]*)>'})
+        self.env.cr.execute(SQL(" UNION ").join(
+            SQL("SELECT regexp_matches(%s, %s, 'g') FROM %s",
+                model._field_to_sql(model._table, field_name),
+                f'<([^>]*data-snippet="{snippet_id}"[^>]*)>',
+                SQL.identifier(model._table)
+            )
+            for model, field_name in html_fields
+        ))
 
         snippet_occurences = [r[0][0] for r in self.env.cr.fetchall()]
         return self._check_snippet_used(snippet_occurences, asset_type, asset_version)
@@ -1626,8 +1782,7 @@ class Website(models.Model):
         :param record: record on which to perform the check
         :raise AccessError: if the operation is forbidden
         """
-        record.check_access_rights('write')
-        record.check_access_rule('write')
+        record.check_access('write')
 
     def _disable_unused_snippets_assets(self):
         snippet_assets = self.env['ir.asset'].with_context(active_test=False).search_fetch(
@@ -1636,7 +1791,7 @@ class Website(models.Model):
         snippet_re = re.compile(r'(\w*)\/.*\/snippets\/(\w*)\/(\d{3})(?:_\w*)?\.(js|scss)')
         # regex will match /module/static/[.../]/snippets/snippet_id/XXX[_variable].asset_type
         # _variable is not kept since only module, snippet_id, asset_version (XXX), asset_type are relevant
-        html_fields_attributes = self._get_html_fields_attributes()
+        html_fields = self._get_html_fields()
         snippet_used = {}
         for snippet_asset in snippet_assets:
             match = snippet_re.match(snippet_asset.path)
@@ -1647,10 +1802,18 @@ class Website(models.Model):
                 asset_type = 'css'
             key = (snippet_id, asset_version, asset_type)  # module is not relevant, we want the first one in the asset id order to filter module extension
             if key not in snippet_used:
-                snippet_used[key] = self._is_snippet_used(snippet_module, snippet_id, asset_version, asset_type, html_fields_attributes)
+                snippet_used[key] = self._is_snippet_used(snippet_module, snippet_id, asset_version, asset_type, html_fields)
             is_snippet_used = snippet_used[key]
             if is_snippet_used != snippet_asset.active:
                 snippet_asset.active = is_snippet_used
+                # Handle missing data-snippet attributes
+                if snippet_id == 's_quotes_carousel' and asset_type == 'css' and asset_version in ['000', '001']:
+                    old_blockquote_key = ('s_blockquote', '000', 'css')
+                    if not snippet_used.get(old_blockquote_key):
+                        snippet_used[old_blockquote_key] = True
+                        old_blockquote_asset = snippet_assets.filtered(lambda asset: asset.path == 'website/static/src/snippets/s_blockquote/000.scss')
+                        if old_blockquote_asset and not old_blockquote_asset.active:
+                            old_blockquote_asset.active = True
         self.env['ir.asset'].flush_model()
 
     def _search_build_domain(self, domain, search, fields, extra=None):
@@ -1670,7 +1833,7 @@ class Website(models.Model):
             for search_term in search.split(' '):
                 subdomains = []
                 for field in fields:
-                    subdomains.append([(field, 'ilike', escape_psql(search_term))])
+                    subdomains.append([(field, 'ilike', sqltools.escape_psql(search_term))])
                 if extra:
                     subdomains.append(extra(self.env, search_term))
                 domains.append(OR(subdomains))
@@ -1723,15 +1886,16 @@ class Website(models.Model):
         """
         fuzzy_term = False
         search_details = self._search_get_details(search_type, order, options)
-        count, results = self._search_exact(search_details, search, limit, order)
-        if count > 0:
-            return count, results, fuzzy_term
         if search and options.get('allowFuzzy', True):
             fuzzy_term = self._search_find_fuzzy_term(search_details, search)
             if fuzzy_term:
                 count, results = self._search_exact(search_details, fuzzy_term, limit, order)
                 if fuzzy_term.lower() == search.lower():
                     fuzzy_term = False
+            else:
+                count, results = self._search_exact(search_details, search, limit, order)
+        else:
+            count, results = self._search_exact(search_details, search, limit, order)
         return count, results, fuzzy_term
 
     def _search_exact(self, search_details, search, limit, order):
@@ -1811,6 +1975,44 @@ class Website(models.Model):
                 words.add(word)
         return best_word
 
+    def _search_get_indirect_fields(self, fields, model):
+        """
+        Returns the list of indirect fields amongst the requested fields.
+
+        :param fields: list of field names to be searched
+        :param model: model within which to search
+        :return: dict of indirect field details per indirect field name
+        """
+        # Are considered valid indirect fields, fields that belong to the
+        # comodel behind a relational direct field.
+        indirect_fields = {}
+        for field in fields:
+            field_parts = field.split('.')
+            if len(field_parts) != 2:
+                continue
+            direct, indirect = field_parts
+            if direct not in model._fields:
+                continue
+            direct_field = model._fields[direct]
+            comodel_name = direct_field.comodel_name
+            if comodel_name not in self.env:
+                continue
+            comodel_fields = self.env[comodel_name]._fields
+            cofield = None
+            if '_description_relation_field' in dir(direct_field):
+                # One2many field's comodel reference to the model's id.
+                cofield = direct_field._description_relation_field
+                if cofield not in comodel_fields:
+                    continue
+            if indirect in comodel_fields:
+                indirect_fields[field] = {
+                    'direct': direct,
+                    'indirect': indirect,
+                    'comodel': self.env[comodel_name],
+                    'cofield': cofield,
+                }
+        return indirect_fields
+
     def _trigram_enumerate_words(self, search_details, search, limit):
         """
         Browses through all words that need to be compared to the search term.
@@ -1824,117 +2026,91 @@ class Website(models.Model):
         """
         match_pattern = r'[\w./-]{%s,}' % min(4, len(search) - 3)
         similarity_threshold = 0.3
-        lang = self.env.lang or 'en_US'
         for search_detail in search_details:
             model_name, fields = search_detail['model'], search_detail['search_fields']
             model = self.env[model_name]
             if search_detail.get('requires_sudo'):
                 model = model.sudo()
             domain = search_detail['base_domain'].copy()
-            fields = set(fields).intersection(model._fields)
+            direct_fields = set(fields).intersection(model._fields)
+            indirect_fields = self._search_get_indirect_fields(fields, model)
 
-            unaccent = get_unaccent_wrapper(self.env.cr)
+            query = Query(self.env.cr, model._table, model._table_query)
 
-            # Specific handling for fields being actually part of another model
-            # through the `inherits` mechanism.
-            # It gets the list of fields requested to search upon and that are
-            # actually not part of the requested model itself but part of a
-            # `inherits` model:
-            #     {
-            #       'name': {
-            #           'table': 'ir_ui_view',
-            #           'fname': 'view_id',
-            #       },
-            #       'url': {
-            #           'table': 'ir_ui_view',
-            #           'fname': 'view_id',
-            #       },
-            #       'another_field': {
-            #           'table': 'another_table',
-            #           'fname': 'record_id',
-            #       },
-            #     }
-            inherits_fields = {
-                inherits_model_fname: {
-                    'table': self.env[inherits_model_name]._table,
-                    'fname': inherits_field_name,
-                }
-                for inherits_model_name, inherits_field_name in model._inherits.items()
-                for inherits_model_fname in self.env[inherits_model_name]._fields.keys()
-                if inherits_model_fname in fields
-            }
-            similarities = []
-            for field in fields:
-                # Field might belong to another model (`inherits` mechanism)
-                table = inherits_fields[field]['table'] if field in inherits_fields else model._table
-                similarities.append(
-                    sql.SQL("word_similarity({search}, {field})").format(
-                        search=unaccent(sql.Placeholder('search')),
-                        field=unaccent(sql.SQL("{table}.{field}").format(
-                            table=sql.Identifier(table),
-                            field=sql.Identifier(field)
-                        )) if not model._fields[field].translate else
-                        unaccent(sql.SQL("COALESCE({table}.{field}->>{lang}, {table}.{field}->>'en_US')").format(
-                            table=sql.Identifier(table),
-                            field=sql.Identifier(field),
-                            lang=sql.Literal(lang)
-                        )),
+            unaccent = self.env.registry.unaccent
+            similarities = [
+                SQL("word_similarity(%(search)s, %(field)s)",
+                    search=unaccent(SQL('%s', search)),
+                    field=unaccent(model._field_to_sql(model._table, field, query)),
                     )
-                )
+                for field in direct_fields
+            ]
+            indirect_similarities = []
+            for field_info in indirect_fields.values():
+                direct = field_info['direct']
+                direct_field = model._fields[direct]
+                comodel = field_info['comodel']
+                coalias = query.make_alias(model._table, direct)
+                cofield = field_info['cofield']
+                if cofield:
+                    # One2many's comodel references the model's id.
+                    query.add_join('LEFT JOIN', coalias, comodel._table, SQL("%s = %s",
+                        SQL.identifier(model._table, 'id'),
+                        SQL.identifier(coalias, cofield),
+                    ))
+                elif 'relation' in dir(direct_field):
+                    # Many2many's relation holds the model's id in column1 and
+                    # the comodel's record id in column2.
+                    rel_alias = coalias
+                    query.add_join('LEFT JOIN', rel_alias, direct_field.relation, SQL("%s = %s",
+                        SQL.identifier(model._table, 'id'),
+                        SQL.identifier(rel_alias, direct_field.column1),
+                    ))
+                    coalias = query.make_alias(coalias, direct_field.column2)
+                    query.add_join('LEFT JOIN', coalias, comodel._table, SQL("%s = %s",
+                        SQL.identifier(rel_alias, direct_field.column2),
+                        SQL.identifier(coalias, 'id'),
+                    ))
+                indirect_similarities.append(SQL("word_similarity(%(search)s, %(field)s)",
+                    search=unaccent(SQL('%s', search)),
+                    field=unaccent(comodel._field_to_sql(coalias, field_info['indirect'], query)),
+                ))
+            similarities.extend(indirect_similarities)
+            best_similarity = SQL('GREATEST(%(similarities)s)', similarities=SQL(', ').join(similarities))
 
-            best_similarity = sql.SQL('GREATEST({similarities})').format(
-                similarities=sql.SQL(', ').join(similarities)
-            )
-
-            where_clause = sql.SQL("")
             # Filter unpublished records for portal and public user for
             # performance.
             # TODO: Same for `active` field?
             filter_is_published = (
                 'is_published' in model._fields
                 and model._fields['is_published'].base_field.model_name == model_name
-                and not self.env.user.has_group('base.group_user')
+                and not self.env.user._is_internal()
             )
             if filter_is_published:
-                where_clause = sql.SQL("WHERE is_published")
+                query.add_where('is_published')
 
-            from_clause = sql.SQL("FROM {table}").format(table=sql.Identifier(model._table))
-            # Specific handling for fields being actually part of another model
-            # through the `inherits` mechanism.
-            for table_to_join in {
-                field['table']: field['fname'] for field in inherits_fields.values()
-            }.items():  # Removes duplicate inherits model
-                from_clause = sql.SQL("""
-                    {from_clause}
-                    LEFT JOIN {inherits_table} ON {table}.{inherits_field} = {inherits_table}.id
-                """).format(
-                    from_clause=from_clause,
-                    table=sql.Identifier(model._table),
-                    inherits_table=sql.Identifier(table_to_join[0]),
-                    inherits_field=sql.Identifier(table_to_join[1]),
-                )
-            query = sql.SQL("""
-                SELECT {table}.id, {best_similarity} AS _best_similarity
-                {from_clause}
-                {where_clause}
-                ORDER BY _best_similarity desc
-                LIMIT 1000
-            """).format(
-                table=sql.Identifier(model._table),
-                best_similarity=best_similarity,
-                from_clause=from_clause,
-                where_clause=where_clause,
-            )
-            self.env.cr.execute(query, {'search': search})
+            query.order = '_best_similarity desc'
+            query.limit = 1000
+            self.env.cr.execute(query.select(
+                SQL.identifier(model._table, 'id'),
+                SQL('%s AS _best_similarity', best_similarity),
+            ))
             ids = {row[0] for row in self.env.cr.fetchall() if row[1] and row[1] >= similarity_threshold}
             domain.append([('id', 'in', list(ids))])
             domain = AND(domain)
-            records = model.search_read(domain, fields, limit=limit)
+            records = model.search_read(domain, direct_fields, limit=limit)
             for record in records:
                 for field, value in record.items():
                     if isinstance(value, str):
                         value = value.lower()
                         yield from re.findall(match_pattern, value)
+            if indirect_fields:
+                records = model.search(domain, limit=limit)
+                for indirect_field in indirect_fields:
+                    for value in records.mapped(indirect_field):
+                        if isinstance(value, str):
+                            value = value.lower()
+                            yield from re.findall(match_pattern, value)
 
     def _basic_enumerate_words(self, search_details, search, limit):
         """
@@ -1947,7 +2123,7 @@ class Website(models.Model):
         :return: yields words
         """
         match_pattern = r'[\w./-]{%s,}' % min(4, len(search) - 3)
-        first = escape_psql(search[0])
+        first = sqltools.escape_psql(search[0])
         for search_detail in search_details:
             model_name, fields = search_detail['model'], search_detail['search_fields']
             model = self.env[model_name]
@@ -1955,7 +2131,9 @@ class Website(models.Model):
                 model = model.sudo()
             domain = search_detail['base_domain'].copy()
             fields_domain = []
-            fields = set(fields).intersection(model._fields)
+            direct_fields = set(fields).intersection(model._fields)
+            indirect_fields = self._search_get_indirect_fields(fields, model)
+            fields = direct_fields.union(indirect_fields)
             for field in fields:
                 fields_domain.append([(field, '=ilike', '%s%%' % first)])
                 fields_domain.append([(field, '=ilike', '%% %s%%' % first)])
@@ -1963,7 +2141,7 @@ class Website(models.Model):
             domain.append(OR(fields_domain))
             domain = AND(domain)
             perf_limit = 1000
-            records = model.search_read(domain, fields, limit=perf_limit)
+            records = model.search_read(domain, direct_fields, limit=perf_limit)
             if len(records) == perf_limit:
                 # Exact match might have been missed because the fetched
                 # results are limited for performance reasons.
@@ -1979,6 +2157,13 @@ class Website(models.Model):
                         for word in re.findall(match_pattern, value):
                             if word[0] == search[0]:
                                 yield word.lower()
+            if indirect_fields:
+                records = model.search(domain, limit=limit)
+                for indirect_field in indirect_fields:
+                    for value in records.mapped(indirect_field):
+                        if isinstance(value, str):
+                            value = value.lower()
+                            yield from re.findall(match_pattern, value)
 
     def _allConsentsGranted(self):
         """
@@ -1988,6 +2173,7 @@ class Website(models.Model):
         user implemented his own consent behavior through custom code / app.
         That custom code / app is able to override this function as desired and
         xpath the `tracking_code_config` script in `website.layout`.
+
         :return: True if all consents have been granted, False otherwise
         """
         self.ensure_one()

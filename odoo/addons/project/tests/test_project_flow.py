@@ -486,3 +486,125 @@ class TestProjectFlow(TestProjectCommon, MailCommon):
         # Tag name_search should not raise Error if project_id is False
         task.tag_ids.with_context(project_id=task.project_id.id).name_search(
             args=["!", ["id", "in", []]])
+
+    def test_task_mail_assignement(self):
+        """ This test will check that an assignement mail is sent when adding an assignee to a task """
+        with self.mock_mail_gateway():
+            self.env['project.task'].create({
+                'name': 'Mail Task',
+                'user_ids': self.user_projectmanager,
+                'project_id': self.project_pigs.id
+            })
+        self.assertSentEmail(self.env.user.email_formatted, [self.user_projectmanager.email_formatted])
+
+    def test_task_copy_no_mail_assignement(self):
+        """ This test will check that no assignement mail is sent to assignees of a duplicated task """
+        with self.mock_mail_gateway():
+            self.task_1.copy() # if the feature that prevents assignement mails from being sent when copying a task is broken, this will create a mail
+        self.assertNotSentEmail(self.user_projectuser.email_formatted) # check that no mail was received for the assignee of the task
+
+    def test_copy_project_with_default_name(self):
+        """ Test the new project after the duplication got the exepected name
+
+            Test Cases:
+            ==========
+            1. Duplicate a project
+            2. Check the new project got the name of the project to copy plus `(copy)`
+            3. Duplicate a project with default name
+            4. Check the new project got the name defined in the default
+        """
+        project = self.project_pigs.copy()
+        self.assertEqual(project.name, 'Pigs (copy)', "The name of the copied project should be 'Pigs (copy)'")
+
+        project = self.project_pigs.copy({'name': 'Pigs 2'})
+        self.assertEqual(project.name, 'Pigs 2', "The name of the copied project should be 'Pigs 2'")
+
+    def test_description_field_history_on_update(self):
+        """Test updating 'description' field in project task and checking history content at revision id."""
+
+        task = self.env['project.task'].create({
+            'name': 'Test Task',
+            'description': 'Hello',
+        })
+        task.description = False
+        self.assertEqual(task.html_field_history_get_content_at_revision('description', 1), '<p>Hello</p>', "should recover previous text for description")
+
+    def test_copy_project_with_embedded_actions(self):
+        project_pigs_milestone_action = self.env['ir.actions.act_window'].create({
+            'name': 'Milestones',
+            'res_model': 'project.milestone',
+            'view_mode': 'kanban,list,form',
+            'domain': f"[('project_id', '=', {self.project_pigs.id})]",
+        })
+        task_action = self.env['ir.actions.act_window'].create({
+            'name': 'Tasks',
+            'res_model': 'project.task',
+            'view_mode': 'kanban,list,form',
+            'domain': "[('project_id', '=', active_id), ('display_in_project', '=', True)]",
+            'context': "{'default_project_id': active_id}",
+        })
+        task_embedded_action = self.env['ir.embedded.actions'].create({
+            'parent_res_model': 'project.project',
+            'parent_res_id': self.project_pigs.id,
+            'action_id': project_pigs_milestone_action.id,
+            'parent_action_id': task_action.id,
+        })
+        project_model = self.env['ir.model'].search([('model', '=', 'project.task')])
+        task_embedded_filter = self.env['ir.filters'].create({
+            'name': 'filter',
+            'embedded_action_id': task_embedded_action.id,
+            'embedded_parent_res_id': self.project_pigs.id,
+            'action_id': project_pigs_milestone_action.id,
+            'model_id': project_model.id,
+        })
+
+        new_project_pigs = self.project_pigs.copy()
+        embedded_action = self.env['ir.embedded.actions'].search([
+            ('parent_res_model', '=', 'project.project'),
+            ('parent_res_id', '=', new_project_pigs.id),
+        ])
+        self.assertTrue(
+            embedded_action,
+            'The embedded action linked to project pigs should also be copied.',
+        )
+        self.assertEqual(
+            embedded_action.action_id,
+            task_embedded_action.action_id,
+            "The new embedded action should have the same action than the one copied.",
+        )
+        self.assertEqual(
+            embedded_action.parent_res_model,
+            task_embedded_action.parent_res_model,
+        )
+        self.assertEqual(
+            embedded_action.parent_action_id,
+            task_embedded_action.parent_action_id,
+        )
+        duplicated_task_embedded_filter = embedded_action.filter_ids
+        self.assertEqual(
+            len(duplicated_task_embedded_filter),
+            1,
+            "The filter linked to the original embedded action should also be copied."
+        )
+        self.assertEqual(duplicated_task_embedded_filter.name, f"{task_embedded_filter.name} (copy)")
+        self.assertEqual(duplicated_task_embedded_filter.embedded_action_id, embedded_action)
+        self.assertEqual(duplicated_task_embedded_filter.embedded_parent_res_id, new_project_pigs.id)
+        self.assertEqual(duplicated_task_embedded_filter.action_id, task_embedded_filter.action_id)
+        self.assertEqual(duplicated_task_embedded_filter.model_id, task_embedded_filter.model_id)
+
+    def test_mail_on_task_project_change(self):
+        """
+            This test will check that a mail is sent to the subscribers having the
+            "Task created" follow subtype when the project_id of said task changes
+        """
+        subtype_id = self.env['ir.model.data']._xmlid_to_res_id('project.mt_project_task_new')
+        partner = self.env['res.partner'].search([('user_ids', '=', self.user_projectuser.id)])
+        self.env['mail.followers'].create({
+            'res_model': 'project.project',
+            'res_id': self.project_goats.id,
+            'partner_id': partner.id,
+            'subtype_ids': [subtype_id],  # task created subtype
+        })  # set user as follower of project
+        with self.mock_mail_gateway():
+            self.task_1.project_id = self.project_goats.id
+        self.assertSentEmail(self.env.user.email_formatted, [self.user_projectuser.email_formatted])

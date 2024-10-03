@@ -4,7 +4,7 @@
     'icon': '/account/static/description/l10n.png',
     'countries': ['ca'],
     'author': 'Savoir-faire Linux (https://www.savoirfairelinux.com); Odoo SA',
-    'website': 'https://www.odoo.com/documentation/17.0/applications/finance/fiscal_localizations.html',
+    'website': 'https://www.odoo.com/documentation/master/applications/finance/fiscal_localizations.html',
     'category': 'Accounting/Localizations/Account Charts',
     'description': """
 This is the module to manage the Canadian accounting chart in Odoo.
@@ -37,6 +37,7 @@ position.
         'account',
         'base_iban',
     ],
+    'auto_install': ['account'],
     'data': [
         'data/tax_report.xml',
         'views/res_partner_view.xml',

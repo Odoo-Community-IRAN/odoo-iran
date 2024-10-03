@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { localization } from "@web/core/l10n/localization";
 import { _t } from "@web/core/l10n/translation";
 import { memoize } from "@web/core/utils/functions";
@@ -17,6 +15,8 @@ const { DateTime, Settings } = luxon;
  * @property {string} [format]
  *  Format used to format a DateTime or to parse a formatted string.
  *  > Default: the session localization format.
+ * @property {boolean} [condensed] if true, months, days and hours will be formatted without
+ *  leading 0.
  *
  * @typedef {luxon.DateTime} DateTime
  *
@@ -126,6 +126,68 @@ export function clampDate(desired, minDate, maxDate) {
         return minDate;
     }
     return desired;
+}
+
+/**
+ * Get the week number of a given date.
+ * Returns the ISO week number of the Monday nearest to the first day of the week.
+ *
+ * @param {Date | luxon.DateTime} date
+ * @returns {number}
+ *  the ISO week number (1-53) of the nearest Monday of the given date's week's start
+ */
+export function getLocalWeekNumber(date) {
+    if (!date.isLuxonDateTime) {
+        date = DateTime.fromJSDate(date);
+    }
+    const { weekStart } = localization;
+    // go to start of week
+    date = date.minus({ days: (date.weekday + 7 - weekStart) % 7 });
+    // go to nearest Monday, up to 3 days back- or forwards
+    date =
+        weekStart > 1 && weekStart < 5 // if firstDay after Mon & before Fri
+            ? date.minus({ days: (date.weekday + 6) % 7 }) // then go back 1-3 days
+            : date.plus({ days: (8 - date.weekday) % 7 }); // else go forwards 0-3 days
+    date = date.plus({ days: 6 }); // go to last weekday of ISO week
+    const jan4 = DateTime.local(date.year, 1, 4);
+    // count from previous year if week falls before Jan 4
+    const diffDays =
+        date < jan4 ? date.diff(jan4.minus({ years: 1 }), "day").days : date.diff(jan4, "day").days;
+    return Math.trunc(diffDays / 7) + 1;
+}
+
+/**
+ * Get the start of the week for the given date, in the user's locale settings.
+ * The start of the week is determined by the `weekStart` setting.
+ *
+ * Luxon's `.startOf("week")` method uses the ISO week definition, which starts on Monday.
+ * Luxon has a `.startOf("week", { useLocaleWeeks: true })` method, but it relies on the
+ * Intl API and the `getWeekInfo` method, which is not supported in all browsers.
+ * See: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/Locale/getWeekInfo#browser_compatibility
+ *
+ * @param {luxon.DateTime} date
+ * @returns {luxon.DateTime}
+ */
+export function getStartOfLocalWeek(date) {
+    const { weekStart } = localization;
+    const weekday = date.weekday < weekStart ? weekStart - 7 : weekStart;
+    return date.set({ weekday }).startOf("day");
+}
+
+/**
+ * Get the end of the week for the given date, in the user's locale settings.
+ * The end of the week is determined by the `weekStart` setting.
+ *
+ * Luxon's `.endOf("week")` method uses the ISO week definition, which starts on Monday.
+ * Luxon has a `.endOf("week", { useLocaleWeeks: true })` method, but it relies on the
+ * Intl API and the `getWeekInfo` method, which is not supported in all browsers.
+ * See: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/Locale/getWeekInfo#browser_compatibility
+ *
+ * @param {luxon.DateTime} date
+ * @returns {luxon.DateTime}
+ */
+export function getEndOfLocalWeek(date) {
+    return getStartOfLocalWeek(date).plus({ days: 6 }).endOf("day");
 }
 
 /**
@@ -265,6 +327,25 @@ export function today() {
 // Formatting
 //-----------------------------------------------------------------------------
 
+const condensedFormats = {};
+/**
+ * Given a date(time) format, returns a format where months, days and hours are
+ * displayed without the leading 0 (e.g. 03/05/2024 08:00:00 => 3/5/2024 8:00:00).
+ *
+ * @param {string} format
+ * @returns string
+ */
+function getCondensedFormat(format) {
+    const originalFormat = format;
+    if (!condensedFormats[originalFormat]) {
+        format = format.replace(/(^|[^M])M{2}([^M]|$)/, "$1M$2");
+        format = format.replace(/(^|[^d])d{2}([^d]|$)/, "$1d$2");
+        format = format.replace(/(^|[^H])H{2}([^H]|$)/, "$1H$2");
+        condensedFormats[originalFormat] = format;
+    }
+    return condensedFormats[originalFormat];
+}
+
 /**
  * Formats a DateTime object to a date string
  *
@@ -275,7 +356,13 @@ export function formatDate(value, options = {}) {
     if (!value) {
         return "";
     }
-    const format = options.format || localization.dateFormat;
+    let format = options.format;
+    if (!format) {
+        format = localization.dateFormat;
+        if (options.condensed) {
+            format = getCondensedFormat(format);
+        }
+    }
     return value.toFormat(format);
 }
 
@@ -289,8 +376,18 @@ export function formatDateTime(value, options = {}) {
     if (!value) {
         return "";
     }
-    const format = options.format || localization.dateTimeFormat;
-    return value.setZone("default").toFormat(format);
+    let format = options.format;
+    if (!format) {
+        if (options.showSeconds === false) {
+            format = `${localization.dateFormat} ${localization.shortTimeFormat}`;
+        } else {
+            format = localization.dateTimeFormat;
+        }
+        if (options.condensed) {
+            format = getCondensedFormat(format);
+        }
+    }
+    return value.setZone(options.tz || "default").toFormat(format);
 }
 
 /**
@@ -379,7 +476,10 @@ export function serializeDateTime(value) {
  *  returned value will always be set at the start of the day)
  */
 export function parseDate(value, options = {}) {
-    const parsed = parseDateTime(value, { ...options, format: options.format || localization.dateFormat });
+    const parsed = parseDateTime(value, {
+        ...options,
+        format: options.format || localization.dateFormat,
+    });
     return parsed && parsed.startOf("day");
 }
 
@@ -410,7 +510,7 @@ export function parseDateTime(value, options = {}) {
     const fmt = options.format || localization.dateTimeFormat;
     const parseOpts = {
         setZone: true,
-        zone: "default",
+        zone: options.tz || "default",
     };
     const switchToLatin = Settings.defaultNumberingSystem !== "latn" && /[0-9]/.test(value);
 
@@ -490,7 +590,7 @@ export function parseDateTime(value, options = {}) {
         });
     }
 
-    return result.setZone("default");
+    return result.setZone(options.tz || "default");
 }
 
 /**
@@ -498,9 +598,8 @@ export function parseDateTime(value, options = {}) {
  * @param {string} value serialized date string, e.g. "2018-01-01"
  */
 export function deserializeDate(value, options = {}) {
-    const defaultDict = {numberingSystem: "latn", zone: "default"}
-    const joinedDict = {...defaultDict, ...options}
-    return DateTime.fromSQL(value, joinedDict).reconfigure({
+    options = { numberingSystem: "latn", zone: "default", ...options };
+    return DateTime.fromSQL(value, options).reconfigure({
         numberingSystem: Settings.defaultNumberingSystem,
     });
 }
@@ -509,9 +608,9 @@ export function deserializeDate(value, options = {}) {
  * Returns a datetime object parsed from the given serialized string.
  * @param {string} value serialized datetime string, e.g. "2018-01-01 00:00:00", expressed in UTC
  */
-export function deserializeDateTime(value) {
+export function deserializeDateTime(value, options = {}) {
     return DateTime.fromSQL(value, { numberingSystem: "latn", zone: "utc" })
-        .setZone("default")
+        .setZone(options?.tz || "default")
         .reconfigure({
             numberingSystem: Settings.defaultNumberingSystem,
         });

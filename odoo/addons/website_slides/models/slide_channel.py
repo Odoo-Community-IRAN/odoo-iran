@@ -10,8 +10,7 @@ from dateutil.relativedelta import relativedelta
 from markupsafe import Markup
 
 from odoo import api, fields, models, tools, _
-from odoo.addons.http_routing.models.ir_http import slug, unslug
-from odoo.exceptions import AccessError, UserError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.osv import expression
 from odoo.tools import is_html_empty
 
@@ -32,7 +31,7 @@ class ChannelUsersRelation(models.Model):
         ('ongoing', 'Ongoing'),
         ('completed', 'Finished')],
         string='Attendee Status', readonly=True, required=True, default='joined')
-    completion = fields.Integer('% Completed Contents', default=0, group_operator="avg")
+    completion = fields.Integer('% Completed Contents', default=0, aggregator="avg")
     completed_slides_count = fields.Integer('# Completed Contents', default=0)
     partner_id = fields.Many2one('res.partner', index=True, required=True, ondelete='cascade')
     partner_email = fields.Char(related='partner_id.email', readonly=True)
@@ -157,15 +156,13 @@ class ChannelUsersRelation(models.Model):
         Override unlink method :
         Remove attendee from a channel, then also remove slide.slide.partner related to.
         """
-        removed_slide_partner_domain = []
-        for channel_partner in self:
+        if self:
             # find all slide link to the channel and the partner
             removed_slide_partner_domain = expression.OR([
-                removed_slide_partner_domain,
                 [('partner_id', '=', channel_partner.partner_id.id),
                  ('slide_id', 'in', channel_partner.channel_id.slide_ids.ids)]
+                for channel_partner in self
             ])
-        if removed_slide_partner_domain:
             self.env['slide.slide.partner'].search(removed_slide_partner_domain).unlink()
         return super(ChannelUsersRelation, self).unlink()
 
@@ -663,7 +660,7 @@ class Channel(models.Model):
         for channel in self:
             if channel.id:  # avoid to perform a slug on a not yet saved record in case of an onchange.
                 base_url = channel.get_base_url()
-                channel.website_url = '%s/slides/%s' % (base_url, slug(channel))
+                channel.website_url = '%s/slides/%s' % (base_url, self.env['ir.http']._slug(channel))
 
     @api.depends('can_publish', 'is_member', 'karma_review', 'karma_slide_comment', 'karma_slide_vote')
     @api.depends_context('uid')
@@ -737,15 +734,15 @@ class Channel(models.Model):
         return channels
 
     def copy_data(self, default=None):
-        self.ensure_one()
-        default = default or {}
+        default = dict(default or {})
+        vals_list = super().copy_data(default=default)
         if 'name' not in default:
-            default['name'] = f"{self.name} ({_('copy')})"
+            for channel, vals in zip(self, vals_list):
+                vals['name'] = f"{channel.name} ({_('copy')})"
 
         if 'enroll' not in default and self.visibility == "members":
-            default['enroll'] = 'invite'
-
-        return super().copy_data(default)
+            vals['enroll'] = 'invite'
+        return vals_list
 
     def write(self, vals):
         # If description_short wasn't manually modified, there is an implicit link between this field and description.
@@ -804,7 +801,8 @@ class Channel(models.Model):
     def message_post(self, *, parent_id=False, subtype_id=False, **kwargs):
         """ Temporary workaround to avoid spam. If someone replies on a channel
         through the 'Presentation Published' email, it should be considered as a
-        note as we don't want all channel followers to be notified of this answer. """
+        note as we don't want all channel followers to be notified of this answer.
+        Also make sure that only one review can be posted per course."""
         self.ensure_one()
         if kwargs.get('message_type') == 'comment' and not self.can_review:
             raise AccessError(_('Not enough karma to review'))
@@ -812,7 +810,21 @@ class Channel(models.Model):
             parent_message = self.env['mail.message'].sudo().browse(parent_id)
             if parent_message.subtype_id and parent_message.subtype_id == self.env.ref('website_slides.mt_channel_slide_published'):
                 subtype_id = self.env.ref('mail.mt_note').id
-        return super(Channel, self).message_post(parent_id=parent_id, subtype_id=subtype_id, **kwargs)
+        message = super().message_post(parent_id=parent_id, subtype_id=subtype_id, **kwargs)
+        if self.env.user._is_internal() and not message.rating_value:
+            return message
+        if message.subtype_id == self.env.ref("mail.mt_comment"):
+            domain = [
+                ("res_id", "=", self.id),
+                ("author_id", "=", message.author_id.id),
+                ("model", "=", "slide.channel"),
+                ("subtype_id", "=", self.env.ref("mail.mt_comment").id),
+            ]
+            if self.env["mail.message"].search_count(domain, limit=2) > 1:
+                raise ValidationError(_("Only a single review can be posted per course."))
+        if message.rating_value and message.is_current_user_or_guest_author:
+            self.env.user._add_karma(self.karma_gen_channel_rank, self, _("Course Ranked"))
+        return message
 
     # ---------------------------------------------------------
     # Business / Actions
@@ -963,14 +975,10 @@ class Channel(models.Model):
         allowed = self.filtered(lambda channel: channel.enroll == 'public')
         on_invite = self.filtered(lambda channel: channel.enroll == 'invite')
         if on_invite:
-            try:
-                on_invite.check_access_rights('write')
-                on_invite.check_access_rule('write')
-            except AccessError:
-                if raise_on_access:
-                    raise AccessError(_('You are not allowed to add members to this course. Please contact the course responsible or an administrator.'))
-            else:
+            if on_invite.has_access('write'):
                 allowed |= on_invite
+            elif raise_on_access:
+                raise AccessError(_('You are not allowed to add members to this course. Please contact the course responsible or an administrator.'))
         return allowed
 
     def _add_groups_members(self):
@@ -1027,16 +1035,14 @@ class Channel(models.Model):
         if not partner_ids:
             raise ValueError("Do not use this method with an empty partner_id recordset")
 
-        removed_channel_partner_domain = []
-        for channel in self:
-            removed_channel_partner_domain = expression.OR([
-                removed_channel_partner_domain,
-                [('partner_id', 'in', partner_ids),
-                 ('channel_id', '=', channel.id)]
-            ])
+        removed_channel_partner_domain = expression.OR([
+            [('partner_id', 'in', partner_ids),
+             ('channel_id', '=', channel.id)]
+            for channel in self
+        ])
 
         self.message_unsubscribe(partner_ids=partner_ids)
-        if removed_channel_partner_domain:
+        if self:
             removed_channel_partner = self.env['slide.channel.partner'].sudo().search(removed_channel_partner_domain)
             if removed_channel_partner:
                 removed_channel_partner.action_archive()
@@ -1055,7 +1061,7 @@ class Channel(models.Model):
                 base_url=record.get_base_url(),
             )
             email_values = {'email_to': emails}
-            if self.env.user.has_group('base.group_portal'):
+            if self.env.user._is_portal():
                 template = template.sudo()
                 email_values['email_from'] = self.env.company.catchall_formatted or self.env.company.email_formatted
 
@@ -1080,7 +1086,7 @@ class Channel(models.Model):
     def action_request_access(self):
         """ Request access to the channel. Returns a dict with keys being either 'error'
         (specific error raised) or 'done' (request done or not). """
-        if self.env.user.has_group('base.group_public'):
+        if self.env.user._is_public():
             return {'error': _('You have to sign in before')}
         if not self.is_published:
             return {'error': _('Course not published yet')}
@@ -1167,7 +1173,7 @@ class Channel(models.Model):
                 continue
             category_data.append({
                 'category': category, 'id': category.id,
-                'name': category.name, 'slug_name': slug(category),
+                'name': category.name, 'slug_name': self.env['ir.http']._slug(category),
                 'total_slides': len(category_slides),
                 'slides': category_slides[(offset or 0):(limit + offset or len(category_slides))],
             })
@@ -1235,7 +1241,7 @@ class Channel(models.Model):
         if search_tags:
             ChannelTag = self.env['slide.channel.tag']
             try:
-                tag_ids = list(filter(None, [unslug(tag)[1] for tag in search_tags.split(',')]))
+                tag_ids = list(filter(None, [self.env['ir.http']._unslug(tag)[1] for tag in search_tags.split(',')]))
                 tags = ChannelTag.search([('id', 'in', tag_ids)]) if tag_ids else ChannelTag
             except Exception:
                 tags = ChannelTag
@@ -1277,4 +1283,4 @@ class Channel(models.Model):
         """ Overridden to use a relative URL instead of an absolute when website_id is False. """
         if self.website_id:
             return super().open_website_url()
-        return self.env['website'].get_client_action(f'/slides/{slug(self)}')
+        return self.env['website'].get_client_action(f'/slides/{self.env["ir.http"]._slug(self)}')

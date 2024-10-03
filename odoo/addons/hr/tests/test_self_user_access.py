@@ -102,6 +102,12 @@ class TestSelfAccessProfile(TestHrCommon):
         available_actions = john.get_views([(view.id, 'form')], {'toolbar': True})['views']['form']['toolbar']['action']
         self.assertTrue(any(x['id'] == change_password_action.id for x in available_actions))
 
+    def test_employee_fields_groups(self):
+        # Note: If this tests is crashing, this is probably because the linked field on the error
+        # message is defined on hr.employee only (and not on hr.employee.public) and has no group
+        # defined on it (at least hr.group_hr_user).
+        internal_user = new_test_user(self.env, login='mireille', groups='base.group_user', name='Mireille', email='mireille@example.com')
+        self.env['hr.employee'].with_user(internal_user).search([]).read([])
 
 class TestSelfAccessRights(TestHrCommon):
 
@@ -169,7 +175,7 @@ class TestSelfAccessRights(TestHrCommon):
         for f, v in self.self_protected_fields_user.items():
             val = None
             if v.type == 'char' or v.type == 'text':
-                val = '0000' if f == 'pin' else 'dummy'
+                val = '0000' if f in ['pin', 'barcode'] else 'dummy'
             if val is not None:
                 self.richard.with_user(self.richard).write({f: val})
 

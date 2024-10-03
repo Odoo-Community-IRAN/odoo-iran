@@ -3,7 +3,7 @@
         <record model="ir.actions.act_window" id="action_mrp_production_moves">
             <field name="name">Inventory Moves</field>
             <field name="res_model">stock.move.line</field>
-            <field name="view_mode">tree,form</field>
+            <field name="view_mode">list,form</field>
             <field name="domain">['|', ('move_id.raw_material_production_id', '=', active_id), ('move_id.production_id', '=', active_id)]</field>
         </record>
 
@@ -33,8 +33,21 @@
             </field>
         </record>
 
+        <record id="view_mrp_stock_move_operations" model="ir.ui.view">
+            <field name="name">stock.move.mrp.operations.raw.form</field>
+            <field name="model">stock.move</field>
+            <field name="priority">1</field>
+            <field name="mode">primary</field>
+            <field name="inherit_id" ref="stock.view_stock_move_operations" />
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='show_lots_m2o']" position="after">
+                    <field name="quantity" invisible="1"/>
+                </xpath>
+            </field>
+        </record>
+
         <record id="view_stock_move_line_operation_tree_finished" model="ir.ui.view">
-            <field name="name">stock.move.line.operation.tree.finished</field>
+            <field name="name">stock.move.line.operation.list.finished</field>
             <field name="model">stock.move.line</field>
             <field name="inherit_id" ref="stock.view_stock_move_line_operation_tree" />
             <field name="arch" type="xml">
@@ -42,7 +55,6 @@
 		            <attribute name="context">{
                         'active_mo_id': context.get('active_mo_id'),
                         'active_picking_id': picking_id,
-                        'default_company_id': parent.company_id,
                         'default_product_id': parent.product_id,
                         }
                     </attribute>
@@ -76,9 +88,8 @@
             sequence="25"/>
 
     <menuitem id="menu_procurement_compute_mrp"
-        action="stock.action_procurement_compute"
+        action="stock.ir_cron_scheduler_action_ir_actions_server"
         parent="mrp_planning_menu_root"
         groups="base.group_no_one"
         sequence="135"/>
-
 </odoo>

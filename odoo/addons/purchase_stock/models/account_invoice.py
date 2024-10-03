@@ -40,7 +40,7 @@ class AccountMove(models.Model):
             for line in move.invoice_line_ids:
                 # Filter out lines being not eligible for price difference.
                 # Moreover, this function is used for standard cost method only.
-                if line.product_id.type != 'product' or line.product_id.valuation != 'real_time' or line.product_id.cost_method != 'standard':
+                if not line._eligible_for_cogs() or line.product_id.cost_method != 'standard':
                     continue
 
                 # Retrieve accounts needed to generate the price difference.
@@ -133,6 +133,13 @@ class AccountMove(models.Model):
             product = product.with_company(company.id)
             if not float_is_zero(product.quantity_svl, precision_rounding=product.uom_id.rounding):
                 product.sudo().with_context(disable_auto_svl=True).write({'standard_price': product.value_svl / product.quantity_svl})
+
+        for (lot, company), dummy in groupby(stock_valuation_layers, key=lambda svl: (svl.lot_id, svl.company_id)):
+            if not lot:
+                continue
+            lot = lot.with_company(company.id)
+            if not float_is_zero(lot.quantity_svl, precision_rounding=lot.product_id.uom_id.rounding):
+                lot.sudo().with_context(disable_auto_svl=True).write({'standard_price': lot.value_svl / lot.quantity_svl})
 
         posted = super(AccountMove, self.with_context(skip_cogs_reconciliation=True))._post(soft)
 

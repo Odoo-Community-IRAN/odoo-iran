@@ -60,9 +60,13 @@ class LoyaltyRule(models.Model):
 
     minimum_qty = fields.Integer('Minimum Quantity', default=1)
     minimum_amount = fields.Monetary('Minimum Purchase', 'currency_id')
-    minimum_amount_tax_mode = fields.Selection([
-        ('incl', 'Included'),
-        ('excl', 'Excluded')], default='incl', required=True,
+    minimum_amount_tax_mode = fields.Selection(
+        selection=[
+            ('incl', "tax included"),
+            ('excl', "tax excluded"),
+        ],
+        default='incl',
+        required=True,
     )
 
     mode = fields.Selection([
@@ -112,17 +116,18 @@ class LoyaltyRule(models.Model):
     @api.depends_context('uid')
     @api.depends("mode")
     def _compute_user_has_debug(self):
-        self.user_has_debug = self.user_has_groups('base.group_no_one')
+        self.user_has_debug = self.env.user.has_group('base.group_no_one')
 
     def _get_valid_product_domain(self):
         self.ensure_one()
-        domain = []
+        constrains = []
         if self.product_ids:
-            domain = [('id', 'in', self.product_ids.ids)]
+            constrains.append([('id', 'in', self.product_ids.ids)])
         if self.product_category_id:
-            domain = expression.OR([domain, [('categ_id', 'child_of', self.product_category_id.id)]])
+            constrains.append([('categ_id', 'child_of', self.product_category_id.id)])
         if self.product_tag_id:
-            domain = expression.OR([domain, [('all_product_tag_ids', 'in', self.product_tag_id.id)]])
+            constrains.append([('all_product_tag_ids', 'in', self.product_tag_id.id)])
+        domain = expression.OR(constrains) if constrains else []
         if self.product_domain and self.product_domain != '[]':
             domain = expression.AND([domain, ast.literal_eval(self.product_domain)])
         return domain

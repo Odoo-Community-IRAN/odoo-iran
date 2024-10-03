@@ -9,8 +9,8 @@ except ImportError:
 
 from odoo.tests import tagged, new_test_user
 from odoo.addons.bus.tests.common import WebsocketCase
-from odoo.addons.bus.models.bus import channel_with_db, json_dump
 from odoo.addons.mail.tests.common import MailCommon
+from odoo.addons.bus.models.bus import channel_with_db, json_dump
 
 
 @tagged("post_install", "-at_install")

@@ -114,15 +114,13 @@ class AccountMove(models.Model):
         remaining = self - recs_with_name
         remaining.l10n_latam_document_number = False
 
-    @api.onchange('l10n_latam_document_type_id', 'l10n_latam_document_number', 'partner_id')
+    @api.onchange('l10n_latam_document_type_id', 'l10n_latam_document_number')
     def _inverse_l10n_latam_document_number(self):
         for rec in self.filtered(lambda x: x.l10n_latam_document_type_id):
             if not rec.l10n_latam_document_number:
                 rec.name = '/'
             else:
-                l10n_latam_document_number = rec.l10n_latam_document_number
-                if not rec._skip_format_document_number():
-                    l10n_latam_document_number = rec.l10n_latam_document_type_id._format_document_number(rec.l10n_latam_document_number)
+                l10n_latam_document_number = rec.l10n_latam_document_type_id._format_document_number(rec.l10n_latam_document_number)
                 if rec.l10n_latam_document_number != l10n_latam_document_number:
                     rec.l10n_latam_document_number = l10n_latam_document_number
                 rec.name = "%s %s" % (rec.l10n_latam_document_type_id.doc_code_prefix, l10n_latam_document_number)
@@ -146,11 +144,6 @@ class AccountMove(models.Model):
         if self.l10n_latam_use_documents:
             return 'never'
         return super(AccountMove, self)._deduce_sequence_number_reset(name)
-
-    def _skip_format_document_number(self):
-        """Hook to be overridden in localisation"""
-        self.ensure_one()
-        return False
 
     def _get_starting_sequence(self):
         if self.journal_id.l10n_latam_use_documents:
@@ -223,8 +216,12 @@ class AccountMove(models.Model):
             document_types = rec.l10n_latam_available_document_type_ids._origin
             rec.l10n_latam_document_type_id = document_types and document_types[0].id
 
-    def _compute_made_sequence_hole(self):
+    def _compute_made_sequence_gap(self):
         use_documents_moves = self.filtered(lambda m: m.journal_id.l10n_latam_use_documents)
-        use_documents_moves.made_sequence_hole = False
+        use_documents_moves.made_sequence_gap = False
         if other_moves := self - use_documents_moves:
-            super(AccountMove, other_moves)._compute_made_sequence_hole()
+            super(AccountMove, other_moves)._compute_made_sequence_gap()
+
+    def _set_next_made_sequence_gap(self, made_gap: bool):
+        if other_moves := self.filtered(lambda m: not m.journal_id.l10n_latam_use_documents):
+            super(AccountMove, other_moves)._set_next_made_sequence_gap(made_gap)

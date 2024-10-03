@@ -5,6 +5,7 @@ import { Component, useState } from "@odoo/owl";
 import { Dropdown } from "@web/core/dropdown/dropdown";
 import { DropdownItem } from "@web/core/dropdown/dropdown_item";
 import { deserializeDateTime } from "@web/core/l10n/dates";
+import { rpc } from "@web/core/network/rpc";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { useDebounced } from "@web/core/utils/timing";
@@ -17,9 +18,7 @@ export class ActivityMenu extends Component {
     static template = "hr_attendance.attendance_menu";
 
     setup() {
-        this.rpc = useService("rpc");
         this.ui = useState(useService("ui"));
-        this.userService = useService("user");
         this.employee = false;
         this.state = useState({
             checkedIn: false,
@@ -33,7 +32,7 @@ export class ActivityMenu extends Component {
     }
 
     async searchReadEmployee(){
-        const result = await this.rpc("/hr_attendance/attendance_user_data");
+        const result = await rpc("/hr_attendance/attendance_user_data");
         this.employee = result;
         if (this.employee.id) {
             this.hoursToday = this.date_formatter(
@@ -53,18 +52,17 @@ export class ActivityMenu extends Component {
     }
 
     async signInOut() {
-        // iOS app lacks permissions to call `getCurrentPosition`
-        if (!isIosApp()) {
+        if (!isIosApp()) { // iOS app lacks permissions to call `getCurrentPosition`
             navigator.geolocation.getCurrentPosition(
                 async ({coords: {latitude, longitude}}) => {
-                    await this.rpc("/hr_attendance/systray_check_in_out", {
+                    await rpc("/hr_attendance/systray_check_in_out", {
                         latitude,
                         longitude
                     })
                     await this.searchReadEmployee()
                 },
                 async err => {
-                    await this.rpc("/hr_attendance/systray_check_in_out")
+                    await rpc("/hr_attendance/systray_check_in_out")
                     await this.searchReadEmployee()
                 },
                 {
@@ -72,7 +70,7 @@ export class ActivityMenu extends Component {
                 }
             )
         } else {
-            await this.rpc("/hr_attendance/systray_check_in_out")
+            await rpc("/hr_attendance/systray_check_in_out")
             await this.searchReadEmployee()
         }
     }

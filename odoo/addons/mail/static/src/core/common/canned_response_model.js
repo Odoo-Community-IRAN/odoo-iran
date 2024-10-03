@@ -1,8 +1,7 @@
-/* @odoo-module */
-
 import { Record } from "@mail/core/common/record";
 
 export class CannedResponse extends Record {
+    static _name = "mail.canned.response";
     static id = "id";
     /** @type {Object.<number, import("models").CannedResponse>} */
     static records = {};

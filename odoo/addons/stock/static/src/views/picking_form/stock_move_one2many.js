@@ -1,22 +1,11 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { ListRenderer } from "@web/views/list/list_renderer";
+import { AutoColumnWidthListRenderer } from "@stock/views/list/auto_column_width_list_renderer";
 import { X2ManyField, x2ManyField } from "@web/views/fields/x2many/x2many_field";
-import { useEffect } from "@odoo/owl";
 
-export class MovesListRenderer extends ListRenderer {
+export class MovesListRenderer extends AutoColumnWidthListRenderer {
     static recordRowTemplate = "stock.MovesListRenderer.RecordRow";
-
-    setup() {
-        super.setup();
-        useEffect(
-            () => {
-                this.keepColumnWidths = false;
-            },
-            () => [this.state.columns]
-        );
-    }
 
     processAllColumn(allColumns, list) {
         let cols = super.processAllColumn(...arguments);
@@ -31,9 +20,8 @@ export class MovesListRenderer extends ListRenderer {
     }
 }
 
-MovesListRenderer.props = [ ...ListRenderer.props, 'stockMoveOpen?']
-
 export class StockMoveX2ManyField extends X2ManyField {
+    static components = { ...X2ManyField.components, ListRenderer: MovesListRenderer };
     setup() {
         super.setup();
         this.canOpenRecord = true;
@@ -43,12 +31,10 @@ export class StockMoveX2ManyField extends X2ManyField {
         return false;
     }
 
-
-
     async openRecord(record) {
         if (this.canOpenRecord && !record.isNew) {
             const dirty = await record.isDirty();
-            if (dirty && 'quantity' in record._changes) {
+            if (await record._parentRecord.isDirty() || (dirty && 'quantity' in record._changes)) {
                 await record._parentRecord.save({ reload: true });
                 record = record._parentRecord.data[this.props.name].records.find(e => e.resId === record.resId);
                 if (!record) {
@@ -60,7 +46,6 @@ export class StockMoveX2ManyField extends X2ManyField {
     }
 }
 
-StockMoveX2ManyField.components = { ...X2ManyField.components, ListRenderer: MovesListRenderer };
 
 export const stockMoveX2ManyField = {
     ...x2ManyField,

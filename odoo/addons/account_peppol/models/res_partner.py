@@ -1,90 +1,79 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import contextlib
 import requests
 from lxml import etree
+from markupsafe import Markup
 from hashlib import md5
 from urllib import parse
 
 from odoo import api, fields, models
 from odoo.addons.account_peppol.tools.demo_utils import handle_demo
-from odoo.tools.sql import column_exists, create_column
+from odoo.addons.account.models.company import PEPPOL_LIST
 
 TIMEOUT = 10
+NON_PEPPOL_FORMAT = (False, 'facturx', 'oioubl_201', 'ciusro')
+
 
 class ResPartner(models.Model):
     _inherit = 'res.partner'
 
-    account_peppol_is_endpoint_valid = fields.Boolean(
-        string="PEPPOL endpoint validity",
-        help="The partner's EAS code and PEPPOL endpoint are valid",
-        compute="_compute_account_peppol_is_endpoint_valid", store=True,
-        copy=False,
+    invoice_sending_method = fields.Selection(
+        selection_add=[('peppol', 'by Peppol')],
     )
-    account_peppol_validity_last_check = fields.Date(
-        string="Checked on",
-        help="Last Peppol endpoint verification",
-        compute="_compute_account_peppol_is_endpoint_valid", store=True,
-        copy=False,
-    )
-    account_peppol_verification_label = fields.Selection(
+
+    peppol_verification_state = fields.Selection(
         selection=[
             ('not_verified', 'Not verified yet'),
             ('not_valid', 'Not valid'),  # does not exist on Peppol at all
             ('not_valid_format', 'Cannot receive this format'),  # registered on Peppol but cannot receive the selected document type
             ('valid', 'Valid'),
         ],
-        string='Peppol endpoint validity',
-        compute='_compute_account_peppol_verification_label',
-        copy=False,
-    )  # field to compute the label to show for partner endpoint
+        string='Peppol endpoint verification',
+        company_dependent=True,
+    )
     is_peppol_edi_format = fields.Boolean(compute='_compute_is_peppol_edi_format')
 
-    def _auto_init(self):
-        """Create columns `account_peppol_is_endpoint_valid` and `account_peppol_validity_last_check`
-        to avoid having them computed by the ORM on installation.
-        """
-        if not column_exists(self.env.cr, 'res_partner', 'account_peppol_is_endpoint_valid'):
-            create_column(self.env.cr, 'res_partner', 'account_peppol_is_endpoint_valid', 'boolean')
-        if not column_exists(self.env.cr, 'res_partner', 'account_peppol_validity_last_check'):
-            create_column(self.env.cr, 'res_partner', 'account_peppol_validity_last_check', 'timestamp')
-        return super()._auto_init()
-
-    @api.model
-    def fields_get(self, allfields=None, attributes=None):
-        # TODO: remove in master
-        res = super().fields_get(allfields, attributes)
-
-        # the orm_cache does not contain the new selections added in stable: clear the cache once
-        existing_selection = res.get('account_peppol_verification_label', {}).get('selection')
-        if existing_selection is None:
-            return res
-
-        not_valid_format_label = next(x for x in self._fields['account_peppol_verification_label'].selection if x[0] == 'not_valid_format')
-        need_update = not_valid_format_label not in existing_selection
-
-        if need_update:
-            self.env['ir.model.fields'].invalidate_model(['selection_ids'])
-            self.env['ir.model.fields.selection']._update_selection(
-                'res.partner',
-                'account_peppol_verification_label',
-                self._fields['account_peppol_verification_label'].selection,
-            )
-            self.env.registry.clear_cache()
-            return super().fields_get(allfields, attributes)
-        return res
-
     # -------------------------------------------------------------------------
-    # HELPER METHODS
+    # HELPERS
     # -------------------------------------------------------------------------
+
+    def _log_verification_state_update(self, company, old_value, new_value):
+        # log the update of the peppol verification state
+        # we do this instead of regular tracking because of the customized message
+        # and because we want to log the change for every company in the db
+        if old_value == new_value:
+            return
+
+        peppol_verification_state_field = self._fields['peppol_verification_state']
+        selection_values = dict(peppol_verification_state_field.selection)
+        old_label = selection_values[old_value] if old_value else False  # get translated labels
+        new_label = selection_values[new_value] if new_value else False
+
+        body = Markup("""
+            <ul>
+                <li>
+                    <span class='o-mail-Message-trackingOld me-1 px-1 text-muted fw-bold'>{old}</span>
+                    <i class='o-mail-Message-trackingSeparator fa fa-long-arrow-right mx-1 text-600'/>
+                    <span class='o-mail-Message-trackingNew me-1 fw-bold text-info'>{new}</span>
+                    <span class='o-mail-Message-trackingField ms-1 fst-italic text-muted'>({field})</span>
+                    <span class='o-mail-Message-trackingCompany ms-1 fst-italic text-muted'>({company})</span>
+                </li>
+            </ul>
+        """).format(
+            old=old_label,
+            new=new_label,
+            field=peppol_verification_state_field.string,
+            company=company.display_name,
+        )
+        self._message_log(body=body)
 
     @api.model
     def _get_participant_info(self, edi_identification):
         hash_participant = md5(edi_identification.lower().encode()).hexdigest()
         endpoint_participant = parse.quote_plus(f"iso6523-actorid-upis::{edi_identification}")
         peppol_user = self.env.company.sudo().account_edi_proxy_client_ids.filtered(lambda user: user.proxy_type == 'peppol')
-        edi_mode = peppol_user and peppol_user.edi_mode or self.env['ir.config_parameter'].sudo().get_param('account_peppol.edi.mode')
+        edi_mode = peppol_user and peppol_user.edi_mode or 'prod'
         sml_zone = 'acc.edelivery' if edi_mode == 'test' else 'edelivery'
         smp_url = f"http://B-{hash_participant}.iso6523-actorid-upis.{sml_zone}.tech.ec.europa.eu/{endpoint_participant}"
 
@@ -97,11 +86,7 @@ class ResPartner(models.Model):
         return etree.fromstring(response.content)
 
     @api.model
-    def _check_peppol_participant_exists(self, edi_identification, check_company=False, ubl_cii_format=False):
-        participant_info = self._get_participant_info(edi_identification)
-        if participant_info is None:
-            return False
-
+    def _check_peppol_participant_exists(self, participant_info, edi_identification, check_company=False):
         participant_identifier = participant_info.findtext('{*}ParticipantIdentifier')
         service_metadata = participant_info.find('.//{*}ServiceMetadataReference')
         service_href = ''
@@ -126,49 +111,61 @@ class ResPartner(models.Model):
                     access_point_contact = access_point_info.findtext('.//{*}TechnicalContactUrl') or access_point_info.findtext('.//{*}TechnicalInformationUrl')
             return access_point_contact
 
-        return self._check_document_type_support(participant_info, ubl_cii_format)
+        return True
 
     def _check_document_type_support(self, participant_info, ubl_cii_format):
-        service_metadata = participant_info.find('.//{*}ServiceMetadataReferenceCollection')
-        if service_metadata is None:
-            return False
-
+        service_references = participant_info.findall(
+            '{*}ServiceMetadataReferenceCollection/{*}ServiceMetadataReference'
+        )
         document_type = self.env['account.edi.xml.ubl_21']._get_customization_ids()[ubl_cii_format]
-        for service in service_metadata.iterfind('{*}ServiceMetadataReference'):
+        for service in service_references:
             if document_type in parse.unquote_plus(service.attrib.get('href', '')):
                 return True
         return False
+
+    def _update_peppol_state_per_company(self, vals=None):
+        partners = self.env['res.partner']
+        if vals is None:
+            partners = self.filtered(lambda p: all([p.peppol_eas, p.peppol_endpoint, p.is_ubl_format, p.country_code in PEPPOL_LIST]))
+        elif {'peppol_eas', 'peppol_endpoint', 'invoice_edi_format'}.intersection(vals.keys()):
+            partners = self.filtered(lambda p: p.country_code in PEPPOL_LIST)
+
+        all_companies = None
+        for partner in partners.sudo():
+            if partner.company_id:
+                partner.with_company(partner.company_id).button_account_peppol_check_partner_endpoint()
+                continue
+
+            if all_companies is None:
+                all_companies = self.env['res.company'].sudo().search([])
+
+            for company in all_companies:
+                partner.with_company(company).button_account_peppol_check_partner_endpoint()
 
     # -------------------------------------------------------------------------
     # COMPUTE METHODS
     # -------------------------------------------------------------------------
 
-    @api.depends('ubl_cii_format')
+    @api.depends_context('company')
+    @api.depends('invoice_edi_format')
     def _compute_is_peppol_edi_format(self):
         for partner in self:
-            partner.is_peppol_edi_format = partner.ubl_cii_format not in (False, 'facturx', 'oioubl_201', 'ciusro')
+            partner.is_peppol_edi_format = partner.invoice_edi_format not in NON_PEPPOL_FORMAT
 
-    @api.depends('peppol_eas', 'peppol_endpoint', 'ubl_cii_format')
-    def _compute_account_peppol_is_endpoint_valid(self):
-        for partner in self:
-            partner.button_account_peppol_check_partner_endpoint()
+    # -------------------------------------------------------------------------
+    # LOW-LEVEL METHODS
+    # -------------------------------------------------------------------------
 
-    @api.depends('account_peppol_is_endpoint_valid', 'account_peppol_validity_last_check')
-    def _compute_account_peppol_verification_label(self):
-        for partner in self:
-            if not partner.account_peppol_validity_last_check:
-                partner.account_peppol_verification_label = 'not_verified'
-            elif (
-                partner.is_peppol_edi_format
-                and (participant_info := self._get_participant_info(f'{partner.peppol_eas}:{partner.peppol_endpoint}'.lower())) is not None
-                and not partner._check_document_type_support(participant_info, partner.ubl_cii_format)
-            ):
-                # the partner might exist on the network, but not be able to receive that specific format
-                partner.account_peppol_verification_label = 'not_valid_format'
-            elif partner.account_peppol_is_endpoint_valid:
-                partner.account_peppol_verification_label = 'valid'
-            else:
-                partner.account_peppol_verification_label = 'not_valid'
+    def write(self, vals):
+        res = super().write(vals)
+        self._update_peppol_state_per_company(vals=vals)
+        return res
+
+    def create(self, vals_list):
+        res = super().create(vals_list)
+        if res:
+            res._update_peppol_state_per_company()
+        return res
 
     # -------------------------------------------------------------------------
     # BUSINESS ACTIONS
@@ -186,10 +183,28 @@ class ResPartner(models.Model):
         """
         self.ensure_one()
 
-        if not (self.peppol_eas and self.peppol_endpoint) or not self.is_peppol_edi_format:
-            self.account_peppol_is_endpoint_valid = False
+        old_value = self.peppol_verification_state
+        if (
+            not (self.peppol_eas and self.peppol_endpoint)
+            or self.with_company(self.company_id).invoice_edi_format in NON_PEPPOL_FORMAT
+        ):
+            self.peppol_verification_state = False
         else:
-            edi_identification = f'{self.peppol_eas}:{self.peppol_endpoint}'.lower()
-            self.account_peppol_validity_last_check = fields.Date.context_today(self)
-            self.account_peppol_is_endpoint_valid = bool(self._check_peppol_participant_exists(edi_identification, ubl_cii_format=self.ubl_cii_format))
+            edi_identification = f"{self.peppol_eas}:{self.peppol_endpoint}".lower()
+            participant_info = self._get_participant_info(edi_identification)
+            if participant_info is None:
+                self.peppol_verification_state = 'not_valid'
+            else:
+                is_participant_on_network = self._check_peppol_participant_exists(participant_info, edi_identification)
+                if is_participant_on_network:
+                    is_valid_format = self._check_document_type_support(participant_info, self.with_company(self.company_id).invoice_edi_format)
+                    if is_valid_format:
+                        self.peppol_verification_state = 'valid'
+                        self.with_company(self.company_id).invoice_sending_method = 'peppol'
+                    else:
+                        self.peppol_verification_state = 'not_valid_format'
+                else:
+                    self.peppol_verification_state = 'not_valid'
+
+        self._log_verification_state_update(self.env.company, old_value, self.peppol_verification_state)
         return False

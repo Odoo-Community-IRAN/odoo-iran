@@ -1,18 +1,58 @@
-/** @odoo-module **/
-
 import { Deferred } from "@web/core/utils/concurrency";
 import { useAutofocus, useForwardRefToParent, useService } from "@web/core/utils/hooks";
 import { useDebounced } from "@web/core/utils/timing";
 import { getActiveHotkey } from "@web/core/hotkeys/hotkey_service";
-import { usePosition } from "@web/core/position_hook";
+import { usePosition } from "@web/core/position/position_hook";
 import { Component, onWillUpdateProps, useExternalListener, useRef, useState } from "@odoo/owl";
 
 export class AutoComplete extends Component {
+    static template = "web.AutoComplete";
+    static props = {
+        value: { type: String, optional: true },
+        id: { type: String, optional: true },
+        onSelect: { type: Function },
+        sources: {
+            type: Array,
+            element: {
+                type: Object,
+                shape: {
+                    placeholder: { type: String, optional: true },
+                    optionTemplate: { type: String, optional: true },
+                    options: [Array, Function],
+                },
+            },
+        },
+        placeholder: { type: String, optional: true },
+        autoSelect: { type: Boolean, optional: true },
+        resetOnSelect: { type: Boolean, optional: true },
+        onInput: { type: Function, optional: true },
+        onCancel: { type: Function, optional: true },
+        onChange: { type: Function, optional: true },
+        onBlur: { type: Function, optional: true },
+        onFocus: { type: Function, optional: true },
+        input: { type: Function, optional: true },
+        dropdown: { type: Boolean, optional: true },
+        autofocus: { type: Boolean, optional: true },
+        class: { type: String, optional: true },
+    };
+    static defaultProps = {
+        value: "",
+        placeholder: "",
+        autoSelect: false,
+        dropdown: true,
+        onInput: () => {},
+        onCancel: () => {},
+        onChange: () => {},
+        onBlur: () => {},
+        onFocus: () => {},
+    };
+
     setup() {
         this.nextSourceId = 0;
         this.nextOptionId = 0;
         this.sources = [];
         this.inEdition = false;
+        this.timeout = 250;
 
         this.state = useState({
             navigationRev: 0,
@@ -44,7 +84,7 @@ export class AutoComplete extends Component {
                     this.loadingPromise = null;
                 }
             }
-        }, this.constructor.timeout);
+        }, this.timeout);
 
         useExternalListener(window, "scroll", this.externalClose, true);
         useExternalListener(window, "pointerdown", this.externalClose, true);
@@ -385,46 +425,3 @@ export class AutoComplete extends Component {
         }
     }
 }
-Object.assign(AutoComplete, {
-    template: "web.AutoComplete",
-    props: {
-        value: { type: String, optional: true },
-        id: { type: String, optional: true },
-        onSelect: { type: Function },
-        sources: {
-            type: Array,
-            element: {
-                type: Object,
-                shape: {
-                    placeholder: { type: String, optional: true },
-                    optionTemplate: { type: String, optional: true },
-                    options: [Array, Function],
-                },
-            },
-        },
-        placeholder: { type: String, optional: true },
-        autoSelect: { type: Boolean, optional: true },
-        resetOnSelect: { type: Boolean, optional: true },
-        onCancel: { type: Function, optional: true },
-        onInput: { type: Function, optional: true },
-        onChange: { type: Function, optional: true },
-        onBlur: { type: Function, optional: true },
-        onFocus: { type: Function, optional: true },
-        input: { type: Function, optional: true },
-        dropdown: { type: Boolean, optional: true },
-        autofocus: { type: Boolean, optional: true },
-        class: { type: String, optional: true },
-    },
-    defaultProps: {
-        value: "",
-        placeholder: "",
-        autoSelect: false,
-        dropdown: true,
-        onCancel: () => {},
-        onInput: () => {},
-        onChange: () => {},
-        onBlur: () => {},
-        onFocus: () => {},
-    },
-    timeout: 250,
-});

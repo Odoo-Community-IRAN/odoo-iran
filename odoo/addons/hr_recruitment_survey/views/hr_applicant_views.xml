@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="crm_case_tree_view_job_inherit" model="ir.ui.view">
-        <field name="name">hr.applicant.tree.inherit</field>
+        <field name="name">hr.applicant.list.inherit</field>
         <field name="model">hr.applicant</field>
         <field name="inherit_id" ref="hr_recruitment.crm_case_tree_view_job"/>
         <field name="arch" type="xml">
@@ -20,7 +20,7 @@
             <xpath expr="//button[@name='archive_applicant']" position="before">
                 <button name="action_send_survey" string="Send Interview" type="object" invisible="not active or not survey_id"/>
             </xpath>
-            <xpath expr="//button[@name='action_makeMeeting']" position="after">
+            <xpath expr="//button[@name='action_create_meeting']" position="after">
                 <button name="action_print_survey"
                     class="oe_stat_button"
                     icon="fa-pencil-square-o"

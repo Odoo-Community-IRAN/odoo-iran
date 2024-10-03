@@ -7,19 +7,46 @@ from odoo.exceptions import ValidationError
 
 
 class Product(models.Model):
-    _inherit = "product.product"
+    _inherit = 'product.product'
 
+    variant_ribbon_id = fields.Many2one(string="Variant Ribbon", comodel_name='product.ribbon')
     website_id = fields.Many2one(related='product_tmpl_id.website_id', readonly=False)
 
-    product_variant_image_ids = fields.One2many('product.image', 'product_variant_id', string="Extra Variant Images")
+    product_variant_image_ids = fields.One2many(
+        string="Extra Variant Images",
+        comodel_name='product.image',
+        inverse_name='product_variant_id',
+    )
 
-    website_url = fields.Char('Website URL', compute='_compute_product_website_url', help='The full URL to access the document through the website.')
-    ribbon_id = fields.Many2one(string="Variant Ribbon", comodel_name='product.ribbon')
+    base_unit_count = fields.Float(
+        string="Base Unit Count",
+        help="Display base unit price on your eCommerce pages. Set to 0 to hide it for this"
+             " product.",
+        required=True,
+        default=1,
+    )
+    base_unit_id = fields.Many2one(
+        string="Custom Unit of Measure",
+        help="Define a custom unit to display in the price per unit of measure field.",
+        comodel_name='website.base.unit',
+    )
+    base_unit_price = fields.Monetary(
+        string="Price Per Unit",
+        compute='_compute_base_unit_price',
+    )
+    base_unit_name = fields.Char(
+        help="Displays the custom unit for the products if defined or the selected unit of measure"
+            " otherwise.",
+        compute='_compute_base_unit_name',
+    )
 
-    base_unit_count = fields.Float('Base Unit Count', required=True, default=1, help="Display base unit price on your eCommerce pages. Set to 0 to hide it for this product.")
-    base_unit_id = fields.Many2one('website.base.unit', string='Custom Unit of Measure', help="Define a custom unit to display in the price per unit of measure field.")
-    base_unit_price = fields.Monetary("Price Per Unit", currency_field="currency_id", compute="_compute_base_unit_price")
-    base_unit_name = fields.Char(compute='_compute_base_unit_name', help='Displays the custom unit for the products if defined or the selected unit of measure otherwise.')
+    website_url = fields.Char(
+        string="Website URL",
+        help="The full URL to access the document through the website.",
+        compute='_compute_product_website_url',
+    )
+
+    #=== COMPUTE METHODS ===#
 
     def _get_base_unit_price(self, price):
         self.ensure_one()
@@ -38,20 +65,27 @@ class Product(models.Model):
         for product in self:
             product.base_unit_name = product.base_unit_id.name or product.uom_name
 
-    @api.constrains('base_unit_count')
-    def _check_base_unit_count(self):
-        if any(product.base_unit_count < 0 for product in self):
-            raise ValidationError(_('The value of Base Unit Count must be greater than 0. Use 0 to hide the price per unit on this product.'))
-
     @api.depends_context('lang')
     @api.depends('product_tmpl_id.website_url', 'product_template_attribute_value_ids')
     def _compute_product_website_url(self):
         for product in self:
-            attributes = ','.join(str(x) for x in product.product_template_attribute_value_ids.ids)
             url = product.product_tmpl_id.website_url
-            if attributes:
-                url = url_join(url, f"#attr={attributes}")
+            if pavs := product.product_template_attribute_value_ids.product_attribute_value_id:
+                pav_ids = [str(pav.id) for pav in pavs]
+                url = f'{url}#attribute_values={",".join(pav_ids)}'
             product.website_url = url
+
+    #=== CONSTRAINT METHODS ===#
+
+    @api.constrains('base_unit_count')
+    def _check_base_unit_count(self):
+        if any(product.base_unit_count < 0 for product in self):
+            raise ValidationError(_(
+                "The value of Base Unit Count must be greater than 0."
+                " Use 0 to hide the price per unit on this product."
+            ))
+
+    #=== BUSINESS METHODS ===#
 
     def _prepare_variant_values(self, combination):
         variant_dict = super()._prepare_variant_values(combination)
@@ -94,22 +128,21 @@ class Product(models.Model):
             **kwargs)
 
     def _website_show_quick_add(self):
+        self.ensure_one()
+        # TODO VFE pass website as param and avoid existence check
         website = self.env['website'].get_current_website()
         return self.sale_ok and (not website.prevent_zero_price_sale or self._get_contextual_price())
 
     def _is_add_to_cart_allowed(self):
         self.ensure_one()
-        return self.user_has_groups('base.group_system') or (self.active and self.sale_ok and self.website_published)
-
-    def _get_contextual_price_tax_selection(self):
-        self.ensure_one()
+        is_product_salable = self.active and self.sale_ok and self.website_published
         website = self.env['website'].get_current_website()
-        fiscal_position_sudo = website.sudo().fiscal_position_id
-        product_taxes = self.sudo().taxes_id._filter_taxes_by_company(self.env.company)
-        return self.env['product.template']._apply_taxes_to_price(
-            self._get_contextual_price(),
-            website.currency_id,
-            product_taxes,
-            fiscal_position_sudo.map_tax(product_taxes),
-            self,
-        )
+        return (is_product_salable and website.has_ecommerce_access()) \
+               or self.env.user.has_group('base.group_system')
+
+    @api.onchange('public_categ_ids')
+    def _onchange_public_categ_ids(self):
+        if self.public_categ_ids:
+            self.website_published = True
+        else:
+            self.website_published = False

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from unittest.mock import patch
@@ -67,11 +66,6 @@ class TestConfiguratorTranslation(TestConfiguratorCommon):
         self.env.ref('base.user_admin').write({'lang': parseltongue.code})
         website_fr = self.env['website'].create({
             'name': "New website",
-        })
-        self.env.ref('web_editor.snippets').update_field_translations('arch_db', {
-            parseltongue.code: {
-                'Save': 'Save_Parseltongue'
-            }
         })
         # disable configurator todo to ensure this test goes through
         active_todo = self.env['ir.actions.todo'].search([('state', '=', 'open')], limit=1)

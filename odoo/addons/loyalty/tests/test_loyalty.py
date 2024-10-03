@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from psycopg2 import IntegrityError
@@ -21,9 +20,36 @@ class TestLoyalty(TransactionCase):
             'reward_ids': [(0, 0, {})],
         })
 
+    def test_loyalty_program_default_values(self):
+        # Test that the default values are correctly set when creating a new program
+        program = self.env['loyalty.program'].create({'name': "Test"})
+        self._check_promotion_default_values(program)
+
+    def _check_promotion_default_values(self, program):
+        self.assertEqual(program.program_type, 'promotion')
+        self.assertEqual(program.trigger, 'auto')
+        self.assertEqual(program.portal_visible, False)
+        self.assertTrue(program.rule_ids)
+        self.assertTrue(len(program.rule_ids) == 1)
+        self.assertEqual(program.rule_ids.reward_point_amount, 1)
+        self.assertEqual(program.rule_ids.reward_point_mode, 'order')
+        self.assertEqual(program.rule_ids.minimum_amount, 50)
+        self.assertEqual(program.rule_ids.minimum_qty, 0)
+        self.assertTrue(program.reward_ids)
+        self.assertTrue(len(program.reward_ids) == 1)
+        self.assertEqual(program.reward_ids.required_points, 1)
+        self.assertEqual(program.reward_ids.discount, 10)
+        self.assertFalse(program.communication_plan_ids)
+
+    def test_loyalty_program_default_values_in_form(self):
+        # Test that the default values are correctly set when creating a new program in a form
+        with Form(self.env['loyalty.program']) as program_form:
+            program_form.name = 'Test'
+            program = program_form.save()
+        self._check_promotion_default_values(program)
 
     def test_discount_product_unlink(self):
-        # Test that we can not unlink dicount line product id
+        # Test that we can not unlink discount line product id
         with mute_logger('odoo.sql_db'):
             with self.assertRaises(IntegrityError):
                 with self.cr.savepoint():
@@ -143,7 +169,7 @@ class TestLoyalty(TransactionCase):
         self.program.flush_recordset()
         product = self.env['product.product'].with_context(default_taxes_id=False).create({
             'name': 'Test Product',
-            'detailed_type': 'consu',
+            'type': 'consu',
             'list_price': 20.0,
         })
         reward = self.env['loyalty.reward'].create({
@@ -166,7 +192,7 @@ class TestLoyalty(TransactionCase):
         """
         product = self.env['product.product'].with_context(default_taxes_id=False).create({
             'name': 'Test Product',
-            'detailed_type': 'consu',
+            'type': 'consu',
             'list_price': 20.0,
         })
 
@@ -184,3 +210,49 @@ class TestLoyalty(TransactionCase):
         loyalty_program.action_archive()
         # Make sure that the main product didn't get archived
         self.assertTrue(product.active)
+
+    def test_merge_loyalty_cards(self):
+        """Test merging nominative loyalty cards from source partners to a destination partner
+        when partners are merged.
+        """
+        program = self.env['loyalty.program'].create({
+            'name': 'Test Program',
+            'is_nominative': True,
+            'applies_on': 'both',
+        })
+
+        partner_1, partner_2, dest_partner = self.env['res.partner'].create([
+            {'name': 'Source Partner 1'},
+            {'name': 'Source Partner 2'},
+            {'name': 'Destination Partner'},
+        ])
+        self.env['loyalty.card'].create([
+            {
+                'partner_id': partner_1.id,
+                'program_id': program.id,
+                'points': 10
+            }, {
+                'partner_id': partner_2.id,
+                'program_id': program.id,
+                'points': 20
+            }, {
+                'partner_id': dest_partner.id,
+                'program_id': program.id,
+                'points': 30
+            }
+        ])
+
+        self.env['base.partner.merge.automatic.wizard']._merge(
+            [partner_1.id, partner_2.id, dest_partner.id], dest_partner
+        )
+
+        dest_partner_loyalty_cards = self.env['loyalty.card'].search([
+            ('partner_id', '=', dest_partner.id),
+            ('program_id', '=', program.id),
+        ])
+
+        self.assertEqual(len(dest_partner_loyalty_cards), 1)
+        self.assertEqual(dest_partner_loyalty_cards.points, 60)
+        self.assertFalse(self.env['loyalty.card'].search([
+            ('partner_id', 'in', [partner_1.id, partner_2.id]),
+        ]))

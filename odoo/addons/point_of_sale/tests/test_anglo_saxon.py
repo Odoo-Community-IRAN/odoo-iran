@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-import time
+from odoo import Command
 from odoo.tests import tagged
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 
@@ -9,8 +9,8 @@ from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 class TestAngloSaxonCommon(AccountTestInvoicingCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref=None):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
         cls.PosMakePayment = cls.env['pos.make.payment']
         cls.PosOrder = cls.env['pos.order']
         cls.Statement = cls.env['account.bank.statement']
@@ -45,7 +45,7 @@ class TestAngloSaxonCommon(AccountTestInvoicingCommon):
             'name': 'New product',
             'standard_price': 100,
             'available_in_pos': True,
-            'type': 'product',
+            'is_storable': True,
         })
         cls.company.anglo_saxon_accounting = True
         cls.company.point_of_sale_update_stock_quantities = 'real'
@@ -73,7 +73,7 @@ class TestAngloSaxonFlow(TestAngloSaxonCommon):
         self.pos_config.open_ui()
         current_session = self.pos_config.current_session_id
         self.cash_journal.loss_account_id = self.account
-        current_session.set_cashbox_pos(0, None)
+        current_session.set_opening_control(0, None)
 
         # I create a PoS order with 1 unit of New product at 450 EUR
         self.pos_order_pos0 = self.PosOrder.create({
@@ -155,7 +155,7 @@ class TestAngloSaxonFlow(TestAngloSaxonCommon):
 
         self.pos_config.open_ui()
         pos_session = self.pos_config.current_session_id
-        pos_session.set_cashbox_pos(0, None)
+        pos_session.set_opening_control(0, None)
 
         pos_order_values = {
             'company_id': self.company.id,
@@ -235,7 +235,7 @@ class TestAngloSaxonFlow(TestAngloSaxonCommon):
         self.pos_config.open_ui()
         current_session = self.pos_config.current_session_id
         self.cash_journal.loss_account_id = self.account
-        current_session.set_cashbox_pos(0, None)
+        current_session.set_opening_control(0, None)
 
         # 2 step delivery method
         self.warehouse.delivery_steps = 'pick_ship'
@@ -281,8 +281,10 @@ class TestAngloSaxonFlow(TestAngloSaxonCommon):
         current_session_id.close_session_from_ui()
         self.assertEqual(current_session_id.state, 'closed', 'Check that session is closed')
 
-        self.assertEqual(len(current_session.picking_ids), 2, "There should be 2 pickings")
+        self.assertEqual(len(current_session.picking_ids), 1, "There should be 2 pickings")
         current_session.picking_ids.move_ids_without_package.write({'quantity': 1, 'picked': True})
+        current_session.picking_ids.button_validate()
+        self.assertEqual(len(current_session.picking_ids), 2, "There should be 2 pickings")
         current_session.picking_ids.button_validate()
 
         # I test that the generated journal entries are correct.
@@ -357,13 +359,12 @@ class TestAngloSaxonFlow(TestAngloSaxonCommon):
         self.pos_config.open_ui()
         pricelist = self.env['product.pricelist'].create({
             'name': 'Test Pricelist',
-            'discount_policy': 'without_discount',
-            'item_ids': [(0, 0, {
-                'compute_price': 'percentage',
-                'percent_price': 5,
-                'min_quantity': 0,
-                'applied_on': '3_global',
-            })]
+            'item_ids': [
+                Command.create({
+                    'compute_price': 'percentage',
+                    'percent_price': '10.0',
+                })
+            ],
         })
         self.product.lst_price = 100
         self.pos_order_pos0 = self.PosOrder.create({
@@ -373,15 +374,14 @@ class TestAngloSaxonFlow(TestAngloSaxonCommon):
             'pricelist_id': pricelist.id,
             'lines': [(0, 0, {
                 'product_id': self.product.id,
-                'price_unit': 95,
+                'price_unit': 100,
                 'qty': 1.0,
-                'tax_ids': [(6, 0, self.tax_purchase_a.ids)],
-                'price_subtotal': 90.25,
-                'price_subtotal_incl': 103.79,
+                'price_subtotal': 95,
+                'price_subtotal_incl': 95,
                 'discount': 5,
             })],
-            'amount_total': 103.79,
-            'amount_tax': 13.51,
+            'amount_total': 95,
+            'amount_tax': 0,
             'amount_paid': 0,
             'amount_return': 0,
             'to_invoice': True,
@@ -396,9 +396,4 @@ class TestAngloSaxonFlow(TestAngloSaxonCommon):
 
         res = self.pos_order_pos0.action_pos_order_invoice()
         invoice = self.env['account.move'].browse(res['res_id'])
-        self.assertTrue('Price discount from 100.00 -> 95.00' in invoice.invoice_line_ids.filtered(lambda l: l.display_type == "line_note").display_name)
-        product_line = invoice.invoice_line_ids.filtered(lambda l: l.display_type == "product")
-        self.assertEqual(product_line.price_unit, 95)  # Only pricelist applies
-        self.assertEqual(product_line.discount, 5)  # Disount is reflected
-        self.assertEqual(product_line.price_subtotal, 90.25)  # Discount applies on price_unit
-        self.assertEqual(product_line.price_total, 103.79)  # Taxes applied with price_total
+        self.assertTrue('Price discount from 100.00 to 95.00' in invoice.invoice_line_ids.filtered(lambda l: l.display_type == "line_note").display_name)

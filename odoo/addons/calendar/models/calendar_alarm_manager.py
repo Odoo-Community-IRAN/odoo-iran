@@ -1,15 +1,11 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-import logging
 from datetime import timedelta, datetime
 from dateutil.relativedelta import relativedelta
 from pytz import UTC
 
 from odoo import api, fields, models
 from odoo.tools import plaintext2html
-
-_logger = logging.getLogger(__name__)
 
 
 class AlarmManager(models.AbstractModel):
@@ -106,7 +102,7 @@ class AlarmManager(models.AbstractModel):
         events = self.env['calendar.event'].browse(result)
         result = {
             key: result[key]
-            for key in set(events._filter_access_rules('read').ids)
+            for key in events._filtered_access('read').ids
         }
         return result
 
@@ -180,6 +176,9 @@ class AlarmManager(models.AbstractModel):
         if not events_by_alarm:
             return
 
+        # force_send limit should apply to the total nb of attendees, not per alarm
+        force_send_limit = int(self.env['ir.config_parameter'].sudo().get_param('mail.mail_force_send_limit', 100))
+
         event_ids = list(set(event_id for event_ids in events_by_alarm.values() for event_id in event_ids))
         events = self.env['calendar.event'].browse(event_ids)
         attendees = events.attendee_ids.filtered(lambda a: a.state != 'declined')
@@ -191,7 +190,7 @@ class AlarmManager(models.AbstractModel):
                 mail_notify_author=True,
             )._send_mail_to_attendees(
                 alarm.mail_template_id,
-                force_send=True
+                force_send=len(attendees) <= force_send_limit
             )
 
         for event in events:
@@ -245,10 +244,7 @@ class AlarmManager(models.AbstractModel):
 
     def _notify_next_alarm(self, partner_ids):
         """ Sends through the bus the next alarm of given partners """
-        notifications = []
         users = self.env['res.users'].search([('partner_id', 'in', tuple(partner_ids))])
         for user in users:
             notif = self.with_user(user).with_context(allowed_company_ids=user.company_ids.ids).get_next_notif()
-            notifications.append([user.partner_id, 'calendar.alarm', notif])
-        if len(notifications) > 0:
-            self.env['bus.bus']._sendmany(notifications)
+            user._bus_send("calendar.alarm", notif)

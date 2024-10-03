@@ -23,7 +23,6 @@ class MailActivityMixin(models.AbstractModel):
     Activities come with a new JS widget for the form view. It is integrated in the
     Chatter widget although it is a separate widget. It displays activities linked
     to the current record and allow to schedule, edit and mark done activities.
-    Just include field activity_ids in the div.oe-chatter to use it.
 
     There is also a kanban widget defined. It defines a small widget to integrate
     in kanban vignettes. It allow to manage activities directly from the kanban
@@ -164,40 +163,33 @@ class MailActivityMixin(models.AbstractModel):
         search_states_int = {integer_state_value.get(s or False) for s in search_states}
 
         self.env['mail.activity'].flush_model(['active', 'date_deadline', 'res_model', 'user_id'])
-        query = """
-          SELECT res_id
-            FROM (
-                SELECT res_id,
-                       -- Global activity state
-                       MIN(
-                            -- Compute the state of each individual activities
-                            -- -1: overdue
-                            --  0: today
-                            --  1: planned
-                           SIGN(EXTRACT(day from (
-                                mail_activity.date_deadline - DATE_TRUNC('day', %(today_utc)s AT TIME ZONE res_partner.tz)
-                           )))
-                        )::INT AS activity_state
-                  FROM mail_activity
-             LEFT JOIN res_users
-                    ON res_users.id = mail_activity.user_id
-             LEFT JOIN res_partner
-                    ON res_partner.id = res_users.partner_id
-                 WHERE mail_activity.res_model = %(res_model_table)s AND mail_activity.active = true 
-              GROUP BY res_id
-            ) AS res_record
-          WHERE %(search_states_int)s @> ARRAY[activity_state]
-        """
-
-        self._cr.execute(
-            query,
-            {
-                'today_utc': pytz.utc.localize(datetime.utcnow()),
-                'res_model_table': self._name,
-                'search_states_int': list(search_states_int)
-            },
+        query = SQL(
+            """(
+            SELECT res_id
+                FROM (
+                    SELECT res_id,
+                        -- Global activity state
+                        MIN(
+                                -- Compute the state of each individual activities
+                                -- -1: overdue
+                                --  0: today
+                                --  1: planned
+                            SIGN(EXTRACT(day from (
+                                    mail_activity.date_deadline - DATE_TRUNC('day', %(today_utc)s AT TIME ZONE COALESCE(mail_activity.user_tz, 'utc'))
+                            )))
+                            )::INT AS activity_state
+                    FROM mail_activity
+                    WHERE mail_activity.res_model = %(res_model_table)s AND mail_activity.active = true
+                GROUP BY res_id
+                ) AS res_record
+            WHERE %(search_states_int)s @> ARRAY[activity_state]
+            )""",
+            today_utc=pytz.utc.localize(datetime.utcnow()),
+            res_model_table=self._name,
+            search_states_int=list(search_states_int)
         )
-        return [('id', 'not in' if reverse_search else 'in', [r[0] for r in self._cr.fetchall()])]
+
+        return [('id', 'not in' if reverse_search else 'in', query)]
 
     @api.depends('activity_ids.date_deadline')
     def _compute_activity_date_deadline(self):
@@ -261,6 +253,7 @@ class MailActivityMixin(models.AbstractModel):
     def _read_group_groupby(self, groupby_spec, query):
         if groupby_spec != 'activity_state':
             return super()._read_group_groupby(groupby_spec, query)
+        self.check_field_access_rights('read', ['activity_state'])
 
         self.env['mail.activity'].flush_model(['res_model', 'res_id', 'user_id', 'date_deadline'])
         self.env['res.users'].flush_model(['partner_id'])
@@ -274,14 +267,12 @@ class MailActivityMixin(models.AbstractModel):
             """
             (SELECT res_id,
                 CASE
-                    WHEN min(EXTRACT(day from (mail_activity.date_deadline - DATE_TRUNC('day', %(today_utc)s AT TIME ZONE COALESCE(res_partner.tz, %(tz)s))))) > 0 THEN 'planned'
-                    WHEN min(EXTRACT(day from (mail_activity.date_deadline - DATE_TRUNC('day', %(today_utc)s AT TIME ZONE COALESCE(res_partner.tz, %(tz)s))))) < 0 THEN 'overdue'
-                    WHEN min(EXTRACT(day from (mail_activity.date_deadline - DATE_TRUNC('day', %(today_utc)s AT TIME ZONE COALESCE(res_partner.tz, %(tz)s))))) = 0 THEN 'today'
+                    WHEN min(EXTRACT(day from (mail_activity.date_deadline - DATE_TRUNC('day', %(today_utc)s AT TIME ZONE COALESCE(mail_activity.user_tz, %(tz)s))))) > 0 THEN 'planned'
+                    WHEN min(EXTRACT(day from (mail_activity.date_deadline - DATE_TRUNC('day', %(today_utc)s AT TIME ZONE COALESCE(mail_activity.user_tz, %(tz)s))))) < 0 THEN 'overdue'
+                    WHEN min(EXTRACT(day from (mail_activity.date_deadline - DATE_TRUNC('day', %(today_utc)s AT TIME ZONE COALESCE(mail_activity.user_tz, %(tz)s))))) = 0 THEN 'today'
                     ELSE null
                 END AS activity_state
             FROM mail_activity
-            JOIN res_users ON (res_users.id = mail_activity.user_id)
-            JOIN res_partner ON (res_partner.id = res_users.partner_id)
             WHERE res_model = %(res_model)s AND mail_activity.active = true
             GROUP BY res_id)
             """,
@@ -291,7 +282,7 @@ class MailActivityMixin(models.AbstractModel):
         )
         alias = query.left_join(self._table, "id", sql_join, "res_id", "last_activity_state")
 
-        return SQL.identifier(alias, 'activity_state'), ['activity_state']
+        return SQL.identifier(alias, 'activity_state')
 
     def toggle_active(self):
         """ Before archiving the record we should also remove its ongoing

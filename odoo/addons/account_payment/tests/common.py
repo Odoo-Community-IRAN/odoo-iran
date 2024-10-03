@@ -10,7 +10,7 @@ from odoo.addons.payment.tests.common import PaymentCommon
 class AccountPaymentCommon(PaymentCommon, AccountTestInvoicingCommon):
 
     @classmethod
-    def setUpClass(cls, *kw):
+    def setUpClass(cls):
         super().setUpClass()
         with cls.mocked_get_payment_method_information(cls):
             cls.dummy_provider_method = cls.env['account.payment.method'].sudo().create({
@@ -20,7 +20,7 @@ class AccountPaymentCommon(PaymentCommon, AccountTestInvoicingCommon):
             })
             cls.dummy_provider.journal_id = cls.company_data['default_journal_bank']
 
-        cls.account = cls.company.account_journal_payment_credit_account_id
+        cls.account = cls.outbound_payment_method_line.payment_account_id
         cls.invoice = cls.env['account.move'].create({
             'move_type': 'entry',
             'date': '2019-01-01',
@@ -42,8 +42,10 @@ class AccountPaymentCommon(PaymentCommon, AccountTestInvoicingCommon):
             ],
         })
 
+        cls.provider.journal_id.inbound_payment_method_line_ids.filtered(lambda l: l.payment_provider_id == cls.provider).payment_account_id = cls.inbound_payment_method_line.payment_account_id
+
     def setUp(self):
-        self.enable_reconcile_after_done_patcher = False
+        self.enable_post_process_patcher = False
         super().setUp()
 
     #=== Utils ===#
@@ -54,7 +56,7 @@ class AccountPaymentCommon(PaymentCommon, AccountTestInvoicingCommon):
 
         def _get_payment_method_information(*args, **kwargs):
             res = Method_get_payment_method_information()
-            res['none'] = {'mode': 'electronic', 'domain': [('type', '=', 'bank')]}
+            res['none'] = {'mode': 'electronic', 'type': ('bank',)}
             return res
 
         with patch.object(self.env.registry['account.payment.method'], '_get_payment_method_information', _get_payment_method_information):

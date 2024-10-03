@@ -34,7 +34,7 @@
                         A session is currently opened for this PoS. Some settings can only be changed after the session is closed.
                         <button class="btn-link" style="padding:0" name="pos_open_ui" type="object" context="{'pos_config_id': pos_config_id}">Click here to close the session</button>
                     </div>
-                    <div class="o_notification_alert alert alert-warning" invisible="pos_company_has_template" role="alert">
+                    <div class="o_notification_alert alert alert-warning" invisible="pos_company_has_template or chart_template" role="alert">
                         There is no Chart of Accounts configured on the company. Please go to the invoicing settings to install a Chart of Accounts.
                     </div>
                     <div invisible="not pos_config_id">
@@ -50,7 +50,10 @@
                             </setting>
                         </block>
                         <block title="Payment" id="pos_payment_section">
-                            <setting id="payment_methods_new" string="Payment Methods" help="Payment methods available">
+                            <div id="available_payment_terminal" class="o_notification_alert alert alert-warning" role="alert" invisible="not is_kiosk_mode">
+                                <span>Please note that the kiosk only works with Adyen &amp; Stripe terminals</span>
+                            </div>
+                            <setting id="payment_methods_new" string="Payment Methods" help="Payment methods available" documentation="/applications/sales/point_of_sale/payment_methods.html">
                                 <field name="pos_payment_method_ids" colspan="4" widget="many2many_tags" readonly="pos_has_active_session" required="pos_company_has_template" options="{'no_create': True}" />
                                 <div>
                                     <button name="%(action_payment_methods_tree)d" icon="oi-arrow-right" type="action" string="Payment Methods" class="btn-link"/>
@@ -64,7 +67,7 @@
                                 <div class="content-group mt16" invisible="not pos_cash_rounding">
                                     <div class="row mt16">
                                         <label string="Rounding Method" for="pos_rounding_method" class="col-lg-3 o_light_label" />
-                                        <field name="pos_rounding_method" required="pos_cash_rounding" domain="[('company_id', '=', company_id)]" readonly="pos_has_active_session"/>
+                                        <field name="pos_rounding_method" required="pos_cash_rounding" readonly="pos_has_active_session"/>
                                     </div>
                                     <div class="row mt16">
                                         <div class="col">
@@ -82,15 +85,15 @@
                             <setting help="Set a maximum difference allowed between the expected and counted money during the closing of the session">
                                 <field name="pos_set_maximum_difference" />
                                 <div class="content-group mt16" invisible="not pos_set_maximum_difference">
-                                    <label for="pos_amount_authorized_diff" string="Authorized Difference" class="fw-normal"/>
+                                    <label for="pos_amount_authorized_diff" string="Authorized Difference" class="fw-normal me-1"/>
                                     <field name="pos_amount_authorized_diff"/>
                                 </div>
                             </setting>
-                            <setting id="iface_tipproduct" title="This product is used as reference on customer receipts." string="Tips" help="Accept customer tips or convert their change to a tip">
+                            <setting id="iface_tipproduct" title="This product is used as reference on customer receipts." string="Tips" help="Accept customer tips or convert their change to a tip" documentation="/applications/sales/point_of_sale/restaurant/tips.html">
                                 <field name="pos_iface_tipproduct" readonly="pos_has_active_session"/>
                                 <div class="content-group" invisible="not pos_iface_tipproduct">
-                                    <div class="mt16" id="tip_product">
-                                        <label string="Tip Product" for="pos_tip_product_id" class="o_light_label"/>
+                                    <div class="row mt16" id="tip_product">
+                                        <label string="Tip Product" for="pos_tip_product_id" class="col-lg-3 o_light_label "/>
                                         <field name="pos_tip_product_id"/>
                                     </div>
                                 </div>
@@ -100,14 +103,7 @@
                             <div class="o_notification_alert alert alert-warning" invisible="pos_company_has_template" role="alert">
                                 There is no Chart of Accounts configured on the company. Please go to the invoicing settings to install a Chart of Accounts.
                             </div>
-                            <setting help="Start selling from a default product category">
-                                <field name="pos_start_category"/>
-                                <div class="content-group mt16" invisible="not pos_start_category">
-                                    <field name="pos_iface_start_categ_id" domain="[('id', 'in', pos_selectable_categ_ids)]"/>
-                                </div>
-                            </setting>
-
-                            <setting id="multiple_employee_session" title="Employees can scan their badge or enter a PIN to log in to a PoS session. These credentials are configurable in the *HR Settings* tab of the employee form." string="Multi Employees per Session" help="Allow to log and switch between selected Employees">
+                            <setting id="multiple_employee_session" title="Employees can scan their badge or enter a PIN to log in to a PoS session. These credentials are configurable in the *HR Settings* tab of the employee form." string="Log in with Employees" help="Allow to log and switch between selected Employees" documentation="/applications/sales/point_of_sale/employee_login.html">
                                 <field name="pos_module_pos_hr" readonly="pos_has_active_session"/>
                                 <div class="content-group mt16" invisible="not pos_module_pos_hr">
                                     <div class="text-warning" id="warning_text_employees">
@@ -115,20 +111,8 @@
                                     </div>
                                 </div>
                             </setting>
-                            <setting help="Pick which product categories are available">
-                                <field name="pos_limit_categories" readonly="pos_has_active_session"/>
-                                <div class="content-group mt16" invisible="not pos_limit_categories">
-                                    <field name="pos_iface_available_categ_ids" widget="many2many_tags" readonly="pos_has_active_session"/>
-                                </div>
-                                <div class="content-group mt16" invisible="not pos_limit_categories">
-                                    <button name="%(product_pos_category_action)d" icon="oi-arrow-right" type="action" string="PoS Product Categories" class="btn-link"/>
-                                </div>
-                            </setting>
                             <setting invisible="is_kiosk_mode" help="Improve navigation for imprecise industrial touchscreens">
                                 <field name="pos_iface_big_scrollbars"/>
-                            </setting>
-                            <setting id="margin_and_cost" string="Margins &amp; Costs" help="Show margins &amp; costs on product information">
-                                <field name="pos_is_margins_costs_accessible_to_every_user"/>
                             </setting>
                             <setting string="Share Open Orders" help="Allow to access each other's active orders" id="is_order_shared" invisible="pos_module_pos_restaurant or is_kiosk_mode">
                                 <div class="content-group">
@@ -141,9 +125,38 @@
                                     </div>
                                 </div>
                             </setting>
+                            <setting string="Hide pictures in POS" help="Self-ordering interfaces are not impacted.">
+                                <div class="content-group">
+                                    <div>
+                                        <field name="pos_show_product_images"/>
+                                        <label for="pos_show_product_images" string="Show product images" class="fw-normal me-1"/>
+                                    </div>
+                                    <div>
+                                        <field name="pos_show_category_images"/>
+                                        <label for="pos_show_category_images" string="Show category images" class="fw-normal me-1"/>
+                                    </div>
+                                </div>
+                            </setting>
+                        </block>
+                        <block id="product_and_category_block" title="Product &amp; PoS categories">
+                            <setting help="Pick which product PoS categories are available">
+                                <field name="pos_limit_categories" readonly="pos_has_active_session"/>
+                                <div class="content-group mt16" invisible="not pos_limit_categories">
+                                    <field name="pos_iface_available_categ_ids" widget="many2many_tags" readonly="pos_has_active_session"/>
+                                </div>
+                                <div class="content-group mt16" invisible="not pos_limit_categories">
+                                    <button name="%(product_pos_category_action)d" icon="oi-arrow-right" type="action" string="PoS Product Categories" class="btn-link"/>
+                                </div>
+                            </setting>
+                            <setting id="margin_and_cost" string="Show margins &amp; costs" help="Show margins &amp; costs on product information">
+                                <field name="pos_is_margins_costs_accessible_to_every_user"/>
+                            </setting>
+                            <setting id="orderlines_seq_cart" string="Sort cart by category" help="Group items in the cart according to their category">
+                                <field name="pos_orderlines_sequence_in_cart_by_category"/>
+                            </setting>
                         </block>
                         <block title="Accounting" id="pos_accounting_section">
-                            <setting id="default_sales_tax_setting" title="This tax is applied to any new product created in the catalog.">
+                            <setting id="default_sales_tax_setting" title="This tax is applied to any new product created in the catalog." documentation="/applications/finance/accounting/taxation/taxes/default_taxes.html">
                                 <label string="Default Sales Tax" for="sale_tax_id"/>
                                 <i class="fa fa-info-circle me-1" title="This setting is common to all PoS." pos-data-toggle="tooltip"/>
                                 <div class="text-muted">
@@ -164,7 +177,10 @@
                                 </div>
                                 <field name="account_default_pos_receivable_account_id" colspan="4" nolabel="1" domain="[('reconcile', '=', True), ('account_type', '=', 'asset_receivable')]"/>
                             </setting>
-                            <setting id="flexible_taxes" title="Choose a specific fiscal position at the order depending on the kind of customer (tax exempt, onsite vs. takeaway, etc.)." string="Flexible Taxes" help="Use fiscal positions to get different taxes by order">
+                            <setting id="order_edit_tracking" help="Store edited orders in the backend">
+                                <field name="pos_order_edit_tracking"/>
+                            </setting>
+                            <setting id="flexible_taxes" title="Choose a specific fiscal position at the order depending on the kind of customer (tax exempt, onsite vs. takeaway, etc.)." string="Flexible Taxes" help="Use fiscal positions to get different taxes by order" documentation="/applications/sales/point_of_sale/pricing/fiscal_position.html">
                                 <field name="pos_tax_regime_selection"/>
                                 <div class="content-group mt16" invisible="not pos_tax_regime_selection">
                                     <div class="row">
@@ -195,16 +211,18 @@
                                     </div>
                                 </div>
                             </setting>
+                            <setting string="Closing Entry by product" id="pos_closeing_entry_by_product" help="Display the breakdown of sales lines by product in the automatically generated closing entry.">
+                                <field name="pos_is_closing_entry_by_product"/>
+                            </setting>
+                            <setting id="pos-avatax" help="Use automatic taxes mapping with Avatax">
+                                <field name="pos_module_pos_avatax" />
+                            </setting>
                         </block>
 
                         <block title="Pricing" id="pos_pricing_section">
-                            <setting id="multiple_prices_setting" string="Flexible Pricelists" help="Set multiple prices per product, automated discounts, etc.">
+                            <setting id="multiple_prices_setting" string="Flexible Pricelists" help="Set multiple prices per product, automated discounts, etc." documentation="/applications/sales/point_of_sale/pricing/pricelists.html">
                                 <field name="pos_use_pricelist" readonly="pos_has_active_session"/>
                                 <div class="content-group" invisible="not pos_use_pricelist">
-                                    <div class="mt16">
-                                        <field name="group_sale_pricelist" invisible="1"/>
-                                        <field name="product_pricelist_setting" widget="radio" class="o_light_label"/>
-                                    </div>
                                     <div class="row mt16">
                                         <label string="Available" for="pos_available_pricelist_ids" class="col-lg-3 o_light_label"/>
                                         <field name="pos_available_pricelist_ids" widget="many2many_tags" domain="['|',('company_id', '=', company_id),('company_id', '=', False)]" readonly="pos_has_active_session"/>
@@ -224,15 +242,13 @@
                             <setting id="product_prices" string="Product Prices" help="Product prices on receipts">
                                 <field name="pos_iface_tax_included" class="o_light_label" widget="radio"/>
                                 <div class="content-group">
-                                    <a invisible="pos_iface_tax_included != 'total'"
-                                        href="https://www.odoo.com/documentation/17.0/applications/finance/accounting/taxation/taxes/B2B_B2C.html"
-                                        target="_blank" class="oe-link"><i class="oi oi-fw oi-arrow-right"/>How to manage tax-included prices</a>
+                                    <widget class="oe-link" name="documentation_link" path="/applications/finance/accounting/taxation/taxes/B2B_B2C.html" label="How to manage tax-included prices" icon="oi oi-fw oi-arrow-right"/>
                                 </div>
                             </setting>
-                            <setting id="manual_discount" help="Allow cashiers to set a discount per line">
+                            <setting id="manual_discount" help="Allow cashiers to set a discount per line" documentation="/applications/sales/point_of_sale/pricing/discounts.html">
                                 <field name="pos_manual_discount"/>
                             </setting>
-                            <setting help="Adds a button to set a global discount">
+                            <setting help="Adds a button to set a global discount" documentation="/applications/sales/point_of_sale/pricing/discounts.html">
                                 <field name="pos_module_pos_discount" readonly="pos_has_active_session"/>
                                 <div class="content-group mt16" invisible="not pos_module_pos_discount">
                                     <div class="text-warning mb4" id="warning_text_pos_discount" >
@@ -240,13 +256,16 @@
                                     </div>
                                 </div>
                             </setting>
-                            <setting id="pos-loyalty" title="Boost your sales with multiple kinds of programs: Coupons, Promotions, Gift Card, Loyalty. Specific conditions can be set (products, customers, minimum purchase amount, period). Rewards can be discounts (% or amount) or free products." string="Promotions, Coupons, Gift Card &amp; Loyalty Program" help="Manage promotion that will grant customers discounts or gifts">
+                            <setting id="pos_pricer" string="Pricer" title="Pricer tags" help="Display and update your products information through electronic price tags">
+                                <field name="module_pos_pricer"/>
+                            </setting>
+                            <setting id="pos-loyalty" title="Boost your sales with multiple kinds of programs: Coupons, Promotions, Gift Card, Loyalty. Specific conditions can be set (products, customers, minimum purchase amount, period). Rewards can be discounts (% or amount) or free products." string="Promotions, Coupons, Gift Card &amp; Loyalty Program" help="Manage promotion that will grant customers discounts or gifts" documentation="/applications/sales/point_of_sale/pricing/loyalty.html">
                                 <field name="module_loyalty"/>
                             </setting>
                         </block>
 
                         <block title="Bills &amp; Receipts" id="pos_bills_and_receipts_section">
-                            <setting help="Add a custom message to header and footer">
+                            <setting help="Add a custom message to header and footer" documentation="/applications/sales/point_of_sale/receipts_invoices.html">
                                 <field name="pos_is_header_or_footer"/>
                                 <div class="content-group mt16" invisible="not pos_is_header_or_footer">
                                     <div>
@@ -259,7 +278,7 @@
                                     </div>
                                 </div>
                             </setting>
-                            <setting id="auto_printing" help="Print receipts automatically once the payment is registered">
+                            <setting id="auto_printing" help="Print receipts automatically once the payment is registered" documentation="/applications/sales/point_of_sale/receipts_invoices.html">
                                 <field name="pos_iface_print_auto"/>
                                 <div class="content-group mt16" invisible="not pos_iface_print_auto or not pos_is_posbox and not pos_other_devices">
                                     <div>
@@ -267,14 +286,32 @@
                                     </div>
                                 </div>
                             </setting>
-                            <setting help="Print a QR code on the receipt to allow the user to easily request the invoice for an order.">
-                                <field name="point_of_sale_use_ticket_qr_code"/>
-                            </setting>
-                            <setting help="Add a 5-digit code on the receipt to allow the user to request the invoice for an order on the portal.">
-                                <field name="point_of_sale_ticket_unique_code"/>
-                            </setting>
                             <setting id="order_reference" groups="base.group_no_one" string="Order Reference" help="Generation of your order references">
                                 <field name="pos_sequence_id" readonly="1"/>
+                            </setting>
+                            <setting id="pos_sms" help="Send Text receipt Using sms">
+                                <field name="pos_module_pos_sms"/>
+                                <div class="content-group" readonly="pos_has_active_session">
+                                    <div class="content-group mt16" invisible="not pos_module_pos_sms">
+                                        <div class="text-warning mb4" id="warning_text_pos_sms" >
+                                            Save this page and come back here to set up the feature.
+                                        </div>
+                                    </div>
+                                </div>
+                            </setting>
+                            <setting help="Print information on the receipt to allow the customer to easily request the invoice anytime, from Odoo's portal." documentation="/applications/sales/point_of_sale/receipts_invoices.html">
+                                <field name="point_of_sale_use_ticket_qr_code"/>
+                                <div class="content-group mt16" invisible="not point_of_sale_use_ticket_qr_code">
+                                    <div class="col mt16">
+                                        <div class="content-group row">
+                                            <label for="point_of_sale_ticket_portal_url_display_mode" class="col-lg-2" string="Print"/>
+                                            <field name="point_of_sale_ticket_portal_url_display_mode"/>
+                                        </div>
+                                    </div>
+                                </div>
+                            </setting>
+                            <setting help="Print basic ticket without prices. Can be used for gifts.">
+                                <field name="pos_basic_receipt"/>
                             </setting>
                         </block>
 
@@ -283,33 +320,37 @@
                                      documentation="/applications/sales/point_of_sale/payment_methods/terminals/adyen.html">
                                 <field name="module_pos_adyen"/>
                             </setting>
-                            <setting id="stripe_payment_terminal_setting" title="The transactions are processed by Stripe. Set your Stripe credentials on the related payment method." string="Stripe" help="Accept payments with a Stripe payment terminal">
+                            <setting id="stripe_payment_terminal_setting" title="The transactions are processed by Stripe. Set your Stripe credentials on the related payment method." string="Stripe" help="Accept payments with a Stripe payment terminal" documentation="applications/sales/point_of_sale/payment_methods/terminals/stripe.html">
                                 <field name="module_pos_stripe"/>
-                            </setting>
-                            <setting id="vantiv_payment_terminal_setting" title="The transactions are processed by Vantiv. Set your Vantiv credentials on the related payment method." string="Vantiv (US &amp; Canada)" documentation="/applications/sales/point_of_sale/payment_methods/terminals/vantiv.html" help="Accept payments with a Vantiv payment terminal">
-                                <field name="module_pos_mercury"/>
-                                <div class="content-group" invisible="not module_pos_mercury">
-                                    <div class="mt16" id="btn_use_pos_mercury">
-                                    </div>
-                                </div>
                             </setting>
                             <setting title="The transactions are processed by Six. Set the IP address of the terminal on the related payment method." string="Six" documentation="/applications/sales/point_of_sale/payment_methods/terminals/six.html" help="Accept payments with a Six payment terminal">
                                 <field name="module_pos_six"/>
                             </setting>
+                            <setting title="The transactions are processed by Viva Wallet on terminal or tap on phone." string="Viva Wallet" help="Accept payments with Viva Wallet on a terminal or tap on phone">
+                                <field name="module_pos_viva_wallet"/>
+                            </setting>
                             <setting title="The transactions are processed by PayTM. Set your PayTM credentials on the related payment method." string="PayTM" help="Accept payments with a PayTM payment terminal">
                                 <field name="module_pos_paytm"/>
+                            </setting>
+                            <setting id="pos_razorpay_setting" title="The transactions are processed by Razorpay. Set your Razorpay credentials on the related payment method." string="Razorpay" help="Accept payments with a Razorpay payment terminal">
+                                <field name="module_pos_razorpay"/>
+                            </setting>
+                            <setting title="The transactions are processed by Mercado Pago on terminal" string="Mercado Pago" help="Accept payments with Mercado Pago on a terminal">
+                                <field name="module_pos_mercado_pago"/>
                             </setting>
                         </block>
 
                         <block title="Connected Devices" id="pos_connected_devices_section">
-                            <setting id="pos_other_devices" string="ePos Printer" help="Connect device to your PoS without an IoT Box">
+                            <setting id="pos_other_devices" string="ePos Printer" help="Connect device to your PoS without an IoT Box" documentation="/applications/sales/point_of_sale/configuration/epos_ssc.html">
                                 <field name="pos_other_devices"/>
                             </setting>
-                            <setting id="customer_display" string="Customer Display" help="Show checkout to customers through a second display">
-                                <field name="pos_iface_customer_facing_display_local"/>
-                                <div invisible="not pos_iface_customer_facing_display_local">
-                                    <label for="pos_iface_customer_facing_display_background_image_1920" />
-                                    <field name="pos_iface_customer_facing_display_background_image_1920" widget="image" style="width: max(min(min(30vw, 30vh), 100%), 10rem); display: block; margin-top: .3rem;"/>
+                            <setting id="customer_display" string="Customer Display" help="Show checkout to customers through a second display" documentation="/applications/sales/point_of_sale/shop/customer_display.html" >
+                                <div>
+                                    <field name="pos_customer_display_type"/>
+                                    <div class="mt-1" invisible="pos_customer_display_type == 'none'">
+                                        <label for="pos_customer_display_bg_img" />
+                                        <field name="pos_customer_display_bg_img" class="w-100" filename="pos_customer_display_bg_img_name"/>
+                                    </div>
                                 </div>
                             </setting>
                             <setting string="IoT Box" help="Connect devices using an IoT Box">
@@ -335,16 +376,11 @@
                                         <label string="Cashdrawer" for="pos_iface_cashdrawer" class="col-lg-4 o_light_label"/>
                                         <field name="pos_iface_cashdrawer"/>
                                     </div>
-                                    <div class="row">
-                                        <label string="Customer Display" for="pos_iface_customer_facing_display_via_proxy" class="col-lg-4 o_light_label"/>
-                                        <field name="pos_iface_customer_facing_display_via_proxy"/>
-                                        <div invisible="not pos_iface_customer_facing_display_via_proxy">
-                                            <label for="pos_iface_customer_facing_display_background_image_1920" />
-                                            <field name="pos_iface_customer_facing_display_background_image_1920" widget="image" style="width: max(min(min(30vw, 30vh), 100%), 10rem); display: block; margin-top: .3rem;" />
-                                        </div>
-                                    </div>
                                 </div>
                             </setting>
+                        </block>
+
+                        <block title="Preparation" id="pos_preparation_section">
                             <setting string="Preparation Printers" help="Print orders at the kitchen, at the bar, etc." id="is_order_printer">
                                 <field name="pos_is_order_printer"/>
                                 <div class="content-group" invisible="not pos_is_order_printer">
@@ -360,6 +396,17 @@
                             <setting string="Preparation Display" help="Display orders on the preparation display" id="preparation_display">
                                 <field name="module_pos_preparation_display" widget="upgrade_boolean"/>
                             </setting>
+                            <setting string="Internal Notes" help="Add internal notes on order lines for the kitchen" id="iface_orderline_notes">
+                                <div class="content-group">
+                                    <div class="mt16">
+                                        <label string="Note Models" for="pos_note_ids" class="o_light_label me-2"/>
+                                        <field name="pos_note_ids" widget="many2many_tags" readonly="pos_has_active_session" placeholder="All notes"/>
+                                    </div>
+                                    <div>
+                                        <button name="%(point_of_sale.action_pos_note_model)d" icon="oi-arrow-right" type="action" string="Notes" class="btn-link"/>
+                                    </div>
+                                </div>
+                            </setting>
                         </block>
 
                         <block title="Inventory" id="pos_inventory_section">
@@ -368,17 +415,17 @@
                             </setting>
                             <setting string="Allow Ship Later" help="Sell products and deliver them later.">
                                 <field name="pos_ship_later"/>
-                                <div class="mt16" invisible="not pos_ship_later">
-                                    <div>
-                                        <label for="pos_warehouse_id" string="Warehouse" class="fw-normal"/>
+                                <div class="content-group mt16" invisible="not pos_ship_later">
+                                    <div class="row">
+                                        <label for="pos_warehouse_id" string="Warehouse" class="col-lg-3 o_light_label"/>
                                         <field name="pos_warehouse_id" required="pos_ship_later"/>
                                     </div>
-                                    <div groups="stock.group_adv_location">
-                                        <label for="pos_route_id" string="Specific route" class="fw-normal"/>
+                                    <div groups="stock.group_adv_location" class="row">
+                                        <label for="pos_route_id" string="Specific route" class="col-lg-3 o_light_label"/>
                                         <field name="pos_route_id"/>
                                     </div>
-                                    <div>
-                                        <label for="pos_picking_policy" class="fw-normal"/>
+                                    <div class="row">
+                                        <label for="pos_picking_policy" class="col-lg-3 o_light_label"/>
                                         <field name="pos_picking_policy" required="pos_ship_later"/>
                                     </div>
                                 </div>

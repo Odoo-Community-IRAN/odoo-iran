@@ -1,8 +1,9 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo import api, fields, models, _
+
 from odoo.exceptions import ValidationError, UserError
+from odoo.osv.expression import AND
 
 
 class LunchOrder(models.Model):
@@ -23,9 +24,10 @@ class LunchOrder(models.Model):
     supplier_id = fields.Many2one(
         string='Vendor', related='product_id.supplier_id', store=True, index=True)
     available_today = fields.Boolean(related='supplier_id.available_today')
-    order_deadline_passed = fields.Boolean(related='supplier_id.order_deadline_passed')
-    user_id = fields.Many2one('res.users', 'User', readonly=False,
-                              default=lambda self: self.env.uid)
+
+    available_on_date = fields.Boolean(compute='_compute_available_on_date')
+    order_deadline_passed = fields.Boolean(compute='_compute_order_deadline_passed')
+    user_id = fields.Many2one('res.users', 'User', default=lambda self: self.env.uid)
     lunch_location_id = fields.Many2one('lunch.location', default=lambda self: self.env.user.last_lunch_location_id)
     note = fields.Text('Notes')
     price = fields.Monetary('Total Price', compute='_compute_total_price', readonly=True, store=True)
@@ -57,6 +59,7 @@ class LunchOrder(models.Model):
     available_toppings_2 = fields.Boolean(help='Are extras available for this product', compute='_compute_available_toppings')
     available_toppings_3 = fields.Boolean(help='Are extras available for this product', compute='_compute_available_toppings')
     display_reorder_button = fields.Boolean(compute='_compute_display_reorder_button')
+    display_add_button = fields.Boolean(compute='_compute_display_add_button')
 
     @api.depends('product_id')
     def _compute_product_images(self):
@@ -71,12 +74,44 @@ class LunchOrder(models.Model):
             order.available_toppings_2 = bool(order.env['lunch.topping'].search_count([('supplier_id', '=', order.supplier_id.id), ('topping_category', '=', 2)]))
             order.available_toppings_3 = bool(order.env['lunch.topping'].search_count([('supplier_id', '=', order.supplier_id.id), ('topping_category', '=', 3)]))
 
+    @api.depends('name')
+    def _compute_display_add_button(self):
+        new_orders = dict(self.env["lunch.order"]._read_group([
+            ("date", "in", self.mapped("date")),
+            ("user_id", "in", self.user_id.ids),
+            ("state", "=", "new"),
+        ], ['user_id'], ['id:recordset']))
+        for order in self:
+            user_new_orders = new_orders.get(order.user_id)
+            price = 0
+            if user_new_orders:
+                user_new_orders = user_new_orders.filtered(lambda lunch_order: lunch_order.date == order.date)
+                price = sum(order.price for order in user_new_orders)
+            wallet_amount = self.env['lunch.cashmove'].get_wallet_balance(order.user_id, False) - price
+            order.display_add_button = wallet_amount >= order.price
+
     @api.depends_context('show_reorder_button')
     @api.depends('state')
     def _compute_display_reorder_button(self):
         show_button = self.env.context.get('show_reorder_button')
         for order in self:
             order.display_reorder_button = show_button and order.state == 'confirmed' and order.supplier_id.available_today
+
+    @api.depends('date', 'supplier_id')
+    def _compute_available_on_date(self):
+        for order in self:
+            order.available_on_date = order.supplier_id._available_on_date(order.date)
+
+    @api.depends('supplier_id', 'date')
+    def _compute_order_deadline_passed(self):
+        today = fields.Date.context_today(self)
+        for order in self:
+            if order.date < today:
+                order.order_deadline_passed = True
+            elif order.date == today:
+                order.order_deadline_passed = order.supplier_id.order_deadline_passed
+            else:
+                order.order_deadline_passed = False
 
     def init(self):
         self._cr.execute("""CREATE INDEX IF NOT EXISTS lunch_order_user_product_date ON %s (user_id, product_id, date)"""
@@ -131,7 +166,7 @@ class LunchOrder(models.Model):
                 **vals,
                 'toppings': self._extract_toppings(vals),
             })
-            if lines.filtered(lambda l: l.state not in ['sent', 'confirmed']):
+            if lines.filtered(lambda l: l.state == 'new'):
                 # YTI FIXME This will update multiple lines in the case there are multiple
                 # matching lines which should not happen through the interface
                 lines.update_quantity(1)
@@ -141,7 +176,8 @@ class LunchOrder(models.Model):
         return orders
 
     def write(self, values):
-        merge_needed = 'note' in values or 'topping_ids_1' in values or 'topping_ids_2' in values or 'topping_ids_3' in values
+        change_topping = 'topping_ids_1' in values or 'topping_ids_2' in values or 'topping_ids_3' in values
+        merge_needed = 'note' in values or change_topping or 'state' in values
         default_location_id = self.env.user.last_lunch_location_id and self.env.user.last_lunch_location_id.id or False
 
         if merge_needed:
@@ -153,14 +189,16 @@ class LunchOrder(models.Model):
                 # This also forces us to invalidate the cache for topping_ids_2 and topping_ids_3 that
                 # could have changed through topping_ids_1 without the cache knowing about it
                 toppings = self._extract_toppings(values)
-                self.invalidate_model(['topping_ids_2', 'topping_ids_3'])
-                values['topping_ids_1'] = [(6, 0, toppings)]
+                if change_topping:
+                    self.invalidate_model(['topping_ids_2', 'topping_ids_3'])
+                    values['topping_ids_1'] = [(6, 0, toppings)]
                 matching_lines = self._find_matching_lines({
                     'user_id': values.get('user_id', line.user_id.id),
                     'product_id': values.get('product_id', line.product_id.id),
                     'note': values.get('note', line.note or False),
                     'toppings': toppings,
                     'lunch_location_id': values.get('lunch_location_id', default_location_id),
+                    'state': values.get('state'),
                 })
                 if matching_lines:
                     lines_to_deactivate |= line
@@ -175,10 +213,12 @@ class LunchOrder(models.Model):
         domain = [
             ('user_id', '=', values.get('user_id', self.default_get(['user_id'])['user_id'])),
             ('product_id', '=', values.get('product_id', False)),
-            ('date', '=', fields.Date.today()),
+            ('date', '=', values.get('date', fields.Date.today())),
             ('note', '=', values.get('note', False)),
             ('lunch_location_id', '=', values.get('lunch_location_id', default_location_id)),
         ]
+        if values.get('state'):
+            domain = AND([domain, [('state', '=', values['state'])]])
         toppings = values.get('toppings', [])
         return self.search(domain).filtered(lambda line: (line.topping_ids_1 | line.topping_ids_2 | line.topping_ids_3).ids == toppings)
 
@@ -218,15 +258,13 @@ class LunchOrder(models.Model):
 
     def action_order(self):
         for order in self:
-            if not order.supplier_id.available_today:
-                raise UserError(_('The vendor related to this order is not available today.'))
+            if not order.available_on_date:
+                raise UserError(_('The vendor related to this order is not available at the selected date.'))
         if self.filtered(lambda line: not line.product_id.active):
             raise ValidationError(_('Product is no longer available.'))
         self.write({
             'state': 'ordered',
         })
-        for order in self:
-            order.lunch_location_id = order.user_id.last_lunch_location_id
         self._check_wallet()
 
     def action_reorder(self):

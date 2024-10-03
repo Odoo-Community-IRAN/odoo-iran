@@ -3,6 +3,7 @@
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
+from odoo.tools import SQL
 
 
 class CrmTeam(models.Model):
@@ -16,7 +17,7 @@ class CrmTeam(models.Model):
                 "of the current and target revenue on the kanban view.")
     invoiced_target = fields.Float(
         string='Invoicing Target',
-        help="Revenue target for the current month (untaxed total of confirmed invoices).")
+        help="Revenue Target for the current month (untaxed total of paid invoices).")
     quotations_count = fields.Integer(
         compute='_compute_quotations_to_invoice',
         string='Number of quotations to invoice', readonly=True)
@@ -34,8 +35,7 @@ class CrmTeam(models.Model):
             ('state', 'in', ['draft', 'sent']),
         ])
         self.env['sale.order']._apply_ir_rules(query, 'read')
-        _, where_clause, where_clause_args = query.get_sql()
-        select_query = """
+        select_sql = SQL("""
             SELECT team_id, count(*), sum(amount_total /
                 CASE COALESCE(currency_rate, 0)
                 WHEN 0 THEN 1.0
@@ -45,8 +45,8 @@ class CrmTeam(models.Model):
             FROM sale_order
             WHERE %s
             GROUP BY team_id
-        """ % where_clause
-        self.env.cr.execute(select_query, where_clause_args)
+        """, query.where_clause or SQL("TRUE"))
+        self.env.cr.execute(select_sql)
         quotation_data = self.env.cr.dictfetchall()
         teams = self.browse()
         for datum in quotation_data:
@@ -110,7 +110,7 @@ class CrmTeam(models.Model):
 
     def _graph_date_column(self):
         if self._in_sale_scope():
-            return 'date'
+            return SQL('date')
         return super()._graph_date_column()
 
     def _graph_get_table(self, GraphModel):
@@ -120,17 +120,17 @@ class CrmTeam(models.Model):
             # as the amounts of the sale report are converted in the currency
             # of the current company (for multi-company reporting, see #83550)
             GraphModel = GraphModel.with_company(self.company_id)
-            return f"({GraphModel._table_query}) AS {GraphModel._table}"
+            return SQL(f"({GraphModel._table_query}) AS {GraphModel._table}")
         return super()._graph_get_table(GraphModel)
 
     def _graph_y_query(self):
         if self._in_sale_scope():
-            return 'SUM(price_subtotal)'
+            return SQL('SUM(price_subtotal)')
         return super()._graph_y_query()
 
     def _extra_sql_conditions(self):
         if self._in_sale_scope():
-            return "AND state = 'sale'"
+            return SQL("state = 'sale'")
         return super()._extra_sql_conditions()
 
     def _graph_title_and_key(self):
@@ -160,7 +160,7 @@ class CrmTeam(models.Model):
         for team in self:
             if team.sale_order_count >= SO_COUNT_TRIGGER:
                 raise UserError(
-                    _('Team %(team_name)s has %(sale_order_count)s active sale orders. Consider canceling them or archiving the team instead.',
+                    _('Team %(team_name)s has %(sale_order_count)s active sale orders. Consider cancelling them or archiving the team instead.',
                       team_name=team.name,
                       sale_order_count=team.sale_order_count
                       ))

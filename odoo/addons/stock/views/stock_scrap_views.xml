@@ -50,7 +50,7 @@
                         </div>
                         <group>
                             <group>
-                                <field name="product_id" context="{'default_detailed_type': 'product'}" readonly="state == 'done'"/>
+                                <field name="product_id" context="{'default_is_storable': True}" readonly="state == 'done'"/>
                                 <field name="tracking" invisible="1"/>
                                 <label for="scrap_qty"/>
                                 <div class="o_row">
@@ -58,7 +58,9 @@
                                     <field name="product_uom_category_id" invisible="1"/>
                                     <field name="product_uom_id" readonly="state == 'done' or tracking == 'serial'" groups="uom.group_uom" force_save="1"/>
                                 </div>
-                                <field name="lot_id" context="{'default_product_id': product_id, 'default_company_id': company_id}" invisible="not product_id or tracking == 'none'" readonly="state == 'done'" required="tracking != 'none'" groups="stock.group_production_lot"/>
+                                <field name="lot_id" context="{'default_product_id': product_id}" invisible="not product_id or tracking == 'none'" readonly="state == 'done'" required="tracking != 'none'" groups="stock.group_production_lot"/>
+                                <field name="should_replenish" readonly="state == 'done'"/>
+                                <field name="scrap_reason_tag_ids" widget="many2many_tags" options="{'no_create_edit': True}"/>
                             </group>
                             <group>
                                 <field name="company_id" invisible="1" readonly="state == 'done'"/>
@@ -70,14 +72,10 @@
                                 <field name="date_done" invisible="state == 'draft'"/>
                                 <field name="picking_id" invisible="not picking_id" readonly="state == 'done'"/>
                                 <field name="company_id" groups="base.group_multi_company" readonly="state == 'done'"/>
-                                <field name="should_replenish" readonly="state == 'done'"/>
                             </group>
                         </group>
                     </sheet>
-                    <div class="oe_chatter">
-                        <field name="message_follower_ids"/>
-                        <field name="message_ids"/>
-                    </div>
+                    <chatter/>
                 </form>
             </field>
         </record>
@@ -87,32 +85,19 @@
             <field name="model">stock.scrap</field>
             <field name="arch" type="xml">
                 <kanban class="o_kanban_mobile" sample="1">
-                    <field name="name"/>
-                    <field name="product_id"/>
-                    <field name="date_done"/>
-                    <field name="scrap_qty"/>
-                    <field name="state"/>
                     <templates>
-                        <t t-name="kanban-box">
-                            <div class="oe_kanban_global_click">
-                                <div class="row mb4">
-                                    <strong class="col-6">
-                                        <span t-esc="record.name.value"/>
-                                    </strong>
-                                    <strong t-if="record.date_done.value" class="col-6 text-end">
-                                        <i class="fa fa-clock-o" role="img" aria-label="Date" title="Date"/><span t-esc="record.date_done.value"/>
-                                    </strong>
-                                    <div class="col-12">
-                                        <span t-esc="record.product_id.value"/>
-                                    </div>
-                                    <div class="col-6">
-                                        <span t-esc="record.scrap_qty.value"/>
-                                    </div>
-                                    <div class="col-6">
-                                        <span class="float-end badge text-bg-secondary">
-                                            <field name="state"/>
-                                        </span>
-                                    </div>
+                        <t t-name="card">
+                            <div class="row">
+                                <field name="name" class="col-6 fw-bolder"/>
+                                <div class="col-6 fw-bolder text-end">
+                                    <i class="fa fa-clock-o" role="img" aria-label="Date" title="Date"/><field name="date_done"/>
+                                </div>
+                            </div>
+                            <field name="product_id"/>
+                            <div class="row">
+                                <field name="scrap_qty" class="col-6"/>
+                                <div class="col-6">
+                                    <field name="state" class="float-end badge text-bg-secondary"/>
                                 </div>
                             </div>
                         </t>
@@ -122,10 +107,10 @@
         </record>
 
         <record id="stock_scrap_tree_view" model="ir.ui.view">
-            <field name="name">stock.scrap.tree</field>
+            <field name="name">stock.scrap.list</field>
             <field name="model">stock.scrap</field>
             <field name="arch" type="xml">
-                <tree multi_edit="1" sample="1" decoration-info="state == 'draft'">
+                <list multi_edit="1" sample="1" decoration-info="state == 'draft'">
                     <field name="company_id" column_invisible="True" readonly="state == 'done'"/>
                     <field name="product_uom_category_id" column_invisible="True"/>
                     <field name="name" decoration-bf="1"/>
@@ -137,14 +122,14 @@
                     <field name="scrap_location_id" options="{'no_create': True}" groups="stock.group_stock_multi_locations" readonly="state == 'done'"/>
                     <field name="company_id" readonly="1" groups="base.group_multi_company"/>
                     <field name="state" widget="badge" decoration-success="state == 'done'" decoration-muted="state == 'draft'"/>
-                </tree>
+                </list>
             </field>
         </record>
 
         <record model="ir.actions.act_window" id="action_stock_scrap">
             <field name="name">Scrap Orders</field>
             <field name="res_model">stock.scrap</field>
-            <field name="view_mode">tree,form,kanban,pivot,graph</field>
+            <field name="view_mode">list,form,kanban,pivot,graph</field>
             <field name="help" type="html">
               <p class="o_view_nocontent_smiling_face">
                 Scrap products
@@ -172,10 +157,11 @@
                                 <field name="product_uom_id" readonly="tracking == 'serial'" groups="uom.group_uom"/>
                             </div>
                             <field name="lot_id" groups="stock.group_production_lot"
-                                context="{'default_company_id': company_id, 'default_product_id': product_id}"
+                                context="{'default_product_id': product_id}"
                                 invisible="not product_id or tracking == 'none'"
                                 readonly="state == 'done'"
                                 required="tracking != 'none'"/>
+                            <field name="scrap_reason_tag_ids" widget="many2many_tags" options="{'no_create_edit': True}"/>
                         </group>
                         <group>
                             <field name="picking_id" invisible="1" readonly="state == 'done'"/>

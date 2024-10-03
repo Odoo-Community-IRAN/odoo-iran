@@ -2,7 +2,8 @@
 
 from datetime import datetime, timedelta
 
-from odoo import api, models
+from odoo import api, models, fields
+from odoo.addons.mail.tools.discuss import Store
 
 
 class ChannelMember(models.Model):
@@ -18,26 +19,24 @@ class ChannelMember(models.Model):
             ('channel_id.channel_type', '=', 'livechat'),
         ])
         sessions_to_be_unpinned = members.filtered(lambda m: m.message_unread_counter == 0)
-        sessions_to_be_unpinned.write({'is_pinned': False})
-        self.env['bus.bus']._sendmany([(member.partner_id, 'discuss.channel/unpin', {'id': member.channel_id.id}) for member in sessions_to_be_unpinned])
+        sessions_to_be_unpinned.write({'unpin_dt': fields.Datetime.now()})
+        for member in sessions_to_be_unpinned:
+            member._bus_send("discuss.channel/unpin", {"id": member.channel_id.id})
 
-    def _get_partner_data(self, fields=None):
+    def _to_store(self, store: Store, **kwargs):
+        super()._to_store(store, **kwargs)
+        for member in self.filtered(lambda m: m.channel_id.channel_type == "livechat"):
+            # sudo: discuss.channel - reading livechat channel to check whether current member is a bot is allowed
+            store.add(
+                member,
+                {
+                    "is_bot": member.partner_id
+                    in member.channel_id.sudo().livechat_channel_id.rule_ids.chatbot_script_id.operator_partner_id,
+                },
+            )
+
+    def _get_store_partner_fields(self, fields):
+        self.ensure_one()
         if self.channel_id.channel_type == 'livechat':
-            data = {
-                'active': self.partner_id.active,
-                'id': self.partner_id.id,
-                'is_public': self.partner_id.is_public,
-                'is_bot': self.partner_id.id in self.channel_id.livechat_channel_id.rule_ids.mapped('chatbot_script_id.operator_partner_id.id')
-            }
-            if self.partner_id.user_livechat_username:
-                data['user_livechat_username'] = self.partner_id.user_livechat_username
-            else:
-                data['name'] = self.partner_id.name
-            if not self.partner_id.is_public:
-                data['country'] = {
-                    'code': self.partner_id.country_id.code,
-                    'id': self.partner_id.country_id.id,
-                    'name': self.partner_id.country_id.name,
-                } if self.partner_id.country_id else False
-            return data
-        return super()._get_partner_data(fields=fields)
+            return ["active", "country", "is_public", "user_livechat_username", "write_date"]
+        return super()._get_store_partner_fields(fields)

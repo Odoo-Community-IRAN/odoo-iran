@@ -197,7 +197,7 @@ class ReceptionReport(models.AbstractModel):
         return "transfers"
 
     def _get_moves(self, docs):
-        return docs.move_ids.filtered(lambda m: m.product_id.type == 'product' and m.state != 'cancel')
+        return docs.move_ids.filtered(lambda m: m.product_id.is_storable and m.state != 'cancel')
 
     def _get_extra_domain(self, docs):
         return [('picking_id', 'not in', docs.ids)]
@@ -332,7 +332,7 @@ class ReceptionReport(models.AbstractModel):
                 out.move_orig_ids = False
                 new_out._recompute_state()
         out.procure_method = 'make_to_stock'
-        out._recompute_state()
+        out._do_unreserve()
         return True
 
     def _action_assign(self, in_move, out_move):

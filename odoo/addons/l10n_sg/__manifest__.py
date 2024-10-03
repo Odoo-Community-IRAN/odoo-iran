@@ -1,7 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 {
     'name': 'Singapore - Accounting',
-    'website': 'https://www.odoo.com/documentation/17.0/applications/finance/fiscal_localizations/singapore.html',
+    'website': 'https://www.odoo.com/documentation/master/applications/finance/fiscal_localizations/singapore.html',
     'icon': '/account/static/description/l10n.png',
     'countries': ['sg'],
     'author': 'Tech Receptives',
@@ -19,7 +19,9 @@ This module add, for accounting:
     """,
     'depends': [
         'account_qr_code_emv',
+        'account',
     ],
+    'auto_install': ['account'],
     'data': [
         'data/l10n_sg_chart_data.xml',
         'data/account_tax_report_data.xml',

@@ -45,9 +45,7 @@ class TestIrWebsocket(WebsocketCase):
         away_timer_later = datetime.now() + timedelta(seconds=AWAY_TIMER + 1)
         with freeze_time(away_timer_later):
             self.env["bus.presence"]._update_presence(
-                inactivity_period=(AWAY_TIMER + 1) * 1000,
-                identity_field="user_id",
-                identity_value=bob.id,
+                inactivity_period=(AWAY_TIMER + 1) * 1000, identity_field="user_id", identity_value=bob.id
             )
             self.trigger_notification_dispatching([(bob.partner_id, "presence")])
             message = json.loads(websocket.recv())[0]["message"]
@@ -92,7 +90,7 @@ class TestIrWebsocket(WebsocketCase):
             [f"odoo-presence-res.partner_{bob.partner_id.id}"],
             self.env["bus.bus"]._bus_last_id(),
         )
-        self.trigger_notification_dispatching([bob.partner_id])
+        self.trigger_notification_dispatching([(bob.partner_id, "presence")])
         notification = json.loads(websocket.recv())[0]
         self._close_websockets()
         bus_record = self.env["bus.bus"].search([("id", "=", int(notification["id"]))])

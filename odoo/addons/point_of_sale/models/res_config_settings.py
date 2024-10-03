@@ -31,21 +31,28 @@ class ResConfigSettings(models.TransientModel):
 
     pos_config_id = fields.Many2one('pos.config', string="Point of Sale", default=lambda self: self._default_pos_config())
     sale_tax_id = fields.Many2one('account.tax', string="Default Sale Tax", related='company_id.account_sale_tax_id', readonly=False, check_company=True)
-    module_pos_mercury = fields.Boolean(string="Vantiv Payment Terminal", help="The transactions are processed by Vantiv. Set your Vantiv credentials on the related payment method.")
     module_pos_adyen = fields.Boolean(string="Adyen Payment Terminal", help="The transactions are processed by Adyen. Set your Adyen credentials on the related payment method.")
     module_pos_stripe = fields.Boolean(string="Stripe Payment Terminal", help="The transactions are processed by Stripe. Set your Stripe credentials on the related payment method.")
     module_pos_six = fields.Boolean(string="Six Payment Terminal", help="The transactions are processed by Six. Set the IP address of the terminal on the related payment method.")
+    module_pos_viva_wallet = fields.Boolean(string="Viva Wallet Payment Terminal", help="The transactions are processed by Viva Wallet on terminal or tap on phone.")
     module_pos_paytm = fields.Boolean(string="PayTM Payment Terminal", help="The transactions are processed by PayTM. Set your PayTM credentials on the related payment method.")
+    module_pos_razorpay = fields.Boolean(string="Razorpay Payment Terminal", help="The transactions are processed by Razorpay. Set your Razorpay credentials on the related payment method.")
+    module_pos_mercado_pago = fields.Boolean(string="Mercado Pago Payment Terminal", help="The transactions are processed by Mercado Pago. Set your Mercado Pago credentials on the related payment method.")
     module_pos_preparation_display = fields.Boolean(string="Preparation Display", help="Show orders on the preparation display screen.")
+    module_pos_pricer = fields.Boolean(string="Pricer electronic price tags", help="Display the price of your products through electronic price tags")
     update_stock_quantities = fields.Selection(related="company_id.point_of_sale_update_stock_quantities", readonly=False)
     account_default_pos_receivable_account_id = fields.Many2one(string='Default Account Receivable (PoS)', related='company_id.account_default_pos_receivable_account_id', readonly=False, check_company=True)
     barcode_nomenclature_id = fields.Many2one('barcode.nomenclature', related='company_id.nomenclature_id', readonly=False)
     is_kiosk_mode = fields.Boolean(string="Is Kiosk Mode", default=False)
+    pos_customer_display_type = fields.Selection(related="pos_config_id.customer_display_type", readonly=False)
+    pos_customer_display_bg_img = fields.Image(related='pos_config_id.customer_display_bg_img', readonly=False)
+    pos_customer_display_bg_img_name = fields.Char(related='pos_config_id.customer_display_bg_img_name', readonly=False)
 
     # pos.config fields
     pos_module_pos_discount = fields.Boolean(related='pos_config_id.module_pos_discount', readonly=False)
     pos_module_pos_hr = fields.Boolean(related='pos_config_id.module_pos_hr', readonly=False)
     pos_module_pos_restaurant = fields.Boolean(related='pos_config_id.module_pos_restaurant', readonly=False)
+    pos_module_pos_avatax = fields.Boolean(related='pos_config_id.module_pos_avatax', readonly=False)
     pos_is_order_printer = fields.Boolean(compute='_compute_pos_printer', store=True, readonly=False)
     pos_printer_ids = fields.Many2many(related='pos_config_id.printer_ids', readonly=False)
 
@@ -62,15 +69,11 @@ class ResConfigSettings(models.TransientModel):
     pos_iface_available_categ_ids = fields.Many2many('pos.category', string='Available PoS Product Categories', compute='_compute_pos_iface_available_categ_ids', readonly=False, store=True)
     pos_iface_big_scrollbars = fields.Boolean(related='pos_config_id.iface_big_scrollbars', readonly=False)
     pos_iface_cashdrawer = fields.Boolean(string='Cashdrawer', compute='_compute_pos_iface_cashdrawer', readonly=False, store=True)
-    pos_iface_customer_facing_display_local = fields.Boolean(related='pos_config_id.iface_customer_facing_display_local', readonly=False)
-    pos_iface_customer_facing_display_via_proxy = fields.Boolean(string='Customer Facing Display', compute='_compute_pos_iface_customer_facing_display_via_proxy', readonly=False, store=True)
-    pos_iface_customer_facing_display_background_image_1920 = fields.Image(related='pos_config_id.iface_customer_facing_display_background_image_1920', readonly=False)
     pos_iface_electronic_scale = fields.Boolean(string='Electronic Scale', compute='_compute_pos_iface_electronic_scale', readonly=False, store=True)
     pos_iface_print_auto = fields.Boolean(related='pos_config_id.iface_print_auto', readonly=False)
     pos_iface_print_skip_screen = fields.Boolean(related='pos_config_id.iface_print_skip_screen', readonly=False)
     pos_iface_print_via_proxy = fields.Boolean(string='Print via Proxy', compute='_compute_pos_iface_print_via_proxy', readonly=False, store=True)
     pos_iface_scan_via_proxy = fields.Boolean(string='Scan via Proxy', compute='_compute_pos_iface_scan_via_proxy', readonly=False, store=True)
-    pos_iface_start_categ_id = fields.Many2one('pos.category', string='Initial Category', compute='_compute_pos_iface_start_categ_id', readonly=False, store=True)
     pos_iface_tax_included = fields.Selection(related='pos_config_id.iface_tax_included', readonly=False)
     pos_iface_tipproduct = fields.Boolean(related='pos_config_id.iface_tipproduct', readonly=False)
     pos_invoice_journal_id = fields.Many2one(related='pos_config_id.invoice_journal_id', readonly=False)
@@ -86,7 +89,7 @@ class ResConfigSettings(models.TransientModel):
     pos_picking_policy = fields.Selection(related='pos_config_id.picking_policy', readonly=False)
     pos_picking_type_id = fields.Many2one(related='pos_config_id.picking_type_id', readonly=False)
     pos_pricelist_id = fields.Many2one('product.pricelist', string='Default Pricelist', compute='_compute_pos_pricelist_id', readonly=False, store=True)
-    pos_proxy_ip = fields.Char(string='IP Address', compute='_compute_pos_proxy_ip', readonly=False, store=True)
+    pos_proxy_ip = fields.Char(string='IP Address', related="pos_config_id.proxy_ip", readonly=False)
     pos_receipt_footer = fields.Text(string='Receipt Footer', compute='_compute_pos_receipt_header_footer', readonly=False, store=True)
     pos_receipt_header = fields.Text(string='Receipt Header', compute='_compute_pos_receipt_header_footer', readonly=False, store=True)
     pos_restrict_price_control = fields.Boolean(related='pos_config_id.restrict_price_control', readonly=False)
@@ -96,15 +99,23 @@ class ResConfigSettings(models.TransientModel):
     pos_sequence_id = fields.Many2one(related='pos_config_id.sequence_id')
     pos_set_maximum_difference = fields.Boolean(related='pos_config_id.set_maximum_difference', readonly=False)
     pos_ship_later = fields.Boolean(related='pos_config_id.ship_later', readonly=False)
-    pos_start_category = fields.Boolean(related='pos_config_id.start_category', readonly=False)
     pos_tax_regime_selection = fields.Boolean(related='pos_config_id.tax_regime_selection', readonly=False)
     pos_tip_product_id = fields.Many2one('product.product', string='Tip Product', compute='_compute_pos_tip_product_id', readonly=False, store=True)
     pos_use_pricelist = fields.Boolean(related='pos_config_id.use_pricelist', readonly=False)
     pos_warehouse_id = fields.Many2one(related='pos_config_id.warehouse_id', readonly=False, string="Warehouse (PoS)")
     point_of_sale_use_ticket_qr_code = fields.Boolean(related='company_id.point_of_sale_use_ticket_qr_code', readonly=False)
     pos_auto_validate_terminal_payment = fields.Boolean(related='pos_config_id.auto_validate_terminal_payment', readonly=False, string="Automatically validates orders paid with a payment terminal.")
-    pos_trusted_config_ids = fields.Many2many(related='pos_config_id.trusted_config_ids', readonly=False)
+    pos_trusted_config_ids = fields.Many2many(related='pos_config_id.trusted_config_ids', readonly=False, domain="[('id', '!=', pos_config_id), ('module_pos_restaurant', '=', False)]")
     point_of_sale_ticket_unique_code = fields.Boolean(related='company_id.point_of_sale_ticket_unique_code', readonly=False)
+    pos_show_product_images = fields.Boolean(related='pos_config_id.show_product_images', readonly=False)
+    pos_show_category_images = fields.Boolean(related='pos_config_id.show_category_images', readonly=False)
+    point_of_sale_ticket_portal_url_display_mode = fields.Selection(related='company_id.point_of_sale_ticket_portal_url_display_mode', readonly=False, required=True)
+    pos_note_ids = fields.Many2many(related='pos_config_id.note_ids', readonly=False)
+    pos_module_pos_sms = fields.Boolean(related="pos_config_id.module_pos_sms", readonly=False)
+    pos_is_closing_entry_by_product = fields.Boolean(related='pos_config_id.is_closing_entry_by_product', readonly=False)
+    pos_order_edit_tracking = fields.Boolean(related="pos_config_id.order_edit_tracking", readonly=False)
+    pos_orderlines_sequence_in_cart_by_category = fields.Boolean(related='pos_config_id.orderlines_sequence_in_cart_by_category', readonly=False)
+    pos_basic_receipt = fields.Boolean(related='pos_config_id.basic_receipt', readonly=False)
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -201,14 +212,6 @@ class ResConfigSettings(models.TransientModel):
             else:
                 res_config.pos_iface_available_categ_ids = res_config.pos_config_id.iface_available_categ_ids
 
-    @api.depends('pos_start_category', 'pos_config_id')
-    def _compute_pos_iface_start_categ_id(self):
-        for res_config in self:
-            if not res_config.pos_start_category:
-                res_config.pos_iface_start_categ_id = False
-            else:
-                res_config.pos_iface_start_categ_id = res_config.pos_config_id.iface_start_categ_id
-
     @api.depends('pos_iface_available_categ_ids')
     def _compute_pos_selectable_categ_ids(self):
         for res_config in self:
@@ -281,14 +284,6 @@ class ResConfigSettings(models.TransientModel):
                 res_config.pos_allowed_pricelist_ids = self.env['product.pricelist'].search([]).ids
 
     @api.depends('pos_is_posbox', 'pos_config_id')
-    def _compute_pos_proxy_ip(self):
-        for res_config in self:
-            if not res_config.pos_is_posbox:
-                res_config.pos_proxy_ip = False
-            else:
-                res_config.pos_proxy_ip = res_config.pos_config_id.proxy_ip
-
-    @api.depends('pos_is_posbox', 'pos_config_id')
     def _compute_pos_iface_print_via_proxy(self):
         for res_config in self:
             if not res_config.pos_is_posbox:
@@ -311,14 +306,6 @@ class ResConfigSettings(models.TransientModel):
                 res_config.pos_iface_electronic_scale = False
             else:
                 res_config.pos_iface_electronic_scale = res_config.pos_config_id.iface_electronic_scale
-
-    @api.depends('pos_is_posbox', 'pos_config_id')
-    def _compute_pos_iface_customer_facing_display_via_proxy(self):
-        for res_config in self:
-            if not res_config.pos_is_posbox:
-                res_config.pos_iface_customer_facing_display_via_proxy = False
-            else:
-                res_config.pos_iface_customer_facing_display_via_proxy = res_config.pos_config_id.iface_customer_facing_display_via_proxy
 
     @api.onchange('pos_trusted_config_ids')
     def _onchange_trusted_config_ids(self):

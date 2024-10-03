@@ -1,15 +1,377 @@
-/** @odoo-module */
-
 /**
  * Provides a way to start JS code for public contents.
  */
 
-import dom from '@web/legacy/js/core/dom';
+import { Component } from "@odoo/owl";
 import Class from "@web/legacy/js/core/class";
-import mixins from "@web/legacy/js/core/mixins";
-import ServicesMixin from "@web/legacy/js/core/service_mixins";
-import { loadBundle } from '@web/core/assets';
+import { loadBundle, loadCSS, loadJS } from '@web/core/assets';
+import { SERVICES_METADATA } from "@web/core/utils/hooks";
 import { renderToElement } from "@web/core/utils/render";
+import { makeAsyncHandler, makeButtonHandler } from "@web/legacy/js/public/minimal_dom";
+
+/**
+ * Mixin to structure objects' life-cycles following a parent-children
+ * relationship. Each object can a have a parent and multiple children.
+ * When an object is destroyed, all its children are destroyed too releasing
+ * any resource they could have reserved before.
+ *
+ * @name ParentedMixin
+ * @mixin
+ */
+const ParentedMixin = {
+    __parentedMixin: true,
+
+    init: function () {
+        this.__parentedDestroyed = false;
+        this.__parentedChildren = [];
+        this.__parentedParent = null;
+    },
+    /**
+     * Set the parent of the current object. When calling this method, the
+     * parent will also be informed and will return the current object
+     * when its getChildren() method is called. If the current object did
+     * already have a parent, it is unregistered before, which means the
+     * previous parent will not return the current object anymore when its
+     * getChildren() method is called.
+     */
+    setParent(parent) {
+        if (this.getParent()) {
+            if (this.getParent().__parentedMixin) {
+                const children = this.getParent().getChildren();
+                this.getParent().__parentedChildren = children.filter(
+                    (child) => child.$el !== this.$el
+                );
+            }
+        }
+        this.__parentedParent = parent;
+        if (parent && parent.__parentedMixin) {
+            parent.__parentedChildren.push(this);
+        }
+    },
+    /**
+     * Return the current parent of the object (or null).
+     */
+    getParent() {
+        return this.__parentedParent;
+    },
+    /**
+     * Return a list of the children of the current object.
+     */
+    getChildren() {
+        return [...this.__parentedChildren];
+    },
+    /**
+     * Returns true if destroy() was called on the current object.
+     */
+    isDestroyed() {
+        return this.__parentedDestroyed;
+    },
+    /**
+     * Releases any resource the instance could have reserved.
+     */
+    destroy() {
+        this.getChildren().forEach(function (child) {
+            child.destroy();
+        });
+        this.setParent(undefined);
+        this.__parentedDestroyed = true;
+    },
+};
+
+function OdooEvent(target, name, data) {
+    this.target = target;
+    this.name = name;
+    this.data = Object.create(null);
+    Object.assign(this.data, data);
+    this.stopped = false;
+}
+OdooEvent.prototype.stopPropagation = function () {
+    this.stopped = true;
+};
+OdooEvent.prototype.is_stopped = function () {
+    return this.stopped;
+};
+
+/**
+ * Do not ever use it directly, use EventDispatcherMixin instead. This class
+ * just handles the dispatching of events, it is not meant to be extended, nor
+ * used directly. All integration with parenting and automatic unregistration of
+ * events is done in EventDispatcherMixin.
+ *
+ * Copyright notice for the following Class and its uses:
+ *
+ * (c) 2010-2012 Jeremy Ashkenas, DocumentCloud Inc.
+ * Backbone may be freely distributed under the MIT license.
+ * For all details and documentation:
+ * http://backbonejs.org
+ *
+ * See the debian/copyright file for the text of the MIT license.
+ */
+class Events {
+    on(events, callback, context) {
+        var ev;
+        events = events.split(/\s+/);
+        var calls = this._callbacks || (this._callbacks = {});
+        while ((ev = events.shift())) {
+            var list = calls[ev] || (calls[ev] = {});
+            var tail = list.tail || (list.tail = list.next = {});
+            tail.callback = callback;
+            tail.context = context;
+            list.tail = tail.next = {};
+        }
+        return this;
+    }
+    off(events, callback, context) {
+        var ev, calls, node;
+        if (!events) {
+            delete this._callbacks;
+        } else if ((calls = this._callbacks)) {
+            events = events.split(/\s+/);
+            while ((ev = events.shift())) {
+                node = calls[ev];
+                delete calls[ev];
+                if (!callback || !node) {
+                    continue;
+                }
+                while ((node = node.next) && node.next) {
+                    if (node.callback === callback
+                            && (!context || node.context === context)) {
+                        continue;
+                    }
+                    this.on(ev, node.callback, node.context);
+                }
+            }
+        }
+        return this;
+    }
+    callbackList() {
+        var lst = [];
+        for (const [eventName, el] of Object.entries(this._callbacks || {})) {
+            var node = el;
+            while ((node = node.next) && node.next) {
+                lst.push([eventName, node.callback, node.context]);
+            }
+        }
+        return lst;
+    }
+    trigger(events) {
+        var event, node, calls, tail, args, all, rest;
+        if (!(calls = this._callbacks)) {
+            return this;
+        }
+        all = calls.all;
+        (events = events.split(/\s+/)).push(null);
+        // Save references to the current heads & tails.
+        while ((event = events.shift())) {
+            if (all) {
+                events.push({
+                    next: all.next,
+                    tail: all.tail,
+                    event: event
+                });
+            }
+            if (!(node = calls[event])) {
+                continue;
+            }
+            events.push({
+                next: node.next,
+                tail: node.tail
+            });
+        }
+        rest = Array.prototype.slice.call(arguments, 1);
+        while ((node = events.pop())) {
+            tail = node.tail;
+            args = node.event ? [node.event].concat(rest) : rest;
+            while ((node = node.next) !== tail) {
+                node.callback.apply(node.context || this, args);
+            }
+        }
+        return this;
+    }
+}
+
+/**
+ * Mixin containing an event system. Events are also registered by specifying
+ * the target object (the object which will receive the event when raised). Both
+ * the event-emitting object and the target object store or reference to each
+ * other. This is used to correctly remove all reference to the event handler
+ * when any of the object is destroyed (when the destroy() method from
+ * ParentedMixin is called). Removing those references is necessary to avoid
+ * memory leak and phantom events (events which are raised and sent to a
+ * previously destroyed object).
+ *
+ * @name EventDispatcherMixin
+ * @mixin
+ */
+const EventDispatcherMixin = Object.assign({}, ParentedMixin, {
+    __eventDispatcherMixin: true,
+    "custom_events": {},
+
+    init() {
+        ParentedMixin.init.call(this);
+        this.__edispatcherEvents = new Events();
+        this.__edispatcherRegisteredEvents = [];
+        this._delegateCustomEvents();
+    },
+    /**
+     * Proxies a method of the object, in order to keep the right ``this`` on
+     * method invocations.
+     *
+     * This method is similar to ``Function.prototype.bind``, and
+     * even more so to ``jQuery.proxy`` with a fundamental difference: its
+     * resolution of the method being called is lazy, meaning it will use the
+     * method as it is when the proxy is called, not when the proxy is created.
+     *
+     * Other methods will fix the bound method to what it is when creating the
+     * binding/proxy, which is fine in most javascript code but problematic in
+     * Odoo where developers may want to replace existing callbacks with theirs.
+     *
+     * The semantics of this precisely replace closing over the method call.
+     *
+     * @param {String|Function} method function or name of the method to invoke
+     * @returns {Function} proxied method
+     */
+    proxy(method) {
+        var self = this;
+        return function () {
+            var fn = (typeof method === 'string') ? self[method] : method;
+            if (fn === void 0) {
+                throw new Error("Couldn't find method '" + method + "' in widget " + self);
+            }
+            return fn.apply(self, arguments);
+        };
+    },
+    _delegateCustomEvents() {
+        if (Object.keys(this.custom_events || {}).length === 0) {
+            return;
+        }
+        for (var key in this.custom_events) {
+            if (!Object.prototype.hasOwnProperty.call(this.custom_events, key)) {
+                continue;
+            }
+
+            var method = this.proxy(this.custom_events[key]);
+            this.on(key, this, method);
+        }
+    },
+    on(events, dest, func) {
+        var self = this;
+        if (typeof func !== "function") {
+            throw new Error("Event handler must be a function.");
+        }
+        events = events.split(/\s+/);
+        events.forEach((eventName) => {
+            self.__edispatcherEvents.on(eventName, func, dest);
+            if (dest && dest.__eventDispatcherMixin) {
+                dest.__edispatcherRegisteredEvents.push({name: eventName, func: func, source: self});
+            }
+        });
+        return this;
+    },
+    off(events, dest, func) {
+        var self = this;
+        events = events.split(/\s+/);
+        events.forEach((eventName) => {
+            self.__edispatcherEvents.off(eventName, func, dest);
+            if (dest && dest.__eventDispatcherMixin) {
+                dest.__edispatcherRegisteredEvents = dest.__edispatcherRegisteredEvents.filter(el => {
+                    return !(el.name === eventName && el.func === func && el.source === self);
+                });
+            }
+        });
+        return this;
+    },
+    trigger() {
+        this.__edispatcherEvents.trigger.apply(this.__edispatcherEvents, arguments);
+        return this;
+    },
+    "trigger_up": function (name, info) {
+        var event = new OdooEvent(this, name, info);
+        //console.info('event: ', name, info);
+        this._trigger_up(event);
+        return event;
+    },
+    "_trigger_up": function (event) {
+        var parent;
+        this.__edispatcherEvents.trigger(event.name, event);
+        if (!event.is_stopped() && (parent = this.getParent())) {
+            parent._trigger_up(event);
+        }
+    },
+    destroy() {
+        var self = this;
+        this.__edispatcherRegisteredEvents.forEach((event) => {
+            event.source.__edispatcherEvents.off(event.name, event.func, self);
+        });
+        this.__edispatcherRegisteredEvents = [];
+        this.__edispatcherEvents.callbackList().forEach(
+            ((cal) => {
+                this.off(cal[0], cal[2], cal[1]);
+            }).bind(this)
+        );
+        this.__edispatcherEvents.off();
+        ParentedMixin.destroy.call(this);
+    },
+});
+
+function protectMethod(widget, fn) {
+    return function (...args) {
+        return new Promise((resolve, reject) => {
+            Promise.resolve(fn.call(this, ...args))
+                .then((result) => {
+                    if (!widget.isDestroyed()) {
+                        resolve(result);
+                    }
+                })
+                .catch((reason) => {
+                    if (!widget.isDestroyed()) {
+                        reject(reason);
+                    }
+                });
+        });
+    };
+}
+
+const ServicesMixin = {
+    bindService: function (serviceName) {
+        const { services } = Component.env;
+        const service = services[serviceName];
+        if (!service) {
+            throw new Error(`Service ${serviceName} is not available`);
+        }
+        if (serviceName in SERVICES_METADATA) {
+            if (service instanceof Function) {
+                return protectMethod(this, service);
+            } else {
+                const methods = SERVICES_METADATA[serviceName];
+                const result = Object.create(service);
+                for (const method of methods) {
+                    result[method] = protectMethod(this, service[method]);
+                }
+                return result;
+            }
+        }
+        return service;
+    },
+    /**
+     * @param  {string} service
+     * @param  {string} method
+     * @return {any} result of the service called
+     */
+    call: function (service, method) {
+        var args = Array.prototype.slice.call(arguments, 2);
+        var result;
+        this.trigger_up('call_service', {
+            service: service,
+            method: method,
+            args: args,
+            callback: function (r) {
+                result = r;
+            },
+        });
+        return result;
+    },
+};
 
 /**
  * Base class for all visual components. Provides a lot of functions helpful
@@ -73,7 +435,7 @@ import { renderToElement } from "@web/core/utils/render";
  * is loaded in the dom.
  * @see PublicWidget.selector
  */
-export const PublicWidget = Class.extend(mixins.PropertiesMixin, ServicesMixin, {
+export const PublicWidget = Class.extend(EventDispatcherMixin, ServicesMixin, {
     // Backbone-ish API
     tagName: 'div',
     id: null,
@@ -114,15 +476,37 @@ export const PublicWidget = Class.extend(mixins.PropertiesMixin, ServicesMixin, 
     assetLibs: null,
     /**
      * The selector attribute, if defined, allows to automatically create an
-     * instance of this widget on page load for each DOM element which matches
+     * instance of this widget on page load for each DOM element according to
      * this selector. The `PublicWidget.$el / el` element will then be that
      * particular DOM element. This should be the main way of instantiating
      * `PublicWidget` elements.
      *
+     * The value can either be a string in which case it is considered as a
+     * `querySelectorAll` selector to match, or a function expecting to return
+     * all DOM elements to consider, which are inside the element received as
+     * parameter of the function (or that element itself).
+     *
+     * @see selectorHas
+     *
      * @todo do not make this part of the Widget but rather an info to give when
      * registering the widget.
+     *
+     * @type {string|function|false}
      */
     selector: false,
+    /**
+     * The `selectorHas` attribute, if defined, allows to filter elements found
+     * through the `selector` attribute by only considering those which contain
+     * at least an element which matches this `selectorHas` selector.
+     *
+     * Note that this is the equivalent of setting up a `selector` using the
+     * `:has` pseudo-selector but that pseudo-selector is known to not be fully
+     * supported in all browsers. To prevent useless crashes, using this
+     * `selectorHas` attribute should be preferred.
+     *
+     * @type {string|false}
+     */
+    selectorHas: false,
     /**
      * Extension of @see Widget.events
      *
@@ -153,7 +537,7 @@ export const PublicWidget = Class.extend(mixins.PropertiesMixin, ServicesMixin, 
      * @param {Object} [options]
      */
     init: function (parent, options) {
-        mixins.PropertiesMixin.init.call(this);
+        EventDispatcherMixin.init.call(this);
         this.setParent(parent);
         this.options = options || {};
     },
@@ -169,7 +553,22 @@ export const PublicWidget = Class.extend(mixins.PropertiesMixin, ServicesMixin, 
     willStart: function () {
         var proms = [];
         if (this.jsLibs || this.cssLibs || this.assetLibs) {
-            proms.push(loadBundle(this));
+            var assetsPromise = Promise.all([
+                ...(this.cssLibs || []).map(loadCSS),
+                ...(this.jsLibs || []).map(loadJS),
+            ]);
+            for (const bundleName of this.assetLibs || []) {
+                if (typeof bundleName === "string") {
+                    assetsPromise = assetsPromise.then(() => {
+                        return loadBundle(bundleName);
+                    });
+                } else {
+                    assetsPromise = assetsPromise.then(() => {
+                        return Promise.all([...bundleName.map(loadBundle)]);
+                    });
+                }
+            }
+            proms.push(assetsPromise);
         }
         return Promise.all(proms);
     },
@@ -195,7 +594,7 @@ export const PublicWidget = Class.extend(mixins.PropertiesMixin, ServicesMixin, 
      * selector property).
      */
     destroy: function () {
-        mixins.PropertiesMixin.destroy.call(this);
+        EventDispatcherMixin.destroy.call(this);
         if (this.$el) {
             this._undelegateEvents();
 
@@ -395,11 +794,11 @@ export const PublicWidget = Class.extend(mixins.PropertiesMixin, ServicesMixin, 
                 // Protect click handler to be called multiple times by
                 // mistake by the user and add a visual disabling effect
                 // for buttons.
-                method = dom.makeButtonHandler(method);
+                method = makeButtonHandler(method);
             } else {
                 // Protect all handlers to be recalled while the previous
                 // async handler call is not finished.
-                method = dom.makeAsyncHandler(method);
+                method = makeAsyncHandler(method);
             }
             _delegateEvent(method, event);
         });
@@ -497,104 +896,16 @@ export const PublicWidget = Class.extend(mixins.PropertiesMixin, ServicesMixin, 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 /**
- * Specialized Widget which automatically instantiates child widgets to attach
- * to internal DOM elements once it is started. The widgets to instantiate are
- * known thanks to a linked registry which contains info about the widget
- * classes and jQuery selectors to use to find the elements to attach them to.
- *
- * @todo Merge with 'PublicWidget' ?
- */
-var RootWidget = PublicWidget.extend({
-    /**
-     * @constructor
-     */
-    init: function () {
-        this._super.apply(this, arguments);
-        this._widgets = [];
-    },
-    /**
-     * @override
-     * @see _attachComponents
-     */
-    start: function () {
-        var defs = [this._super.apply(this, arguments)];
-
-        defs.push(this._attachComponents());
-        this._getRegistry().addEventListener("UPDATE", ({ detail }) => {
-            const { operation, value } = detail;
-            if (operation === "add") {
-                this._attachComponent(value);
-            }
-        });
-
-        return Promise.all(defs);
-    },
-
-    //--------------------------------------------------------------------------
-    // Private
-    //--------------------------------------------------------------------------
-
-    /**
-     * Instantiates a child widget according to the given registry data.
-     *
-     * @private
-     * @param {Object} childInfo
-     * @param {function} childInfo.Widget - the widget class to instantiate
-     * @param {string} childInfo.selector
-     *        the jQuery selector to use to find the internal DOM element which
-     *        needs to be attached to the instantiated widget
-     * @param {jQuery} [$from] - only check DOM elements which are descendant of
-     *                         the given one. If not given, use this.$el.
-     * @returns {Deferred}
-     */
-    _attachComponent: function (childInfo, $from) {
-        var self = this;
-        var $elements = dom.cssFind($from || this.$el, childInfo.selector);
-        var defs = Array.from($elements).map((element) => {
-            var w = new childInfo.Widget(self);
-            self._widgets.push(w);
-            return w.attachTo(element);
-        });
-        return Promise.all(defs);
-    },
-    /**
-     * Instantiates the child widgets that need to be according to the linked
-     * registry.
-     *
-     * @private
-     * @param {jQuery} [$from] - only check DOM elements which are descendant of
-     *                         the given one. If not given, use this.$el.
-     * @returns {Deferred}
-     */
-    _attachComponents: function ($from) {
-        var self = this;
-        var childInfos = this._getRegistry().getAll();
-        var defs = childInfos.map((childInfo) => {
-            return self._attachComponent(childInfo, $from);
-        });
-        return Promise.all(defs);
-    },
-    /**
-     * Returns the `RootWidgetRegistry` instance that is linked to this
-     * `RootWidget` instance.
-     *
-     * @abstract
-     * @private
-     * @returns {RootWidgetRegistry}
-     */
-    _getRegistry: function () {},
-});
-
-//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-/**
  * The registry object contains the list of widgets that should be instantiated
  * thanks to their selector property if any.
  */
 var registry = {};
 
 export default {
-    RootWidget: RootWidget,
     Widget: PublicWidget,
     registry: registry,
+
+    ParentedMixin: ParentedMixin,
+    EventDispatcherMixin: EventDispatcherMixin,
+    ServicesMixin: ServicesMixin,
 };

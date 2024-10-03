@@ -60,7 +60,7 @@ class ResetGoogleAccount(models.TransientModel):
         if self.delete_policy not in ('delete_odoo', 'delete_both'):
             events.write(next_sync_update)
 
-        self.user_id.google_calendar_account_id._set_auth_tokens(False, False, 0)
+        self.user_id.res_users_settings_id._set_google_auth_tokens(False, False, 0)
         self.user_id.write({
             'google_calendar_sync_token': False,
             'google_calendar_cal_id': False,

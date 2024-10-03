@@ -1,10 +1,9 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 import re
 
 import odoo.tests
 
-from odoo.tools import config, mute_logger
+from odoo.tools import config
 
 
 @odoo.tests.common.tagged('post_install', '-at_install')
@@ -20,8 +19,8 @@ class TestWebsiteAssets(odoo.tests.HttpCase):
         [w.write({'domain': f'inactive-{w.id}.test'}) for w in Website.search([])]
         # Don't use HOST, hardcode it so it doesn't get changed one day and make
         # the test useless
-        domain_1 = "http://127.0.0.1:%s" % config['http_port']
-        domain_2 = "http://localhost:%s" % config['http_port']
+        domain_1 = f"http://127.0.0.1:{self.http_port()}"
+        domain_2 = f"http://localhost:{self.http_port()}"
         Website.browse(1).domain = domain_1
 
         self.authenticate('admin', 'admin')
@@ -56,15 +55,15 @@ class TestWebsiteAssets(odoo.tests.HttpCase):
         #      "GET /web HTTP/1.1" 200 - 11 0.004 0.007   <--  11 Queries, ~10ms
         #      "GET /web HTTP/1.1" 200 - 11 0.003 0.005   <--  11 Queries, ~10ms
         #      "GET /web HTTP/1.1" 200 - 11 0.003 0.008   <--  11 Queries, ~10ms
-        self.url_open(domain_1 + '/web')
+        self.url_open(domain_1 + '/odoo')
         check_asset()
-        self.url_open(domain_2 + '/web')
+        self.url_open(domain_2 + '/odoo')
         check_asset()
-        self.url_open(domain_1 + '/web')
+        self.url_open(domain_1 + '/odoo')
         check_asset()
-        self.url_open(domain_2 + '/web')
+        self.url_open(domain_2 + '/odoo')
         check_asset()
-        self.url_open(domain_1 + '/web')
+        self.url_open(domain_1 + '/odoo')
         check_asset()
 
     def test_02_t_cache_invalidation(self):
@@ -263,13 +262,3 @@ class TestWebAssets(odoo.tests.HttpCase):
             [base_url_versioned, website_url_versioned],
             'base asset is expected to be present',
         )
-
-    def test_assets_bundle_css_error_frontend(self):
-        self.env['ir.qweb']._get_asset_bundle('web.assets_frontend', assets_params={'website_id': self.env['website'].search([], limit=1).id}).css()  # force pregeneration so that we have the base style
-        self.env['ir.asset'].create({
-            'name': 'Css error',
-            'bundle': 'web.assets_frontend',
-            'path': 'website/static/src/css/test_error.scss',
-        })
-        with mute_logger('odoo.addons.base.models.assetsbundle'):
-            self.start_tour('/', 'css_error_tour_frontend', login='admin')

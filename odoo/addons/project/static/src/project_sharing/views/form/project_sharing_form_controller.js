@@ -1,27 +1,18 @@
 /** @odoo-module */
 
 import { _t } from "@web/core/l10n/translation";
-import { useService } from '@web/core/utils/hooks';
-import { createElement } from "@web/core/utils/xml";
 import { FormController } from '@web/views/form/form_controller';
-import { useViewCompiler } from '@web/views/view_compiler';
-import { ProjectSharingChatterCompiler } from './project_sharing_form_compiler';
-import { ChatterContainer } from '../../components/chatter/chatter_container';
+import { useService } from '@web/core/utils/hooks';
 import { useExternalListener } from "@odoo/owl";
 
 export class ProjectSharingFormController extends FormController {
+    static components = {
+        ...FormController.components,
+    };
+
     setup() {
         super.setup();
-        this.uiService = useService('ui');
         this.notification = useService('notification');
-        const { xmlDoc } = this.archInfo;
-        const template = createElement('t');
-        const xmlDocChatter = xmlDoc.querySelector("div.oe_chatter");
-        if (xmlDocChatter && xmlDocChatter.parentNode.nodeName === "form") {
-            template.appendChild(xmlDocChatter.cloneNode(true));
-        }
-        const mailTemplates = useViewCompiler(ProjectSharingChatterCompiler, { Mail: template });
-        this.mailTemplate = mailTemplates.Mail;
         useExternalListener(window, "paste", this.onGlobalPaste, { capture: true });
         useExternalListener(window, "drop", this.onGlobalDrop, { capture: true });
     }
@@ -63,9 +54,4 @@ export class ProjectSharingFormController extends FormController {
             }
         }
     }
-}
-
-ProjectSharingFormController.components = {
-    ...FormController.components,
-    ChatterContainer,
 }

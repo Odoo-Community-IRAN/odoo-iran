@@ -6,7 +6,8 @@
         <field name="inherit_id" ref="base.view_res_bank_form"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='bic']" position="after">
-                <field name="l10n_mx_edi_code"/>
+                <field name="fiscal_country_codes" invisible="1"/>
+                <field name="l10n_mx_edi_code" invisible="'MX' not in fiscal_country_codes"/>
             </xpath>
         </field>
     </record>
@@ -17,18 +18,19 @@
         <field name="inherit_id" ref="base.view_partner_bank_form"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='bank_id']" position="after">
-                <field name="l10n_mx_edi_clabe" colspan="2"/>
+                <field name="fiscal_country_codes" invisible="1"/>
+                <field name="l10n_mx_edi_clabe" colspan="2" invisible="'MX' not in fiscal_country_codes"/>
             </xpath>
         </field>
     </record>
 
     <record model="ir.ui.view" id="view_partner_bank_tree_l10n_mx_edi_bank">
-        <field name="name">view.partner.bank.tree.mx.inherit</field>
+        <field name="name">view.partner.bank.list.mx.inherit</field>
         <field name="model">res.partner.bank</field>
         <field name="inherit_id" ref="base.view_partner_bank_tree"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='bank_name']" position="after">
-                <field name="l10n_mx_edi_clabe"/>
+                <field name="l10n_mx_edi_clabe" optional="hide"/>
             </xpath>
         </field>
     </record>

@@ -1,12 +1,12 @@
 /** @odoo-module **/
 
 import { Component, onMounted, useRef, useState } from "@odoo/owl";
-import dom from "@web/legacy/js/core/dom";
 import { _t } from "@web/core/l10n/translation";
+import { addLoadingEffect } from '@web/core/utils/ui';
+import { rpc } from "@web/core/network/rpc";
 import { registry } from "@web/core/registry";
 import { redirect } from "@web/core/utils/urls";
 import { NameAndSignature } from "@web/core/signature/name_and_signature";
-import { useService } from "@web/core/utils/hooks";
 
 /**
  * This Component is a signature request form. It uses
@@ -16,10 +16,10 @@ import { useService } from "@web/core/utils/hooks";
 class SignatureForm extends Component {
     static template = "portal.SignatureForm"
     static components = { NameAndSignature }
+    static props = ["*"];
 
     setup() {
         this.rootRef = useRef("root");
-        this.rpc = useService("rpc");
 
         this.csrfToken = odoo.csrf_token;
         this.state = useState({
@@ -65,11 +65,11 @@ class SignatureForm extends Component {
     async onClickSubmit() {
         const button = document.querySelector('.o_portal_sign_submit')
         const icon = button.removeChild(button.firstChild)
-        const restoreBtnLoading = dom.addButtonLoadingEffect(button);
+        const restoreBtnLoading = addLoadingEffect(button);
 
         const name = this.signature.name;
-        const signature = this.signature.getSignatureImage()[1];
-        const data = await this.rpc(this.props.callUrl, { name, signature });
+        const signature = this.signature.getSignatureImage().split(",")[1];
+        const data = await rpc(this.props.callUrl, { name, signature });
         if (data.force_refresh) {
             restoreBtnLoading();
             button.prepend(icon)

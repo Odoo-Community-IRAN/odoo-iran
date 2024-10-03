@@ -98,18 +98,15 @@ class TestLivechatBasicFlowHttpCase(HttpCaseWithUserDemo, TestLivechatCommon):
         self.authenticate(self.operator.login, 'ideboulonate')
 
         # Retrieve channels information, visitor info should be there
-        res = self.opener.post(self.message_info_url, json={})
-        self.assertEqual(res.status_code, 200)
-        messages_info = res.json().get('result', {})
-        livechat_info = next(c for c in messages_info['channels'] if c['id'] == channel.id)
+        params = {"channels_as_member": True}
+        init_messaging = self.make_jsonrpc_request(f"{self.livechat_base_url}/mail/data", params=params)
+        livechat_info = next(c for c in init_messaging["discuss.channel"] if c["id"] == channel.id)
         self.assertIn('visitor', livechat_info)
 
         # Remove access to visitors and try again, visitors info shouldn't be included
         self.operator.groups_id -= self.group_livechat_user
-        res = self.opener.post(self.message_info_url, json={})
-        self.assertEqual(res.status_code, 200)
-        messages_info = res.json().get('result', {})
-        livechat_info = next(c for c in messages_info['channels'] if c['id'] == channel.id)
+        init_messaging = self.make_jsonrpc_request(f"{self.livechat_base_url}/mail/data", params=params)
+        livechat_info = next(c for c in init_messaging["discuss.channel"] if c["id"] == channel.id)
         self.assertNotIn('visitor', livechat_info)
 
     def _common_basic_flow(self):
@@ -146,3 +143,6 @@ class TestLivechatBasicFlowHttpCase(HttpCaseWithUserDemo, TestLivechatCommon):
     def test_livechat_as_portal_user(self):
         new_test_user(self.env, login="portal_user", groups="base.group_portal")
         self.start_tour("/my", "website_livechat_as_portal_tour", login="portal_user")
+
+    def test_user_known_after_reload(self):
+        self.start_tour('/', 'website_livechat_user_known_after_reload')

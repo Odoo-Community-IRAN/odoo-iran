@@ -1,7 +1,7 @@
-/* @odoo-module */
-
 import { Record } from "@mail/core/common/record";
 import { assignDefined } from "@mail/utils/common/misc";
+import { _t } from "@web/core/l10n/translation";
+import { formatDate, formatDateTime } from "@web/core/l10n/dates";
 
 /**
  * @typedef Data
@@ -63,14 +63,11 @@ export class Activity extends Record {
         if (data.request_partner_id) {
             data.request_partner_id = data.request_partner_id[0];
         }
-        if (!data.icon) {
-            data.icon = "fa-tasks";
-        }
         assignDefined(activity, data);
         if (broadcast) {
-            this.env.services["mail.activity"].broadcastChannel?.postMessage({
+            this.store.activityBroadcastChannel?.postMessage({
                 type: "INSERT",
-                payload: this.env.services["mail.activity"]._serialize(activity),
+                payload: activity.serialize(),
             });
         }
         return activity;
@@ -90,14 +87,14 @@ export class Activity extends Record {
     can_write;
     /** @type {'suggest'|'trigger'} */
     chaining_type;
-    /** @type {string} */
-    create_date;
+    /** @type {luxon.DateTime} */
+    create_date = Record.attr(undefined, { type: "datetime" });
     /** @type {[number, string]} */
     create_uid;
-    /** @type {string} */
-    date_deadline;
-    /** @type {string} */
-    date_done;
+    /** @type {luxon.DateTime} */
+    date_deadline = Record.attr(undefined, { type: "date" });
+    /** @type {luxon.DateTime} */
+    date_done = Record.attr(undefined, { type: "date" });
     /** @type {string} */
     display_name;
     /** @type {boolean} */
@@ -105,12 +102,13 @@ export class Activity extends Record {
     /** @type {string} */
     feedback;
     /** @type {string} */
-    icon;
+    icon = "fa-tasks";
     /** @type {number} */
     id;
     /** @type {Object[]} */
     mail_template_ids;
     note = Record.attr("", { html: true });
+    persona = Record.one("Persona");
     /** @type {number|false} */
     previous_activity_type_id;
     /** @type {number|false} */
@@ -135,6 +133,79 @@ export class Activity extends Record {
     write_date;
     /** @type {[number, string]} */
     write_uid;
+
+    get dateDeadlineFormatted() {
+        return formatDate(this.date_deadline);
+    }
+
+    get dateDoneFormatted() {
+        return formatDate(this.date_done);
+    }
+
+    get dateCreateFormatted() {
+        return formatDateTime(this.create_date);
+    }
+
+    async edit() {
+        return new Promise((resolve) =>
+            this.store.env.services.action.doAction(
+                {
+                    type: "ir.actions.act_window",
+                    name: _t("Schedule Activity"),
+                    res_model: "mail.activity",
+                    view_mode: "form",
+                    views: [[false, "form"]],
+                    target: "new",
+                    res_id: this.id,
+                    context: {
+                        default_res_model: this.res_model,
+                        default_res_id: this.res_id,
+                    },
+                },
+                { onClose: resolve }
+            )
+        );
+    }
+
+    /** @param {number[]} attachmentIds */
+    async markAsDone(attachmentIds = []) {
+        await this.store.env.services.orm.call("mail.activity", "action_feedback", [[this.id]], {
+            attachment_ids: attachmentIds,
+            feedback: this.feedback,
+        });
+        this.store.activityBroadcastChannel?.postMessage({
+            type: "RELOAD_CHATTER",
+            payload: { id: this.res_id, model: this.res_model },
+        });
+    }
+
+    async markAsDoneAndScheduleNext() {
+        const action = await this.store.env.services.orm.call(
+            "mail.activity",
+            "action_feedback_schedule_next",
+            [[this.id]],
+            { feedback: this.feedback }
+        );
+        this.activityBroadcastChannel?.postMessage({
+            type: "RELOAD_CHATTER",
+            payload: { id: this.res_id, model: this.res_model },
+        });
+        return action;
+    }
+
+    remove({ broadcast = true } = {}) {
+        this.delete();
+        if (broadcast) {
+            this.activityBroadcastChannel?.postMessage({
+                type: "DELETE",
+                payload: { id: this.id },
+            });
+        }
+    }
+
+    serialize() {
+        return JSON.parse(JSON.stringify(this.toData()));
+    }
 }
 
 Activity.register();

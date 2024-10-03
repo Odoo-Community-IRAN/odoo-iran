@@ -2,14 +2,18 @@
 <odoo>
 
 <template id="website_blog" inherit_id="website.snippets" name="Snippet Blog">
+    <xpath expr="//t[@id='installed_snippets_hook']" position="after">
+        <t snippet-group="blogs" t-snippet="website.s_snippet_group" string="Blogs"
+            t-thumbnail="/website/static/src/img/snippets_thumbs/s_blog_posts.svg"/>
+    </xpath>
     <xpath expr="//t[@id='blog_posts_hook']" position="replace">
-        <t t-snippet="website_blog.s_blog_posts" string="Blog Posts" t-thumbnail="/website_blog/static/src/img/s_blog_posts.svg"/>
+        <t t-snippet="website_blog.s_blog_posts" string="Blog Posts" group="blogs"/>
     </xpath>
 </template>
 
 <template id="snippet_options" inherit_id="website.snippet_options" name="Blog snippet options">
     <xpath expr="." position="inside">
-        <div data-js="BlogPostTagSelection" data-selector=".o_wblog_post_page_cover" data-target="#o_wblog_post_name" data-no-check="true">
+        <div data-js="BlogPostTagSelection" data-selector=".o_wblog_post_page_cover[data-res-model='blog.post']" data-target="#o_wblog_post_name" data-no-check="true">
             <we-many2many string="Tags"
                 data-no-preview="true"
                 data-model="blog.post"
@@ -19,11 +23,11 @@
         </div>
         <!-- Blog Posts page  -->
         <div data-selector="main:has(#o_wblog_index_content)" data-page-options="true" groups="website.group_website_designer" data-no-check="true" string="Blogs Page">
-            <we-select string="Top Banner" data-no-preview="true" data-reload="/">
-                <we-button data-customize-website-views="website_blog.opt_blog_cover_post"
-                    data-name="blog_cover_opt">Name / Latest Post</we-button>
-                <we-button data-customize-website-views="">Drop Zone for Building Blocks</we-button>
-            </we-select>
+            <we-checkbox string="Top Banner"
+                         data-name="blog_cover_opt"
+                         data-customize-website-views="website_blog.opt_blog_cover_post"
+                         data-no-preview="true"
+                         data-reload="/"/>
             <we-checkbox string="Full-Width"
                          class="o_we_sublevel_1"
                          data-customize-website-views="website_blog.opt_blog_cover_post_fullwidth_design"
@@ -55,7 +59,7 @@
                          data-customize-website-views="website_blog.opt_sidebar_blog_index_archives"
                          data-no-preview="true"
                          data-reload="/"/>
-            <we-checkbox string="Follow us"
+            <we-checkbox string="Follow Us"
                          class="o_we_sublevel_1"
                          data-dependencies="blog_posts_sidebar_opt"
                          data-customize-website-views="website_blog.opt_sidebar_blog_index_follow_us"

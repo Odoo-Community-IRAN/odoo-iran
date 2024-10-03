@@ -2,7 +2,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import odoo
-
+from odoo import fields
 from odoo.addons.point_of_sale.tests.common import TestPoSCommon
 
 
@@ -13,6 +13,7 @@ class TestPoSSaleReport(TestPoSCommon):
         super(TestPoSSaleReport, self).setUp()
         self.config = self.basic_config
         self.product0 = self.create_product('Product 0', self.categ_basic, 0.0, 0.0)
+        self.partner_1 = self.env['res.partner'].create({'name': 'Test Partner 1'})
 
     def test_weight_and_volume(self):
         self.product0.product_tmpl_id.weight = 3
@@ -25,7 +26,7 @@ class TestPoSSaleReport(TestPoSCommon):
         # Process two orders
         orders.append(self.create_ui_order_data([(self.product0, 3)]))
         orders.append(self.create_ui_order_data([(self.product0, 1)]))
-        self.env['pos.order'].create_from_ui(orders)
+        self.env['pos.order'].sync_from_ui(orders)
         # Duplicate the first line of the first order
         session.order_ids[0].lines.copy()
 
@@ -70,7 +71,7 @@ class TestPoSSaleReport(TestPoSCommon):
         session = self.pos_session
 
         order = self.create_ui_order_data([(product_1, 3), (product_2, 3)])
-        self.env['pos.order'].create_from_ui([order])
+        self.env['pos.order'].sync_from_ui([order])
 
         session.action_pos_session_closing_control()
 
@@ -93,11 +94,11 @@ class TestPoSSaleReport(TestPoSCommon):
         self.open_new_session()
 
         data = self.create_ui_order_data([(product_0, 1)], self.customer, True)
-        data['data']['lines'][0][2]['sale_order_origin_id'] = sale_order.read()[0]
-        data['data']['lines'][0][2]['sale_order_line_id'] = sale_order.order_line[0].read()[0]
-        order_ids = self.env['pos.order'].create_from_ui([data])
+        data['lines'][0][2]['sale_order_origin_id'] = sale_order.id
+        data['lines'][0][2]['sale_order_line_id'] = sale_order.order_line[0].id
+        order_ids = self.env['pos.order'].sync_from_ui([data])
 
-        move_id = self.env['account.move'].browse(order_ids[0]['account_move'])
+        move_id = self.env['account.move'].browse(order_ids['pos.order'][0]['account_move'])
         self.assertEqual(move_id.partner_id.id, self.customer.id)
         self.assertEqual(move_id.partner_shipping_id.id, self.other_customer.id)
 
@@ -109,9 +110,45 @@ class TestPoSSaleReport(TestPoSCommon):
 
         # Process two orders
         orders.append(self.create_ui_order_data([(self.product0, 3)]))
-        self.env['pos.order'].create_from_ui(orders)
+        self.env['pos.order'].sync_from_ui(orders)
 
         session.action_pos_session_closing_control()
 
         reports = self.env['sale.report'].sudo().search([('product_id', '=', self.product0.id)], order='id', limit=2)
         self.assertEqual(reports[0].warehouse_id.id, self.config.picking_type_id.warehouse_id.id)
+
+    def test_qty_deliverd_qty_to_deliver_in_sales_report(self):
+        """
+            Track the quantity of products ordered based on their picking state. for example : If an order is created for 3 products
+            with the option to ship later, the products will be listed under qty_to_deliver in the sales report until the picking state
+            is validated. Once validated and marked as done, the quantity will shift to qty_delivered.
+        """
+        self.config.ship_later = True
+        self.open_new_session()
+        session = self.pos_session
+
+        orders = []
+
+        orders.append(self.create_ui_order_data([(self.product0, 5)], self.partner_1))
+        orders[0]['shipping_date'] = fields.Date.to_string(fields.Date.today())
+
+        order = self.env['pos.order'].sync_from_ui(orders)
+        order = self.env['pos.order'].browse(order['pos.order'][0]['id'])
+
+        session.action_pos_session_closing_control()
+
+        report = self.env['sale.report'].sudo().search([('product_id', '=', self.product0.id)], order='id')
+
+        self.assertEqual(report.qty_to_deliver, 5)
+        self.assertEqual(report.qty_delivered, 0)
+
+        order.picking_ids.move_ids.quantity = 5.0
+        order.picking_ids.button_validate()
+        # flush computations and clear the cache before checking again the report
+        self.env.flush_all()
+        self.env.clear()
+
+        report = self.env['sale.report'].sudo().search([('product_id', '=', self.product0.id)], order='id')
+
+        self.assertEqual(report.qty_to_deliver, 0)
+        self.assertEqual(report.qty_delivered, 5)

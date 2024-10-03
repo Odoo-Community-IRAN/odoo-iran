@@ -8,6 +8,7 @@ from . import ir_ui_menu
 from . import ir_ui_view
 from . import ir_asset
 from . import ir_actions
+from . import ir_embedded_actions
 from . import ir_actions_report
 from . import ir_attachment
 from . import ir_binary
@@ -24,7 +25,6 @@ from . import ir_qweb
 from . import ir_qweb_fields
 from . import ir_http
 from . import ir_logging
-from . import ir_property
 from . import ir_module
 from . import ir_demo
 from . import ir_demo_failure
@@ -45,5 +45,6 @@ from . import res_company
 from . import res_users
 from . import res_users_settings
 from . import res_users_deletion
+from . import res_device
 
 from . import decimal_precision

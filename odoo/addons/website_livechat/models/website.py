@@ -2,7 +2,6 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo import fields, models, _, Command
-from odoo.addons.http_routing.models.ir_http import url_for
 from odoo.addons.mail.models.discuss.mail_guest import add_guest_to_context
 
 
@@ -23,7 +22,7 @@ class Website(models.Model):
             if livechat_info['available']:
                 livechat_request_session = self._get_livechat_request_session()
                 if livechat_request_session:
-                    livechat_info['options']['chat_request_session'] = livechat_request_session
+                    livechat_info['options']['force_thread'] = livechat_request_session
             return livechat_info
         return {}
 
@@ -37,9 +36,11 @@ class Website(models.Model):
         :return: {dict} livechat request session information
         """
         visitor = self.env['website.visitor']._get_visitor_from_request()
+        chat_request_session = {}
         if visitor:
             # get active chat_request linked to visitor
             chat_request_channel = self.env['discuss.channel'].sudo().search([
+                ("channel_type", "=", "livechat"),
                 ('livechat_visitor_id', '=', visitor.id),
                 ('livechat_channel_id', '=', self.channel_id.id),
                 ('livechat_active', '=', True),
@@ -53,28 +54,21 @@ class Website(models.Model):
                         # Channel was created with a guest but the visitor was
                         # linked to another guest in the meantime. We need to
                         # update the channel to link it to the current guest.
-                        chat_request_channel.write({'channel_member_ids': [Command.unlink(channel_guest_member.id), Command.create({'guest_id': current_guest.id})]})
-                    if not current_guest and not channel_guest_member:
-                        return {}
-                    if not current_guest:
+                        chat_request_channel.write({'channel_member_ids': [
+                            Command.unlink(channel_guest_member.id),
+                            Command.create({'guest_id': current_guest.id, 'fold_state': 'open'})
+                        ]})
+                    if not current_guest and channel_guest_member:
                         channel_guest_member.guest_id._set_auth_cookie()
                         chat_request_channel = chat_request_channel.with_context(guest=channel_guest_member.guest_id.sudo(False))
-                return {
-                    "folded": False,
-                    "id": chat_request_channel.id,
-                    "requested_by_operator": chat_request_channel.create_uid in chat_request_channel.livechat_operator_id.user_ids,
-                    "operator_pid": [
-                        chat_request_channel.livechat_operator_id.id,
-                        chat_request_channel.livechat_operator_id.user_livechat_username or chat_request_channel.livechat_operator_id.display_name,
-                        chat_request_channel.livechat_operator_id.user_livechat_username,
-                    ],
-                    "name": chat_request_channel.name,
-                    "uuid": chat_request_channel.uuid,
-                    "type": "chat_request"
-                }
-        return {}
+                if chat_request_channel.is_member:
+                    chat_request_session = {
+                        "id": chat_request_channel.id,
+                        "model": "discuss.channel",
+                    }
+        return chat_request_session
 
     def get_suggested_controllers(self):
         suggested_controllers = super(Website, self).get_suggested_controllers()
-        suggested_controllers.append((_('Live Support'), url_for('/livechat'), 'website_livechat'))
+        suggested_controllers.append((_('Live Support'), self.env['ir.http']._url_for('/livechat'), 'website_livechat'))
         return suggested_controllers

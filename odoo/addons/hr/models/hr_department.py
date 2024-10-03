@@ -8,7 +8,7 @@ from odoo.exceptions import ValidationError
 class Department(models.Model):
     _name = "hr.department"
     _description = "Department"
-    _inherit = ['mail.thread']
+    _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = "name"
     _rec_name = 'complete_name'
     _parent_store = True
@@ -19,15 +19,17 @@ class Department(models.Model):
     company_id = fields.Many2one('res.company', string='Company', index=True, default=lambda self: self.env.company)
     parent_id = fields.Many2one('hr.department', string='Parent Department', index=True, check_company=True)
     child_ids = fields.One2many('hr.department', 'parent_id', string='Child Departments')
-    manager_id = fields.Many2one('hr.employee', string='Manager', tracking=True, check_company=True)
+    manager_id = fields.Many2one('hr.employee', string='Manager', tracking=True, domain="['|', ('company_id', '=', False), ('company_id', 'in', allowed_company_ids)]")
     member_ids = fields.One2many('hr.employee', 'department_id', string='Members', readonly=True)
-    total_employee = fields.Integer(compute='_compute_total_employee', string='Total Employee')
+    has_read_access = fields.Boolean(search="_search_has_read_access", store=False, export_string_translation=False)
+    total_employee = fields.Integer(compute='_compute_total_employee', string='Total Employee',
+        export_string_translation=False)
     jobs_ids = fields.One2many('hr.job', 'department_id', string='Jobs')
     plan_ids = fields.One2many('mail.activity.plan', 'department_id')
     plans_count = fields.Integer(compute='_compute_plan_count')
     note = fields.Text('Note')
     color = fields.Integer('Color Index')
-    parent_path = fields.Char(index=True, unaccent=False)
+    parent_path = fields.Char(index=True)
     master_department_id = fields.Many2one(
         'hr.department', 'Master Department', compute='_compute_master_department_id', store=True)
 
@@ -37,6 +39,17 @@ class Department(models.Model):
             return super()._compute_display_name()
         for record in self:
             record.display_name = record.name
+
+    def _search_has_read_access(self, operator, value):
+        supported_operators = ["="]
+        if operator not in supported_operators or not isinstance(value, bool):
+            raise NotImplementedError()
+        if not value:
+            return [(1, "=", 0)]
+        if self.env['hr.employee'].has_access('read'):
+            return [(1, "=", 1)]
+        departments_ids = self.env['hr.department'].sudo().search([('manager_id', 'in', self.env.user.employee_ids.ids)]).ids
+        return [('id', 'child_of', departments_ids)]
 
     @api.model
     def name_create(self, name):
@@ -57,7 +70,7 @@ class Department(models.Model):
             department.master_department_id = int(department.parent_path.split('/')[0])
 
     def _compute_total_employee(self):
-        emp_data = self.env['hr.employee']._read_group([('department_id', 'in', self.ids)], ['department_id'], ['__count'])
+        emp_data = self.env['hr.employee'].sudo()._read_group([('department_id', 'in', self.ids)], ['department_id'], ['__count'])
         result = {department.id: count for department, count in emp_data}
         for department in self:
             department.total_employee = result.get(department.id, 0)
@@ -70,7 +83,7 @@ class Department(models.Model):
 
     @api.constrains('parent_id')
     def _check_parent_id(self):
-        if not self._check_recursion():
+        if self._has_cycle():
             raise ValidationError(_('You cannot create recursive departments.'))
 
     @api.model_create_multi
@@ -99,6 +112,11 @@ class Department(models.Model):
                 # subscribe the manager user
                 if manager.user_id:
                     self.message_subscribe(partner_ids=manager.user_id.partner_id.ids)
+            manager_to_unsubscribe = set()
+            for department in self:
+                if department.manager_id and department.manager_id.user_id:
+                    manager_to_unsubscribe.update(department.manager_id.user_id.partner_id.ids)
+            self.message_unsubscribe(partner_ids=list(manager_to_unsubscribe))
             # set the employees's parent to the new manager
             self._update_employee_manager(manager_id)
         return super(Department, self).write(vals)
@@ -115,7 +133,7 @@ class Department(models.Model):
 
     def get_formview_action(self, access_uid=None):
         res = super().get_formview_action(access_uid=access_uid)
-        if (not self.user_has_groups('hr.group_hr_user') and
+        if (not self.env.user.has_group('hr.group_hr_user') and
            self.env.context.get('open_employees_kanban', False)):
             res.update({
                 'name': self.name,
@@ -132,8 +150,40 @@ class Department(models.Model):
         action['context'] = {'default_department_id': self.id, 'search_default_department_id': self.id}
         return action
 
+    def action_employee_from_department(self):
+        if self.env['hr.employee'].has_access('read'):
+            res_model = "hr.employee"
+            search_view_id = self.env.ref('hr.view_employee_filter').id
+        else:
+            res_model = "hr.employee.public"
+            search_view_id = self.env.ref('hr.hr_employee_public_view_search').id
+        return {
+            'name': _("Employees"),
+            'type': 'ir.actions.act_window',
+            'res_model': res_model,
+            'view_mode': 'list,kanban,form',
+            'search_view_id': [search_view_id, 'search'],
+            'context': {
+                'searchpanel_default_department_id': self.id,
+                'default_department_id': self.id,
+                'search_default_group_department': 1,
+                'search_default_department_id': self.id,
+                'expand': 1
+            },
+        }
+
     def get_children_department_ids(self):
         return self.env['hr.department'].search([('id', 'child_of', self.ids)])
+
+    def action_open_view_child_departments(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "hr.department",
+            "views": [[False, "kanban"], [False, "list"], [False, "form"]],
+            "domain": [['id', 'in', self.get_children_department_ids().ids]],
+            "name": "Child departments",
+        }
 
     def get_department_hierarchy(self):
         if not self:

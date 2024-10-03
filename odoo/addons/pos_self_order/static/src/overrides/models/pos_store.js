@@ -1,36 +1,32 @@
-/** @odoo-module */
-
 import { PosStore } from "@point_of_sale/app/store/pos_store";
-import { Order } from "@point_of_sale/app/store/models";
 import { patch } from "@web/core/utils/patch";
+import { PosOrder } from "@point_of_sale/app/models/pos_order";
 
 patch(PosStore.prototype, {
-    // @Override
-    async _processData(loadedData) {
-        await super._processData(...arguments);
-        this.company_has_self_ordering = loadedData["company_has_self_ordering"];
+    async getServerOrders() {
+        if (this.session._self_ordering) {
+            await this.loadServerOrders([
+                ["company_id", "=", this.config.company_id.id],
+                ["state", "=", "draft"],
+                "|",
+                ["pos_reference", "ilike", "Kiosk"],
+                ["pos_reference", "ilike", "Self-Order"],
+                ["table_id", "=", false],
+            ]);
+        }
+
+        return await super.getServerOrders(...arguments);
+    },
+    _shouldLoadOrders() {
+        return super._shouldLoadOrders() || this.session._self_ordering;
     },
 });
 
-patch(Order.prototype, {
+patch(PosOrder.prototype, {
     setup() {
         super.setup(...arguments);
-        if (this.name.startsWith('Self-Order')) {
-            this.trackingNumber = "S" + this.trackingNumber
+        if (this.pos_reference?.startsWith("Self-Order")) {
+            this.tracking_number = "S" + this.tracking_number;
         }
     },
-
-    defaultTableNeeded(options) {
-        return (
-            super.defaultTableNeeded(...arguments) &&
-            !this.name.includes("Kiosk") &&
-            !this.name.includes("Self-Order")
-        );
-    },
-
-    updateSequenceNumber(json){
-        if(!json.name.startsWith('Self-Order')) {
-            super.updateSequenceNumber(json);
-        }
-    }
 });

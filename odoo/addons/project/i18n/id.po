@@ -3,16 +3,16 @@
 # 	* project
 # 
 # Translators:
-# Abe Manyo, 2024
 # Wil Odoo, 2024
+# Abe Manyo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-08-13 10:26+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Wil Odoo, 2024\n"
+"POT-Creation-Date: 2024-09-25 08:39+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Abe Manyo, 2024\n"
 "Language-Team: Indonesian (https://app.transifex.com/odoo/teams/41243/id/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -23,7 +23,6 @@ msgstr ""
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
 msgid ""
 "\n"
 "                <p class=\"o_view_nocontent_smiling_face\">\n"
@@ -43,15 +42,117 @@ msgstr ""
 
 #. module: project
 #. odoo-javascript
-#: code:addons/project/static/src/views/project_task_calendar/project_task_calendar_controller.js:0
-#, python-format
-msgid " - Tasks by Deadline"
-msgstr "- Tasks berdasarkan Deadline"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__collaborator_count
-msgid "# Collaborators"
-msgstr "# Kolaborator"
+#: code:addons/project/static/src/views/project_task_form/project_task_form_controller.js:0
+msgid ""
+"\n"
+");\n"
+"\n"
+"export class ProjectTaskFormController extends FormControllerWithHTMLExpander {\n"
+"    setup() {\n"
+"        super.setup();\n"
+"        this.notifications = useService(\"notification\");\n"
+"    }\n"
+"\n"
+"    /**\n"
+"     * @override\n"
+"     */\n"
+"    getStaticActionMenuItems() {\n"
+"        return {\n"
+"            ...super.getStaticActionMenuItems(),\n"
+"            openHistoryDialog: {\n"
+"                sequence: 50,\n"
+"                icon: \"fa fa-history\",\n"
+"                description: _t(\"Version History\"),\n"
+"                callback: () => this.openHistoryDialog(),\n"
+"            },\n"
+"        };\n"
+"    }\n"
+"\n"
+"    get deleteConfirmationDialogProps() {\n"
+"        const deleteConfirmationDialogProps = super.deleteConfirmationDialogProps;\n"
+"        if (!this.model.root.data.subtask_count) {\n"
+"            return deleteConfirmationDialogProps;\n"
+"        }\n"
+"        return {\n"
+"            ...deleteConfirmationDialogProps,\n"
+"            body: subTaskDeleteConfirmationMessage,\n"
+"        }\n"
+"    }\n"
+"\n"
+"    async openHistoryDialog() {\n"
+"        const record = this.model.root;\n"
+"        const versionedFieldName = 'description';\n"
+"        const historyMetadata = record.data[\"html_field_history_metadata\"]?.[versionedFieldName];\n"
+"        if (!historyMetadata) {\n"
+"            this.notifications.add(\n"
+"                escape(_t(\n"
+"                    \"The task description lacks any past content that could be restored at the moment.\"\n"
+"                ))\n"
+"            );\n"
+"            return;\n"
+"        }\n"
+"\n"
+"        this.dialogService.add(\n"
+"            HistoryDialog,\n"
+"            {\n"
+"                title: _t(\"Task Description History\"),\n"
+"                noContentHelper: markup(\n"
+"                    "
+msgstr ""
+"\n"
+");\n"
+"\n"
+"export class ProjectTaskFormController extends FormControllerWithHTMLExpander {\n"
+"    setup() {\n"
+"        super.setup();\n"
+"        this.notifications = useService(\"notification\");\n"
+"    }\n"
+"\n"
+"    /**\n"
+"     * @override\n"
+"     */\n"
+"    getStaticActionMenuItems() {\n"
+"        return {\n"
+"            ...super.getStaticActionMenuItems(),\n"
+"            openHistoryDialog: {\n"
+"                sequence: 50,\n"
+"                icon: \"fa fa-history\",\n"
+"                description: _t(\"Version History\"),\n"
+"                callback: () => this.openHistoryDialog(),\n"
+"            },\n"
+"        };\n"
+"    }\n"
+"\n"
+"    get deleteConfirmationDialogProps() {\n"
+"        const deleteConfirmationDialogProps = super.deleteConfirmationDialogProps;\n"
+"        if (!this.model.root.data.subtask_count) {\n"
+"            return deleteConfirmationDialogProps;\n"
+"        }\n"
+"        return {\n"
+"            ...deleteConfirmationDialogProps,\n"
+"            body: subTaskDeleteConfirmationMessage,\n"
+"        }\n"
+"    }\n"
+"\n"
+"    async openHistoryDialog() {\n"
+"        const record = this.model.root;\n"
+"        const versionedFieldName = 'description';\n"
+"        const historyMetadata = record.data[\"html_field_history_metadata\"]?.[versionedFieldName];\n"
+"        if (!historyMetadata) {\n"
+"            this.notifications.add(\n"
+"                escape(_t(\n"
+"                    \"Keterangan task tidak memiliki konten di masa lalu yang dapat dipulihkan pada saat ini.\"\n"
+"                ))\n"
+"            );\n"
+"            return;\n"
+"        }\n"
+"\n"
+"        this.dialogService.add(\n"
+"            HistoryDialog,\n"
+"            {\n"
+"                title: _t(\"Task Description History\"),\n"
+"                noContentHelper: markup(\n"
+"                    "
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_project__rating_count
@@ -59,22 +160,10 @@ msgid "# Ratings"
 msgstr "# Rating"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_res_partner__task_count
-#: model:ir.model.fields,field_description:project.field_res_users__task_count
-msgid "# Tasks"
-msgstr "# Kegiatans"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_milestone__done_task_count
-msgid "# of Done Tasks"
-msgstr "# Task yang Selesai"
-
-#. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/burndown_chart/burndown_chart_model.js:0
 #: model:ir.model.fields,field_description:project.field_project_milestone__task_count
 #: model:ir.model.fields,field_description:project.field_report_project_task_user__nbr
-#, python-format
 msgid "# of Tasks"
 msgstr "# Kegiatans"
 
@@ -93,60 +182,64 @@ msgid "#{task.stage_id.name}"
 msgstr "#{task.stage_id.name}"
 
 #. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/views/widget/subtask_counter.js:0
+msgid "%(closedCount)s sub-tasks closed out of %(totalCount)s"
+msgstr "%(closedCount)s sub-task ditutup dari total %(totalCount)s"
+
+#. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
 msgid "%(closed_task_count)s / %(task_count)s"
 msgstr "%(closed_task_count)s / %(task_count)s"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
 msgid "%(closed_task_count)s / %(task_count)s (%(closed_rate)s%%)"
 msgstr "%(closed_task_count)s / %(task_count)s (%(closed_rate)s%%)"
 
 #. module: project
-#. odoo-python
-#: code:addons/project/models/project_project.py:0
-#, python-format
-msgid "%(name)s"
-msgstr "%(name)s"
+#. odoo-javascript
+#: code:addons/project/static/src/views/widget/subtask_counter.js:0
+msgid "%(count1)s/%(count2)s"
+msgstr "%(count1)s/%(count2)s"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
+msgid "%(name)s Dashboard"
+msgstr "%(name)s Dashboard"
+
+#. module: project
+#. odoo-python
+#: code:addons/project/models/project_project.py:0
 msgid "%(name)s's Burndown Chart"
 msgstr "Grafik Burndown %(name)s"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
 msgid "%(name)s's Milestones"
 msgstr "Milestone %(name)s"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
 msgid "%(name)s's Rating"
 msgstr "Rating %(name)s"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
 msgid "%(name)s's Tasks Analysis"
 msgstr "Analisis Task %(name)s"
 
 #. module: project
 #. odoo-python
-#: code:addons/project/models/project_project.py:0
-#, python-format
-msgid "%(name)s's Updates"
-msgstr "Update %(name)s"
+#: code:addons/project/models/res_partner.py:0
+msgid "%(partner_name)s's Tasks"
+msgstr "Task %(partner_name)s"
 
 #. module: project
 #. odoo-python
@@ -154,9 +247,14 @@ msgstr "Update %(name)s"
 #: code:addons/project/models/project_project_stage.py:0
 #: code:addons/project/models/project_task.py:0
 #: code:addons/project/models/project_task_type.py:0
-#, python-format
 msgid "%s (copy)"
 msgstr "%s (salin)"
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/components/notebook_task_one2many_field/notebook_task_list_renderer.js:0
+msgid "%s closed tasks"
+msgstr "%s task-task ditutup"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.milestone_deadline
@@ -169,7 +267,14 @@ msgid "(last project update),"
 msgstr "(update project terakhir),"
 
 #. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/project_sharing/components/depend_on_ids_one2many/depend_on_ids_list_renderer.xml:0
+msgid "(other) tasks to which you do not have access."
+msgstr "task (lainnya) yang aksesnya Anda tidak miliki."
+
+#. module: project
 #: model_terms:ir.ui.view,arch_db:project.project_message_user_assigned
+#: model_terms:ir.ui.view,arch_db:project.task_invitation_follower
 msgid ""
 ",\n"
 "    <br/><br/>"
@@ -185,7 +290,6 @@ msgstr "- diraih pada"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/js/tours/project.js:0
-#, python-format
 msgid "<b>Drag &amp; drop</b> the card to change your task from stage."
 msgstr ""
 "<b>Drag &amp; drop</b> ke kartu untuk merubah task Anda dari tahap ke tahap."
@@ -193,7 +297,6 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/js/tours/project.js:0
-#, python-format
 msgid ""
 "<b>Log notes</b> for internal communications <i>(the people following this "
 "task won't be notified of the note you are logging unless you specifically "
@@ -229,8 +332,8 @@ msgid ""
 "            </t>\n"
 "        </td></tr>\n"
 "        <tr><td style=\"text-align: center;\">\n"
-"            <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"590\" summary=\"o_mail_notification\" style=\"width:100%; margin: 32px 0px 32px 0px;\">\n"
-"                <tr><td style=\"font-size: 13px;\">\n"
+"            <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"590\" style=\"width:100%; margin: 32px 0px 32px 0px; display: inline-table;\">\n"
+"                <tr><td style=\"font-size: 13px;text-align:center;\">\n"
 "                    <strong>Tell us how you feel about our services</strong><br>\n"
 "                    <span style=\"font-size: 12px; opacity: 0.5; color: #454748;\">(click on one of these smileys)</span>\n"
 "                </td></tr>\n"
@@ -238,17 +341,17 @@ msgid ""
 "                    <table style=\"width:100%;text-align:center;margin-top:2rem;\">\n"
 "                        <tr>\n"
 "                            <td>\n"
-"                                <a t-attf-href=\"/rate/{{ access_token }}/5\">\n"
+"                                <a t-attf-href=\"/rate/{{ access_token }}/5\" t-att-class=\"'pe-none' if object._rating_get_operator() else ''\">\n"
 "                                    <img alt=\"Satisfied\" src=\"/rating/static/src/img/rating_5.png\" title=\"Satisfied\">\n"
 "                                </a>\n"
 "                            </td>\n"
 "                            <td>\n"
-"                                <a t-attf-href=\"/rate/{{ access_token }}/3\">\n"
+"                                <a t-attf-href=\"/rate/{{ access_token }}/3\" t-att-class=\"'pe-none' if object._rating_get_operator() else ''\">\n"
 "                                    <img alt=\"Okay\" src=\"/rating/static/src/img/rating_3.png\" title=\"Okay\">\n"
 "                                </a>\n"
 "                            </td>\n"
 "                            <td>\n"
-"                                <a t-attf-href=\"/rate/{{ access_token }}/1\">\n"
+"                                <a t-attf-href=\"/rate/{{ access_token }}/1\" t-att-class=\"'pe-none' if object._rating_get_operator() else ''\">\n"
 "                                    <img alt=\"Dissatisfied\" src=\"/rating/static/src/img/rating_1.png\" title=\"Dissatisfied\">\n"
 "                                </a>\n"
 "                            </td>\n"
@@ -291,40 +394,40 @@ msgstr ""
 "    <tbody>\n"
 "        <tr><td valign=\"top\" style=\"font-size: 13px;\">\n"
 "            <t t-if=\"partner.name\">\n"
-"                Halo <t t-out=\"partner.name or ''\">Brandon Freeman</t>,<br><br>\n"
+"                Hello <t t-out=\"partner.name or ''\">Brandon Freeman</t>,<br><br>\n"
 "            </t>\n"
 "            <t t-else=\"\">\n"
 "                Hello,<br><br>\n"
 "            </t>\n"
-"            Mohon ambil sedikit waktu untuk menilai layanan kami terkait task <strong t-out=\"object.name or ''\">Planning dan budget</strong>\n"
+"            Please take a moment to rate our services related to the <strong t-out=\"object.name or ''\">Planning and budget</strong> task\n"
 "            <t t-if=\"object._rating_get_operator().name\">\n"
-"                yang ditugaskan ke <strong t-out=\"object._rating_get_operator().name or ''\">Mitchell Admin</strong>.<br>\n"
+"                assigned to <strong t-out=\"object._rating_get_operator().name or ''\">Mitchell Admin</strong>.<br>\n"
 "            </t>\n"
 "            <t t-else=\"\">\n"
 "                .<br>\n"
 "            </t>\n"
 "        </td></tr>\n"
 "        <tr><td style=\"text-align: center;\">\n"
-"            <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"590\" summary=\"o_mail_notification\" style=\"width:100%; margin: 32px 0px 32px 0px;\">\n"
-"                <tr><td style=\"font-size: 13px;\">\n"
-"                    <strong>26Beritahu kami pendapat Anda mengenai layanan kami</strong><br>\n"
-"                    <span style=\"font-size: 12px; opacity: 0.5; color: #454748;\">(klik salah satu emoji ini)</span>\n"
+"            <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"590\" style=\"width:100%; margin: 32px 0px 32px 0px; display: inline-table;\">\n"
+"                <tr><td style=\"font-size: 13px;text-align:center;\">\n"
+"                    <strong>Tell us how you feel about our services</strong><br>\n"
+"                    <span style=\"font-size: 12px; opacity: 0.5; color: #454748;\">(click on one of these smileys)</span>\n"
 "                </td></tr>\n"
 "                <tr><td style=\"font-size: 13px;\">\n"
 "                    <table style=\"width:100%;text-align:center;margin-top:2rem;\">\n"
 "                        <tr>\n"
 "                            <td>\n"
-"                                <a t-attf-href=\"/rate/{{ access_token }}/5\">\n"
+"                                <a t-attf-href=\"/rate/{{ access_token }}/5\" t-att-class=\"'pe-none' if object._rating_get_operator() else ''\">\n"
 "                                    <img alt=\"Satisfied\" src=\"/rating/static/src/img/rating_5.png\" title=\"Satisfied\">\n"
 "                                </a>\n"
 "                            </td>\n"
 "                            <td>\n"
-"                                <a t-attf-href=\"/rate/{{ access_token }}/3\">\n"
+"                                <a t-attf-href=\"/rate/{{ access_token }}/3\" t-att-class=\"'pe-none' if object._rating_get_operator() else ''\">\n"
 "                                    <img alt=\"Okay\" src=\"/rating/static/src/img/rating_3.png\" title=\"Okay\">\n"
 "                                </a>\n"
 "                            </td>\n"
 "                            <td>\n"
-"                                <a t-attf-href=\"/rate/{{ access_token }}/1\">\n"
+"                                <a t-attf-href=\"/rate/{{ access_token }}/1\" t-att-class=\"'pe-none' if object._rating_get_operator() else ''\">\n"
 "                                    <img alt=\"Dissatisfied\" src=\"/rating/static/src/img/rating_1.png\" title=\"Dissatisfied\">\n"
 "                                </a>\n"
 "                            </td>\n"
@@ -334,15 +437,15 @@ msgstr ""
 "            </table>\n"
 "        </td></tr>\n"
 "        <tr><td valign=\"top\" style=\"font-size: 13px;\">\n"
-"            Kami menghargai feedback Anda. Feedback Anda membantu kami terus berkembang.\n"
+"            We appreciate your feedback. It helps us improve continuously.\n"
 "            <t t-if=\"object.project_id.rating_status == 'stage'\">\n"
-"                <br><span style=\"margin: 0; font-size: 12px; opacity: 0.5; color: #454748;\">Survei kepuasan ini dikirim karena tiket Anda telah dipindahkan ke tahap <b t-out=\"object.stage_id.name or ''\">Sedang berlangsung</b></span>\n"
+"                <br><span style=\"margin: 0; font-size: 12px; opacity: 0.5; color: #454748;\">This satisfaction survey has been sent because your task has been moved to the <b t-out=\"object.stage_id.name or ''\">In progress</b> stage</span>\n"
 "            </t>\n"
 "            <t t-if=\"object.project_id.rating_status == 'periodic'\">\n"
-"                <br><span style=\"margin: 0; font-size: 12px; opacity: 0.5; color: #454748;\">Survei kepuasan ini dikirim <b t-out=\"object.project_id.rating_status_period or ''\">setiap minggu</b> selama task masih berada dalam tahap <b t-out=\"object.stage_id.name or ''\">Sedang berlangsung</b>.</span>\n"
+"                <br><span style=\"margin: 0; font-size: 12px; opacity: 0.5; color: #454748;\">This satisfaction survey is sent <b t-out=\"object.project_id.rating_status_period or ''\">weekly</b> as long as the task is in the <b t-out=\"object.stage_id.name or ''\">In progress</b> stage.</span>\n"
 "            </t>\n"
 "        </td></tr>\n"
-"        <tr><td><br>Salam hormat,</td></tr>\n"
+"        <tr><td><br>Best regards,</td></tr>\n"
 "        <tr><td>\n"
 "           <t t-out=\"object.project_id.company_id.name or ''\">YourCompany</t>\n"
 "        </td></tr>\n"
@@ -389,11 +492,12 @@ msgstr ""
 #: model:mail.template,body_html:project.mail_template_data_project_task
 msgid ""
 "<div>\n"
-"    Dear <t t-out=\"object.partner_id.name or 'customer'\">Brandon Freeman</t>,<br>\n"
-"    Thank you for your enquiry.<br>\n"
-"    If you have any questions, please let us know.\n"
-"    <br><br>\n"
-"    Thank you,\n"
+"    Dear <t t-out=\"object.partner_id.name or 'customer'\">Brandon Freeman</t>,<br><br>\n"
+"    Thank you for contacting us. We appreciate your interest in our products/services.<br>\n"
+"    Our team is currently reviewing your inquiry and will respond to your email as soon as possible.<br>\n"
+"    If you have any further questions or concerns in the meantime, please do not hesitate to let us know. We are here to help.<br><br>\n"
+"    Thank you for your patience.<br>\n"
+"    Best regards,\n"
 "    <t t-if=\"user.signature\">\n"
 "        <br>\n"
 "        <t t-out=\"user.signature or ''\">--<br>Mitchell Admin</t>\n"
@@ -402,11 +506,12 @@ msgid ""
 "        "
 msgstr ""
 "<div>\n"
-"    Yth <t t-out=\"object.partner_id.name or 'customer'\">Brandon Freeman</t>,<br>\n"
-"    Terima kasih untuk pertanyaan Anda.<br>\n"
-"    Bila Anda memiliki pertanyaan tambahan apapun, mohon beritahu kami.\n"
-"    <br><br>\n"
-"    Terima kasih,\n"
+"    Yth <t t-out=\"object.partner_id.name or 'customer'\">Brandon Freeman</t>,<br><br>\n"
+"    Terima kasih sudah menghubungi kami. Kami menghargai minat Anda untuk produk/layanan kami.<br>\n"
+"    Tim kami saat ini meninjau pertanyaan Anda dan akan menanggapi email Anda secepat mungkin.<br>\n"
+"    Bila Anda memiliki pertanyaan lebih lanjut atau kekhawatiran saat ini, mohon jangan sungkan untuk memberitahu kami. Kami hadir di sini untuk membantu.<br><br>\n"
+"    Terima kasih atas kesabaran Anda.<br>\n"
+"    Salam hormat,\n"
 "    <t t-if=\"user.signature\">\n"
 "        <br>\n"
 "        <t t-out=\"user.signature or ''\">--<br>Mitchell Admin</t>\n"
@@ -505,25 +610,9 @@ msgid "<span class=\"fw-normal\"> Tasks</span>"
 msgstr "<span class=\"fw-normal\"> Task</span>"
 
 #. module: project
-#: model_terms:ir.ui.view,arch_db:project.view_task_form2
-msgid "<span class=\"o_stat_text order-2\">Closed</span>"
-msgstr "<span class=\"o_stat_text order-2\">Tutup</span>"
-
-#. module: project
-#: model_terms:ir.ui.view,arch_db:project.view_task_form2
-msgid "<span class=\"o_stat_text order-2\">Sub-tasks</span>"
-msgstr "<span class=\"o_stat_text order-2\">Sub-task</span>"
-
-#. module: project
-#: model_terms:ir.ui.view,arch_db:project.edit_project
-msgid ""
-"<span class=\"o_stat_text\">\n"
-"                                    Collaborators\n"
-"                                </span>"
+#: model_terms:ir.ui.view,arch_db:project.project_sharing_project_task_view_form
+msgid "<span class=\"o_stat_text\">Blocked Tasks</span>"
 msgstr ""
-"<span class=\"o_stat_text\">\n"
-"                                    Kolaborator\n"
-"                                </span>"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.view_task_form2
@@ -535,6 +624,16 @@ msgstr "<span class=\"o_stat_text\">Rating Terakhir</span>"
 #: model_terms:ir.ui.view,arch_db:project.view_task_form2
 msgid "<span class=\"o_stat_text\">Parent Task</span>"
 msgstr "<span class=\"o_stat_text\">Task Induk</span>"
+
+#. module: project
+#: model_terms:ir.ui.view,arch_db:project.view_task_form2
+msgid "<span class=\"o_stat_text\">Sub-tasks</span>"
+msgstr "<span class=\"o_stat_text\">Sub-tasks</span>"
+
+#. module: project
+#: model_terms:ir.ui.view,arch_db:project.edit_project
+msgid "<span class=\"o_stat_text\">Tasks</span>"
+msgstr "<span class=\"o_stat_text\">Task</span>"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.edit_project
@@ -566,11 +665,6 @@ msgstr "Laporan"
 #: model_terms:ir.ui.view,arch_db:project.view_project_kanban
 msgid "<span>View</span>"
 msgstr "<span>Lihat</span>"
-
-#. module: project
-#: model_terms:ir.ui.view,arch_db:project.portal_my_task
-msgid "<strong class=\"d-block mb-2\">Attachments</strong>"
-msgstr "<strong class=\"d-block mb-2\">Lampiran</strong>"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.portal_my_task
@@ -617,8 +711,19 @@ msgstr ""
 
 #. module: project
 #. odoo-python
+#: code:addons/project/models/project_task.py:0
+msgid "A new task has been created and is not part of any project."
+msgstr "Task baru telah dibuat dan tidak merupakan bagian project apa pun."
+
+#. module: project
+#. odoo-python
+#: code:addons/project/models/project_task.py:0
+msgid "A new task has been created in the \"%(project_name)s\" project."
+msgstr "Task baru telah dibuat di project \"%(project_name)s\""
+
+#. module: project
+#. odoo-python
 #: code:addons/project/models/project_task_type.py:0
-#, python-format
 msgid ""
 "A personal stage cannot be linked to a project because it is only visible to"
 " its corresponding user."
@@ -652,12 +757,7 @@ msgid "Accept Emails From"
 msgstr "Menerima Email Dari"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__access_instruction_message
-msgid "Access Instruction Message"
-msgstr "Pesan Instruksi Akses"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_share_wizard__access_mode
+#: model:ir.model.fields,field_description:project.field_project_share_collaborator_wizard__access_mode
 msgid "Access Mode"
 msgstr "Mode Akses"
 
@@ -677,10 +777,6 @@ msgid "Action Needed"
 msgstr "Tindakan Diperluka"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__active
-#: model:ir.model.fields,field_description:project.field_project_project_stage__active
-#: model:ir.model.fields,field_description:project.field_project_task__active
-#: model:ir.model.fields,field_description:project.field_project_task_type__active
 #: model:ir.model.fields,field_description:project.field_report_project_task_user__active
 msgid "Active"
 msgstr "Aktif"
@@ -727,28 +823,35 @@ msgid "Activity Types"
 msgstr "Jenis Aktivitas"
 
 #. module: project
+#: model_terms:ir.actions.act_window,help:project.mail_activity_plan_action_config_project_task_plan
+msgid ""
+"Activity plans are used to assign a list of activities in just a few clicks\n"
+"                    (e.g. \"Progress Report\", \"Stand-up Meeting\", ...)"
+msgstr ""
+"Rencana kegiatan digunakan untuk menugaskan daftar kegiatan dengan beberapa klik saja\n"
+"                    (contoh, \"Progress Report\", \"Stand-up Meeting\", ...)"
+
+#. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_right_side_panel/project_right_side_panel.xml:0
-#, python-format
 msgid "Add Milestone"
 msgstr "Tambahkan Milestone"
 
 #. module: project
-#: model_terms:ir.actions.act_window,help:project.mail_activity_plan_action_config_project_task_plan
-#: model_terms:ir.actions.act_window,help:project.mail_activity_plan_action_config_task_plan
-msgid "Add a new plan"
-msgstr "Tambahkan rencana baru"
-
-#. module: project
-#: model_terms:ir.ui.view,arch_db:project.project_share_wizard_view_form
-msgid "Add a note"
-msgstr "Tambahkan catatan"
+#. odoo-javascript
+#: code:addons/project/static/src/components/subtask_kanban_list/subtask_kanban_create/subtask_kanban_create.js:0
+msgid "Add Sub-tasks"
+msgstr "Tambahkan Sub-task"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/js/tours/project.js:0
+msgid "Add a sub-task"
+msgstr "Tambahkan sub-task"
+
+#. module: project
+#. odoo-javascript
 #: code:addons/project/static/src/js/tours/project.js:0
-#, python-format
 msgid ""
 "Add columns to organize your tasks into <b>stages</b> <i>e.g. New - In "
 "Progress - Done</i>."
@@ -757,11 +860,7 @@ msgstr ""
 "tahap</b> <i>contohnya Baru - Sedang Berlangsung - Selesai</i>."
 
 #. module: project
-#: model_terms:ir.ui.view,arch_db:project.project_share_wizard_view_form
-msgid "Add contacts to share the project..."
-msgstr "Tambahkan kontak untuk membagi project..."
-
-#. module: project
+#: model_terms:ir.ui.view,arch_db:project.project_sharing_project_task_view_form
 #: model_terms:ir.ui.view,arch_db:project.view_task_form2
 msgid "Add details about this task..."
 msgstr "Tambahkan detail mengenai task ini..."
@@ -772,9 +871,17 @@ msgid "Add extra content to display in the email"
 msgstr "Tambahkan konten ekstra untuk ditampilkan di email"
 
 #. module: project
+#: model_terms:digest.tip,tip_description:project.digest_tip_project_3
+msgid ""
+"Add project-specific property fields on tasks to customize your project "
+"management process."
+msgstr ""
+"Tambahkan field properti yang khusus project pada task untuk mengustomisasi "
+"proses manajemen project Anda."
+
+#. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/js/tours/project.js:0
-#, python-format
 msgid "Add your task once it is ready."
 msgstr "Tambahkan task Anda setelah siap."
 
@@ -786,7 +893,6 @@ msgstr "Administrator"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Agile Scrum"
 msgstr "Agile Scrum"
 
@@ -838,7 +944,6 @@ msgstr "Model Alias"
 #. module: project
 #. odoo-python
 #: code:addons/project/controllers/portal.py:0
-#, python-format
 msgid "All"
 msgstr "Semua"
 
@@ -866,48 +971,15 @@ msgid "Allocated Time:"
 msgstr "Waktu yang Dialokasikan:"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__allow_rating
-msgid "Allow Customer Ratings"
-msgstr "Izinkan Rating Pelanggan"
+#: model_terms:ir.ui.view,arch_db:project.edit_project
+msgid "Analytic"
+msgstr "Analitik"
 
 #. module: project
 #: model:ir.model,name:project.model_account_analytic_account
-#: model:ir.model.fields,field_description:project.field_project_project__analytic_account_id
-#: model:ir.model.fields,field_description:project.field_project_task__analytic_account_id
+#: model:ir.model.fields,field_description:project.field_project_project__auto_account_id
 msgid "Analytic Account"
 msgstr "Akun Analitik"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_res_config_settings__analytic_plan_id
-msgid "Analytic Plan"
-msgstr "Rencana Analitik"
-
-#. module: project
-#: model:ir.model.fields,help:project.field_project_project__analytic_account_id
-msgid ""
-"Analytic account to which this project, its tasks and its timesheets are linked. \n"
-"Track the costs and revenues of your project by setting this analytic account on your related documents (e.g. sales orders, invoices, purchase orders, vendor bills, expenses etc.).\n"
-"This analytic account can be changed on each task individually if necessary.\n"
-"An analytic account is required in order to use timesheets."
-msgstr ""
-"Akun analitik di mana project, tugas dan timesheet-nya terhubung. \n"
-"Lacak biaya dan pendapatan dari project Anda dengan menyetel akun analitik ini pada dokumen Anda yang terkait (contohnya sales order, faktur, purchase order, tagihan vendor, pengeluaran dsb.).\n"
-"Akun analitik ini dapat dirubah pada setiap tugas secara individu bila diperlukan.\n"
-"Akun analitik diperlukan agar bisa menggunakan timesheet."
-
-#. module: project
-#: model:ir.model.fields,help:project.field_project_task__analytic_account_id
-msgid ""
-"Analytic account to which this task and its timesheets are linked.\n"
-"Track the costs and revenues of your task by setting its analytic account on your related documents (e.g. sales orders, invoices, purchase orders, vendor bills, expenses etc.).\n"
-"By default, the analytic account of the project is set. However, it can be changed on each task individually if necessary."
-msgstr ""
-"Akun analitik di mana tugas dan timesheet-nya terhubung. Lacak biaya Lacak "
-"biaya dan pendapatan dari tugas Anda dengan menyetel akun analitik-nya pada "
-"dokumen Anda yang terkait contohnya sales order, faktur, purchase order, "
-"tagihan vendor, pengeluaran dsb.). Secara default, akun analitik project ini"
-" sudah disetel. Namun, akun tersebut dapat dirubah untuk setiap tugas secara"
-" individu bila diperlukan."
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.edit_project
@@ -931,14 +1003,33 @@ msgid ""
 msgstr "Analisa progress project Anda dan performa karyawan Anda."
 
 #. module: project
-#. odoo-javascript
-#: code:addons/project/static/src/components/project_task_state_selection/project_task_state_selection.js:0
+#: model:ir.model.fields,help:project.field_project_share_wizard__share_link
+msgid "Anyone with this link can access the project in read mode."
+msgstr "Siapa pun dengan link ini dapat mengakses project dalam mode read."
+
+#. module: project
 #: model:ir.model.fields.selection,name:project.selection__project_task__state__03_approved
 #: model:ir.model.fields.selection,name:project.selection__project_task_burndown_chart_report__state__03_approved
 #: model:ir.model.fields.selection,name:project.selection__report_project_task_user__state__03_approved
-#, python-format
 msgid "Approved"
 msgstr "Disetujui"
+
+#. module: project
+#: model:project.tags,name:project.project_tags_07
+msgid "Architecture"
+msgstr "Arsitektur"
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/views/analytic_account_form/analytic_account_form_controller.js:0
+msgid "Archive Account"
+msgstr "Arsip Akun"
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/views/analytic_account_list/analytic_account_list_controller.js:0
+msgid "Archive Accounts"
+msgstr "Arsip Akun-Akun"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.view_project_project_stage_delete_wizard
@@ -948,7 +1039,6 @@ msgstr "Arsip Tahap"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.edit_project
-#: model_terms:ir.ui.view,arch_db:project.personal_task_type_edit
 #: model_terms:ir.ui.view,arch_db:project.project_project_stage_view_form
 #: model_terms:ir.ui.view,arch_db:project.project_project_stage_view_search
 #: model_terms:ir.ui.view,arch_db:project.project_sharing_project_task_view_form
@@ -975,9 +1065,14 @@ msgstr "Apakah Anda yakin ingin menghapus tahap-tahap ini?"
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_right_side_panel/components/project_milestone.js:0
 #: code:addons/project/static/src/components/subtask_one2many_field/subtask_list_renderer.js:0
-#, python-format
 msgid "Are you sure you want to delete this record?"
 msgstr "Apakah anda yakin untuk menghapus rekord ini?"
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/views/project_task_form/project_task_form_controller.js:0
+msgid "Are you sure you want to restore this version ?"
+msgstr "Apakah Anda yakin ingin memulihkan versi ini ?"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.view_project_kanban
@@ -992,28 +1087,20 @@ msgstr "Ikon Tanda Panah"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Assembling"
 msgstr "Perakitan"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/js/tours/project.js:0
-#, python-format
 msgid "Assign a responsible to your task"
 msgstr "Tetapkan penanggung jawab untuk task Anda"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Assigned"
 msgstr "Ditugaskan"
-
-#. module: project
-#: model:ir.actions.act_window,name:project.act_res_users_2_project_task_opened
-msgid "Assigned Tasks"
-msgstr "Kegiatan yang ditetapkan"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.rating_rating_view_form_project
@@ -1026,10 +1113,11 @@ msgstr "Ditugaskan untuk"
 #: model:ir.model.fields,field_description:project.field_project_task__user_ids
 #: model:ir.model.fields,field_description:project.field_project_task_burndown_chart_report__user_ids
 #: model:ir.model.fields,field_description:project.field_report_project_task_user__user_ids
+#: model_terms:ir.ui.view,arch_db:project.open_view_blocked_by_list_view
 #: model_terms:ir.ui.view,arch_db:project.portal_tasks_list
 #: model_terms:ir.ui.view,arch_db:project.project_sharing_project_task_view_form
 #: model_terms:ir.ui.view,arch_db:project.project_sharing_project_task_view_tree
-#: model_terms:ir.ui.view,arch_db:project.view_task_search_form_base
+#: model_terms:ir.ui.view,arch_db:project.view_task_search_form_project_fsm_base
 msgid "Assignees"
 msgstr "Petugas"
 
@@ -1059,7 +1147,6 @@ msgstr "Beresiko"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid ""
 "Attach all documents or links to the task directly, to have all research "
 "information centralized."
@@ -1076,9 +1163,9 @@ msgid "Attachment Count"
 msgstr "Hitungan Lampiran"
 
 #. module: project
-#: model:ir.model.fields,help:project.field_project_task__attachment_ids
-msgid "Attachments that don't come from a message."
-msgstr "Lampiran yang tidak datang dari pesan."
+#: model_terms:ir.ui.view,arch_db:project.portal_my_task
+msgid "Attachments"
+msgstr "Lampiran-Lampiran"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_update__user_id
@@ -1107,9 +1194,17 @@ msgstr ""
 " * Feedback netral atau jelek akan mengupdate status kanban ke 'Perubahan Diminta' (lingkaran oranye).\n"
 
 #. module: project
+#: model:mail.template,description:project.mail_template_data_project_task
+msgid ""
+"Automatically send an email to customers when a task reaches a specific "
+"stage in a project by setting this template on that stage"
+msgstr ""
+"Secara otomatis kirim email ke pelanggan saat task mencapai stage tertentu "
+"di project dengan menetapkan templat ini pada stage tersebut"
+
+#. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_composer.xml:0
-#, python-format
 msgid "Avatar"
 msgstr "Avatar"
 
@@ -1118,8 +1213,6 @@ msgstr "Avatar"
 #: code:addons/project/models/project_project.py:0
 #: model:ir.model.fields,field_description:project.field_project_project__rating_avg
 #: model:ir.model.fields,field_description:project.field_project_task__rating_avg
-#: model:ir.model.fields,field_description:project.field_report_project_task_user__rating_avg
-#, python-format
 msgid "Average Rating"
 msgstr "Rata-Rata Rating"
 
@@ -1127,6 +1220,11 @@ msgstr "Rata-Rata Rating"
 #: model:ir.model.fields,field_description:project.field_project_project__rating_avg_percentage
 msgid "Average Rating (%)"
 msgstr "Rating Rata-Rata (%)"
+
+#. module: project
+#: model:ir.model.fields,field_description:project.field_report_project_task_user__rating_avg
+msgid "Average Rating (1-5)"
+msgstr "Rating Rata-Rata (1-5)"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.view_project_kanban
@@ -1149,8 +1247,6 @@ msgstr "Rating Rata-Rata: Puas"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Backlog"
 msgstr "Backlog"
 
@@ -1162,12 +1258,10 @@ msgstr "Saldo"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_right_side_panel/components/project_profitability.xml:0
-#, python-format
 msgid "Billed"
 msgstr "Billing"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_task__dependent_ids
 #: model:ir.model.fields,field_description:project.field_report_project_task_user__dependent_ids
 msgid "Block"
 msgstr "Blokir"
@@ -1179,24 +1273,25 @@ msgstr "Diblokir"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_task__depend_on_ids
+#: model_terms:ir.ui.view,arch_db:project.project_sharing_project_task_view_form
 #: model_terms:ir.ui.view,arch_db:project.view_task_form2
 msgid "Blocked By"
 msgstr "Diblokir Oleh"
 
 #. module: project
+#: model_terms:ir.ui.view,arch_db:project.view_task_form2
+msgid "Blocked Tasks"
+msgstr ""
+
+#. module: project
+#: model:ir.actions.act_window,name:project.project_sharing_project_task_action_blocking_tasks
 #: model_terms:ir.ui.view,arch_db:project.view_task_search_form_base
 msgid "Blocking"
 msgstr "Blokir"
 
 #. module: project
-#: model_terms:ir.ui.view,arch_db:project.view_task_form2
-msgid "Blocking Tasks"
-msgstr "Memblokir Task"
-
-#. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Brainstorm"
 msgstr "Brainstor"
 
@@ -1213,20 +1308,12 @@ msgstr "Bug"
 #: model_terms:ir.ui.view,arch_db:project.project_task_burndown_chart_report_view_graph
 #: model_terms:ir.ui.view,arch_db:project.project_task_burndown_chart_report_view_search
 #: model_terms:ir.ui.view,arch_db:project.view_project_kanban
-#, python-format
 msgid "Burndown Chart"
 msgstr "Grafik Burndown"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_milestone__can_be_marked_as_done
-msgid "Can Be Marked As Done"
-msgstr "Dapat Ditandai Sebagai Selesai"
-
-#. module: project
-#. odoo-javascript
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
-#: code:addons/project/static/src/components/project_task_state_selection/project_task_state_selection.js:0
 #: model:ir.model.fields.selection,name:project.selection__project_task__state__1_canceled
 #: model:ir.model.fields.selection,name:project.selection__project_task_burndown_chart_report__state__1_canceled
 #: model:ir.model.fields.selection,name:project.selection__report_project_task_user__state__1_canceled
@@ -1234,27 +1321,22 @@ msgstr "Dapat Ditandai Sebagai Selesai"
 #: model:project.task.type,name:project.project_personal_stage_admin_6
 #: model:project.task.type,name:project.project_personal_stage_demo_6
 #: model:project.task.type,name:project.project_stage_3
-#, python-format
-msgid "Canceled"
+msgid "Cancelled"
 msgstr "Dibatalkan"
 
 #. module: project
-#. odoo-javascript
-#: code:addons/project/static/src/components/project_task_state_selection/project_task_state_selection.js:0
 #: model:ir.model.fields.selection,name:project.selection__project_task__state__02_changes_requested
 #: model:ir.model.fields.selection,name:project.selection__project_task_burndown_chart_report__state__02_changes_requested
 #: model:ir.model.fields.selection,name:project.selection__report_project_task_user__state__02_changes_requested
 #: model:mail.message.subtype,description:project.mt_task_changes_requested
 #: model:mail.message.subtype,name:project.mt_project_task_changes_requested
 #: model:mail.message.subtype,name:project.mt_task_changes_requested
-#, python-format
 msgid "Changes Requested"
 msgstr "Perubahan Diminta"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/js/tours/project.js:0
-#, python-format
 msgid ""
 "Choose a <b>name</b> for your project. <i>It can be anything you want: the "
 "name of a customer, of a product, of a team, of a construction site, "
@@ -1266,38 +1348,36 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/js/tours/project.js:0
-#, python-format
 msgid ""
 "Choose a task <b>name</b> <i>(e.g. Website Design, Purchase Goods...)</i>"
 msgstr "Pilih nama <b>task</b> <i>(contoh Website Design, Beli Barang...)</i>"
 
 #. module: project
+#: model_terms:ir.ui.view,arch_db:project.project_share_wizard_view_form
+msgid "Choose one of the following access modes for your collaborators:"
+msgstr "Pilih satu dari mode akses berikut untuk kolaborator Anda:"
+
+#. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Client Review"
 msgstr "Review Klien"
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/js/tours/project.js:0
+msgid "Close the sub-tasks list"
+msgstr "Tutup daftar sub-task"
+
+#. module: project
+#: model:ir.model.fields,field_description:project.field_project_task__closed_depend_on_count
+msgid "Closed Depending on Tasks"
+msgstr "Ditutup Tergantung pada Task"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.view_task_search_form_base
 msgid "Closed On"
 msgstr "Ditutup Pada"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_task__closed_subtask_count
-msgid "Closed Sub-tasks Count"
-msgstr "Jumlah Sub-task Tertutup"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__closed_task_count
-#: model:ir.model.fields,field_description:project.field_project_update__closed_task_count
-msgid "Closed Task Count"
-msgstr "Jumlah Task yang Ditutup"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_update__closed_task_percentage
-msgid "Closed Task Percentage"
-msgstr "Persentase Task yang Ditutup"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.project_task_burndown_chart_report_view_search
@@ -1306,24 +1386,29 @@ msgid "Closed Tasks"
 msgstr "Task Tertutup"
 
 #. module: project
-#: model_terms:ir.actions.act_window,help:project.project_collaborator_action
-msgid ""
-"Collaborate efficiently with key stakeholders by sharing with them the "
-"Kanban view of your tasks. Collaborators will be able to edit parts of tasks"
-" and send messages."
-msgstr ""
-"Kolaborasi secara efisien dengan stakeholder penting dengan membagi ke "
-"mereka tampilan Kanban task Anda. Kolaborator akan dapat mengedit bagian-"
-"bagian task dan mengirimkan pesan."
+#: model:ir.model.fields,field_description:project.field_project_task__is_closed
+#: model:ir.model.fields,field_description:project.field_report_project_task_user__is_closed
+msgid "Closed state"
+msgstr "State tertutup"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_collaborator__partner_id
-#: model_terms:ir.ui.view,arch_db:project.project_collaborator_view_search
+#: model:ir.model.fields.selection,name:project.selection__project_task_burndown_chart_report__is_closed__closed
+msgid "Closed tasks"
+msgstr "Task ditutup"
+
+#. module: project
+#: model:ir.model.fields,field_description:project.field_project_task_burndown_chart_report__is_closed
+msgid "Closing Stage"
+msgstr "Tahap penutupan"
+
+#. module: project
+#: model:ir.model.fields,field_description:project.field_project_share_collaborator_wizard__partner_id
 msgid "Collaborator"
 msgstr "Kolaborator"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__collaborator_ids
+#: model:ir.model.fields,field_description:project.field_project_share_wizard__collaborator_ids
+#: model_terms:ir.ui.view,arch_db:project.project_share_wizard_view_form
 msgid "Collaborators"
 msgstr "Kolaborator-kolaborator"
 
@@ -1345,20 +1430,12 @@ msgstr ""
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_tags__color
-#: model:ir.model.fields,field_description:project.field_project_update__color
 msgid "Color"
 msgstr "Warna"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__color
-#: model:ir.model.fields,field_description:project.field_project_task__color
-msgid "Color Index"
-msgstr "Indeks Warna"
-
-#. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid ""
 "Communicate with customers on the task using the email gateway. Attach logo designs to the task, so that information flows from\n"
 "      designers to the workers who print the t-shirt."
@@ -1409,21 +1486,22 @@ msgstr "Konfirmasi"
 #: code:addons/project/wizard/project_share_wizard.py:0
 #: code:addons/project/wizard/project_task_type_delete.py:0
 #: model_terms:ir.ui.view,arch_db:project.project_share_wizard_confirm_form
-#, python-format
 msgid "Confirmation"
 msgstr "Konfirmasi"
 
 #. module: project
-#. odoo-javascript
-#: code:addons/project/static/src/js/tours/project.js:0
-#, python-format
+#: model_terms:web_tour.tour,rainbow_man_message:project.project_tour
 msgid "Congratulations, you are now a master of project management."
 msgstr "Selamat, Anda sekarang adalah master manajemen project."
 
 #. module: project
+#: model:project.tags,name:project.project_tags_06
+msgid "Construction"
+msgstr "Konstruksi"
+
+#. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Consulting"
 msgstr "Konsultasi"
 
@@ -1442,21 +1520,18 @@ msgstr "Konversikan Task"
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
 #: model:ir.actions.server,name:project.action_server_convert_to_subtask
-#, python-format
 msgid "Convert to Task/Sub-Task"
 msgstr "Konversikan menjadi Task/Sub-Task"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Copywriting"
 msgstr "Copywriting"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_right_side_panel/components/project_profitability.xml:0
-#, python-format
 msgid "Costs"
 msgstr "Biaya"
 
@@ -1468,7 +1543,6 @@ msgstr "Cover Image"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/js/tours/project.js:0
-#, python-format
 msgid ""
 "Create <b>activities</b> to set yourself to-dos or to schedule meetings."
 msgstr ""
@@ -1486,9 +1560,20 @@ msgid "Create a Project"
 msgstr "Buat Proyek"
 
 #. module: project
+#: model_terms:ir.actions.act_window,help:project.mail_activity_plan_action_config_project_task_plan
+msgid "Create a Task Activity Plan"
+msgstr "Buat Task Rencana Kegiatan"
+
+#. module: project
 #: model_terms:ir.actions.act_window,help:project.open_task_type_form_domain
 msgid "Create a new stage in the task pipeline"
 msgstr "Buat tahap baru di pipeline task"
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/js/tours/project.js:0
+msgid "Create a new sub-task"
+msgstr "Buat sub-task baruk"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.project_project_view_form_simplified_footer
@@ -1535,6 +1620,7 @@ msgstr "Dibuat Pada"
 #: model:ir.model.fields,field_description:project.field_project_project__create_uid
 #: model:ir.model.fields,field_description:project.field_project_project_stage__create_uid
 #: model:ir.model.fields,field_description:project.field_project_project_stage_delete_wizard__create_uid
+#: model:ir.model.fields,field_description:project.field_project_share_collaborator_wizard__create_uid
 #: model:ir.model.fields,field_description:project.field_project_share_wizard__create_uid
 #: model:ir.model.fields,field_description:project.field_project_tags__create_uid
 #: model:ir.model.fields,field_description:project.field_project_task__create_uid
@@ -1552,6 +1638,7 @@ msgstr "Dibuat oleh"
 #: model:ir.model.fields,field_description:project.field_project_project__create_date
 #: model:ir.model.fields,field_description:project.field_project_project_stage__create_date
 #: model:ir.model.fields,field_description:project.field_project_project_stage_delete_wizard__create_date
+#: model:ir.model.fields,field_description:project.field_project_share_collaborator_wizard__create_date
 #: model:ir.model.fields,field_description:project.field_project_share_wizard__create_date
 #: model:ir.model.fields,field_description:project.field_project_tags__create_date
 #: model:ir.model.fields,field_description:project.field_project_task_recurrence__create_date
@@ -1568,11 +1655,6 @@ msgid "Creation Date"
 msgstr "Tanggal Pembuatan"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__currency_id
-msgid "Currency"
-msgstr "Mata Uang"
-
-#. module: project
 #: model_terms:ir.ui.view,arch_db:project.portal_tasks_list
 msgid "Current project of the task"
 msgstr "Project task saat ini"
@@ -1585,7 +1667,6 @@ msgstr "Tahap saat ini untuk task ini"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_messages.xml:0
-#, python-format
 msgid ""
 "Currently available to everyone viewing this document, click to restrict to "
 "internal employees."
@@ -1596,7 +1677,6 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_messages.xml:0
-#, python-format
 msgid ""
 "Currently restricted to internal employees, click to make it available to "
 "everyone viewing this document."
@@ -1620,21 +1700,18 @@ msgstr "Pesan Kustom yang Dikembalikan"
 #: model_terms:ir.ui.view,arch_db:project.view_project
 #: model_terms:ir.ui.view,arch_db:project.view_project_project_filter
 #: model_terms:ir.ui.view,arch_db:project.view_task_search_form_base
-#, python-format
 msgid "Customer"
 msgstr "Pelanggan"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
-#, python-format
 msgid "Customer Email"
 msgstr "Email Pelanggan"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Customer Feedback"
 msgstr "Feedback Pelanggan"
 
@@ -1660,7 +1737,6 @@ msgstr "Status Rating Pelanggan"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid ""
 "Customers propose feedbacks by email; Odoo creates tasks automatically, and you can\n"
 "      communicate on the task directly."
@@ -1671,7 +1747,6 @@ msgstr ""
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
 msgid "Customers will be added to the followers of their project and tasks."
 msgstr "Pelanggan akan ditambahkan ke pengikut project dan task mereka."
 
@@ -1681,24 +1756,21 @@ msgid "Daily"
 msgstr "Harian"
 
 #. module: project
-#. odoo-javascript
-#: code:addons/project/static/src/views/burndown_chart/burndown_chart_search_model.js:0
+#: model:ir.actions.act_window,name:project.project_update_all_action
+#: model:ir.embedded.actions,name:project.project_embedded_action_project_updates
+#: model_terms:ir.ui.view,arch_db:project.project_view_kanban_inherit_project
+msgid "Dashboard"
+msgstr "Dashboard"
+
+#. module: project
 #: model:ir.model.fields,field_description:project.field_project_task_burndown_chart_report__date
 #: model:ir.model.fields,field_description:project.field_project_update__date
 #: model_terms:ir.ui.view,arch_db:project.project_task_burndown_chart_report_view_graph
 #: model_terms:ir.ui.view,arch_db:project.project_task_burndown_chart_report_view_search
 #: model_terms:ir.ui.view,arch_db:project.project_update_view_kanban
 #: model_terms:ir.ui.view,arch_db:project.project_update_view_search
-#, python-format
 msgid "Date"
 msgstr "Tanggal"
-
-#. module: project
-#. odoo-javascript
-#: code:addons/project/static/src/views/burndown_chart/burndown_chart_search_model.js:0
-#, python-format
-msgid "Date and Stage"
-msgstr "Tanggal dan Tahap"
 
 #. module: project
 #: model:ir.model.fields,help:project.field_project_task__date_last_stage_update
@@ -1747,8 +1819,8 @@ msgstr "Hari menuju Deadline"
 #: model:ir.model.fields,field_description:project.field_project_task__date_deadline
 #: model:ir.model.fields,field_description:project.field_project_task_burndown_chart_report__date_deadline
 #: model:ir.model.fields,field_description:project.field_report_project_task_user__date_deadline
+#: model_terms:ir.ui.view,arch_db:project.project_sharing_project_task_view_search
 #: model_terms:ir.ui.view,arch_db:project.view_task_search_form_project_base
-#, python-format
 msgid "Deadline"
 msgstr "Batas waktu"
 
@@ -1790,20 +1862,17 @@ msgstr ""
 
 #. module: project
 #. odoo-javascript
-#: code:addons/project/static/src/components/delete_subtasks_confirmation_dialog/delete_subtasks_confirmation_dialog.js:0
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_attachments_viewer.xml:0
 #: model:ir.actions.server,name:project.unlink_project_stage_action
 #: model:ir.actions.server,name:project.unlink_task_type_action
 #: model_terms:ir.ui.view,arch_db:project.view_project_project_stage_delete_wizard
 #: model_terms:ir.ui.view,arch_db:project.view_project_task_type_delete_wizard
-#, python-format
 msgid "Delete"
 msgstr "Hapus"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_right_side_panel/components/project_milestone.xml:0
-#, python-format
 msgid "Delete Milestone"
 msgstr "Hapus Meilstone"
 
@@ -1811,7 +1880,6 @@ msgstr "Hapus Meilstone"
 #. odoo-python
 #: code:addons/project/models/project_project_stage.py:0
 #: model_terms:ir.ui.view,arch_db:project.view_project_project_stage_delete_wizard
-#, python-format
 msgid "Delete Project Stage"
 msgstr "Hapus Tahap Project"
 
@@ -1822,22 +1890,8 @@ msgstr "Hapus Tahap Project"
 #: model_terms:ir.ui.view,arch_db:project.view_project_task_type_delete_confirmation_wizard
 #: model_terms:ir.ui.view,arch_db:project.view_project_task_type_delete_wizard
 #: model_terms:ir.ui.view,arch_db:project.view_project_task_type_unarchive_wizard
-#, python-format
 msgid "Delete Stage"
 msgstr "Hapus Tahap"
-
-#. module: project
-#. odoo-javascript
-#: code:addons/project/static/src/components/delete_subtasks_confirmation_dialog/delete_subtasks_confirmation_dialog.js:0
-#, python-format
-msgid ""
-"Deleting a task will also delete its associated sub-tasks. If you wish to "
-"preserve the sub-tasks, make sure to unlink them from their parent task "
-"beforehand. Are you sure you want to proceed?"
-msgstr ""
-"Menghapus task juga akan menghapus sub-task yang terkait. Bila Anda ingin  "
-"menyimpan sub-tasknya, pastikan Anda memputuskan hubungan mereka dengan task"
-" induk sebelumnya. Apakah Anda yakin ingin melanjutkan?"
 
 #. module: project
 #: model:ir.model.fields,help:project.field_project_task__milestone_id
@@ -1851,23 +1905,23 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Delivered"
 msgstr "Sudah Terkirim"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
-#: model:ir.model.fields,field_description:project.field_project_task__dependent_tasks_count
-#, python-format
 msgid "Dependent Tasks"
 msgstr "Task yang Tergantung"
 
 #. module: project
+#: model:ir.model.fields,field_description:project.field_project_task__depend_on_count
+msgid "Depending on Tasks"
+msgstr "Tergantung pada Task"
+
+#. module: project
 #: model:ir.model.fields,field_description:project.field_project_project__description
 #: model:ir.model.fields,field_description:project.field_project_task__description
-#: model:ir.model.fields,field_description:project.field_project_task_type__description
 #: model:ir.model.fields,field_description:project.field_project_update__description
 #: model:ir.model.fields,field_description:project.field_report_project_task_user__description
 #: model_terms:ir.ui.view,arch_db:project.edit_project
@@ -1888,9 +1942,7 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
+#: model:project.tags,name:project.project_tags_08
 msgid "Design"
 msgstr "Desain"
 
@@ -1903,7 +1955,6 @@ msgstr "Tentukan urutan dalam melakukan task"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Development"
 msgstr "Pengembangan"
 
@@ -1915,16 +1966,14 @@ msgstr "Digest"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Digital Marketing"
 msgstr "Digital Marketing"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_task_type__disabled_rating_warning
-msgid "Disabled Rating Warning"
-msgstr "Nonaktifkan Peringatan Rating"
-
-#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/core/web/follower_list_patch.js:0
+#: code:addons/project/static/src/views/analytic_account_form/analytic_account_form_controller.js:0
+#: code:addons/project/static/src/views/analytic_account_list/analytic_account_list_controller.js:0
 #: model_terms:ir.ui.view,arch_db:project.project_project_view_form_simplified_footer
 #: model_terms:ir.ui.view,arch_db:project.project_share_wizard_confirm_form
 #: model_terms:ir.ui.view,arch_db:project.project_share_wizard_view_form
@@ -1938,21 +1987,12 @@ msgid "Discard"
 msgstr "Buang"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_share_wizard__display_access_mode
-msgid "Display Access Mode"
-msgstr "Display Access Mode"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_task__display_in_project
-msgid "Display In Project"
-msgstr "Tampilkan Di Project"
-
-#. module: project
 #: model:ir.model.fields,field_description:project.field_project_collaborator__display_name
 #: model:ir.model.fields,field_description:project.field_project_milestone__display_name
 #: model:ir.model.fields,field_description:project.field_project_project__display_name
 #: model:ir.model.fields,field_description:project.field_project_project_stage__display_name
 #: model:ir.model.fields,field_description:project.field_project_project_stage_delete_wizard__display_name
+#: model:ir.model.fields,field_description:project.field_project_share_collaborator_wizard__display_name
 #: model:ir.model.fields,field_description:project.field_project_share_wizard__display_name
 #: model:ir.model.fields,field_description:project.field_project_tags__display_name
 #: model:ir.model.fields,field_description:project.field_project_task__display_name
@@ -1966,14 +2006,13 @@ msgid "Display Name"
 msgstr "Nama Tampilan"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_task__display_parent_task_button
-msgid "Display Parent Task Button"
-msgstr "Tampilkan Tombol Induk Task"
+#: model_terms:ir.ui.view,arch_db:project.view_task_form2
+msgid "Display the sub-task in your pipeline"
+msgstr "Tampilkan sub-task di pipeline Anda"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/models/digest_digest.py:0
-#, python-format
 msgid "Do not have access, skip this data for user's digest email"
 msgstr "Tidak punya akses, lewati data ini untuk email singkat pengguna"
 
@@ -1981,11 +2020,6 @@ msgstr "Tidak punya akses, lewati data ini untuk email singkat pengguna"
 #. odoo-javascript
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
-#: code:addons/project/static/src/components/project_task_state_selection/project_task_state_selection.js:0
-#: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
 #: model:ir.model.fields.selection,name:project.selection__project_project__last_update_status__done
 #: model:ir.model.fields.selection,name:project.selection__project_task__state__1_done
@@ -1996,21 +2030,24 @@ msgstr "Tidak punya akses, lewati data ini untuk email singkat pengguna"
 #: model:project.task.type,name:project.project_personal_stage_admin_5
 #: model:project.task.type,name:project.project_personal_stage_demo_5
 #: model:project.task.type,name:project.project_stage_2
-#, python-format
 msgid "Done"
 msgstr "Selesai"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Draft"
 msgstr "Draft"
 
 #. module: project
+#: model_terms:ir.ui.view,arch_db:project.view_project_kanban
+#: model_terms:ir.ui.view,arch_db:project.view_task_kanban
+msgid "Duplicate"
+msgstr "Gandakan"
+
+#. module: project
 #. odoo-python
 #: code:addons/project/models/project_task_type.py:0
-#, python-format
 msgid ""
 "Each user should have at least one personal stage. Create a new stage to "
 "which the tasks can be transferred after the selected ones are deleted."
@@ -2019,22 +2056,38 @@ msgstr ""
 "agar task dapat ditransfer setelah task yang dipilih dihapus."
 
 #. module: project
-#: model:ir.model.fields.selection,name:project.selection__project_share_wizard__access_mode__edit
+#: model:ir.model.fields.selection,name:project.selection__project_share_collaborator_wizard__access_mode__edit
 msgid "Edit"
 msgstr "Edit"
 
 #. module: project
-#. odoo-javascript
-#: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
-msgid "Editing"
-msgstr "Editing"
+#: model:ir.model.fields.selection,name:project.selection__project_share_collaborator_wizard__access_mode__edit_limited
+msgid "Edit with limited access"
+msgstr "Edit dengan akses terbatas"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_collaborator__partner_email
-msgid "Email"
-msgstr "Email"
+#: model_terms:ir.ui.view,arch_db:project.project_share_wizard_view_form
+msgid ""
+"Edit with limited access: collaborators can view and edit tasks they follow "
+"in the Kanban view."
+msgstr ""
+"Edit dengan akses terbatas: kolaborator dapat melihat dan mengedit task yang"
+" mereka ikuti dalam tampilan Kanban."
+
+#. module: project
+#: model_terms:ir.ui.view,arch_db:project.project_share_wizard_view_form
+msgid ""
+"Edit: collaborators can view and edit all tasks in the Kanban view. "
+"Additionally, they can choose which tasks they want to follow."
+msgstr ""
+"Edit: kolaborator dapat melihat dan mengedit semua task di tampilan Kanban. "
+"Sebagai tambahan, mereka dapat memilih task mana yang mereka dapat ikuti."
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
+msgid "Editing"
+msgstr "Editing"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_project__alias_email
@@ -2075,7 +2128,6 @@ msgstr "Email dikirim ke"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_messages.xml:0
-#, python-format
 msgid "Employees Only"
 msgstr "Hanya Karyawan"
 
@@ -2095,14 +2147,12 @@ msgstr "Tanggal Akhir"
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
-#, python-format
 msgid "Error! You cannot create a recursive hierarchy of tasks."
 msgstr "Error! Anda tidak dapat membuat hirarki task yang rekursif."
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid "Everyone can propose ideas, and the Editor marks the best ones as"
 msgstr ""
 "Siapapun dapat mengajukan ide, dan Editor akan menandai yang terbaik sebagai"
@@ -2110,8 +2160,6 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_right_side_panel/components/project_profitability.xml:0
-#: code:addons/project/static/src/components/project_right_side_panel/components/project_profitability.xml:0
-#, python-format
 msgid "Expected"
 msgstr "Diharapkan margin * 100 / diharapkan dijual"
 
@@ -2149,15 +2197,26 @@ msgstr "Project Favorit"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Final Document"
 msgstr "Dokumen Final"
+
+#. module: project
+#: model:project.tags,name:project.project_tags_11
+msgid "Finance"
+msgstr "Keuangan"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_project_stage__fold
 #: model:ir.model.fields,field_description:project.field_project_task_type__fold
 msgid "Folded in Kanban"
 msgstr "Dilipat di Kanban"
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/project_sharing/chatter/portal_chatter_patch.xml:0
+#: code:addons/project/static/src/project_sharing/components/chatter/chatter_container.xml:0
+msgid "Follow"
+msgstr "Ikuti"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.portal_my_home
@@ -2168,15 +2227,6 @@ msgstr "Ikuti dan komentari task dari project Anda"
 #: model_terms:ir.ui.view,arch_db:project.portal_my_home
 msgid "Follow the evolution of your projects"
 msgstr "Ikuti evolusi project Anda"
-
-#. module: project
-#: model_terms:ir.ui.view,arch_db:project.edit_project
-msgid ""
-"Follow this project to automatically track the events associated to tasks "
-"and issues of this project."
-msgstr ""
-"Ikuti proyek ini untuk secara otomatis melacak aktivitas terkait dengan "
-"kegiatan dan masalah dari proyek ini."
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.view_task_search_form_base
@@ -2223,6 +2273,12 @@ msgid "Frequency"
 msgstr "Frekuensi"
 
 #. module: project
+#: model_terms:ir.ui.view,arch_db:project.project_sharing_project_task_view_search
+#: model_terms:ir.ui.view,arch_db:project.view_task_search_form_project_base
+msgid "Future"
+msgstr "Masa Depan"
+
+#. module: project
 #: model_terms:ir.ui.view,arch_db:project.view_project_project_filter
 #: model_terms:ir.ui.view,arch_db:project.view_task_search_form
 msgid "Future Activities"
@@ -2243,6 +2299,12 @@ msgid "Get customer feedback and evaluate the performance of your employees"
 msgstr "Dapatkan feedback pelanggan dan evaluasi performa karyawan Anda"
 
 #. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/js/tours/project.js:0
+msgid "Give the sub-task a <b>name</b>"
+msgstr "Berikan sub-task <b>nama</b>"
+
+#. module: project
 #: model_terms:ir.ui.view,arch_db:project.project_share_wizard_confirm_form
 msgid "Grant Portal Access"
 msgstr "Berikan Akses Portal"
@@ -2250,7 +2312,6 @@ msgstr "Berikan Akses Portal"
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
 msgid ""
 "Grant employees access to your project or tasks by adding them as followers."
 " Employees automatically get access to the tasks they are assigned to."
@@ -2262,18 +2323,16 @@ msgstr ""
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
 msgid ""
-"Grant portal users access to your project or tasks by adding them as "
-"followers. Customers automatically get access to their tasks in their "
-"portal."
+"Grant portal users access to your project by adding them as followers (the "
+"tasks of the project are not included). To grant access to tasks to a portal"
+" user, add them as followers for these tasks."
 msgstr ""
-"Berikan user portal akses ke project atau task Anda dengan menambahkan "
-"mereka sebagai pengikut. Pelanggan secara otomatis mendapatkan akses ke task"
-" mereka di portal mereka."
+"Berikan portal user akses ke project Anda dengan menambahkan mereka sebagai "
+"pengikut (task project yang tidak termasuk). Untuk memberikan akses ke task "
+"ke portal user, tambahkan mereka sebagai pengikut untuk task-task ini."
 
 #. module: project
-#: model_terms:ir.ui.view,arch_db:project.project_collaborator_view_search
 #: model_terms:ir.ui.view,arch_db:project.project_task_burndown_chart_report_view_search
 #: model_terms:ir.ui.view,arch_db:project.view_project_project_filter
 #: model_terms:ir.ui.view,arch_db:project.view_task_search_form_base
@@ -2283,7 +2342,6 @@ msgstr "Dikelompokkan berdasarkan"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid ""
 "Handle your idea gathering within Tasks of your new Project and discuss them"
 " in the chatter of the tasks."
@@ -2294,7 +2352,6 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Handoff"
 msgstr "Handoff"
 
@@ -2305,17 +2362,28 @@ msgid "Happy face"
 msgstr "Muka bahagia"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_task__has_late_and_unreached_milestone
-msgid "Has Late And Unreached Milestone"
-msgstr "Memiliki Milestone yang Terlambat dan Belum Tercapai"
-
-#. module: project
 #: model:ir.model.fields,field_description:project.field_project_milestone__has_message
 #: model:ir.model.fields,field_description:project.field_project_project__has_message
 #: model:ir.model.fields,field_description:project.field_project_task__has_message
 #: model:ir.model.fields,field_description:project.field_project_update__has_message
 msgid "Has Message"
 msgstr "Memiliki Pesan"
+
+#. module: project
+#: model_terms:ir.ui.view,arch_db:project.task_invitation_follower
+msgid "Hello"
+msgstr "Halo"
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/components/notebook_task_one2many_field/notebook_task_list_renderer.js:0
+msgid "Hide closed tasks"
+msgstr "Sembunyikan task yang disembunyikan"
+
+#. module: project
+#: model_terms:ir.ui.view,arch_db:project.view_task_form2
+msgid "Hide the sub-task in your pipeline"
+msgstr "Sembunyikan sub-task di pipeline Anda"
 
 #. module: project
 #: model:ir.model.fields.selection,name:project.selection__project_task__priority__1
@@ -2327,6 +2395,27 @@ msgstr "Tinggi"
 #: model_terms:ir.ui.view,arch_db:project.portal_my_task
 msgid "History"
 msgstr "Riwayat"
+
+#. module: project
+#: model:ir.model.fields,field_description:project.field_project_task__html_field_history
+msgid "History data"
+msgstr "Data sejarah"
+
+#. module: project
+#: model:ir.model.fields,field_description:project.field_project_task__html_field_history_metadata
+msgid "History metadata"
+msgstr "Metadata sejarah"
+
+#. module: project
+#: model:project.tags,name:project.project_tags_13
+msgid "Home"
+msgstr "Beranda"
+
+#. module: project
+#: model:account.analytic.account,name:project.analytic_construction
+#: model:project.project,name:project.project_home_construction
+msgid "Home Construction"
+msgstr "Konstruksi Rumah"
 
 #. module: project
 #: model:project.project,name:project.project_project_4
@@ -2349,6 +2438,7 @@ msgstr "Bagaimana perkembangan project ini?"
 #: model:ir.model.fields,field_description:project.field_project_project__id
 #: model:ir.model.fields,field_description:project.field_project_project_stage__id
 #: model:ir.model.fields,field_description:project.field_project_project_stage_delete_wizard__id
+#: model:ir.model.fields,field_description:project.field_project_share_collaborator_wizard__id
 #: model:ir.model.fields,field_description:project.field_project_share_wizard__id
 #: model:ir.model.fields,field_description:project.field_project_tags__id
 #: model:ir.model.fields,field_description:project.field_project_task__id
@@ -2387,8 +2477,6 @@ msgstr "Ikon untuk menunjukkan sebuah aktivitas pengecualian."
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Ideas"
 msgstr "Gagasan"
 
@@ -2460,33 +2548,20 @@ msgstr ""
 "tanpa wewenang daripada pesan default."
 
 #. module: project
-#: model:ir.model.fields,help:project.field_project_project__active
-msgid ""
-"If the active field is set to False, it will allow you to hide the project "
-"without removing it."
-msgstr ""
-"Jika bidang aktif diatur ke False, itu akan memungkinkan Anda untuk "
-"menyembunyikan proyek tanpa menghapus itu."
-
-#. module: project
 #. odoo-javascript
-#: code:addons/project/static/src/components/project_task_state_selection/project_task_state_selection.js:0
 #: code:addons/project/static/src/components/project_task_state_selection/project_task_state_selection.xml:0
-#: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
 #: model:ir.model.fields.selection,name:project.selection__project_task__state__01_in_progress
 #: model:ir.model.fields.selection,name:project.selection__project_task_burndown_chart_report__state__01_in_progress
 #: model:ir.model.fields.selection,name:project.selection__report_project_task_user__state__01_in_progress
 #: model:project.project.stage,name:project.project_project_stage_1
 #: model:project.task.type,name:project.project_stage_1
-#, python-format
 msgid "In Progress"
 msgstr "Dalam Proses"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "In development"
 msgstr "Dalam perkembangan"
 
@@ -2495,9 +2570,13 @@ msgstr "Dalam perkembangan"
 #: code:addons/project/models/project_task.py:0
 #: model:project.task.type,name:project.project_personal_stage_admin_0
 #: model:project.task.type,name:project.project_personal_stage_demo_0
-#, python-format
 msgid "Inbox"
 msgstr "Kotak Pesan"
+
+#. module: project
+#: model:project.tags,name:project.project_tags_09
+msgid "Interior"
+msgstr "Interior"
 
 #. module: project
 #: model:project.tags,name:project.project_tags_04
@@ -2507,7 +2586,6 @@ msgstr "Internal"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_messages.xml:0
-#, python-format
 msgid "Internal Note"
 msgstr "Catatan Internal"
 
@@ -2525,33 +2603,20 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_messages.xml:0
-#, python-format
 msgid "Internal notes are only displayed to internal users."
 msgstr "Catatan internal hanya ditampilkan ke user internal."
 
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
 msgid "Invalid operator: %s"
 msgstr "Operator tidak valid: %s"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
 msgid "Invalid value: %s"
 msgstr "Value tidak valid: %s"
-
-#. module: project
-#: model_terms:ir.ui.view,arch_db:project.project_sharing_access_view_tree
-msgid "Invite Collaborators"
-msgstr "Undang Kolaborator"
-
-#. module: project
-#: model_terms:ir.ui.view,arch_db:project.project_share_wizard_view_form
-msgid "Invite People"
-msgstr "Undang Orang"
 
 #. module: project
 #: model:ir.model.fields.selection,name:project.selection__project_project__privacy_visibility__followers
@@ -2566,19 +2631,13 @@ msgstr "User portal yang diundang dan semua user internal (publik)"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_right_side_panel/components/project_profitability.xml:0
-#, python-format
 msgid "Invoiced"
 msgstr "Telah Difakturkan"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_milestone__is_deadline_exceeded
-msgid "Is Deadline Exceeded"
-msgstr "Apakah Deadline Terlewat"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_milestone__is_deadline_future
-msgid "Is Deadline Future"
-msgstr "Apakah Deadline Di Masa Depan"
+#: model_terms:ir.ui.view,arch_db:project.project_task_burndown_chart_report_view_search
+msgid "Is Closed (Burn-up Chart)"
+msgstr "Apakah Ditutup (Burn-up Chart)"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_milestone__message_is_follower
@@ -2590,14 +2649,8 @@ msgid "Is Follower"
 msgstr "Adalah Follower"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__is_milestone_exceeded
-msgid "Is Milestone Exceeded"
-msgstr "Apakah Milestone Terlewat"
-
-#. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_task_state_selection/project_task_state_selection.js:0
-#, python-format
 msgid "Is toggle mode"
 msgstr "Apakah mode toggle"
 
@@ -2607,9 +2660,10 @@ msgid "Issue Version"
 msgstr "Versi"
 
 #. module: project
+#: model:ir.model.fields,help:project.field_project_project__duration_tracking
 #: model:ir.model.fields,help:project.field_project_task__duration_tracking
 msgid "JSON that maps ids from a many2one field to seconds spent"
-msgstr "JSON yang mempetakan ID dari field many2one ke detik yang dihabiskan "
+msgstr "JSON yang mempetakan ID dari field many2one ke detik yang digunakan"
 
 #. module: project
 #: model_terms:ir.actions.act_window,help:project.act_project_project_2_project_task_all
@@ -2625,6 +2679,7 @@ msgstr ""
 
 #. module: project
 #: model_terms:ir.actions.act_window,help:project.project_sharing_project_task_action
+#: model_terms:ir.actions.act_window,help:project.project_sharing_project_task_recurring_tasks_action
 msgid ""
 "Keep track of the progress of your tasks from creation to completion.<br>\n"
 "                Collaborate efficiently by chatting in real-time or via email."
@@ -2633,14 +2688,31 @@ msgstr ""
 "                Berkolaborasi secara efisien dengan berbicara secara real-time atau melalui email."
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_digest_digest__kpi_project_task_opened_value
-msgid "Kpi Project Task Opened Value"
-msgstr "Kpi Project Task Opened Value"
+#: model_terms:ir.ui.view,arch_db:project.rating_rating_view_search_project
+#: model_terms:ir.ui.view,arch_db:project.view_task_search_form_base
+msgid "Last 30 Days"
+msgstr "30 Hari Terakhir"
+
+#. module: project
+#: model_terms:ir.ui.view,arch_db:project.rating_rating_view_search_project
+#: model_terms:ir.ui.view,arch_db:project.view_task_search_form_base
+msgid "Last 365 Days"
+msgstr "365 Hari Terakhir"
+
+#. module: project
+#: model_terms:ir.ui.view,arch_db:project.rating_rating_view_search_project
+msgid "Last 7 Days"
+msgstr "7 Hari Terakhir"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.project_task_burndown_chart_report_view_search
 msgid "Last Month"
 msgstr "Bulan Lalu"
+
+#. module: project
+#: model:ir.model.fields,field_description:project.field_report_project_task_user__rating_last_value
+msgid "Last Rating (1-5)"
+msgstr "Rating Terakhir (1-5)"
 
 #. module: project
 #. odoo-python
@@ -2649,24 +2721,8 @@ msgstr "Bulan Lalu"
 #: model:ir.model.fields,field_description:project.field_project_task_burndown_chart_report__date_last_stage_update
 #: model:ir.model.fields,field_description:project.field_report_project_task_user__date_last_stage_update
 #: model_terms:ir.ui.view,arch_db:project.view_task_search_form_base
-#, python-format
 msgid "Last Stage Update"
 msgstr "Update Tahap Terakhir"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__last_update_id
-msgid "Last Update"
-msgstr "Terakhir diperbarui"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__last_update_color
-msgid "Last Update Color"
-msgstr "Warna Update Terakhir"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__last_update_status
-msgid "Last Update Status"
-msgstr "Status Updater Terakhir"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_task__write_date
@@ -2679,6 +2735,7 @@ msgstr "Update Terakhir Pada"
 #: model:ir.model.fields,field_description:project.field_project_project__write_uid
 #: model:ir.model.fields,field_description:project.field_project_project_stage__write_uid
 #: model:ir.model.fields,field_description:project.field_project_project_stage_delete_wizard__write_uid
+#: model:ir.model.fields,field_description:project.field_project_share_collaborator_wizard__write_uid
 #: model:ir.model.fields,field_description:project.field_project_share_wizard__write_uid
 #: model:ir.model.fields,field_description:project.field_project_tags__write_uid
 #: model:ir.model.fields,field_description:project.field_project_task__write_uid
@@ -2696,6 +2753,7 @@ msgstr "Terakhir Diperbarui oleh"
 #: model:ir.model.fields,field_description:project.field_project_project__write_date
 #: model:ir.model.fields,field_description:project.field_project_project_stage__write_date
 #: model:ir.model.fields,field_description:project.field_project_project_stage_delete_wizard__write_date
+#: model:ir.model.fields,field_description:project.field_project_share_collaborator_wizard__write_date
 #: model:ir.model.fields,field_description:project.field_project_share_wizard__write_date
 #: model:ir.model.fields,field_description:project.field_project_tags__write_date
 #: model:ir.model.fields,field_description:project.field_project_task_recurrence__write_date
@@ -2722,50 +2780,42 @@ msgstr "Milestone Terlambat"
 #: code:addons/project/models/project_task.py:0
 #: model:project.task.type,name:project.project_personal_stage_admin_4
 #: model:project.task.type,name:project.project_personal_stage_demo_4
-#, python-format
 msgid "Later"
 msgstr "Nanti"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_composer.xml:0
-#, python-format
 msgid "Leave a comment"
 msgstr "Tinggalkan komentar"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/js/tours/project.js:0
-#: code:addons/project/static/src/js/tours/project.js:0
-#, python-format
 msgid "Let's create your first <b>project</b>."
 msgstr "Ayo buat <b>project</b> pertama Anda."
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/js/tours/project.js:0
-#, python-format
 msgid "Let's create your first <b>stage</b>."
 msgstr "Mari membuat <b>tahap</b> pertama Anda."
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/js/tours/project.js:0
-#, python-format
 msgid "Let's create your first <b>task</b>."
 msgstr "Ayo buat <b>task</b> pertama Anda."
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/js/tours/project.js:0
-#, python-format
 msgid "Let's create your second <b>stage</b>."
 msgstr "Mari membuat <b>tahap</b> kedua Anda."
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/js/tours/project.js:0
-#, python-format
 msgid ""
 "Let's go back to the <b>kanban view</b> to have an overview of your next "
 "tasks."
@@ -2776,7 +2826,6 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/js/tours/project.js:0
-#, python-format
 msgid "Let's start working on your task."
 msgstr "Ayo mulai mengerjakan task Anda."
 
@@ -2786,15 +2835,8 @@ msgid "Let's wait for your customers to manifest themselves."
 msgstr "Mari menunggu pelanggan Anda untuk datang sendiri."
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_share_wizard__share_link
-#: model_terms:ir.ui.view,arch_db:project.project_share_wizard_view_form
-msgid "Link"
-msgstr "Tautan..."
-
-#. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Live"
 msgstr "Live"
 
@@ -2806,14 +2848,12 @@ msgstr "Local-part based incoming detection"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Logo Design"
 msgstr "Desain Logo"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid "Look for the"
 msgstr "Cari"
 
@@ -2824,14 +2864,8 @@ msgid "Low"
 msgstr "Rendah"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_task__attachment_ids
-msgid "Main Attachments"
-msgstr "Lampiran Utama"
-
-#. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid ""
 "Manage the lifecycle of your project using the kanban view. Add newly acquired projects,\n"
 "      assign them and use the"
@@ -2842,29 +2876,36 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Manufacturing"
 msgstr "Produksi"
 
 #. module: project
 #. odoo-javascript
-#: code:addons/project/static/src/components/project_right_side_panel/components/project_profitability.xml:0
-#, python-format
-msgid "Margin"
-msgstr "Margin"
-
-#. module: project
-#. odoo-javascript
 #: code:addons/project/static/src/components/project_task_state_selection/project_task_state_selection.xml:0
-#, python-format
 msgid "Mark as done"
 msgstr "Tandai sebagai selesai"
 
 #. module: project
 #. odoo-javascript
+#: code:addons/project/static/src/components/project_right_side_panel/components/project_milestone.xml:0
+msgid "Mark as incomplete"
+msgstr "Tandai sebagai tidak lengkap"
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/components/project_right_side_panel/components/project_milestone.xml:0
+msgid "Mark as reached"
+msgstr "Tandai sebagai tercapai"
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/js/tours/project.js:0
+msgid "Mark the task as <b>Cancelled</b>"
+msgstr "Tandai task sebagai <b>Dibatalkan</b>"
+
+#. module: project
+#. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Material Sourcing"
 msgstr "Sourcing Material"
 
@@ -2878,9 +2919,9 @@ msgstr ""
 "Anda mencapai tahap tertentu."
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__favorite_user_ids
-msgid "Members"
-msgstr "Anggota"
+#: model:project.tags,name:project.project_tags_15
+msgid "Meeting"
+msgstr "Meeting"
 
 #. module: project
 #: model:ir.model,name:project.model_ir_ui_menu
@@ -2912,44 +2953,28 @@ msgstr "Pesan"
 #. odoo-javascript
 #. odoo-python
 #: code:addons/project/controllers/portal.py:0
-#: code:addons/project/controllers/portal.py:0
 #: code:addons/project/static/src/components/project_right_side_panel/components/project_milestone.js:0
-#: model:ir.model.fields,field_description:project.field_project_project__milestone_ids
 #: model:ir.model.fields,field_description:project.field_project_task__milestone_id
 #: model:ir.model.fields,field_description:project.field_project_task_burndown_chart_report__milestone_id
 #: model:ir.model.fields,field_description:project.field_report_project_task_user__milestone_id
 #: model_terms:ir.ui.view,arch_db:project.portal_tasks_list
 #: model_terms:ir.ui.view,arch_db:project.view_task_search_form_base
-#, python-format
 msgid "Milestone"
 msgstr "Milestone"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__milestone_count
-msgid "Milestone Count"
-msgstr "Jumlah Milestone"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__milestone_count_reached
-msgid "Milestone Count Reached"
-msgstr "Jumlah Milestone Tercapai"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_right_side_panel/project_right_side_panel.js:0
 #: code:addons/project/static/src/components/project_right_side_panel/project_right_side_panel.xml:0
 #: model:ir.model.fields,field_description:project.field_project_project__allow_milestones
-#: model:ir.model.fields,field_description:project.field_project_task__allow_milestones
 #: model:ir.model.fields,field_description:project.field_res_config_settings__group_project_milestone
 #: model_terms:ir.ui.view,arch_db:project.view_project_kanban
-#, python-format
 msgid "Milestones"
 msgstr "Milestone"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Mixing"
 msgstr "Mixing"
 
@@ -3007,14 +3032,8 @@ msgstr "Update Saya"
 #: model_terms:ir.ui.view,arch_db:project.project_project_view_form_simplified
 #: model_terms:ir.ui.view,arch_db:project.task_type_search
 #: model_terms:ir.ui.view,arch_db:project.view_project
-#, python-format
 msgid "Name"
 msgstr "Nama"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_update__name_cropped
-msgid "Name Cropped"
-msgstr "Nama Di-crop"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.edit_project
@@ -3040,10 +3059,9 @@ msgstr "Muka netral"
 #. odoo-javascript
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
+#: code:addons/project/static/src/components/subtask_kanban_list/subtask_kanban_list.xml:0
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
 #: model:project.task.type,name:project.project_stage_0
-#, python-format
 msgid "New"
 msgstr "Baru"
 
@@ -3055,59 +3073,48 @@ msgstr "Fitur Baru"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_right_side_panel/project_right_side_panel.js:0
-#, python-format
 msgid "New Milestone"
 msgstr "Milestone Baru"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "New Orders"
 msgstr "Order Baru"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_project_calendar/project_project_calendar_controller.js:0
-#, python-format
 msgid "New Project"
 msgstr "Project Baru"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "New Projects"
 msgstr "Project Baru"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "New Request"
 msgstr "Permintaan Baru"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_calendar/project_task_calendar_controller.js:0
-#, python-format
 msgid "New Task"
 msgstr "Task Baru"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/controllers/portal.py:0
-#: code:addons/project/controllers/portal.py:0
-#, python-format
 msgid "Newest"
 msgstr "Terbaru"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_pager.xml:0
-#: code:addons/project/static/src/project_sharing/components/chatter/chatter_pager.xml:0
-#, python-format
 msgid "Next"
 msgstr "Next"
 
@@ -3163,7 +3170,6 @@ msgstr "Tidak ada Project"
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
-#, python-format
 msgid "No Subject"
 msgstr "Tidak Ada Judul"
 
@@ -3171,11 +3177,6 @@ msgstr "Tidak Ada Judul"
 #: model_terms:ir.actions.act_window,help:project.mail_activity_type_action_config_project_types
 msgid "No activity types found. Let's create one!"
 msgstr "Tidak ada tipe kegiatan yang ditemukan. Ayo buat baru!"
-
-#. module: project
-#: model_terms:ir.actions.act_window,help:project.project_collaborator_action
-msgid "No collaborators found"
-msgstr "Tidak ada kolaborator yang ditemukan"
 
 #. module: project
 #: model_terms:ir.actions.act_window,help:project.rating_rating_action_project_report
@@ -3215,7 +3216,10 @@ msgstr "Tidak ada tag yang ditemukan. Ayo buat baru!"
 #: model_terms:ir.actions.act_window,help:project.action_view_task
 #: model_terms:ir.actions.act_window,help:project.action_view_task_from_milestone
 #: model_terms:ir.actions.act_window,help:project.project_sharing_project_task_action
+#: model_terms:ir.actions.act_window,help:project.project_sharing_project_task_action_blocking_tasks
 #: model_terms:ir.actions.act_window,help:project.project_sharing_project_task_action_sub_task
+#: model_terms:ir.actions.act_window,help:project.project_sharing_project_task_recurring_tasks_action
+#: model_terms:ir.actions.act_window,help:project.project_task_action_from_partner
 #: model_terms:ir.actions.act_window,help:project.project_task_action_sub_task
 msgid "No tasks found. Let's create one!"
 msgstr "Tidak ada task yang ditemukan. Ayo buat baru!"
@@ -3228,14 +3232,12 @@ msgstr "Tidak ada update yang ditemukan. Ayo buat baru!"
 #. module: project
 #. odoo-python
 #: code:addons/project/controllers/portal.py:0
-#, python-format
 msgid "None"
 msgstr "Tidak Ada"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
-#, python-format
 msgid "Not Implemented."
 msgstr "Tidak Diimplementasi."
 
@@ -3251,21 +3253,6 @@ msgstr "Catatan"
 #: model:ir.model.fields,field_description:project.field_project_update__message_needaction_counter
 msgid "Number of Actions"
 msgstr "Jumlah Action"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_project_stage_delete_wizard__projects_count
-msgid "Number of Projects"
-msgstr "Jumlah Project"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_task_type_delete_wizard__tasks_count
-msgid "Number of Tasks"
-msgstr "Jumlah Task"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__doc_count
-msgid "Number of documents attached"
-msgstr "Jumlah dokumen yang dilampirkan"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_milestone__message_has_error_counter
@@ -3299,6 +3286,11 @@ msgid "Off Track"
 msgstr "Keluar dari Jalur"
 
 #. module: project
+#: model:project.tags,name:project.project_tags_10
+msgid "Office"
+msgstr "Kantor"
+
+#. module: project
 #: model:account.analytic.account,name:project.analytic_office_design
 #: model:project.project,name:project.project_project_1
 msgid "Office Design"
@@ -3307,7 +3299,6 @@ msgstr "Desain Kantor"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Old Completed Sprint"
 msgstr "Sprint Lama yang Selesai"
 
@@ -3333,21 +3324,14 @@ msgstr "Sekali Sebulan"
 #. module: project
 #. odoo-python
 #: code:addons/project/controllers/portal.py:0
-#, python-format
 msgid "Only jpeg, png, bmp and tiff images are allowed as attachments."
 msgstr "Hanya format jpeg, png, bmp dan tiff yang diizinkan sebagai lampiran."
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_composer.xml:0
-#, python-format
 msgid "Oops! Something went wrong. Try to reload the page and log in."
 msgstr "Oops! Terjadi kesalahan. Coba muat ulang halaman dan log in."
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__open_task_count
-msgid "Open Task Count"
-msgstr "Jumlah Task Open"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_digest_digest__kpi_project_task_opened
@@ -3357,9 +3341,19 @@ msgid "Open Tasks"
 msgstr "Buka Task"
 
 #. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/js/tours/project.js:0
+msgid "Open sub-tasks notebook section"
+msgstr "Buka bagian buku catatan sub-task"
+
+#. module: project
+#: model:ir.model.fields.selection,name:project.selection__project_task_burndown_chart_report__is_closed__open
+msgid "Open tasks"
+msgstr "Buka task"
+
+#. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
 msgid "Operation not supported"
 msgstr "Operation not supported"
 
@@ -3377,13 +3371,13 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid "Organize priorities amongst orders using the"
 msgstr "Atur prioritas di antara order menggunakan"
 
 #. module: project
 #: model_terms:ir.actions.act_window,help:project.action_view_all_task
 #: model_terms:ir.actions.act_window,help:project.action_view_my_task
+#: model_terms:ir.actions.act_window,help:project.project_task_action_from_partner
 msgid ""
 "Organize your tasks by dispatching them across the pipeline.<br>\n"
 "                    Collaborate efficiently by chatting in real-time or via email."
@@ -3394,9 +3388,14 @@ msgstr ""
 #. module: project
 #. odoo-python
 #: code:addons/project/controllers/portal.py:0
-#, python-format
 msgid "Others"
 msgstr "Lainnya"
+
+#. module: project
+#: model_terms:ir.ui.view,arch_db:project.project_sharing_project_task_view_search
+#: model_terms:ir.ui.view,arch_db:project.view_task_search_form_project_base
+msgid "Overdue"
+msgstr "Terlambat"
 
 #. module: project
 #: model:ir.actions.act_window,name:project.action_view_task_overpassed_draft
@@ -3406,7 +3405,6 @@ msgstr "Kegiatan-kegiatan overpassed"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Page Ideas"
 msgstr "Ide Halaman"
 
@@ -3425,7 +3423,6 @@ msgstr "Catatan Induk ID File"
 #: code:addons/project/models/project_task.py:0
 #: model:ir.model.fields,field_description:project.field_project_task__parent_id
 #: model:ir.model.fields,field_description:project.field_report_project_task_user__parent_id
-#, python-format
 msgid "Parent Task"
 msgstr "Task Induk"
 
@@ -3443,7 +3440,6 @@ msgstr ""
 #. module: project
 #. odoo-python
 #: code:addons/project/models/res_partner.py:0
-#, python-format
 msgid ""
 "Partner company cannot be different from its assigned projects' company"
 msgstr ""
@@ -3453,10 +3449,14 @@ msgstr ""
 #. module: project
 #. odoo-python
 #: code:addons/project/models/res_partner.py:0
-#, python-format
 msgid "Partner company cannot be different from its assigned tasks' company"
 msgstr ""
 "Perusahaan partner tidak boleh berbeda dari perusahaan task yang ditugaskan"
+
+#. module: project
+#: model:ir.actions.act_window,name:project.project_task_action_from_partner
+msgid "Partner's Tasks"
+msgstr "Task Partner"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.project_share_wizard_confirm_form
@@ -3478,9 +3478,9 @@ msgid ""
 "- All internal users: all internal users can access the project and all of its tasks without distinction.\n"
 "\n"
 "- Invited portal users and all internal users: all internal users can access the project and all of its tasks without distinction.\n"
-"When following a project, portal users will get access to all of its tasks without distinction. Otherwise, they will only get access to the specific tasks they are following.\n"
+"When following a project, portal users will only get access to the specific tasks they are following.\n"
 "\n"
-"When a project is shared in read-only, the portal user is redirected to their portal. They can view the tasks, but not edit them.\n"
+"When a project is shared in read-only, the portal user is redirected to their portal. They can view the tasks they are following, but not edit them.\n"
 "When a project is shared in edit, the portal user is redirected to the kanban and list views of the tasks. They can modify a selected number of fields on the tasks.\n"
 "\n"
 "In any case, an internal user with no project access rights can still access a task, provided that they are given the corresponding URL (and that they are part of the followers if the project is private)."
@@ -3493,9 +3493,9 @@ msgstr ""
 "- Semua user internal: semua user internal dapat mengakses project dan semua tugasnya.\n"
 "\n"
 "- User portal yang diundang dan semua user internal: semua user internal dapat mengakses project dan semua tugasnya.\n"
-"Saat mengikuti project, user portal akan dapat mengakses semua tugasnya. Jika tidak, mereka hanya mendapatkan akses ke tugas-tugas yang mereka ikuti.\n"
+"Saat mengikuti project, user portal hanya mendapatkan akses ke tugas-tugas yang mereka ikuti.\n"
 "\n"
-"Saat project dibagikan dalam format read-only, user portal akan dialihkan ke portal mereka. Mereka dapat melihat tugasnya, tapi tidak dapat mengedit.\n"
+"Saat project dibagikan dalam format read-only, user portal akan dialihkan ke portal mereka. Mereka dapat melihat tugas yang mereka ikuti, tapi tidak dapat mengedit.\n"
 "Saat project dibagikan dalam format bisa diedit, user portal akan dialihkan ke tampilan daftar dan kanban dari tugas mereka. Mereka dapat memodifikasi field-field terpilih tertentu pada tugas mereka.\n"
 "\n"
 "Dalam kasus apapun juga, user internal tanpa hak akses project masih dapat mengakses tugas, asalkan mereka diberikan URL yang sesuai (dan mereka merupakan bagian dari follower bila project bersifat privat."
@@ -3520,11 +3520,6 @@ msgid "Personal Stage State"
 msgstr "Status Tahap Pribadi"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_task__personal_stage_type_ids
-msgid "Personal Stages"
-msgstr "Tahap-Tahap Pribadi"
-
-#. module: project
 #: model:ir.model,name:project.model_project_task_stage_personal
 msgid "Personal Task Stage"
 msgstr "Status Task Pribadi"
@@ -3538,7 +3533,6 @@ msgstr "Tanggal Yang Direncanakan"
 #. module: project
 #. odoo-python
 #: code:addons/project/models/account_analytic_account.py:0
-#, python-format
 msgid ""
 "Please remove existing tasks in the project linked to the accounts you want "
 "to delete."
@@ -3549,7 +3543,6 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Podcast and Video Production"
 msgstr "Produksi Podcast dan Video"
 
@@ -3573,14 +3566,8 @@ msgid "Portal Access URL"
 msgstr "Portal Access URL"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_task__portal_user_names
-msgid "Portal User Names"
-msgstr "Nama User Portal"
-
-#. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
 msgid ""
 "Portal users will be removed from the followers of the project and its "
 "tasks."
@@ -3589,25 +3576,21 @@ msgstr "User portal akan dihapus dari pengikut project dan tasknya."
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_pager.xml:0
-#: code:addons/project/static/src/project_sharing/components/chatter/chatter_pager.xml:0
-#, python-format
 msgid "Previous"
 msgstr "Sebelum"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid "Prioritize your tasks by marking important ones using the"
 msgstr "Prioritaskan task Anda dengan menandai yang penting menggunakan"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/controllers/portal.py:0
-#: code:addons/project/controllers/portal.py:0
 #: model:ir.model.fields,field_description:project.field_project_task__priority
 #: model:ir.model.fields,field_description:project.field_report_project_task_user__priority
-#, python-format
+#: model:project.tags,name:project.project_tags_16
 msgid "Priority"
 msgstr "Prioritas"
 
@@ -3617,19 +3600,12 @@ msgid "Priority: {{'Important' if task.priority == '1' else 'Normal'}}"
 msgstr "Prioritas: {{'Important' if task.priority == '1' else 'Normal'}}"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__privacy_visibility_warning
-msgid "Privacy Visibility Warning"
-msgstr "Peringatan Visibilitas Privasi"
-
-#. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_many2one_field/project_many2one_field.js:0
-#: code:addons/project/static/src/components/project_many2one_field/project_many2one_field.xml:0
 #: code:addons/project/static/src/components/project_many2one_field/project_many2one_field.xml:0
 #: code:addons/project/static/src/views/project_task_calendar/project_task_calendar_model.js:0
 #: code:addons/project/static/src/views/project_task_pivot/project_pivot_model.js:0
 #: model_terms:ir.ui.view,arch_db:project.quick_create_task_form
-#, python-format
 msgid "Private"
 msgstr "Pribadi"
 
@@ -3641,19 +3617,17 @@ msgstr "Task Privat"
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
-#, python-format
 msgid ""
-"Private tasks cannot be converted into sub-tasks. Please set a project for "
+"Private tasks cannot be converted into sub-tasks. Please set a project on "
 "the task to gain access to this feature."
 msgstr ""
 "Task-task pribadi tidak dapat dikonversi menjadi sub-task. Mohon tetapkan "
-"project untuk task untuk mendapatkan akses ke fitur ini."
+"project pada task untuk mendapatkan akses ke fitur ini."
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_right_side_panel/project_right_side_panel.js:0
 #: code:addons/project/static/src/components/project_right_side_panel/project_right_side_panel.xml:0
-#, python-format
 msgid "Profitability"
 msgstr "Profitabilitas"
 
@@ -3665,28 +3639,17 @@ msgid "Progress"
 msgstr "Kemajuan"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_update__progress_percentage
-msgid "Progress Percentage"
-msgstr "Persentase Progress"
-
-#. module: project
-#. odoo-javascript
 #. odoo-python
 #: code:addons/project/controllers/portal.py:0
-#: code:addons/project/controllers/portal.py:0
-#: code:addons/project/static/src/views/project_rating_graph/project_rating_graph_view.js:0
-#: code:addons/project/static/src/views/project_rating_pivot/project_rating_pivot_view.js:0
 #: model:ir.model,name:project.model_project_project
 #: model:ir.model.fields,field_description:project.field_project_milestone__project_id
 #: model:ir.model.fields,field_description:project.field_project_task__project_id
 #: model:ir.model.fields,field_description:project.field_project_task_burndown_chart_report__project_id
-#: model:ir.model.fields,field_description:project.field_project_update__project_id
 #: model:ir.model.fields,field_description:project.field_report_project_task_user__project_id
 #: model:ir.ui.menu,name:project.menu_main_pm
 #: model_terms:ir.ui.view,arch_db:project.digest_digest_view_form
 #: model_terms:ir.ui.view,arch_db:project.edit_project
 #: model_terms:ir.ui.view,arch_db:project.portal_tasks_list
-#: model_terms:ir.ui.view,arch_db:project.project_collaborator_view_search
 #: model_terms:ir.ui.view,arch_db:project.project_project_view_activity
 #: model_terms:ir.ui.view,arch_db:project.project_project_view_form_simplified
 #: model_terms:ir.ui.view,arch_db:project.rating_rating_view_form_project
@@ -3697,25 +3660,17 @@ msgstr "Persentase Progress"
 #: model_terms:ir.ui.view,arch_db:project.view_project_project_filter
 #: model_terms:ir.ui.view,arch_db:project.view_task_form2
 #: model_terms:ir.ui.view,arch_db:project.view_task_search_form_project_fsm_base
-#, python-format
 msgid "Project"
 msgstr "Proyek"
 
 #. module: project
-#: model:ir.actions.act_window,name:project.project_collaborator_action
-#: model_terms:ir.ui.view,arch_db:project.project_sharing_access_view_tree
-msgid "Project Collaborators"
-msgstr "Kolaborator Project"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_account_analytic_account__project_count
-msgid "Project Count"
-msgstr "Jumlah Proyek"
+#: model:ir.model.fields,field_description:project.field_project_project__account_id
+msgid "Project Account"
+msgstr "Akun Project"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_project__user_id
 #: model_terms:ir.ui.view,arch_db:project.edit_project
-#: model_terms:ir.ui.view,arch_db:project.project_view_kanban
 #: model_terms:ir.ui.view,arch_db:project.view_project
 #: model_terms:ir.ui.view,arch_db:project.view_project_project_filter
 msgid "Project Manager"
@@ -3738,15 +3693,20 @@ msgid "Project Rating Status"
 msgstr "Status Rating Projec"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_collaborator__project_id
-msgid "Project Shared"
-msgstr "Project Dishare"
-
-#. module: project
 #: model:ir.actions.act_window,name:project.project_sharing_project_task_action
 #: model:ir.model,name:project.model_project_share_wizard
 msgid "Project Sharing"
 msgstr "Sharing Project"
+
+#. module: project
+#: model:ir.model,name:project.model_project_share_collaborator_wizard
+msgid "Project Sharing Collaborator Wizard"
+msgstr "Project Sharing Collaborator Wizard"
+
+#. module: project
+#: model:ir.actions.act_window,name:project.project_sharing_project_task_recurring_tasks_action
+msgid "Project Sharing Recurrence"
+msgstr "Pengulangan Sharing Project"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.project_sharing_project_task_view_form
@@ -3802,12 +3762,6 @@ msgid "Project Update"
 msgstr "Update Project"
 
 #. module: project
-#: model:ir.actions.act_window,name:project.project_update_all_action
-#: model_terms:ir.ui.view,arch_db:project.project_view_kanban_inherit_project
-msgid "Project Updates"
-msgstr "Update Project"
-
-#. module: project
 #: model:ir.model.fields,field_description:project.field_project_task__project_privacy_visibility
 msgid "Project Visibility"
 msgstr "Visibilitas Project"
@@ -3816,6 +3770,12 @@ msgstr "Visibilitas Project"
 #: model_terms:ir.ui.view,arch_db:project.edit_project
 msgid "Project description..."
 msgstr "Keterangan project..."
+
+#. module: project
+#. odoo-python
+#: code:addons/project/wizard/project_share_wizard.py:0
+msgid "Project shared with your collaborators."
+msgstr "Project dibagikan dengan kolaborator Anda."
 
 #. module: project
 #: model:mail.template,subject:project.project_done_email_template
@@ -3854,12 +3814,7 @@ msgstr "Project: Permintaan Rating Task"
 #: model:ir.actions.act_window,name:project.open_view_project_all_config
 #: model:ir.actions.act_window,name:project.open_view_project_all_config_group_stage
 #: model:ir.actions.act_window,name:project.open_view_project_all_group_stage
-#: model:ir.model.fields,field_description:project.field_account_analytic_account__project_ids
-#: model:ir.model.fields,field_description:project.field_project_tags__project_ids
 #: model:ir.model.fields,field_description:project.field_project_task_type__project_ids
-#: model:ir.model.fields,field_description:project.field_project_task_type_delete_wizard__project_ids
-#: model:ir.model.fields,field_description:project.field_res_partner__project_ids
-#: model:ir.model.fields,field_description:project.field_res_users__project_ids
 #: model:ir.ui.menu,name:project.menu_projects
 #: model:ir.ui.menu,name:project.menu_projects_config
 #: model:ir.ui.menu,name:project.menu_projects_config_group_stage
@@ -3870,7 +3825,6 @@ msgstr "Project: Permintaan Rating Task"
 #: model_terms:ir.ui.view,arch_db:project.portal_my_projects
 #: model_terms:ir.ui.view,arch_db:project.view_project
 #: model_terms:ir.ui.view,arch_db:project.view_project_calendar
-#, python-format
 msgid "Projects"
 msgstr "Proyek"
 
@@ -3902,24 +3856,25 @@ msgid "Properties"
 msgstr "Properti"
 
 #. module: project
+#: model:ir.model.fields,field_description:project.field_project_share_wizard__share_link
+msgid "Public Link"
+msgstr "Link Publik"
+
+#. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Published"
 msgstr "Terpublikasi"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_messages.xml:0
-#, python-format
 msgid "Published on"
 msgstr "Dipublikasikan pada"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Publishing"
 msgstr "Publikasi"
 
@@ -3946,10 +3901,15 @@ msgid "Rating"
 msgstr "Rating"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_report_project_task_user__rating_last_value
 #: model_terms:ir.ui.view,arch_db:project.view_project_task_graph
 msgid "Rating (/5)"
 msgstr "Rating (/5)"
+
+#. module: project
+#: model_terms:ir.ui.view,arch_db:project.rating_rating_view_graph
+#: model_terms:ir.ui.view,arch_db:project.rating_rating_view_pivot
+msgid "Rating (1-5)"
+msgstr "Rating (1-5)"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_task__rating_avg_text
@@ -3982,11 +3942,6 @@ msgid "Rating Last Value"
 msgstr "Nilai Value Terakhir"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__rating_request_deadline
-msgid "Rating Request Deadline"
-msgstr "Deadline Permintaan Rating"
-
-#. module: project
 #: model:ir.model.fields,field_description:project.field_project_project__rating_percentage_satisfaction
 #: model:ir.model.fields,field_description:project.field_project_task__rating_percentage_satisfaction
 msgid "Rating Satisfaction"
@@ -3996,14 +3951,6 @@ msgstr "Nilai Kepuasan"
 #: model:ir.model.fields,field_description:project.field_project_task__rating_last_text
 msgid "Rating Text"
 msgstr "Nilai Teks"
-
-#. module: project
-#. odoo-javascript
-#: code:addons/project/static/src/views/project_rating_graph/project_rating_graph_view.js:0
-#: code:addons/project/static/src/views/project_rating_pivot/project_rating_pivot_view.js:0
-#, python-format
-msgid "Rating Value (/5)"
-msgstr "Nilai Rating (/5)"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_task__rating_count
@@ -4026,14 +3973,26 @@ msgid "Reached"
 msgstr "Mencapai"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_milestone__reached_date
-msgid "Reached Date"
-msgstr "Reached Date"
+#: model:ir.model.fields.selection,name:project.selection__project_share_collaborator_wizard__access_mode__read
+msgid "Read"
+msgstr "Baca"
 
 #. module: project
-#: model:ir.model.fields.selection,name:project.selection__project_share_wizard__access_mode__read
-msgid "Readonly"
-msgstr "Readonly"
+#: model_terms:ir.ui.view,arch_db:project.project_share_wizard_view_form
+msgid "Read: collaborators can view tasks but cannot edit them."
+msgstr ""
+"Read-only: kolaborator dapat melihat task tapi tidak dapat mengedit mereka."
+
+#. module: project
+#: model:ir.model.fields,help:project.field_project_share_collaborator_wizard__access_mode
+msgid ""
+"Read: collaborators can view tasks but cannot edit them.\n"
+"Edit with limited access: collaborators can view and edit tasks they follow in the Kanban view.\n"
+"Edit: collaborators can view and edit all tasks in the Kanban view. Additionally, they can choose which tasks they want to follow."
+msgstr ""
+"Read-only: kolaborator dapat melihat task tapi tidak dapat mengedit mereka.\n"
+"Edit dengan akses terbatas: kolaborator dapat melihat dan mengedit task yang mereka ikuti di tampilan Kanban.\n"
+"Edit: kolaborator dapat melihat dan mengedit semua task di tampilan Kanban. Sebagai tambahan, mereka dapat memilih task mana yang mereka ingin ikuti."
 
 #. module: project
 #: model:mail.template,subject:project.mail_template_data_project_task
@@ -4053,7 +4012,6 @@ msgstr "Rekam ID Thread"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Recording"
 msgstr "Pencatatan"
 
@@ -4068,7 +4026,13 @@ msgid "Recurrent"
 msgstr "Berulang"
 
 #. module: project
+#: model_terms:ir.ui.view,arch_db:project.portal_layout
+msgid "Recurrent tasks"
+msgstr "Task berulang"
+
+#. module: project
 #: model:ir.model.fields,field_description:project.field_res_config_settings__group_project_recurring_tasks
+#: model_terms:ir.ui.view,arch_db:project.project_sharing_project_task_view_form
 #: model_terms:ir.ui.view,arch_db:project.view_task_form2
 msgid "Recurring Tasks"
 msgstr "Task Berulang"
@@ -4076,7 +4040,6 @@ msgstr "Task Berulang"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Refused"
 msgstr "Ditolak"
 
@@ -4096,6 +4059,18 @@ msgid "Related Document Model"
 msgstr "Model Dokumen Terkait"
 
 #. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/core/web/follower_list_patch.js:0
+msgid "Remove Collaborator"
+msgstr "Hapus Kolaborator"
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/components/subtask_kanban_list/subtask_kanban_create/subtask_kanban_create.xml:0
+msgid "Rename"
+msgstr "Ganti nama"
+
+#. module: project
 #: model:account.analytic.account,name:project.analytic_renovations
 #: model:project.project,name:project.project_project_3
 msgid "Renovations"
@@ -4109,7 +4084,6 @@ msgstr "Ulangi Setiap"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_task__repeat_unit
-#: model:ir.model.fields,field_description:project.field_project_task_recurrence__repeat_unit
 msgid "Repeat Unit"
 msgstr "Unit Berulang"
 
@@ -4121,8 +4095,6 @@ msgstr "Laporan"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Research"
 msgstr "Penelitian"
 
@@ -4135,21 +4107,18 @@ msgstr "Penelitian & Pengembangan"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Research Project"
 msgstr "Project Penelitian"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Researching"
 msgstr "Penelitian"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Resources Allocation"
 msgstr "Alokasi Sumber Daya"
 
@@ -4162,10 +4131,31 @@ msgstr "Tanggung-jawab"
 
 #. module: project
 #. odoo-javascript
+#: code:addons/project/static/src/views/project_task_form/project_task_form_controller.js:0
+msgid "Restore"
+msgstr "Pulihkan"
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/views/project_task_form/project_task_form_controller.js:0
+msgid ""
+"Restoring will replace the current content with the selected version. Any "
+"unsaved changes will be lost."
+msgstr ""
+"Memulihkan akan mengganti konten saat ini dengan versi yang dipilih. "
+"Perubahan apapun yang tidak disimpan akan hilang."
+
+#. module: project
+#. odoo-javascript
 #: code:addons/project/static/src/components/project_right_side_panel/components/project_profitability.xml:0
-#, python-format
 msgid "Revenues"
 msgstr "Pendapatan"
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/components/subtask_kanban_list/subtask_kanban_create/subtask_kanban_create.xml:0
+msgid "SAVE"
+msgstr "SIMPAN"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_milestone__message_has_sms_error
@@ -4184,37 +4174,26 @@ msgstr "Muka sedih"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/views/form/project_sharing_form_controller.js:0
-#, python-format
 msgid "Save the task to be able to drag images in description"
 msgstr "Simpan task untuk dapat menarik gambar di keterangan"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/views/form/project_sharing_form_controller.js:0
-#, python-format
 msgid "Save the task to be able to paste images in description"
 msgstr "Simpan task untuk dapat menempel gambar di keterangan"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/js/tours/project.js:0
-#, python-format
 msgid "Schedule your activity once it is ready."
 msgstr "Jadwalkan kegiatan Anda setelah siap."
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Script"
 msgstr "Script"
-
-#. module: project
-#. odoo-python
-#: code:addons/project/controllers/portal.py:0
-#, python-format
-msgid "Search <span class=\"nolabel\"> (in Content)</span>"
-msgstr "Cari <span class=\"nolabel\"> (di Konten)</span>"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.view_project_project_filter
@@ -4229,72 +4208,50 @@ msgstr "Cari Update"
 #. module: project
 #. odoo-python
 #: code:addons/project/controllers/portal.py:0
-#, python-format
-msgid "Search in All"
-msgstr "Cari di Semua"
-
-#. module: project
-#. odoo-python
-#: code:addons/project/controllers/portal.py:0
-#, python-format
 msgid "Search in Assignees"
 msgstr "Cari pada Petugas"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/controllers/portal.py:0
-#, python-format
 msgid "Search in Customer"
 msgstr "Cari di Pelanggan"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/controllers/portal.py:0
-#, python-format
-msgid "Search in Messages"
-msgstr "Cari di Pesan"
-
-#. module: project
-#. odoo-python
-#: code:addons/project/controllers/portal.py:0
-#, python-format
 msgid "Search in Milestone"
 msgstr "Cari di Milestone"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/controllers/portal.py:0
-#, python-format
 msgid "Search in Priority"
 msgstr "Cari di Prioritas"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/controllers/portal.py:0
-#, python-format
 msgid "Search in Project"
 msgstr "Cari di Project"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/controllers/portal.py:0
-#, python-format
-msgid "Search in Ref"
-msgstr "Cari di Referensi"
-
-#. module: project
-#. odoo-python
-#: code:addons/project/controllers/portal.py:0
-#, python-format
 msgid "Search in Stages"
 msgstr "Cari di Tahap"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/controllers/portal.py:0
-#, python-format
 msgid "Search in Status"
 msgstr "Cari di Status"
+
+#. module: project
+#. odoo-python
+#: code:addons/project/controllers/portal.py:0
+msgid "Search%(left)s Tasks%(right)s"
+msgstr "Cari%(left)s Task%(right)s"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_project__access_token
@@ -4304,9 +4261,13 @@ msgstr "Token Keamanan"
 
 #. module: project
 #. odoo-javascript
+#: code:addons/project/static/src/js/tours/project.js:0
+msgid "Select an assignee from the menu"
+msgstr "Pilih dari menu"
+
+#. module: project
+#. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_composer.xml:0
-#: model_terms:ir.ui.view,arch_db:project.project_share_wizard_view_form
-#, python-format
 msgid "Send"
 msgstr "Kirim"
 
@@ -4317,9 +4278,11 @@ msgid "Send Email"
 msgstr "Kirim Email"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__sequence
-#: model:ir.model.fields,field_description:project.field_project_project_stage__sequence
-#: model:ir.model.fields,field_description:project.field_project_task__sequence
+#: model:ir.model.fields,field_description:project.field_project_share_collaborator_wizard__send_invitation
+msgid "Send Invitation"
+msgstr "Kirim Undangan"
+
+#. module: project
 #: model:ir.model.fields,field_description:project.field_project_task_type__sequence
 msgid "Sequence"
 msgstr "Urutan"
@@ -4333,7 +4296,6 @@ msgstr "Foto Cover"
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
 #: model:ir.model.fields.selection,name:project.selection__project_project__last_update_status__to_define
-#, python-format
 msgid "Set Status"
 msgstr "Tetapkan Status"
 
@@ -4355,14 +4317,12 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_task_priority_switch_field/project_task_priority_switch_field.js:0
-#, python-format
 msgid "Set priority as %s"
 msgstr "Tetapkan prioritas sebagai %s"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_task_state_selection/project_task_state_selection.js:0
-#, python-format
 msgid "Set state as..."
 msgstr "Tetapkan status sebagai..."
 
@@ -4376,15 +4336,6 @@ msgstr ""
 " pelanggan Anda. Aktifkan fitur \"rating pelanggan\" pada projec"
 
 #. module: project
-#: model:mail.template,description:project.mail_template_data_project_task
-msgid ""
-"Set this template on a project's stage to automate email when tasks reach "
-"stages"
-msgstr ""
-"Tetapkan templat pada tahap project untuk mengotomatiskan email saat task "
-"sampai di tahap"
-
-#. module: project
 #: model:ir.actions.act_window,name:project.project_config_settings_action
 #: model:ir.ui.menu,name:project.project_config_settings_menu_action
 #: model_terms:ir.ui.view,arch_db:project.edit_project
@@ -4393,32 +4344,25 @@ msgid "Settings"
 msgstr "Pengaturan"
 
 #. module: project
-#: model:ir.actions.act_window,name:project.portal_share_action
-#: model_terms:ir.ui.view,arch_db:project.view_project_kanban
-#: model_terms:ir.ui.view,arch_db:project.view_task_kanban
-msgid "Share"
-msgstr "Bagikan"
-
-#. module: project
-#: model_terms:ir.ui.view,arch_db:project.edit_project
-msgid "Share Editable"
-msgstr "Share Editable"
-
-#. module: project
+#. odoo-python
+#: code:addons/project/models/project_project.py:0
 #: model:ir.actions.act_window,name:project.project_share_wizard_action
+#: model_terms:ir.ui.view,arch_db:project.edit_project
 #: model_terms:ir.ui.view,arch_db:project.project_share_wizard_view_form
+#: model_terms:ir.ui.view,arch_db:project.view_project_kanban
 msgid "Share Project"
 msgstr "Share Projec"
 
 #. module: project
-#: model_terms:ir.ui.view,arch_db:project.edit_project
-msgid "Share Read-only"
-msgstr "Share Read-only"
+#: model:ir.actions.act_window,name:project.portal_share_action
+#: model_terms:ir.ui.view,arch_db:project.view_task_kanban
+msgid "Share Task"
+msgstr "Bagikan Task"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__is_favorite
-msgid "Show Project on Dashboard"
-msgstr "Tunjukkan Project pada Dashboard"
+#: model:ir.model.fields,field_description:project.field_project_task__show_display_in_project
+msgid "Show Display In Project"
+msgstr "Tunjukkan Tampilan Di Project"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.view_project_project_filter
@@ -4427,70 +4371,106 @@ msgid "Show all records which has next action date is before today"
 msgstr "Tampilkan semua dokumen dengan aksi berikut sebelum hari ini"
 
 #. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/components/notebook_task_one2many_field/notebook_task_list_renderer.js:0
+msgid "Show closed tasks"
+msgstr "Tunjukkan task-task yang ditutup"
+
+#. module: project
 #: model_terms:ir.ui.view,arch_db:project.project_update_default_description
 msgid "Since"
 msgstr "Sejak"
 
 #. module: project
+#: model:project.tags,name:project.project_tags_12
+msgid "Social"
+msgstr "Sosial"
+
+#. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Software Development"
 msgstr "Software Development"
 
 #. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/views/analytic_account_list/analytic_account_list_controller.js:0
+msgid ""
+"Some of the selected analytic accounts are associated with a project:\n"
+"%(accountList)s\n"
+"\n"
+"Archiving these accounts will remove the option to log timesheets for their respective projects.\n"
+"\n"
+"Are you sure you want to proceed?"
+msgstr ""
+"Beberapa akun analitik yang dipilih terkait dengan project:\n"
+"%(accountList)s\n"
+"\n"
+"Mengarsip akun-akun ini akan menghapus opsi untuk merekam timesheet untuk project masing-masing.\n"
+"\n"
+"Apakah Anda yakin ingin melanjutkan?"
+
+#. module: project
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
-#, python-format
 msgid "Sorry. You can't set a task as its parent task."
 msgstr "Maaf. Anda tidak dapat menetapkan task sebagai induk task-nya."
 
 #. module: project
 #. odoo-javascript
+#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
+msgid ""
+"Sort your tasks by sprint using milestones, tags, or a dedicated property. "
+"At the end of each sprint, just pick the remaining tasks in your list and "
+"move them all at once to the next sprint by editing the milestone, tag, or "
+"property."
+msgstr ""
+"Sortir task Anda dengan sprint menggunakan milestone, tag, atau properti "
+"terdedikasi. Setelah Anda selesai, pilih task yang tersisa di daftar Anda "
+"dan siapkan mereka untuk sprint berikutnya dengan mengedit milestone, tag, "
+"atau properti."
+
+#. module: project
+#. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Specifications"
 msgstr "Spesifikasi"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Sprint Backlog"
 msgstr "Sprint Backlog"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Sprint Complete"
 msgstr "Sprint Selesai"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Sprint in Progress"
 msgstr "Sprint sedang Berlangsung"
 
 #. module: project
-#. odoo-javascript
 #. odoo-python
 #: code:addons/project/controllers/portal.py:0
-#: code:addons/project/controllers/portal.py:0
-#: code:addons/project/static/src/views/burndown_chart/burndown_chart_search_model.js:0
 #: model:ir.model.fields,field_description:project.field_project_project__stage_id
 #: model:ir.model.fields,field_description:project.field_project_task__stage_id
 #: model:ir.model.fields,field_description:project.field_project_task_burndown_chart_report__stage_id
-#: model:ir.model.fields,field_description:project.field_project_task_stage_personal__stage_id
 #: model:ir.model.fields,field_description:project.field_report_project_task_user__stage_id
 #: model_terms:ir.ui.view,arch_db:project.portal_tasks_list
-#: model_terms:ir.ui.view,arch_db:project.project_task_burndown_chart_report_view_search
 #: model_terms:ir.ui.view,arch_db:project.view_project_project_filter
 #: model_terms:ir.ui.view,arch_db:project.view_task_search_form_base
-#, python-format
 msgid "Stage"
 msgstr "Tahapan"
+
+#. module: project
+#: model_terms:ir.ui.view,arch_db:project.project_task_burndown_chart_report_view_search
+msgid "Stage (Burndown Chart)"
+msgstr "Stage (Burndown Chart)"
 
 #. module: project
 #: model:mail.message.subtype,name:project.mt_task_stage
@@ -4510,21 +4490,8 @@ msgstr "Tahapan diubah"
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
-#, python-format
 msgid "Stage: %s"
 msgstr "Tahap: %s"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_project_stage_delete_wizard__stages_active
-#: model:ir.model.fields,field_description:project.field_project_task_type_delete_wizard__stages_active
-msgid "Stages Active"
-msgstr "Tahap Aktif"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_project_stage_delete_wizard__stage_ids
-#: model:ir.model.fields,field_description:project.field_project_task_type_delete_wizard__stage_ids
-msgid "Stages To Delete"
-msgstr "Tahap Untuk Dihapu"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.view_task_search_form_base
@@ -4545,23 +4512,27 @@ msgid "State"
 msgstr "Status"
 
 #. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/components/project_task_state_selection/project_task_stage_state_selection/project_task_stage_with_state_selection.js:0
+msgid "State readonly"
+msgstr "Status readonly"
+
+#. module: project
+#. odoo-javascript
 #. odoo-python
 #: code:addons/project/controllers/portal.py:0
-#: code:addons/project/controllers/portal.py:0
-#: model:ir.model.fields,field_description:project.field_project_update__status
+#: code:addons/project/static/src/components/project_status_with_color_selection/project_status_with_color_selection_field.xml:0
 #: model_terms:ir.ui.view,arch_db:project.view_project
 #: model_terms:ir.ui.view,arch_db:project.view_project_calendar
 #: model_terms:ir.ui.view,arch_db:project.view_project_project_filter
-#, python-format
 msgid "Status"
 msgstr "Status"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
-msgid "Status Update - "
-msgstr "Status Update - "
+msgid "Status Update - %(date)s"
+msgstr "Update Status - %(date)s"
 
 #. module: project
 #: model:ir.model.fields,help:project.field_project_project__activity_state
@@ -4579,29 +4550,19 @@ msgstr ""
 "Direncanakan: Aktivitas yang akan datang."
 
 #. module: project
+#: model:ir.model.fields,field_description:project.field_project_project__duration_tracking
 #: model:ir.model.fields,field_description:project.field_project_task__duration_tracking
 msgid "Status time"
 msgstr "Waktu status"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_task__subtask_count
-msgid "Sub-task Count"
-msgstr "Jumlah Sub-tas"
-
-#. module: project
 #: model:ir.actions.act_window,name:project.project_sharing_project_task_action_sub_task
 #: model:ir.actions.act_window,name:project.project_task_action_sub_task
-#: model:ir.model.fields,field_description:project.field_project_task__child_ids
 #: model_terms:ir.ui.view,arch_db:project.portal_layout
 #: model_terms:ir.ui.view,arch_db:project.project_sharing_project_task_view_form
 #: model_terms:ir.ui.view,arch_db:project.view_task_form2
 msgid "Sub-tasks"
 msgstr "Sub-task"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_task__subtask_allocated_hours
-msgid "Sub-tasks Allocated Time"
-msgstr "Waktu yang Dialokasikan untuk Sub-task"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.rating_rating_view_form_project
@@ -4628,7 +4589,6 @@ msgstr "Ringkasan"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "T-shirt Printing"
 msgstr "Pencetakan T-shirt"
 
@@ -4647,12 +4607,8 @@ msgid "Tags"
 msgstr "Label"
 
 #. module: project
-#. odoo-javascript
-#: code:addons/project/static/src/views/project_rating_graph/project_rating_graph_view.js:0
-#: code:addons/project/static/src/views/project_rating_pivot/project_rating_pivot_view.js:0
 #: model:ir.model,name:project.model_project_task
 #: model:ir.model.fields,field_description:project.field_project_task_recurrence__task_ids
-#: model:ir.model.fields,field_description:project.field_project_task_stage_personal__task_id
 #: model:ir.model.fields,field_description:project.field_report_project_task_user__name
 #: model_terms:ir.ui.view,arch_db:project.portal_my_task
 #: model_terms:ir.ui.view,arch_db:project.project_sharing_project_task_view_form
@@ -4660,7 +4616,6 @@ msgstr "Label"
 #: model_terms:ir.ui.view,arch_db:project.rating_rating_view_search_project
 #: model_terms:ir.ui.view,arch_db:project.rating_rating_view_tree_project
 #: model_terms:ir.ui.view,arch_db:project.view_task_form2
-#, python-format
 msgid "Task"
 msgstr "Kegiatan"
 
@@ -4677,15 +4632,19 @@ msgstr "Task Disetujui"
 
 #. module: project
 #: model:mail.message.subtype,name:project.mt_project_task_canceled
-#: model:mail.message.subtype,name:project.mt_task_canceled
 msgid "Task Canceled"
 msgstr "Task Dibatalkan"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__task_count
-#: model:ir.model.fields,field_description:project.field_project_update__task_count
-msgid "Task Count"
-msgstr "Jumlah Task"
+#: model:mail.message.subtype,name:project.mt_task_canceled
+msgid "Task Cancelled"
+msgstr "Task Dibatalkan"
+
+#. module: project
+#. odoo-python
+#: code:addons/project/models/project_task.py:0
+msgid "Task Converted from To-Do"
+msgstr "Task Dikonversikan dari To-Do"
 
 #. module: project
 #: model:mail.message.subtype,description:project.mt_task_new
@@ -4696,7 +4655,6 @@ msgstr "Task Dibuat"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_project__allow_task_dependencies
-#: model:ir.model.fields,field_description:project.field_project_task__allow_task_dependencies
 #: model:ir.model.fields,field_description:project.field_res_config_settings__group_project_task_dependencies
 msgid "Task Dependencies"
 msgstr "Ketergantungan Task"
@@ -4720,11 +4678,6 @@ msgid "Task Logs"
 msgstr "Log Task"
 
 #. module: project
-#: model:ir.actions.act_window,name:project.mail_activity_plan_action_config_task_plan
-msgid "Task Plans"
-msgstr "Rencana Task"
-
-#. module: project
 #: model:ir.model.fields,field_description:project.field_project_project__task_properties_definition
 msgid "Task Properties"
 msgstr "Properti Task"
@@ -4742,7 +4695,6 @@ msgstr "Pengulangan Task"
 
 #. module: project
 #: model:ir.model,name:project.model_project_task_type
-#: model_terms:ir.ui.view,arch_db:project.personal_task_type_edit
 #: model_terms:ir.ui.view,arch_db:project.task_type_edit
 #: model_terms:ir.ui.view,arch_db:project.task_type_tree
 msgid "Task Stage"
@@ -4773,6 +4725,14 @@ msgid "Task Title..."
 msgstr "Tugas judul..."
 
 #. module: project
+#. odoo-python
+#: code:addons/project/models/project_task.py:0
+msgid ""
+"Task Transferred from Project %(source_project)s to %(destination_project)s"
+msgstr ""
+"Task Ditransfer dari Project %(source_project)s ke %(destination_project)s"
+
+#. module: project
 #: model:mail.message.subtype,description:project.mt_task_waiting
 #: model:mail.message.subtype,name:project.mt_project_task_waiting
 #: model:mail.message.subtype,name:project.mt_task_waiting
@@ -4786,7 +4746,7 @@ msgstr "Task disetujui"
 
 #. module: project
 #: model:mail.message.subtype,description:project.mt_task_canceled
-msgid "Task canceled"
+msgid "Task cancelled"
 msgstr "Task dibatalkan"
 
 #. module: project
@@ -4807,24 +4767,17 @@ msgstr "Task: Rating Permintaan"
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#: code:addons/project/models/project_project.py:0
-#: code:addons/project/models/project_project.py:0
 #: model:ir.actions.act_window,name:project.act_project_project_2_project_task_all
 #: model:ir.actions.act_window,name:project.action_view_task
 #: model:ir.actions.act_window,name:project.action_view_task_from_milestone
-#: model:ir.actions.act_window,name:project.project_task_action_from_partner
-#: model:ir.model.fields,field_description:project.field_project_milestone__task_ids
-#: model:ir.model.fields,field_description:project.field_project_project__task_ids
-#: model:ir.model.fields,field_description:project.field_project_tags__task_ids
+#: model:ir.embedded.actions,name:project.project_embedded_action_all_tasks_dashboard
 #: model:ir.model.fields,field_description:project.field_report_project_task_user__task_id
-#: model:ir.model.fields,field_description:project.field_res_partner__task_ids
-#: model:ir.model.fields,field_description:project.field_res_users__task_ids
 #: model:ir.ui.menu,name:project.menu_project_management
+#: model:project.project,label_tasks:project.project_home_construction
 #: model:project.project,label_tasks:project.project_project_1
 #: model:project.project,label_tasks:project.project_project_2
 #: model:project.project,label_tasks:project.project_project_3
 #: model:project.project,label_tasks:project.project_project_4
-#: model_terms:ir.ui.view,arch_db:project.edit_project
 #: model_terms:ir.ui.view,arch_db:project.portal_layout
 #: model_terms:ir.ui.view,arch_db:project.portal_my_home
 #: model_terms:ir.ui.view,arch_db:project.portal_my_project
@@ -4837,7 +4790,6 @@ msgstr "Task: Rating Permintaan"
 #: model_terms:ir.ui.view,arch_db:project.view_task_calendar
 #: model_terms:ir.ui.view,arch_db:project.view_task_partner_info_form
 #: model_terms:ir.ui.view,arch_db:project.view_task_search_form_base
-#, python-format
 msgid "Tasks"
 msgstr "Kegiatan"
 
@@ -4859,7 +4811,6 @@ msgid "Tasks Management"
 msgstr "Manajemen Task"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__type_ids
 #: model_terms:ir.ui.view,arch_db:project.task_type_search
 msgid "Tasks Stages"
 msgstr "Tahap kegiatan"
@@ -4868,23 +4819,20 @@ msgstr "Tahap kegiatan"
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
 #: model:ir.model.fields,field_description:project.field_project_task__recurring_count
-#, python-format
 msgid "Tasks in Recurrence"
 msgstr "Task pada Pengulangan"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Tests"
 msgstr "Tes"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/burndown_chart/burndown_chart_search_model.js:0
-#, python-format
-msgid "The Burndown Chart must be grouped by"
-msgstr "Grafik Burndown harus dikelompokkan berdasarkan"
+msgid "The Burndown Chart must be grouped by Date"
+msgstr "Burndown Chart harus dikelompokkan berdasarkan Tanggal"
 
 #. module: project
 #: model:ir.model.fields,help:project.field_project_task__personal_stage_id
@@ -4899,7 +4847,6 @@ msgstr "Tahap task pribadi user saat ini."
 #. module: project
 #. odoo-python
 #: code:addons/project/controllers/portal.py:0
-#, python-format
 msgid ""
 "The document does not exist or you do not have the rights to access it."
 msgstr ""
@@ -4908,7 +4855,6 @@ msgstr ""
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_task_recurrence.py:0
-#, python-format
 msgid "The end date should be in the future"
 msgstr "Tanggal akhir harus di masa depan"
 
@@ -4925,7 +4871,6 @@ msgstr "Milestone berikut telah ditambahkan:"
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_task_recurrence.py:0
-#, python-format
 msgid "The interval should be greater than 0"
 msgstr "Interval harus lebih dari 0"
 
@@ -4952,7 +4897,6 @@ msgstr ""
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
 msgid ""
 "The project and the associated partner must be linked to the same company."
 msgstr "Project dan partner terkait harus di-link ke perusahaan yang sama."
@@ -4960,20 +4904,6 @@ msgstr "Project dan partner terkait harus di-link ke perusahaan yang sama."
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
-msgid ""
-"The project cannot be shared with the recipient(s) because the privacy of "
-"the project is too restricted. Set the privacy to 'Visible by following "
-"customers' in order to make it accessible by the recipient(s)."
-msgstr ""
-"Project tidak dapat dibagi dengan penerima karena privasi project terlalu "
-"terbatas. Tetapkan privasi menjadi 'Terlihat oleh pelanggan berikut' agar "
-"dapat diakses oleh penerima."
-
-#. module: project
-#. odoo-python
-#: code:addons/project/models/project_project.py:0
-#, python-format
 msgid ""
 "The project's company cannot be changed if its analytic account has analytic"
 " lines or if more than one project is linked to it."
@@ -4987,16 +4917,27 @@ msgid "The project's start date must be before its end date."
 msgstr "Tanggal mulai project harus sebelum tanggal akhir."
 
 #. module: project
-#. odoo-python
-#: code:addons/project/models/project_task.py:0
-#, python-format
-msgid "The search does not support the %s operator or %s value."
-msgstr "Pencarian tidak mendukung operator %s atau value %s."
+#. odoo-javascript
+#: code:addons/project/static/src/views/burndown_chart/burndown_chart_search_model.js:0
+msgid ""
+"The report should be grouped either by \"Stage\" to represent a Burndown "
+"Chart or by \"Is Closed\" to represent a Burn-up chart. Without one of these"
+" groupings applied, the report will not provide relevant information."
+msgstr ""
+"Laporan harus dikelompokkan baik dengan \"Stage\" untuk mewakili Burndown "
+"Chart atau \"Apakah Ditutup\" untuk mewakili Burn-up chart. Tanpa salah satu"
+" dari pengelompokan ini, laporan tidak dapat menyediakan informasi yang "
+"relevan."
 
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
-#, python-format
+msgid "The search does not support operator %(operator)s or value %(value)s."
+msgstr "Pencarian tidak mendukung operator %(operator)s atau value %(value)s."
+
+#. module: project
+#. odoo-python
+#: code:addons/project/models/project_task.py:0
 msgid ""
 "The task and the associated partner must be linked to the same company."
 msgstr "Task dan partner yang terkait harus di-link ke perusahaan yang sama."
@@ -5004,27 +4945,34 @@ msgstr "Task dan partner yang terkait harus di-link ke perusahaan yang sama."
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
-#, python-format
 msgid ""
 "The task cannot be shared with the recipient(s) because the privacy of the "
-"project is too restricted. Set the privacy of the project to 'Visible by "
-"following customers' in order to make it accessible by the recipient(s)."
+"project is too restricted. Set the privacy of the project to "
+"'%(visibility)s' in order to make it accessible by the recipient(s)."
 msgstr ""
 "Task tidak dapat dibagi dengan penerima karena privasi task terlalu "
-"terbatas. Tetapkan privasi menjadi 'Terlihat oleh pelanggan berikut' agar "
-"dapat diakses oleh penerima."
+"terbatas. Tetapkan privasi menjadi %(visibility)s agar dapat diakses oleh "
+"penerima."
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/views/project_task_form/project_task_form_controller.js:0
+msgid "The task description was empty at the time."
+msgstr "Keterangan task kosong pada saat itu."
 
 #. module: project
 #. odoo-python
 #: code:addons/project/report/project_task_burndown_chart_report.py:0
-#, python-format
-msgid "The view must be grouped by date and by stage_id"
-msgstr "Tampilan harus dikelompokkan berdasarkan tanggal dan stage_id"
+msgid ""
+"The view must be grouped by date and by Stage - Burndown chart or Is Closed "
+"- Burnup chart"
+msgstr ""
+"Tampilan harus dikelompokkan berdasarkan tanggal dan Stage - Burndown chart "
+"atau Apakah Ditutup - Burnup chart"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_message_counter.xml:0
-#, python-format
 msgid "There are no comments for now."
 msgstr "Tidak ada komentar saat ini."
 
@@ -5047,16 +4995,15 @@ msgstr "Tidak ada task."
 #. module: project
 #. odoo-python
 #: code:addons/project/controllers/portal.py:0
-#, python-format
 msgid "There is nothing to report."
 msgstr "Tidak ada yang perlu dilaporkan."
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.project_share_wizard_confirm_form
 msgid ""
-"They can edit shared project tasks and view specific documents in read-only "
-"mode on your website. This includes leads/opportunities, quotations/sales "
-"orders, purchase orders, invoices and bills, timesheets, and tickets."
+"They can edit shared project tasks and view specific documents in read mode "
+"on your website. This includes leads/opportunities, quotations/sales orders,"
+" purchase orders, invoices and bills, timesheets, and tickets."
 msgstr ""
 "Mereka dapat mengedit task project yang dibagikan dan melihat dokumen "
 "tertentu di mode read-only pada website Anda. Ini termasuk "
@@ -5068,7 +5015,6 @@ msgstr ""
 #: code:addons/project/models/project_task.py:0
 #: model:project.task.type,name:project.project_personal_stage_admin_3
 #: model:project.task.type,name:project.project_personal_stage_demo_3
-#, python-format
 msgid "This Month"
 msgstr "Bulan Ini"
 
@@ -5077,9 +5023,39 @@ msgstr "Bulan Ini"
 #: code:addons/project/models/project_task.py:0
 #: model:project.task.type,name:project.project_personal_stage_admin_2
 #: model:project.task.type,name:project.project_personal_stage_demo_2
-#, python-format
+#: model_terms:ir.ui.view,arch_db:project.project_sharing_project_task_view_search
+#: model_terms:ir.ui.view,arch_db:project.view_task_search_form_project_base
 msgid "This Week"
 msgstr "Pekan Ini"
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/views/analytic_account_form/analytic_account_form_controller.js:0
+msgid ""
+"This analytic account is associated with the following projects:\n"
+"%(projectList)s\n"
+"\n"
+"Archiving the account will remove the option to log timesheets for these projects.\n"
+"\n"
+"Are you sure you want to proceed?"
+msgstr ""
+"Beberapa akun analitik yang dipilih terkait dengan project berikut:\n"
+"%(projectList)s\n"
+"\n"
+"Mengarsip akun akan menghapus opsi untuk merekam timesheet untuk project-project ini.\n"
+"\n"
+"Apakah Anda yakin ingin melanjutkan?"
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/core/web/follower_list_patch.js:0
+msgid ""
+"This follower is currently a project collaborator. Removing them will revoke"
+" their portal access to the project. Are you sure you want to proceed?"
+msgstr ""
+"Pengikut ini saat ini merupakan kolaborator project. Menghapus mereka akan "
+"mencabut akses portal mereka ke project ini. Apakah Anda yakin ingin "
+"melanjutkan?"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.project_sharing_project_task_view_form
@@ -5093,41 +5069,61 @@ msgstr ""
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
 msgid ""
-"This project is associated with %s, whereas the selected stage belongs to "
-"%s. There are a couple of options to consider: either remove the company "
-"designation from the project or from the stage. Alternatively, you can "
-"update the company information for these records to align them under the "
-"same company."
+"This project is associated with %(project_company)s, whereas the selected "
+"stage belongs to %(stage_company)s. There are a couple of options to "
+"consider: either remove the company designation from the project or from the"
+" stage. Alternatively, you can update the company information for these "
+"records to align them under the same company."
 msgstr ""
-"Project ini terkait %s, sementara tahap yang dipilih berasal dari %s. "
-"Terdapat beberapa opsi untuk dipertimbangkan: baik hapus perusahaan dari "
-"project atau dari tahap. Jalan alternatif adalah Anda dapat memperbarui "
-"informasi perusahan untuk record-record ini untuk menggabungkan mereka di "
-"bawah perusahaan yang sama."
+"Project ini terkait %(project_company)s, sementara tahap yang dipilih "
+"berasal dari %(stage_company)s. Terdapat beberapa opsi untuk "
+"dipertimbangkan: baik hapus perusahaan dari project atau dari tahap. Jalan "
+"alternatif adalah Anda dapat memperbarui informasi perusahan untuk record-"
+"record ini untuk menggabungkan mereka di bawah perusahaan yang sama."
 
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
 msgid ""
-"This project is not associated to any company, while the stage is associated"
-" to %s. There are a couple of options to consider: either change the "
-"project's company to align with the stage's company or remove the company "
-"designation from the stage"
+"This project is currently restricted to \"Invited internal users\". The "
+"project's visibility will be changed to \"invited portal users and all "
+"internal users (public)\" in order to make it accessible to the recipients."
 msgstr ""
-"Project ini tidak terkait perusahaan apapun, sementara tahap terkait ke %s. "
-"Terdapat beberapa opsi untuk dipertimbangkan: baik ubah perusahaan project "
-"untuk menyamakan tahap perusahaan atau hapus perusahaan dari tahap"
+"Project ini saat ini terbatas ke \"User internal yang diundang\". "
+"Visibilitas project akan diubah menjadi \"user portal yang diundang dan "
+"semua user internal (publik)\" agar dapat diakses oleh penerima."
+
+#. module: project
+#. odoo-python
+#: code:addons/project/models/project_project.py:0
+msgid ""
+"This project is not associated with any company, while the stage is "
+"associated with %s. There are a couple of options to consider: either change"
+" the project's company to align with the stage's company or remove the "
+"company designation from the stage"
+msgstr ""
+"Project ini tidak terkait perusahaan apapun, sementara tahap terkait dengan "
+"%s. Terdapat beberapa opsi untuk dipertimbangkan: baik ubah perusahaan "
+"project untuk menyamakan tahap perusahaan atau hapus perusahaan dari tahap"
+
+#. module: project
+#. odoo-python
+#: code:addons/project/models/project_task.py:0
+msgid "This task has sub-tasks, so it can't be private."
+msgstr "Task ini memiliki sub-task, sehingga tidak dapat privat."
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_task_state_selection/project_task_state_selection.xml:0
-#: code:addons/project/static/src/components/project_task_state_selection/project_task_state_selection.xml:0
-#, python-format
 msgid "This task is blocked by another unfinished task"
 msgstr "Task ini akan diblokir oleh task lain yang belum selesai"
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/project_sharing/components/depend_on_ids_one2many/depend_on_ids_list_renderer.xml:0
+msgid "This task is currently blocked by"
+msgstr "Task ini saat ini diblokir oleh"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.view_project_task_type_delete_confirmation_wizard
@@ -5160,10 +5156,22 @@ msgid "Tip: Create tasks from incoming emails"
 msgstr "Tip: Buat task dari email masuk"
 
 #. module: project
+#: model:digest.tip,name:project.digest_tip_project_3
+#: model_terms:digest.tip,tip_description:project.digest_tip_project_3
+msgid "Tip: Project-Specific Fields"
+msgstr "Tip: Field Khusus Project"
+
+#. module: project
 #: model:digest.tip,name:project.digest_tip_project_0
 #: model_terms:digest.tip,tip_description:project.digest_tip_project_0
 msgid "Tip: Use task states to keep track of your tasks' progression"
 msgstr "Tip: Gunakan status task untuk melacak proses task Anda"
+
+#. module: project
+#: model:digest.tip,name:project.digest_tip_project_2
+#: model_terms:digest.tip,tip_description:project.digest_tip_project_2
+msgid "Tip: Your Own Personal Kanban"
+msgstr "Tip: Kanban Pribadi Anda Sendiri"
 
 #. module: project
 #. odoo-python
@@ -5171,14 +5179,12 @@ msgstr "Tip: Gunakan status task untuk melacak proses task Anda"
 #: model:ir.model.fields,field_description:project.field_project_task__name
 #: model:ir.model.fields,field_description:project.field_project_update__name
 #: model_terms:ir.ui.view,arch_db:project.project_task_view_tree_main_base
-#, python-format
 msgid "Title"
 msgstr "Judul"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_right_side_panel/components/project_profitability.xml:0
-#, python-format
 msgid "To Bill"
 msgstr "Untuk Ditagih"
 
@@ -5190,18 +5196,17 @@ msgstr "Todo"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_right_side_panel/components/project_profitability.xml:0
-#, python-format
 msgid "To Invoice"
 msgstr "Siap Difakturkan"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "To Print"
 msgstr "Untuk Dicetak"
 
 #. module: project
+#: model_terms:ir.actions.act_window,help:project.project_sharing_project_task_action_blocking_tasks
 #: model_terms:ir.actions.act_window,help:project.project_sharing_project_task_action_sub_task
 msgid ""
 "To get things done, use activities and status on tasks.<br>\n"
@@ -5226,7 +5231,8 @@ msgstr ""
 #: code:addons/project/models/project_task.py:0
 #: model:project.task.type,name:project.project_personal_stage_admin_1
 #: model:project.task.type,name:project.project_personal_stage_demo_1
-#, python-format
+#: model_terms:ir.ui.view,arch_db:project.project_sharing_project_task_view_search
+#: model_terms:ir.ui.view,arch_db:project.view_task_search_form_project_base
 msgid "Today"
 msgstr "Hari Ini"
 
@@ -5239,10 +5245,20 @@ msgstr "Aktivitas Hari ini"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_right_side_panel/components/project_profitability.xml:0
-#: code:addons/project/static/src/components/project_right_side_panel/components/project_profitability.xml:0
-#, python-format
 msgid "Total"
 msgstr "Total"
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/components/project_right_side_panel/components/project_profitability.xml:0
+msgid "Total Costs"
+msgstr "Biaya Total"
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/components/project_right_side_panel/components/project_profitability.xml:0
+msgid "Total Revenues"
+msgstr "Total Pendapatan"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.res_config_settings_view_form
@@ -5259,7 +5275,6 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_right_side_panel/project_right_side_panel.xml:0
-#, python-format
 msgid "Track major progress points that must be reached to achieve success."
 msgstr ""
 "Lacak poin perkembangan utama yang harus diraih untuk mencapai kesuksesan."
@@ -5267,32 +5282,12 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_right_side_panel/project_right_side_panel.xml:0
-#, python-format
 msgid ""
 "Track project costs, revenues, and margin by setting the analytic account "
 "associated with the project on relevant documents."
 msgstr ""
 "Lacak biaya project, pendapatan, dan margin dengan menetapkan akun analitik "
 "terkait dengan project pada dokumen yang relevan."
-
-#. module: project
-#: model_terms:ir.ui.view,arch_db:project.res_config_settings_view_form
-msgid ""
-"Track the profitability of your project with analytic accounting. Select the"
-" analytic plan for new projects:"
-msgstr ""
-"Lacak profitabilitas project Anda dengan akuntansi analitik. Pilih rencana "
-"analitik untuk project baru:"
-
-#. module: project
-#: model_terms:ir.ui.view,arch_db:project.res_config_settings_view_form
-msgid ""
-"Track the profitability of your projects. Any project, its tasks and "
-"timesheets are linked to an analytic account and any analytic account "
-"belongs to a plan."
-msgstr ""
-"Lacak profitabilitas project Anda. Project, task dan timesheet apapun akan "
-"di-linhk ke akun analitik dan akun analitik apapun yang dimiliki rencana."
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.res_config_settings_view_form
@@ -5320,7 +5315,6 @@ msgstr "Dua Kali Sebulan"
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
-#, python-format
 msgid "Two tasks cannot depend on each other."
 msgstr "Dua task tidak dapat bergantung satu sama lain"
 
@@ -5334,14 +5328,12 @@ msgstr "Jenis dari aktivitas pengecualian pada rekaman data."
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_project_stage.py:0
-#, python-format
 msgid "Unarchive Projects"
 msgstr "Batalkan Arsip Projec"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_task_type.py:0
-#, python-format
 msgid "Unarchive Tasks"
 msgstr "Batalkan Arsip Task"
 
@@ -5351,14 +5343,19 @@ msgstr "Batalkan Arsip Task"
 #: model_terms:ir.ui.view,arch_db:project.project_task_burndown_chart_report_view_search
 #: model_terms:ir.ui.view,arch_db:project.view_project_project_filter
 #: model_terms:ir.ui.view,arch_db:project.view_task_search_form_base
-#, python-format
 msgid "Unassigned"
 msgstr "Tak diserah-tugaskan"
 
 #. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/project_sharing/chatter/portal_chatter_patch.xml:0
+#: code:addons/project/static/src/project_sharing/components/chatter/chatter_container.xml:0
+msgid "Unfollow"
+msgstr "Batal Mengikuti"
+
+#. module: project
 #. odoo-python
 #: code:addons/project/models/project_project.py:0
-#, python-format
 msgid "Unknown Analytic Account"
 msgstr "Akun Analitik Tidak Diketahui"
 
@@ -5374,11 +5371,6 @@ msgstr "Pesan Belum Dibaca"
 #: model:ir.model.fields.selection,name:project.selection__project_task_recurrence__repeat_type__until
 msgid "Until"
 msgstr "Hingga"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__update_ids
-msgid "Update"
-msgstr "Perbarui"
 
 #. module: project
 #: model:mail.message.subtype,description:project.mt_update_create
@@ -5425,9 +5417,16 @@ msgstr "Menggunakan tugas sebagai"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Use This For My Project"
 msgstr "Gunakan Ini Untuk Project Saya"
+
+#. module: project
+#: model_terms:digest.tip,tip_description:project.digest_tip_project_2
+msgid ""
+"Use personal stages to organize your tasks and create your own workflow."
+msgstr ""
+"Gunakan tahap-tahap pribadi untuk mengorganisir task-task Anda dan buat "
+"workflow Anda sendiri."
 
 #. module: project
 #: model_terms:ir.actions.act_window,help:project.project_tags_action
@@ -5437,27 +5436,12 @@ msgstr "Gunakan tags untuk mengkategorikan task Anda."
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid "Use the"
 msgstr "Gunakan"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/js/tours/project.js:0
-#, python-format
 msgid ""
 "Use the chatter to <b>send emails</b> and communicate efficiently with your "
 "customers. Add new people to the followers' list to make them aware of the "
@@ -5489,7 +5473,6 @@ msgstr ""
 "        Pastikan Anda menggunakan format dan order yang benar contoh Perbarui layar konfigurasi 5h #feature #v16 @Mitchell !"
 
 #. module: project
-#: model:ir.model.fields,field_description:project.field_project_task_stage_personal__user_id
 #: model:res.groups,name:project.group_project_user
 #: model_terms:ir.ui.view,arch_db:project.portal_tasks_list
 msgid "User"
@@ -5519,7 +5502,6 @@ msgstr "Visibilitas"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_messages.xml:0
-#, python-format
 msgid "Visible"
 msgstr "Terlihat"
 
@@ -5529,15 +5511,12 @@ msgstr "Terlihat"
 #: model:ir.model.fields.selection,name:project.selection__project_task__state__04_waiting_normal
 #: model:ir.model.fields.selection,name:project.selection__project_task_burndown_chart_report__state__04_waiting_normal
 #: model:ir.model.fields.selection,name:project.selection__report_project_task_user__state__04_waiting_normal
-#, python-format
 msgid "Waiting"
 msgstr "Menunggu"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/js/tours/project.js:0
-#: code:addons/project/static/src/js/tours/project.js:0
-#, python-format
 msgid ""
 "Want a better way to <b>manage your projects</b>? <i>It starts here.</i>"
 msgstr ""
@@ -5547,7 +5526,6 @@ msgstr ""
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_milestone__website_message_ids
 #: model:ir.model.fields,field_description:project.field_project_project__website_message_ids
-#: model:ir.model.fields,field_description:project.field_project_task__website_message_ids
 #: model:ir.model.fields,field_description:project.field_project_update__website_message_ids
 msgid "Website Messages"
 msgstr "Pesan situs"
@@ -5555,7 +5533,6 @@ msgstr "Pesan situs"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Website Redesign"
 msgstr "Desain Ulang Website"
 
@@ -5579,22 +5556,9 @@ msgid "Weeks"
 msgstr "Minggu"
 
 #. module: project
-#: model_terms:ir.ui.view,arch_db:project.project_share_wizard_view_form
-msgid ""
-"When sharing a project in edit mode, you are giving people access to the kanban and list views of your tasks.\n"
-"                    Collaborators will be able to view and modify part of the tasks' information."
-msgstr ""
-"Dengan membagikan project di mode edit, Anda memberikan orang akses ke tampilan kanban dan daftar ke task Anda.\n"
-"                    Kolaborator akan dapat melihat dan memodifikasi bagian dari informasi task."
-
-#. module: project
-#: model_terms:ir.ui.view,arch_db:project.project_share_wizard_view_form
-msgid ""
-"When sharing a project in read-only mode, you are giving people access to the tasks in their portal.\n"
-"                    These people will be able to view the tasks, but not edit them."
-msgstr ""
-"Saat membagikan project di mode read-only, Anda memberikan orang akses ke task in portal mereka.\n"
-"                    Mereka dapat melihat task, tapi tidak dapat mengedit."
+#: model:project.tags,name:project.project_tags_14
+msgid "Work"
+msgstr "Kerja"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_task__working_days_open
@@ -5619,11 +5583,6 @@ msgstr "Jam Kerja untuk Ditugaskan"
 #: model:ir.model.fields,field_description:project.field_report_project_task_user__working_hours_close
 msgid "Working Hours to Close"
 msgstr "Jam Kerja untuk Ditutup"
-
-#. module: project
-#: model:ir.model.fields,field_description:project.field_project_project__resource_calendar_id
-msgid "Working Time"
-msgstr "Waktu Kerja"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.view_task_form2
@@ -5656,15 +5615,12 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_composer.xml:0
-#, python-format
 msgid "Write a message..."
 msgstr "Tulis pesan..."
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_examples.js:0
-#, python-format
 msgid "Writing"
 msgstr "Tulisan"
 
@@ -5682,7 +5638,6 @@ msgstr "Tahun"
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_project_stage.py:0
-#, python-format
 msgid ""
 "You are not able to switch the company of this stage to %(company_name)s "
 "since it currently includes projects associated with "
@@ -5695,11 +5650,22 @@ msgstr ""
 " project yang terhubung ke %(company_name)s."
 
 #. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/js/tours/project.js:0
+msgid "You can change the sub-task state here!"
+msgstr "Anda dapat mengubah status sub-task di sini!"
+
+#. module: project
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
-#, python-format
 msgid "You can only set a personal stage on a private task."
 msgstr "Anda hanya dapat menetapkan tahap pribadi pada task privat."
+
+#. module: project
+#. odoo-javascript
+#: code:addons/project/static/src/js/tours/project.js:0
+msgid "You can open sub-tasks from the kanban card!"
+msgstr "Anda tidak dapat membuka sub-task dari kartu kanban!"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.view_project_project_stage_delete_wizard
@@ -5740,21 +5706,19 @@ msgstr ""
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
-#, python-format
-msgid "You cannot read %s fields in task."
-msgstr "Anda tidak dapat membaca field %s di task."
+msgid "You cannot read the following fields on tasks: %(field_list)s"
+msgstr "Anda tidak dapat membaca field berikut pada task: %(field_list)s"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
-#, python-format
-msgid "You cannot write on %s fields in task."
-msgstr "Anda tidak dapat menulis pada field %s di task."
+msgid "You cannot write on the following fields on tasks: %(field_list)s"
+msgstr ""
+"Anda tidak dapat menulis pada field-field berikut pada task: %(field_list)s"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
-#, python-format
 msgid "You have been assigned to %s"
 msgstr "Anda telah ditugaskan ke %s"
 
@@ -5762,6 +5726,17 @@ msgstr "Anda telah ditugaskan ke %s"
 #: model_terms:ir.ui.view,arch_db:project.project_message_user_assigned
 msgid "You have been assigned to the"
 msgstr "Anda telah ditugaskan ke"
+
+#. module: project
+#. odoo-python
+#: code:addons/project/models/project_task.py:0
+msgid "You have been invited to follow %s"
+msgstr "Anda telah diundang untuk mengikuti %s"
+
+#. module: project
+#: model_terms:ir.ui.view,arch_db:project.task_invitation_follower
+msgid "You have been invited to follow Task Document :"
+msgstr "Anda telah diundang untuk mengikuti Dokumen Task :"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.project_share_wizard_confirm_form
@@ -5773,38 +5748,44 @@ msgstr ""
 "Apakah Anda siap untuk melanjutkan?"
 
 #. module: project
-#. odoo-python
-#: code:addons/project/models/project_task.py:0
-#, python-format
-msgid "You have not write access of %s field."
-msgstr "Anda tidak dapat menulis akses field %s."
+#. odoo-javascript
+#: code:addons/project/static/src/js/tours/project.js:0
+msgid ""
+"You have unsaved changes - no worries! Odoo will automatically save it as "
+"you navigate.<br/> You can discard these changes from here or manually save "
+"your task.<br/>Let's save it manually."
+msgstr ""
+"Anda memiliki perubahan yang tidak disimpan - jangan khawatir! Odoo akan "
+"secara otomatis menyimpannya selagi Anda bernavigasi.<br/> Anda dapat "
+"membuang perubahan ini dari sini atau secara manual simpan task "
+"Anda.<br/>Ayo simpan secara manual."
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_composer.xml:0
-#, python-format
 msgid "You must be"
 msgstr "Anda haru"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid "Your managers decide which feedback is accepted"
 msgstr "Manajer Anda akan menentukan feedback apa yang diterima"
 
 #. module: project
+#: model_terms:ir.ui.view,arch_db:project.edit_project
+msgid "alias"
+msgstr "alias"
+
+#. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid "and"
 msgstr "dan"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid ""
 "and which feedback is\n"
 "      moved to the \"Refused\" column."
@@ -5820,21 +5801,18 @@ msgstr "ditugasi"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_messages.xml:0
-#, python-format
 msgid "avatar"
 msgstr "avatar"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid "button."
 msgstr "tombol."
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_message_counter.xml:0
-#, python-format
 msgid "comments"
 msgstr "komentar"
 
@@ -5868,7 +5846,6 @@ msgid "e.g. Tasks"
 msgstr "contoh Task"
 
 #. module: project
-#: model_terms:ir.ui.view,arch_db:project.personal_task_type_edit
 #: model_terms:ir.ui.view,arch_db:project.project_project_stage_view_form
 #: model_terms:ir.ui.view,arch_db:project.project_project_stage_view_form_quick_create
 #: model_terms:ir.ui.view,arch_db:project.project_project_stage_view_tree
@@ -5880,8 +5857,8 @@ msgstr "contoh To Do"
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.edit_project
 #: model_terms:ir.ui.view,arch_db:project.project_project_view_form_simplified
-msgid "e.g. domain.com"
-msgstr "contoh domain.com"
+msgid "e.g. mycompany.com"
+msgstr "contoh. mycompany.com"
 
 #. module: project
 #: model_terms:ir.ui.view,arch_db:project.project_project_view_form_simplified
@@ -5896,23 +5873,15 @@ msgstr "contoh: Peluncuran Produk"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid "icon to organize your daily activities."
 msgstr "ikon untuk mengatur kegiatan sehari-hari Anda."
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid ""
 "icon to see tasks waiting on other ones. Once a task is marked as complete "
-"or canceled, all of its dependencies will be unblocked."
+"or cancelled, all of its dependencies will be unblocked."
 msgstr ""
 "ikon untuk melihat task yang menunggu task lainnya. Setelah task ditandai "
 "selesai atau dibatalkan, semua ketergantungannya akan dihapus blokirnya."
@@ -5920,14 +5889,12 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid "icon."
 msgstr "ikon."
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_composer.xml:0
-#, python-format
 msgid "logged in"
 msgstr "logged in"
 
@@ -5954,8 +5921,6 @@ msgstr "siap untuk ditandai sebagai tercapai"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid ""
 "state to indicate a request for changes or a need for discussion on a task."
 msgstr ""
@@ -5965,8 +5930,6 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid ""
 "state to inform your colleagues that a task is approved for the next stage."
 msgstr ""
@@ -5976,35 +5939,30 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
-msgid "state to mark the task as canceled."
+msgid "state to mark the task as cancelled."
 msgstr "status untuk menandai task sebagai dibatalkan."
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid "state to mark the task as complete."
 msgstr "status untuk menandai task sebagai selesai."
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_composer.xml:0
-#, python-format
 msgid "state.message"
 msgstr "state.message"
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/components/project_task_name_with_subtask_count_char_field/project_task_name_with_subtask_count_char_field.xml:0
-#, python-format
 msgid "sub-tasks)"
 msgstr "sub-task)"
 
 #. module: project
 #. odoo-python
 #: code:addons/project/models/project_task.py:0
-#, python-format
 msgid "task"
 msgstr "task"
 
@@ -6021,7 +5979,6 @@ msgstr "deadline untuk milestone berikut telah diupdate:"
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid ""
 "to define if the project is\n"
 "      ready for the next step."
@@ -6032,14 +5989,12 @@ msgstr ""
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/project_sharing/components/chatter/chatter_composer.xml:0
-#, python-format
 msgid "to post a comment."
 msgstr "untuk posting komentar."
 
 #. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/xml/project_task_kanban_examples.xml:0
-#, python-format
 msgid "to signalize what is the current status of your Idea."
 msgstr "untuk memberikan signal apa status saat ini untuk Ide Anda."
 
@@ -6063,19 +6018,9 @@ msgstr ""
 "Kepuasan"
 
 #. module: project
-#: model_terms:ir.ui.view,arch_db:project.view_task_kanban
-msgid ""
-"{{ record.closed_subtask_count.value }} sub-tasks closed out of {{ "
-"record.subtask_count.value }}"
-msgstr ""
-"{{ record.closed_subtask_count.value }} sub-tasks ditutup dari {{ "
-"record.subtask_count.value }}"
-
-#. module: project
 #. odoo-javascript
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_header.js:0
 #: code:addons/project/static/src/views/project_task_list/project_task_list_renderer.js:0
-#, python-format
 msgid "👤 Unassigned"
 msgstr "👤 Belum Ditugaskan"
 
@@ -6084,6 +6029,5 @@ msgstr "👤 Belum Ditugaskan"
 #: code:addons/project/static/src/views/project_task_graph/project_task_graph_model.js:0
 #: code:addons/project/static/src/views/project_task_kanban/project_task_kanban_header.js:0
 #: code:addons/project/static/src/views/project_task_list/project_task_list_renderer.js:0
-#, python-format
 msgid "🔒 Private"
 msgstr "🔒 Privat"

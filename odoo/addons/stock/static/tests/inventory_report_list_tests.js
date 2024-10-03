@@ -8,13 +8,13 @@ const { DateTime } = luxon;
 let target, serverData;
 
 const arch =
-    '<tree editable="top" js_class="inventory_report_list">'+
+    '<list editable="top" js_class="inventory_report_list">'+
     '<field name="name"/>'+
     '<field name="age"/>'+
     '<field name="job"/>'+
     '<field name="create_date" invisible="1"/>'+
     '<field name="write_date" invisible="1"/>'+
-    '</tree>';
+    '</list>';
 
 const setup_date = DateTime.fromISO('2022-01-03T08:03:44+00:00').toSQL();
 
@@ -88,10 +88,10 @@ QUnit.module(
         assert.containsN(target, '.o_data_row', 3, "should have 3 records");
 
         // Create a new line...
-        await click(target.querySelector(".o_control_panel_main_buttons .d-none.d-xl-inline-flex .o_list_button_add"));
+        await click(target.querySelector(".o_control_panel_main_buttons .o_list_button_add"));
         await editInput(target, "[name=name] input", 'Bilou');
         await editInput(target, "[name=age] input", '24');
-        await click(target.querySelector(".o_control_panel_main_buttons .d-none.d-xl-inline-flex .o_list_button_save"));
+        await click(target.querySelector(".o_control_panel_main_buttons .o_list_button_save"));
 
         // Check new record is in the list
         assert.containsN(target, '.o_data_row', 4, "should now have 4 records");
@@ -117,10 +117,10 @@ QUnit.module(
 
         // Create a new line for an existing record...
         let name = serverData.models.person.records[2].name, age = '72';
-        await click(target.querySelector(".o_control_panel_main_buttons .d-none.d-xl-inline-flex .o_list_button_add"));
+        await click(target.querySelector(".o_control_panel_main_buttons .o_list_button_add"));
         await editInput(target, "[name=name] input", name);
         await editInput(target, "[name=age] input", age);
-        await click(target.querySelector(".o_control_panel_main_buttons .d-none.d-xl-inline-flex .o_list_button_save"));
+        await click(target.querySelector(".o_control_panel_main_buttons .o_list_button_save"));
 
         // Check we still have 3 records...
         assert.containsN(target, '.o_data_row', 3, "should still have 3 records");
@@ -157,7 +157,7 @@ QUnit.module(
         await click(target, ".o_group_field_row_add a");
         await editInput(target, "[name=name] input", name);
         await editInput(target, "[name=age] input", age);
-        await click(target.querySelector(".o_control_panel_main_buttons .d-none.d-xl-inline-flex .o_list_button_save"));
+        await click(target.querySelector(".o_control_panel_main_buttons .o_list_button_save"));
         // Check we have 2 records...
         assert.containsN(target, '.o_data_row', 2, "should have 2 records");
 
@@ -167,7 +167,7 @@ QUnit.module(
         await click(target, ".o_group_field_row_add a");
         await editInput(target, "[name=name] input", name);
         await editInput(target, "[name=age] input", age);
-        await click(target.querySelector(".o_control_panel_main_buttons .d-none.d-xl-inline-flex .o_list_button_save"));
+        await click(target.querySelector(".o_control_panel_main_buttons .o_list_button_save"));
         // Check we still have 2 records...
         assert.containsN(target, '.o_data_row', 2, "should still have 2 records");
 
@@ -177,7 +177,7 @@ QUnit.module(
         await editInput(target, "[name=name] input", name);
         await editInput(target, "[name=age] input", age);
         await editInput(target, "[name=job] input", "Soldier"); // let it in its original group
-        await click(target.querySelector(".o_control_panel_main_buttons .d-none.d-xl-inline-flex .o_list_button_save"));
+        await click(target.querySelector(".o_control_panel_main_buttons .o_list_button_save"));
         // Check we have 3 records...
         assert.containsN(target, '.o_data_row', 3, "should have 3 records");
 

@@ -3,11 +3,9 @@
 import logging
 import os
 
-from dateutil.relativedelta import relativedelta
-import pytz
-
 from odoo import _, api, fields, models, SUPERUSER_ID
-from odoo.tools import format_date, email_normalize, email_normalize_all
+from odoo.addons.event.tools.esc_label_tools import print_event_attendees, setup_printer, layout_96x82, layout_96x134
+from odoo.tools import email_normalize, email_normalize_all
 from odoo.exceptions import AccessError, ValidationError
 _logger = logging.getLogger(__name__)
 
@@ -35,7 +33,7 @@ class EventRegistration(models.Model):
     event_id = fields.Many2one(
         'event.event', string='Event', required=True)
     event_ticket_id = fields.Many2one(
-        'event.event.ticket', string='Event Ticket', ondelete='restrict')
+        'event.event.ticket', string='Ticket Type', ondelete='restrict')
     active = fields.Boolean(default=True)
     barcode = fields.Char(string='Barcode', default=lambda self: self._get_random_barcode(), readonly=True, copy=False)
     # utm informations
@@ -57,6 +55,7 @@ class EventRegistration(models.Model):
         readonly=False, store=True)
     event_begin_date = fields.Datetime(string="Event Start Date", related='event_id.date_begin', readonly=True)
     event_end_date = fields.Datetime(string="Event End Date", related='event_id.date_end', readonly=True)
+    event_date_range = fields.Char("Date Range", compute="_compute_date_range")
     event_organizer_id = fields.Many2one(string='Event Organizer', related='event_id.organizer_id', readonly=True)
     event_user_id = fields.Many2one(string='Event Responsible', related='event_id.user_id', readonly=True)
     company_id = fields.Many2one(
@@ -73,6 +72,14 @@ class EventRegistration(models.Model):
              'Registered: registrations considered taken by a client\n'
              'Attended: registrations for which the attendee attended the event\n'
              'Cancelled: registrations cancelled manually')
+    # questions
+    registration_answer_ids = fields.One2many('event.registration.answer', 'registration_id', string='Attendee Answers')
+    registration_answer_choice_ids = fields.One2many('event.registration.answer', 'registration_id', string='Attendee Selection Answers',
+        domain=[('question_type', '=', 'simple_choice')])
+    # scheduled mails
+    mail_registration_ids = fields.One2many(
+        'event.mail.registration', 'registration_id',
+        string="Scheduler Emails", readonly=True)
     # properties
     registration_properties = fields.Properties(
         'Properties', definition='event_id.registration_properties_definition', copy=True)
@@ -145,6 +152,11 @@ class EventRegistration(models.Model):
                 else:
                     registration.date_closed = False
 
+    @api.depends("event_id", "partner_id")
+    def _compute_date_range(self):
+        for registration in self:
+            registration.event_date_range = registration.event_id._get_date_range_str(registration.partner_id.lang)
+
     @api.constrains('event_id', 'event_ticket_id')
     def _check_event_ticket(self):
         if any(registration.event_id != registration.event_ticket_id.event_id for registration in self if registration.event_ticket_id):
@@ -174,6 +186,8 @@ class EventRegistration(models.Model):
         res = attendee._get_registration_summary()
         if attendee.state == 'cancel':
             status = 'canceled_registration'
+        elif attendee.state == 'draft':
+            status = 'unconfirmed_registration'
         elif attendee.event_id.is_finished:
             status = 'not_ongoing_event'
         elif attendee.state != 'done':
@@ -184,7 +198,7 @@ class EventRegistration(models.Model):
                 status = 'confirmed_registration'
         else:
             status = 'already_registered'
-        res.update({'status': status, 'event_id': event_id})
+        res.update({'status': status})
         return res
 
     # ------------------------------------------------------------
@@ -241,10 +255,6 @@ class EventRegistration(models.Model):
     # ------------------------------------------------------------
     # ACTIONS / BUSINESS
     # ------------------------------------------------------------
-
-    def action_set_previous_state(self):
-        self.filtered(lambda reg: reg.state == 'open').action_set_draft()
-        self.filtered(lambda reg: reg.state == 'done').action_confirm()
 
     def action_set_draft(self):
         self.write({'state': 'draft'})
@@ -305,7 +315,6 @@ class EventRegistration(models.Model):
         if not onsubscribe_schedulers:
             return
 
-        onsubscribe_schedulers.update({'mail_done': False})
         # either trigger the cron, either run schedulers immediately (scaling choice)
         async_scheduler = self.env['ir.config_parameter'].sudo().get_param('event.event_mail_async')
         if async_scheduler:
@@ -314,9 +323,14 @@ class EventRegistration(models.Model):
             # we could simply call _create_missing_mail_registrations and let cron do their job
             # but it currently leads to several delays. We therefore call execute until
             # cron triggers are correctly used
-            onsubscribe_schedulers.with_context(
-                event_mail_registration_ids=open_registrations.ids
-            ).with_user(SUPERUSER_ID).execute()
+            for scheduler in onsubscribe_schedulers:
+                try:
+                    scheduler.with_context(
+                        event_mail_registration_ids=open_registrations.ids
+                    ).with_user(SUPERUSER_ID).execute()
+                except Exception as e:
+                    _logger.exception("Failed to run scheduler %s", scheduler.id)
+                    self.env["event.mail"]._warn_template_error(scheduler, e)
 
     # ------------------------------------------------------------
     # MAILING / GATEWAY
@@ -336,18 +350,17 @@ class EventRegistration(models.Model):
         )
 
     def _message_get_suggested_recipients(self):
-        recipients = super(EventRegistration, self)._message_get_suggested_recipients()
+        recipients = super()._message_get_suggested_recipients()
         public_users = self.env['res.users'].sudo()
         public_groups = self.env.ref("base.group_public", raise_if_not_found=False)
         if public_groups:
             public_users = public_groups.sudo().with_context(active_test=False).mapped("users")
         try:
-            for attendee in self:
-                is_public = attendee.sudo().with_context(active_test=False).partner_id.user_ids in public_users if public_users else False
-                if attendee.partner_id and not is_public:
-                    attendee._message_add_suggested_recipient(recipients, partner=attendee.partner_id, reason=_('Customer'))
-                elif attendee.email:
-                    attendee._message_add_suggested_recipient(recipients, email=attendee.email, reason=_('Customer Email'))
+            is_public = self.sudo().with_context(active_test=False).partner_id.user_ids in public_users if public_users else False
+            if self.partner_id and not is_public:
+                self._message_add_suggested_recipient(recipients, partner=self.partner_id, reason=_('Customer'))
+            elif self.email:
+                self._message_add_suggested_recipient(recipients, email=self.email, reason=_('Customer Email'))
         except AccessError:     # no read access rights -> ignore suggested recipients
             pass
         return recipients
@@ -386,32 +399,50 @@ class EventRegistration(models.Model):
     # TOOLS
     # ------------------------------------------------------------
 
-    def get_date_range_str(self, lang_code=False):
-        self.ensure_one()
-        today_tz = pytz.utc.localize(fields.Datetime.now()).astimezone(pytz.timezone(self.event_id.date_tz))
-        event_date_tz = pytz.utc.localize(self.event_begin_date).astimezone(pytz.timezone(self.event_id.date_tz))
-        diff = (event_date_tz.date() - today_tz.date())
-        if diff.days <= 0:
-            return _('today')
-        elif diff.days == 1:
-            return _('tomorrow')
-        elif (diff.days < 7):
-            return _('in %d days', diff.days)
-        elif (diff.days < 14):
-            return _('next week')
-        elif event_date_tz.month == (today_tz + relativedelta(months=+1)).month:
-            return _('next month')
-        else:
-            return _('on %(date)s', date=format_date(self.env, self.event_begin_date, lang_code=lang_code, date_format='medium'))
-
     def _get_registration_summary(self):
         self.ensure_one()
+        if self.event_id.badge_format in ["96x82", "96x134"] and self.env.get("iot.device") is not None:
+            badge_printers = self.env["iot.device"].search([("subtype", "=", "label_printer")])
+            iot_printers = badge_printers.mapped(lambda printer: {
+                "id": printer.id,
+                "name": printer.name,
+                "identifier": printer.identifier,
+                "iotIdentifier": printer.iot_id.identifier,
+                "ip": printer.iot_id.ip,
+                "ipUrl": printer.iot_id.ip_url
+            })
+        else:
+            iot_printers = []
         return {
             'id': self.id,
             'name': self.name,
             'partner_id': self.partner_id.id,
-            'ticket_name': self.event_ticket_id.name or _('None'),
+            'ticket_name': self.event_ticket_id.name,
             'event_id': self.event_id.id,
             'event_display_name': self.event_id.display_name,
-            'company_name': self.event_id.company_id and self.event_id.company_id.name or False,
+            'registration_answers': self.registration_answer_ids.filtered('value_answer_id').mapped('display_name'),
+            'company_name': self.company_name,
+            'iot_printers': iot_printers,
+            'badge_format': self.event_id.badge_format
         }
+
+    def _get_registration_print_details(self):
+        return {
+            'name': self.name,
+            'ticket_name': self.event_ticket_id.name if self.event_ticket_id else None,
+            'ticket_color': self.event_ticket_id.color if self.event_ticket_id else None,
+            'ticket_text_color': self.event_ticket_id._get_ticket_printing_color() if self.event_ticket_id else None,
+            'registration_answers': self.registration_answer_choice_ids.mapped('display_name'),
+            'company_name': self.company_name
+        }
+
+    def _generate_esc_label_badges(self, is_small_badge: bool):
+        badge_layout = layout_96x82 if is_small_badge else layout_96x134
+        command = setup_printer(badge_layout)
+
+        attendees_per_event = self.grouped("event_id").items()
+        for (event, attendees) in attendees_per_event:
+            attendees_details = attendees.mapped(lambda attendee: attendee._get_registration_print_details())
+            command.concat(print_event_attendees(event._get_event_print_details(), attendees_details, badge_layout))
+
+        return command.to_string()

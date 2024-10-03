@@ -1,23 +1,20 @@
 # Translation of Odoo Server.
 # This file contains the translation of the following modules:
 # 	* pos_paytm
-# 
+#
 # Translators:
-# Martin Trigaux, 2023
-# Wil Odoo, 2024
-# 
 msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 17.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:55+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Wil Odoo, 2024\n"
+"POT-Creation-Date: 2024-02-12 10:36+0000\n"
+"PO-Revision-Date: 2024-01-30 15:14+0400\n"
+"Last-Translator: \n"
 "Language-Team: Russian (https://app.transifex.com/odoo/teams/41243/ru/)\n"
+"Language: ru\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: \n"
-"Language: ru\n"
 "Plural-Forms: nplurals=4; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 || n%100>14) ? 1 : n%10==0 || (n%10>=5 && n%10<=9) || (n%100>=11 && n%100<=14)? 2 : 3);\n"
 
 #. module: pos_paytm
@@ -46,9 +43,35 @@ msgid "Card"
 msgstr "Карта"
 
 #. module: pos_paytm
+#: model:ir.model.fields,help:pos_paytm.field_pos_payment_method__accept_payment
+msgid ""
+"Choose accept payment mode: \n"
+" Manually or Automatically"
+msgstr ""
+
+#. module: pos_paytm
+#: model:ir.model.fields,help:pos_paytm.field_pos_payment_method__allowed_payment_modes
+msgid ""
+"Choose allow payment mode: \n"
+" All/Card or QR"
+msgstr ""
+
+#. module: pos_paytm
+#: model:ir.model.fields,help:pos_paytm.field_pos_payment_method__paytm_mid
+msgid "Go to https://business.paytm.com/ and create the merchant account"
+msgstr ""
+
+#. module: pos_paytm
 #: model:ir.model.fields.selection,name:pos_paytm.selection__pos_payment_method__accept_payment__manual
 msgid "Manually"
 msgstr "Вручную"
+
+#. module: pos_paytm
+#: model:ir.model.fields,help:pos_paytm.field_pos_payment_method__paytm_merchant_key
+msgid ""
+"Merchant/AES key \n"
+" ex: B1o6Ivjy8L1@abc9"
+msgstr ""
 
 #. module: pos_paytm
 #: model:ir.model.fields,field_description:pos_paytm.field_pos_payment_method__channel_id
@@ -58,7 +81,6 @@ msgstr "Идентификатор канала PayTM"
 #. module: pos_paytm
 #. odoo-javascript
 #: code:addons/pos_paytm/static/src/js/payment_paytm.js:0
-#, python-format
 msgid "PayTM Error"
 msgstr "Ошибка PayTM"
 
@@ -135,48 +157,53 @@ msgstr "QR"
 #. module: pos_paytm
 #. odoo-javascript
 #: code:addons/pos_paytm/static/src/js/payment_paytm.js:0
-#, python-format
 msgid "Reference number mismatched"
 msgstr "Несоответствие номера ссылки"
 
 #. module: pos_paytm
 #. odoo-python
 #: code:addons/pos_paytm/models/pos_payment_method.py:0
-#, python-format
 msgid "Something went wrong with paytm request. Please try later."
 msgstr "Что-то пошло не так с запросом paytm. Пожалуйста, попробуйте позже."
 
 #. module: pos_paytm
-#. odoo-python
-#: code:addons/pos_paytm/models/pos_payment_method.py:0
-#, python-format
-msgid "This Payment Terminal is only valid for INR Currency"
-msgstr "Этот платежный терминал действителен только для валюты INR"
+#: model:ir.model.fields,help:pos_paytm.field_pos_payment_method__paytm_tid
+msgid ""
+"Terminal model or Activation code \n"
+" ex: 70000123"
+msgstr ""
 
 #. module: pos_paytm
 #. odoo-python
 #: code:addons/pos_paytm/models/pos_payment_method.py:0
-#, python-format
+msgid "This Payment Terminal is only valid for INR Currency"
+msgstr "Этот платежный терминал действителен только для валюты INR"
+
+#. module: pos_paytm
+#: model:ir.model.fields,help:pos_paytm.field_pos_payment_method__paytm_test_mode
+msgid "Turn it on when in Test Mode"
+msgstr ""
+
+#. module: pos_paytm
+#. odoo-python
+#: code:addons/pos_paytm/models/pos_payment_method.py:0
 msgid "makePaymentRequest expected resultCode not found in the response"
 msgstr "makePaymentRequest ожидаемый результатCode не найден в ответе"
 
 #. module: pos_paytm
 #. odoo-python
 #: code:addons/pos_paytm/models/pos_payment_method.py:0
-#, python-format
 msgid "paymentFetchRequest expected resultCode not found in the response"
 msgstr "paymentFetchRequest Ожидаемый результатCode не найден в ответе"
 
 #. module: pos_paytm
 #. odoo-python
 #: code:addons/pos_paytm/models/pos_payment_method.py:0
-#, python-format
 msgid "paytm transaction failure"
 msgstr "сбой транзакции paytm"
 
 #. module: pos_paytm
 #. odoo-python
 #: code:addons/pos_paytm/models/pos_payment_method.py:0
-#, python-format
 msgid "paytm transaction request declined"
 msgstr "запрос на транзакцию paytm отклонен"

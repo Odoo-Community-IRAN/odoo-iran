@@ -1,6 +1,11 @@
 /** @odoo-module **/
 
-import wTourUtils from '@website/js/tours/tour_utils';
+import {
+    clickOnEditAndWaitEditMode,
+    clickOnSave,
+    insertSnippet,
+    registerWebsitePreviewTour,
+} from '@website/js/tours/tour_utils';
 
 // Note: cannot import @website/../tests/tour_utils/widget_lifecycle_dep_widget
 // here because that module requires web.public.widget which is not available
@@ -9,35 +14,35 @@ import wTourUtils from '@website/js/tours/tour_utils';
 // key only.
 const localStorageKey = 'widgetAndWysiwygLifecycle';
 
-wTourUtils.registerWebsitePreviewTour("widget_lifecycle", {
+registerWebsitePreviewTour("widget_lifecycle", {
     test: true,
     url: "/",
     edition: true,
 }, () => [
-    wTourUtils.dragNDrop({
+    ...insertSnippet({
         id: "s_countdown",
         name: "Countdown",
+        groupName: "Content",
     }),
     {
         content: "Wait for the widget to be started and empty the widgetAndWysiwygLifecycle list",
-        trigger: "iframe .s_countdown.public_widget_started",
+        trigger: ":iframe .s_countdown.public_widget_started",
         run: () => {
             // Start recording the calls to the "start" and "destroy" method of
             // the widget and the wysiwyg.
             window.localStorage.setItem(localStorageKey, '[]');
         },
     },
-    ...wTourUtils.clickOnSave(),
+    ...clickOnSave(),
     {
         content: "Wait for the widget to be started",
-        trigger: "iframe .s_countdown.public_widget_started",
-        run: () => {}, // It's a check
+        trigger: ":iframe .s_countdown.public_widget_started",
     },
-    ...wTourUtils.clickOnEditAndWaitEditMode(),
+    ...clickOnEditAndWaitEditMode(),
     {
         content: "Wait for the widget to be started and check the order of the lifecycle method call of the widget and the wysiwyg",
-        trigger: "iframe .s_countdown.public_widget_started",
-        run: () => {
+        trigger: ":iframe .s_countdown.public_widget_started",
+        run() {
             const result = JSON.parse(window.localStorage.widgetAndWysiwygLifecycle);
             const expected = ["widgetStop", "wysiwygStop", "widgetStart",
                 "widgetStop", "wysiwygStart", "wysiwygStarted", "widgetStart",

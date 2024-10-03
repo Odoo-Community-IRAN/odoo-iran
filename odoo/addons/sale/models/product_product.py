@@ -21,7 +21,7 @@ class ProductProduct(models.Model):
     def _compute_sales_count(self):
         r = {}
         self.sales_count = 0
-        if not self.user_has_groups('sales_team.group_sale_salesman'):
+        if not self.env.user.has_group('sales_team.group_sale_salesman'):
             return r
         date_from = fields.Datetime.to_string(fields.datetime.combine(fields.datetime.now() - timedelta(days=365),
                                                                       time.min))
@@ -85,6 +85,9 @@ class ProductProduct(models.Model):
             'search_default_filter_order_date': 1,
         }
         return action
+
+    def _get_backend_root_menu_ids(self):
+        return super()._get_backend_root_menu_ids() + [self.env.ref('sale.sale_menu_root').id]
 
     def _get_invoice_policy(self):
         return self.invoice_policy

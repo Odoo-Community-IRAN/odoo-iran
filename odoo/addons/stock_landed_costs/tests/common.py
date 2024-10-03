@@ -6,8 +6,8 @@ from odoo.addons.stock_account.tests.test_anglo_saxon_valuation_reconciliation_c
 class TestStockLandedCostsCommon(ValuationReconciliationTestCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref=None):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
 
         # Objects
         cls.Product = cls.env['product.product']
@@ -39,20 +39,20 @@ class TestStockLandedCostsCommon(ValuationReconciliationTestCommon):
         # Create product refrigerator & oven
         cls.product_refrigerator = cls.Product.create({
             'name': 'Refrigerator',
-            'type': 'product',
+            'is_storable': True,
             'standard_price': 1.0,
             'weight': 10,
             'volume': 1,
             'categ_id': cls.categ_real_time.id})
         cls.product_oven = cls.Product.create({
             'name': 'Microwave Oven',
-            'type': 'product',
+            'is_storable': True,
             'standard_price': 1.0,
             'weight': 20,
             'volume': 1.5,
             'categ_id': cls.categ_real_time.id})
         # Create service type product 1.Labour 2.Brokerage 3.Transportation 4.Packaging
-        cls.landed_cost = cls.Product.create({'name': 'Landed Cost', 'type': 'service'})
+        cls.landed_cost = cls.Product.create({'name': 'Landed Cost', 'type': 'service', 'categ_id': cls.product_category.id})
         cls.brokerage_quantity = cls.Product.create({'name': 'Brokerage Cost', 'type': 'service'})
         cls.transportation_weight = cls.Product.create({'name': 'Transportation Cost', 'type': 'service'})
         cls.packaging_volume = cls.Product.create({'name': 'Packaging Cost', 'type': 'service'})

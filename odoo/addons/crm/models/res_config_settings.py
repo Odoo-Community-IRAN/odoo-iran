@@ -5,6 +5,7 @@ from datetime import timedelta
 from dateutil.relativedelta import relativedelta
 
 from odoo import api, exceptions, fields, models, _
+from odoo.tools import format_list
 
 
 class ResConfigSettings(models.TransientModel):
@@ -61,7 +62,8 @@ class ResConfigSettings(models.TransientModel):
                 setting.crm_auto_assignment_run_datetime = assign_cron.nextcall
             else:
                 setting.crm_auto_assignment_action = 'manual'
-                setting.crm_auto_assignment_interval_type = setting.crm_auto_assignment_run_datetime = False
+                setting.crm_auto_assignment_interval_type = 'days'
+                setting.crm_auto_assignment_run_datetime = False
                 setting.crm_auto_assignment_interval_number = 1
 
     @api.onchange('crm_auto_assignment_interval_type', 'crm_auto_assignment_interval_number')
@@ -125,7 +127,7 @@ class ResConfigSettings(models.TransientModel):
         for setting in self:
             if setting.predictive_lead_scoring_fields:
                 field_names = [_('Stage')] + [field.name for field in setting.predictive_lead_scoring_fields]
-                setting.predictive_lead_scoring_field_labels = _('%s and %s', ', '.join(field_names[:-1]), field_names[-1])
+                setting.predictive_lead_scoring_field_labels = format_list(self.env, field_names)
             else:
                 setting.predictive_lead_scoring_field_labels = _('Stage')
 
@@ -167,4 +169,4 @@ class ResConfigSettings(models.TransientModel):
 
     def action_crm_assign_leads(self):
         self.ensure_one()
-        return self.env['crm.team'].search([('assignment_optout', '=', False)]).action_assign_leads(work_days=2, log=False)
+        return self.env['crm.team'].search([('assignment_optout', '=', False)]).action_assign_leads()

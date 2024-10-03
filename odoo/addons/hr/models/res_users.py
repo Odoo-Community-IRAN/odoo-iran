@@ -51,6 +51,8 @@ HR_WRITABLE_FIELDS = [
     'ssnid',
     'job_title',
     'km_home_work',
+    'distance_home_work',
+    'distance_home_work_unit',
     'marital',
     'mobile_phone',
     'employee_parent_id',
@@ -95,6 +97,8 @@ class User(models.Model):
     address_id = fields.Many2one(related='employee_id.address_id', readonly=False, related_sudo=False)
     work_contact_id = fields.Many2one(related='employee_id.work_contact_id', readonly=False, related_sudo=False)
     work_location_id = fields.Many2one(related='employee_id.work_location_id', readonly=False, related_sudo=False)
+    work_location_name = fields.Char(related="employee_id.work_location_name")
+    work_location_type = fields.Selection(related="employee_id.work_location_type")
     employee_parent_id = fields.Many2one(related='employee_id.parent_id', readonly=False, related_sudo=False)
     coach_id = fields.Many2one(related='employee_id.coach_id', readonly=False, related_sudo=False)
     private_street = fields.Char(related='employee_id.private_street', string="Private Street", readonly=False, related_sudo=False)
@@ -109,6 +113,8 @@ class User(models.Model):
     private_email = fields.Char(related='employee_id.private_email', string="Private Email", readonly=False)
     private_lang = fields.Selection(related='employee_id.lang', string="Employee Lang", readonly=False)
     km_home_work = fields.Integer(related='employee_id.km_home_work', readonly=False, related_sudo=False)
+    distance_home_work = fields.Integer(related='employee_id.distance_home_work', readonly=False, related_sudo=False)
+    distance_home_work_unit = fields.Selection(related='employee_id.distance_home_work_unit', readonly=False, related_sudo=False)
     # res.users already have a field bank_account_id and country_id from the res.partner inheritance: don't redefine them
     employee_bank_account_id = fields.Many2one(related='employee_id.bank_account_id', string="Employee's Bank Account Number", related_sudo=False, readonly=False)
     employee_country_id = fields.Many2one(related='employee_id.country_id', string="Employee's Country", readonly=False, related_sudo=False)
@@ -308,6 +314,8 @@ class User(models.Model):
 
     def action_create_employee(self):
         self.ensure_one()
+        if self.env.company not in self.company_ids:
+            raise AccessError(_("You are not allowed to create an employee because the user does not have access rights for %s", self.env.company.name))
         self.env['hr.employee'].create(dict(
             name=self.name,
             company_id=self.env.company.id,
@@ -317,13 +325,13 @@ class User(models.Model):
     def action_open_employees(self):
         self.ensure_one()
         employees = self.employee_ids
-        model = 'hr.employee' if self.user_has_groups('hr.group_hr_user') else 'hr.employee.public'
+        model = 'hr.employee' if self.env.user.has_group('hr.group_hr_user') else 'hr.employee.public'
         if len(employees) > 1:
             return {
                 'name': _('Related Employees'),
                 'type': 'ir.actions.act_window',
                 'res_model': model,
-                'view_mode': 'kanban,tree,form',
+                'view_mode': 'kanban,list,form',
                 'domain': [('id', 'in', employees.ids)],
             }
         return {

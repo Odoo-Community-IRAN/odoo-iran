@@ -1,9 +1,10 @@
-/** @odoo-module **/
-
 import { useAutofocus } from "../utils/hooks";
 import { clamp } from "../utils/numbers";
 
-import { Component, useExternalListener, useState } from "@odoo/owl";
+import { Component, useExternalListener, useState, EventBus } from "@odoo/owl";
+
+export const PAGER_UPDATED_EVENT = "PAGER:UPDATED";
+export const pagerBus = new EventBus();
 
 /**
  * Pager
@@ -19,6 +20,21 @@ import { Component, useExternalListener, useState } from "@odoo/owl";
  * @extends Component
  */
 export class Pager extends Component {
+    static template = "web.Pager";
+    static defaultProps = {
+        isEditable: true,
+        withAccessKey: true,
+    };
+    static props = {
+        offset: Number,
+        limit: Number,
+        total: Number,
+        onUpdate: Function,
+        isEditable: { type: Boolean, optional: true },
+        withAccessKey: { type: Boolean, optional: true },
+        updateTotal: { type: Function, optional: true },
+    };
+
     setup() {
         this.state = useState({
             isEditing: false,
@@ -115,9 +131,18 @@ export class Pager extends Component {
      */
     async update(offset, limit, hasNavigated) {
         this.state.isDisabled = true;
-        await this.props.onUpdate({ offset, limit }, hasNavigated);
-        this.state.isDisabled = false;
-        this.state.isEditing = false;
+        try {
+            await this.props.onUpdate({ offset, limit }, hasNavigated);
+        } finally {
+            if (this.env.isSmall) {
+                pagerBus.trigger(PAGER_UPDATED_EVENT, {
+                    value: this.value,
+                    total: this.props.total,
+                });
+            }
+            this.state.isDisabled = false;
+            this.state.isEditing = false;
+        }
     }
 
     async updateTotal() {
@@ -174,18 +199,3 @@ export class Pager extends Component {
         }
     }
 }
-Pager.template = "web.Pager";
-
-Pager.defaultProps = {
-    isEditable: true,
-    withAccessKey: true,
-};
-Pager.props = {
-    offset: Number,
-    limit: Number,
-    total: Number,
-    onUpdate: Function,
-    isEditable: { type: Boolean, optional: true },
-    withAccessKey: { type: Boolean, optional: true },
-    updateTotal: { type: Function, optional: true },
-};

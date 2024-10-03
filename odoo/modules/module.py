@@ -11,13 +11,13 @@ import os
 import pkg_resources
 import re
 import sys
+import traceback
 import warnings
 from os.path import join as opj, normpath
 
 import odoo
 import odoo.tools as tools
 import odoo.release as release
-from odoo.tools import pycompat
 from odoo.tools.misc import file_path
 
 
@@ -32,6 +32,7 @@ _DEFAULT_MANIFEST = {
     'author': 'Odoo S.A.',
     'auto_install': False,
     'category': 'Uncategorized',
+    'cloc_exclude': [],
     'configurator_snippets': {},  # website themes
     'countries': [],
     'data': [],
@@ -61,6 +62,17 @@ _DEFAULT_MANIFEST = {
     'web': False,
     'website': '',
 }
+
+# matches field definitions like
+#     partner_id: base.ResPartner = fields.Many2one
+#     partner_id = fields.Many2one[base.ResPartner]
+TYPED_FIELD_DEFINITION_RE = re.compile(r'''
+    \b (?P<field_name>\w+) \s*
+    (:\s*(?P<field_type>[^ ]*))? \s*
+    = \s*
+    fields\.(?P<field_class>Many2one|One2many|Many2many)
+    (\[(?P<type_param>[^\]]+)\])?
+''', re.VERBOSE)
 
 _logger = logging.getLogger(__name__)
 
@@ -103,7 +115,7 @@ def initialize_sys_path():
 
     # hook odoo.addons on addons paths
     for ad in tools.config['addons_path'].split(','):
-        ad = os.path.normcase(os.path.abspath(tools.ustr(ad.strip())))
+        ad = os.path.normcase(os.path.abspath(ad.strip()))
         if ad not in odoo.addons.__path__:
             odoo.addons.__path__.append(ad)
 
@@ -116,7 +128,7 @@ def initialize_sys_path():
     from odoo import upgrade
     legacy_upgrade_path = os.path.join(base_path, 'base', 'maintenance', 'migrations')
     for up in (tools.config['upgrade_path'] or legacy_upgrade_path).split(','):
-        up = os.path.normcase(os.path.abspath(tools.ustr(up.strip())))
+        up = os.path.normcase(os.path.abspath(up.strip()))
         if os.path.isdir(up) and up not in upgrade.__path__:
             upgrade.__path__.append(up)
 
@@ -154,39 +166,6 @@ def get_module_path(module, downloaded=False, display_warning=True):
     if display_warning:
         _logger.warning('module %s: module not found', module)
     return False
-
-def get_module_filetree(module, dir='.'):
-    warnings.warn(
-        "Since 16.0: use os.walk or a recursive glob or something",
-        DeprecationWarning,
-        stacklevel=2
-    )
-    path = get_module_path(module)
-    if not path:
-        return False
-
-    dir = os.path.normpath(dir)
-    if dir == '.':
-        dir = ''
-    if dir.startswith('..') or (dir and dir[0] == '/'):
-        raise Exception('Cannot access file outside the module')
-
-    files = odoo.tools.osutil.listdir(path, True)
-
-    tree = {}
-    for f in files:
-        if not f.startswith(dir):
-            continue
-
-        if dir:
-            f = f[len(dir)+int(not dir.endswith('/')):]
-        lst = f.split(os.sep)
-        current = tree
-        while len(lst) != 1:
-            current = current.setdefault(lst.pop(0), {})
-        current[lst.pop(0)] = None
-
-    return tree
 
 def get_resource_path(module, *args):
     """Return the full path of a resource of the given module.
@@ -372,11 +351,6 @@ def get_manifest(module, mod_path=None):
 def _get_manifest_cached(module, mod_path=None):
     return load_manifest(module, mod_path)
 
-def load_information_from_description_file(module, mod_path=None):
-    warnings.warn(
-        'load_information_from_description_file() is a deprecated '
-        'alias to get_manifest()', DeprecationWarning, stacklevel=2)
-    return get_manifest(module, mod_path)
 
 def load_openerp_module(module_name):
     """ Load an OpenERP module, if not already loaded.
@@ -401,6 +375,24 @@ def load_openerp_module(module_name):
         if info['post_load']:
             getattr(sys.modules[qualname], info['post_load'])()
 
+    except AttributeError as err:
+        _logger.critical("Couldn't load module %s", module_name)
+        trace = traceback.format_exc()
+        match = TYPED_FIELD_DEFINITION_RE.search(trace)
+        if match and "most likely due to a circular import" in trace:
+            field_name = match['field_name']
+            field_class = match['field_class']
+            field_type = match['field_type'] or match['type_param']
+            if "." not in field_type:
+                field_type = f"{module_name}.{field_type}"
+            raise AttributeError(
+                f"{err}\n"
+                "To avoid circular import for the the comodel use the annotation syntax:\n"
+                f"    {field_name}: {field_type} = fields.{field_class}(...)\n"
+                "and add at the beggining of the file:\n"
+                "    from __future__ import annotations"
+            ).with_traceback(err.__traceback__) from None
+        raise
     except Exception:
         _logger.critical("Couldn't load module %s", module_name)
         raise
@@ -459,7 +451,7 @@ def adapt_version(version):
     return version
 
 
-current_test = None
+current_test = False
 
 
 def check_python_external_dependency(pydep):

@@ -12,33 +12,42 @@ export const SHOW_OPTIONS = {
         receipts: Boolean,
         unitCosts: Boolean,
         moCosts: Boolean,
+        bomCosts: Boolean,
         realCosts: Boolean,
     },
 };
 
 export class MoOverviewDisplayFilter extends BomOverviewDisplayFilter {
+    static props = {
+        showOptions: SHOW_OPTIONS,
+        changeDisplay: Function,
+        limited: { type: Boolean, optional: true },
+        isProductionDraft: { type: Boolean, optional: true},
+    };
+    static defaultProps = {
+        limited: false,
+        isProductionDraft: false,
+    };
+
     setup() {
+        this.displayOptions = {
+            unitCosts: _t("Unit Costs"),
+            moCosts: _t("MO Costs"),
+            bomCosts: _t("BoM Costs"),
+        };
         if (!this.props.limited) {
             this.displayOptions = {
+                ...this.displayOptions,
                 replenishments: _t("Replenishments"),
                 availabilities: _t("Availabilities"),
                 receipts: _t("Receipts"),
             };
         }
-        this.displayOptions = {
-            ...(this.displayOptions || {}),
-            unitCosts: _t("Unit Costs"),
-            moCosts: _t("MO Costs"),
-            realCosts: _t("Real Costs"),
-        };
+        if (!this.props.isProductionDraft) {
+            this.displayOptions = {
+                ...this.displayOptions,
+                realCosts: _t("Real Costs"),
+            };
+        }
     }
 }
-
-MoOverviewDisplayFilter.props = {
-    showOptions: SHOW_OPTIONS,
-    changeDisplay: Function,
-    limited: { type: Boolean, optional: true },
-};
-MoOverviewDisplayFilter.defaultProps = {
-    limited: false,
-};

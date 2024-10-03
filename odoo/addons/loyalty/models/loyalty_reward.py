@@ -1,12 +1,12 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import ast
 import json
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import ValidationError
 from odoo.osv import expression
+
 
 class LoyaltyReward(models.Model):
     _name = 'loyalty.reward'
@@ -35,8 +35,8 @@ class LoyaltyReward(models.Model):
         symbol = self.env.context.get('currency_symbol', self.env.company.currency_id.symbol)
         return [
             ('percent', '%'),
+            ('per_order', symbol),
             ('per_point', _('%s per point', symbol)),
-            ('per_order', _('%s per order', symbol))
         ]
 
     @api.depends('program_id', 'description')
@@ -51,7 +51,14 @@ class LoyaltyReward(models.Model):
     company_id = fields.Many2one(related='program_id.company_id', store=True)
     currency_id = fields.Many2one(related='program_id.currency_id')
 
-    description = fields.Char(compute='_compute_description', readonly=False, store=True, translate=True)
+    description = fields.Char(
+        translate=True,
+        compute='_compute_description',
+        precompute=True,
+        store=True,
+        readonly=False,
+        required=True,
+    )
 
     reward_type = fields.Selection([
         ('product', 'Free Product'),
@@ -79,9 +86,17 @@ class LoyaltyReward(models.Model):
     discount_line_product_id = fields.Many2one('product.product', copy=False, ondelete='restrict',
         help="Product used in the sales order to apply the discount. Each reward has its own product for reporting purpose")
     is_global_discount = fields.Boolean(compute='_compute_is_global_discount')
+    tax_ids = fields.Many2many(
+        string="Taxes",
+        help="Taxes to add on the discount line.",
+        comodel_name='account.tax',
+        domain="[('type_tax_use', '=', 'sale'), ('company_id', '=', company_id)]",
+    )
 
     # Product rewards
-    reward_product_id = fields.Many2one('product.product', string='Product')
+    reward_product_id = fields.Many2one(
+        'product.product', string='Product', domain=[('type', '!=', 'combo')]
+    )
     reward_product_tag_id = fields.Many2one('product.tag', string='Product Tag')
     multi_product = fields.Boolean(compute='_compute_multi_product')
     reward_product_ids = fields.Many2many(
@@ -118,15 +133,16 @@ class LoyaltyReward(models.Model):
 
     def _get_discount_product_domain(self):
         self.ensure_one()
-        domain = []
+        constrains = []
         if self.discount_product_ids:
-            domain = [('id', 'in', self.discount_product_ids.ids)]
+            constrains.append([('id', 'in', self.discount_product_ids.ids)])
         if self.discount_product_category_id:
             product_category_ids = self._find_all_category_children(self.discount_product_category_id, [])
             product_category_ids.append(self.discount_product_category_id.id)
-            domain = expression.OR([domain, [('categ_id', 'in', product_category_ids)]])
+            constrains.append([('categ_id', 'in', product_category_ids)])
         if self.discount_product_tag_id:
-            domain = expression.OR([domain, [('all_product_tag_ids', 'in', self.discount_product_tag_id.id)]])
+            constrains.append([('all_product_tag_ids', 'in', self.discount_product_tag_id.id)])
+        domain = expression.OR(constrains) if constrains else []
         if self.discount_product_domain and self.discount_product_domain != '[]':
             domain = expression.AND([domain, ast.literal_eval(self.discount_product_domain)])
         return domain
@@ -168,7 +184,9 @@ class LoyaltyReward(models.Model):
     @api.depends('reward_product_id', 'reward_product_tag_id', 'reward_type')
     def _compute_multi_product(self):
         for reward in self:
-            products = reward.reward_product_id + reward.reward_product_tag_id.product_ids
+            products = reward.reward_product_id + reward.reward_product_tag_id.product_ids.filtered(
+                lambda product: product.type != 'combo'
+            )
             reward.multi_product = reward.reward_type == 'product' and len(products) > 1
             reward.reward_product_ids = reward.reward_type == 'product' and products or self.env['product.product']
 
@@ -208,7 +226,7 @@ class LoyaltyReward(models.Model):
                 elif reward.discount_mode == 'per_point':
                     reward_string = _('%s per point on ', formatted_amount)
                 elif reward.discount_mode == 'per_order':
-                    reward_string = _('%s per order on ', formatted_amount)
+                    reward_string = _('%s on ', formatted_amount)
                 if reward.discount_applicability == 'order':
                     reward_string += _('your order')
                 elif reward.discount_applicability == 'cheapest':
@@ -230,20 +248,21 @@ class LoyaltyReward(models.Model):
     @api.depends('reward_type', 'discount_applicability', 'discount_mode')
     def _compute_is_global_discount(self):
         for reward in self:
-            reward.is_global_discount = reward.reward_type == 'discount' and\
-                                        reward.discount_applicability == 'order' and\
-                                        reward.discount_mode == 'percent'
+            reward.is_global_discount = (
+                reward.reward_type == 'discount'
+                and reward.discount_applicability == 'order'
+                and reward.discount_mode in ['per_order', 'percent']
+            )
 
     @api.depends_context('uid')
     @api.depends("reward_type")
     def _compute_user_has_debug(self):
-        self.user_has_debug = self.user_has_groups('base.group_no_one')
+        self.user_has_debug = self.env.user.has_group('base.group_no_one')
 
-    @api.onchange('description')
-    def _ensure_reward_has_description(self):
-        for reward in self:
-            if not reward.description:
-                raise UserError(_("The reward description field cannot be empty."))
+    @api.constrains('reward_product_id')
+    def _check_reward_product_id_no_combo(self):
+        if any(reward.reward_product_id.type == 'combo' for reward in self):
+            raise ValidationError(_("A reward product can't be of type \"combo\"."))
 
     def _create_missing_discount_line_products(self):
         # Make sure we create the product that will be used for our discounts

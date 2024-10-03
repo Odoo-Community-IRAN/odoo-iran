@@ -41,12 +41,10 @@ class TestSurveyInvite(common.TestSurveyCommon, MailCommon):
             {},  # empty
             {   # no question
                 'question_and_page_ids': [Command.create({'is_page': True, 'question_type': False, 'title': 'P0', 'sequence': 1})],
-                'session_code': '100000',
             }, {
                 # scored without positive score obtainable
                 'scoring_type': 'scoring_with_answers',
                 'question_and_page_ids': [Command.create({'question_type': 'numerical_box', 'title': 'Q0', 'sequence': 1})],
-                'session_code': '100001',
             }, {
                 # scored without positive score obtainable from simple choice
                 'scoring_type': 'scoring_with_answers',
@@ -58,7 +56,6 @@ class TestSurveyInvite(common.TestSurveyCommon, MailCommon):
                         Command.create({'value': '2', 'answer_score': 0}),
                     ],
                 })],
-                'session_code': '100002',
             }, {
                 # closed
                 'active': False,
@@ -66,7 +63,6 @@ class TestSurveyInvite(common.TestSurveyCommon, MailCommon):
                     Command.create({'is_page': True, 'question_type': False, 'title': 'P0', 'sequence': 1}),
                     Command.create({'title': 'Q0', 'sequence': 2, 'question_type': 'text_box'})
                 ],
-                'session_code': '100003',
              },
         ]
         good_cases = [
@@ -76,7 +72,6 @@ class TestSurveyInvite(common.TestSurveyCommon, MailCommon):
                 'question_and_page_ids': [
                     Command.create({'question_type': 'numerical_box', 'title': 'Q0', 'sequence': 1, 'answer_score': 1}),
                 ],
-                'session_code': '100004',
             }, {
                 # scored with positive score obtainable from simple choice
                 'scoring_type': 'scoring_with_answers',
@@ -98,7 +93,6 @@ class TestSurveyInvite(common.TestSurveyCommon, MailCommon):
                         ],
                     }),
                 ],
-                'session_code': '100005',
             },
         ]
         surveys = self.env['survey.survey'].with_user(self.survey_manager).create([
@@ -118,8 +112,7 @@ class TestSurveyInvite(common.TestSurveyCommon, MailCommon):
         deadline = fields.Datetime.now() + relativedelta(months=1)
 
         self.survey.write({'access_mode': 'public', 'users_login_required': False})
-        action = self.survey.action_send_survey()
-        invite_form = Form(self.env[action['res_model']].with_context(action['context']))
+        invite_form = Form.from_action(self.env, self.survey.action_send_survey())
         invite_form.send_email = True
 
         # some lowlevel checks that action is correctly configured
@@ -141,8 +134,7 @@ class TestSurveyInvite(common.TestSurveyCommon, MailCommon):
         self.assertEqual(set(answers.mapped('deadline')), set([deadline]))
 
         with self.subTest('Warning when inviting an already invited partner'):
-            action = self.survey.action_send_survey()
-            invite_form = Form(self.env[action['res_model']].with_context(action['context']))
+            invite_form = Form.from_action(self.env, self.survey.action_send_survey())
             invite_form.send_email = True
             invite_form.partner_ids.add(self.customer)
 
@@ -155,8 +147,7 @@ class TestSurveyInvite(common.TestSurveyCommon, MailCommon):
         Answer = self.env['survey.user_input']
 
         self.survey.write({'access_mode': 'public', 'users_login_required': True})
-        action = self.survey.action_send_survey()
-        invite_form = Form(self.env[action['res_model']].with_context(action['context']))
+        invite_form = Form.from_action(self.env, self.survey.action_send_survey())
         invite_form.send_email = True
 
         with self.assertRaises(UserError):  # do not allow to add customer (partner without user)
@@ -185,8 +176,7 @@ class TestSurveyInvite(common.TestSurveyCommon, MailCommon):
         Answer = self.env['survey.user_input']
 
         self.survey.write({'access_mode': 'public', 'users_login_required': True})
-        action = self.survey.action_send_survey()
-        invite_form = Form(self.env[action['res_model']].with_context(action['context']))
+        invite_form = Form.from_action(self.env, self.survey.action_send_survey())
         invite_form.send_email = True
 
         invite_form.partner_ids.add(self.customer)
@@ -210,7 +200,7 @@ class TestSurveyInvite(common.TestSurveyCommon, MailCommon):
         # Verifies whether changing the value of the "email_from" field reflects on the receiving end.
         action = self.survey.action_send_survey()
         action['context']['default_send_email'] = True
-        invite_form = Form(self.env[action['res_model']].with_context(action['context']))
+        invite_form = Form.from_action(self.env, action)
         invite_form.partner_ids.add(self.survey_user.partner_id)
         invite_form.template_id.write({'email_from':'{{ object.partner_id.email_formatted }}'})
         invite = invite_form.save()
@@ -226,8 +216,7 @@ class TestSurveyInvite(common.TestSurveyCommon, MailCommon):
         Answer = self.env['survey.user_input']
 
         self.survey.write({'access_mode': 'public', 'users_login_required': False})
-        action = self.survey.action_send_survey()
-        invite_form = Form(self.env[action['res_model']].with_context(action['context']))
+        invite_form = Form.from_action(self.env, self.survey.action_send_survey())
         invite_form.send_email = True
 
         invite_form.partner_ids.add(self.customer)
@@ -248,8 +237,7 @@ class TestSurveyInvite(common.TestSurveyCommon, MailCommon):
         Answer = self.env['survey.user_input']
 
         self.survey.write({'access_mode': 'token', 'users_login_required': False})
-        action = self.survey.action_send_survey()
-        invite_form = Form(self.env[action['res_model']].with_context(action['context']))
+        invite_form = Form.from_action(self.env, self.survey.action_send_survey())
 
         invite_form.partner_ids.add(self.customer)
         invite_form.emails = 'test1@example.com, Raoulette Vignolette <test2@example.com>'
@@ -269,8 +257,7 @@ class TestSurveyInvite(common.TestSurveyCommon, MailCommon):
         Answer = self.env['survey.user_input']
 
         self.survey.write({'access_mode': 'token', 'users_login_required': True})
-        action = self.survey.action_send_survey()
-        invite_form = Form(self.env[action['res_model']].with_context(action['context']))
+        invite_form = Form.from_action(self.env, self.survey.action_send_survey())
 
         with self.assertRaises(UserError):  # do not allow to add customer (partner without user)
             invite_form.partner_ids.add(self.customer)
@@ -309,8 +296,7 @@ class TestSurveyInvite(common.TestSurveyCommon, MailCommon):
         })
 
         self.survey.write({'access_mode': 'token', 'users_login_required': False})
-        action = self.survey.action_send_survey()
-        invite_form = Form(self.env[action['res_model']].with_context(action['context']))
+        invite_form = Form.from_action(self.env, self.survey.action_send_survey())
         invite_form.emails = 'test@example.com'
         invite = invite_form.save()
         invite.action_invite()
@@ -355,8 +341,7 @@ class TestSurveyInvite(common.TestSurveyCommon, MailCommon):
             ]
         })
 
-        action = user_survey.action_send_survey()
-        invite_form = Form(self.env[action['res_model']].with_context(action['context']))
+        invite_form = Form.from_action(self.env, user_survey.action_send_survey())
         invite_form.send_email = True
         invite_form.template_id = mail_template
         invite_form.emails = 'test_survey_invite_with_template_attachment@odoo.gov'

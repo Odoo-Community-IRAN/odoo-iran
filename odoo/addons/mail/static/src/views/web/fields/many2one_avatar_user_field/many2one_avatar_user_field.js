@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { useAssignUserCommand } from "@mail/views/web/fields/assign_user_command_hook";
 
 import { _t } from "@web/core/l10n/translation";
@@ -23,17 +21,25 @@ const WithUserChatter = (T) =>
             this.avatarCard = usePopover(AvatarCardPopover);
         }
 
+        get displayAvatarCard() {
+            return this.relation === "res.users";
+        }
+
+        getAvatarCardProps() {
+            return {
+                id: this.props.record.data[this.props.name][0] ?? false,
+            };
+        }
+
         onClickAvatar(ev) {
             const id = this.props.record.data[this.props.name][0] ?? false;
             if (id !== false) {
-                if (this.relation !== "res.users") {
+                if (!this.displayAvatarCard) {
                     return;
                 }
                 const target = ev.currentTarget;
                 if (!this.avatarCard.isOpen) {
-                    this.avatarCard.open(target, {
-                        id: this.props.record.data[this.props.name][0],
-                    });
+                    this.avatarCard.open(target, this.getAvatarCardProps());
                 }
             }
         }
@@ -43,8 +49,6 @@ export class Many2OneAvatarUserField extends WithUserChatter(Many2OneAvatarField
     static template = "mail.Many2OneAvatarUserField";
     static props = {
         ...Many2OneAvatarField.props,
-        context: { type: String, optional: true },
-        domain: { type: [Array, Function], optional: true },
         withCommand: { type: Boolean, optional: true },
     };
 }
@@ -55,8 +59,6 @@ export const many2OneAvatarUserField = {
     additionalClasses: ["o_field_many2one_avatar"],
     extractProps(fieldInfo, dynamicInfo) {
         const props = many2OneAvatarField.extractProps(...arguments);
-        props.context = fieldInfo.context;
-        props.domain = dynamicInfo.domain;
         props.withCommand = fieldInfo.viewType === "form" || fieldInfo.viewType === "list";
         return props;
     },

@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { ActivityButton } from "@mail/core/web/activity_button";
 
 import { Component } from "@odoo/owl";
@@ -39,6 +37,8 @@ export class ListActivity extends Component {
 export const listActivity = {
     component: ListActivity,
     fieldDependencies: ListActivity.fieldDependencies,
+    displayName: _t("List Activity"),
+    supportedTypes: ["one2many"],
 };
 
 registry.category("fields").add("list_activity", listActivity);

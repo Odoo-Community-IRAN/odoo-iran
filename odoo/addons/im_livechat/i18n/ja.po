@@ -3,17 +3,15 @@
 # 	* im_livechat
 # 
 # Translators:
-# Junko Augias, 2024
 # Wil Odoo, 2024
-# Ryoko Tsuda <ryoko@quartile.co>, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-08-13 10:26+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Ryoko Tsuda <ryoko@quartile.co>, 2024\n"
+"POT-Creation-Date: 2024-09-25 08:39+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Japanese (https://app.transifex.com/odoo/teams/41243/ja/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -23,15 +21,7 @@ msgstr ""
 
 #. module: im_livechat
 #. odoo-python
-#: code:addons/im_livechat/models/chatbot_script.py:0
-#, python-format
-msgid " (copy)"
-msgstr "(コピー)"
-
-#. module: im_livechat
-#. odoo-python
 #: code:addons/im_livechat/models/chatbot_script_step.py:0
-#, python-format
 msgid "\"%s\" is not a valid email."
 msgstr "\"%s\" は有効なEメールではありません。"
 
@@ -67,18 +57,13 @@ msgstr "満足度% "
 
 #. module: im_livechat
 #. odoo-python
-#: code:addons/im_livechat/models/discuss_channel.py:0
-#, python-format
-msgid ""
-"%(new_line)sType %(bold_start)s:shortcut%(bold_end)s to insert a canned "
-"response in your message."
-msgstr ""
-"%(new_line)sタイプ %(bold_start)s:ショートカット%(bold_end)sをクリックすると、メッセージに定型文が挿入されます。"
+#: code:addons/im_livechat/models/chatbot_script.py:0
+msgid "%s (copy)"
+msgstr "%s (コピー)"
 
 #. module: im_livechat
 #. odoo-python
 #: code:addons/im_livechat/models/chatbot_script_step.py:0
-#, python-format
 msgid "%s has joined"
 msgstr "%sが参加しました "
 
@@ -86,7 +71,6 @@ msgstr "%sが参加しました "
 #. odoo-python
 #: code:addons/im_livechat/models/chatbot_script.py:0
 #: code:addons/im_livechat/models/discuss_channel.py:0
-#, python-format
 msgid ""
 "'%(input_email)s' does not look like a valid email. Can you please try "
 "again?"
@@ -116,11 +100,6 @@ msgid "1 is Monday, 7 is Sunday"
 msgstr "1は月曜、7は日曜"
 
 #. module: im_livechat
-#: model_terms:ir.ui.view,arch_db:im_livechat.discuss_channel_view_form
-msgid "<i class=\"fa fa-mail-reply me-2\" title=\"Reply\"/>"
-msgstr "<i class=\"fa fa-mail-reply me-2\" title=\"Reply\"/>"
-
-#. module: im_livechat
 #: model_terms:ir.ui.view,arch_db:im_livechat.im_livechat_channel_view_kanban
 msgid ""
 "<i class=\"fa fa-smile-o text-success\" title=\"Percentage of happy "
@@ -138,6 +117,11 @@ msgstr "<i class=\"oi oi-fw oi-arrow-right\"/>編集モードに戻る"
 #: model_terms:ir.ui.view,arch_db:im_livechat.im_livechat_channel_view_form
 msgid "<i title=\"Remove operator\" class=\"fa fa-fw fa-lg fa-close\"/>"
 msgstr "<i title=\"Remove operator\" class=\"fa fa-fw fa-lg fa-close\"/>"
+
+#. module: im_livechat
+#: model_terms:ir.ui.view,arch_db:im_livechat.discuss_channel_view_kanban
+msgid "<span class=\"fw-bold\">Country: </span>"
+msgstr "<span class=\"fw-bold\">国: </span>"
 
 #. module: im_livechat
 #: model_terms:ir.ui.view,arch_db:im_livechat.livechat_email_template
@@ -224,7 +208,6 @@ msgstr "管理者"
 #. module: im_livechat
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/embed/common/feedback_panel/transcript_sender.xml:0
-#, python-format
 msgid "An error occurred. Please try again."
 msgstr "エラーが発生しました。もう一度試して下さい。"
 
@@ -232,11 +215,6 @@ msgstr "エラーが発生しました。もう一度試して下さい。"
 #: model:chatbot.script.step,message:im_livechat.chatbot_script_welcome_step_documentation_redirect
 msgid "And tadaaaa here you go! 🌟"
 msgstr "では、こちらでございます！ 🌟"
-
-#. module: im_livechat
-#: model_terms:ir.ui.view,arch_db:im_livechat.discuss_channel_view_form
-msgid "Anonymous"
-msgstr "匿名"
 
 #. module: im_livechat
 #: model:ir.model.fields,field_description:im_livechat.field_discuss_channel__anonymous_name
@@ -273,11 +251,6 @@ msgstr "添付数"
 #: model:ir.model.fields,field_description:im_livechat.field_im_livechat_channel__available_operator_ids
 msgid "Available Operator"
 msgstr "対応可能なオペレータ"
-
-#. module: im_livechat
-#: model_terms:ir.ui.view,arch_db:im_livechat.discuss_channel_view_form
-msgid "Avatar"
-msgstr "アバター"
 
 #. module: im_livechat
 #: model:ir.model.fields,field_description:im_livechat.field_discuss_channel__rating_avg
@@ -378,12 +351,12 @@ msgstr "チャネル名"
 #. module: im_livechat
 #: model_terms:ir.ui.view,arch_db:im_livechat.im_livechat_channel_rule_view_form
 msgid "Channel Rule"
-msgstr "チャネルのルール"
+msgstr "チャネル規則"
 
 #. module: im_livechat
 #: model_terms:ir.ui.view,arch_db:im_livechat.im_livechat_channel_view_form
 msgid "Channel Rules"
-msgstr "チャネルのルール"
+msgstr "チャネル規則"
 
 #. module: im_livechat
 #: model:ir.model.fields,field_description:im_livechat.field_discuss_channel__channel_type
@@ -472,7 +445,6 @@ msgstr "閉じる"
 #. module: im_livechat
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/embed/common/feedback_panel/feedback_panel.xml:0
-#, python-format
 msgid "Close conversation"
 msgstr "会話を閉じる"
 
@@ -507,31 +479,30 @@ msgstr "会話"
 #. module: im_livechat
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/embed/common/chatbot/chatbot_service.js:0
-#, python-format
 msgid "Conversation ended..."
 msgstr "会話が終了しました。"
 
 #. module: im_livechat
 #. odoo-python
 #: code:addons/im_livechat/models/discuss_channel.py:0
-#, python-format
 msgid "Conversation with %s"
 msgstr "%sとの会話"
 
 #. module: im_livechat
 #: model:ir.model.fields,field_description:im_livechat.field_digest_digest__kpi_livechat_conversations
 msgid "Conversations handled"
-msgstr "会話が対応されました"
+msgstr "会話対応済"
 
 #. module: im_livechat
 #: model_terms:ir.ui.view,arch_db:im_livechat.im_livechat_channel_view_form
 msgid ""
 "Copy and paste this code into your website, within the &lt;head&gt; tag:"
-msgstr "あなたのウェブサイトの &lt;head&gt; tagの中に、このコードをコピーして、貼り付けてください:"
+msgstr "このコードをコピーして、あなたのウェブサイトの &lt;head&gt; タグ内に貼り付けて下さい:"
 
 #. module: im_livechat
 #: model:ir.model.fields,field_description:im_livechat.field_discuss_channel__country_id
 #: model:ir.model.fields,field_description:im_livechat.field_im_livechat_channel_rule__country_ids
+#: model_terms:ir.ui.view,arch_db:im_livechat.discuss_channel_view_kanban
 msgid "Country"
 msgstr "国"
 
@@ -593,6 +564,11 @@ msgid "Customer Ratings"
 msgstr "顧客評価"
 
 #. module: im_livechat
+#: model_terms:ir.ui.view,arch_db:im_livechat.discuss_channel_view_kanban
+msgid "Date:"
+msgstr "日付:"
+
+#. module: im_livechat
 #: model:ir.model.fields,field_description:im_livechat.field_im_livechat_report_channel__day_number
 msgid "Day Number"
 msgstr "日付番号"
@@ -640,7 +616,7 @@ msgid ""
 "installed on your server, otherwise, the countries of the rule will not be "
 "taken into account."
 msgstr ""
-"ライブサポートチャネルのルールを定義します。与えられたURLと国ごとにアクションを適用することができます。<br/>国を特定するには、GeoIPをサーバーにインストールする必要があります。そうでない場合は、ルール上の国が考慮されません。"
+"ライブサポートチャネルの規則を定義します。与えられたURLと国ごとにアクションを適用することができます。<br/>国を特定するには、GeoIPをサーバーにインストールする必要があります。そうでない場合は、規則上の国が考慮されません。"
 
 #. module: im_livechat
 #: model:ir.model.fields,help:im_livechat.field_im_livechat_channel_rule__auto_popup_timer
@@ -653,7 +629,6 @@ msgstr "会話ウィンドウを自動的に開くまでの遅延時間（秒）
 #. module: im_livechat
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/embed/common/feedback_panel/feedback_panel.xml:0
-#, python-format
 msgid "Did we correctly answer your question?"
 msgstr "あなたの質問に正しく回答しましたか？"
 
@@ -664,8 +639,7 @@ msgstr "ダイジェスト"
 
 #. module: im_livechat
 #. odoo-javascript
-#: code:addons/im_livechat/static/src/views/discuss_channel_list/discuss_channel_list_view_controller.js:0
-#, python-format
+#: code:addons/im_livechat/static/src/views/livechat_view_controller_mixin.js:0
 msgid "Discuss"
 msgstr "ディスカス"
 
@@ -690,7 +664,6 @@ msgstr "表示名"
 #. module: im_livechat
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/embed/common/livechat_button.xml:0
-#, python-format
 msgid "Drag to Move"
 msgstr "ドラッグして移動"
 
@@ -717,6 +690,11 @@ msgid "Duration of the session in hours"
 msgstr "会話の長さ(時間)"
 
 #. module: im_livechat
+#: model_terms:ir.ui.view,arch_db:im_livechat.discuss_channel_view_kanban
+msgid "Duration:"
+msgstr "期間:"
+
+#. module: im_livechat
 #: model:ir.model.fields.selection,name:im_livechat.selection__chatbot_script_step__step_type__question_email
 msgid "Email"
 msgstr "メール"
@@ -735,9 +713,13 @@ msgstr "オペレーターがいない場合のみ有効"
 #. module: im_livechat
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/embed/common/feedback_panel/feedback_panel.xml:0
-#, python-format
 msgid "Explain your note"
 msgstr "メモを説明"
+
+#. module: im_livechat
+#: model:ir.model,name:im_livechat.model_ir_binary
+msgid "File streaming helper model for controllers"
+msgstr "コントローラーのファイルストリーミングヘルパーモデル"
 
 #. module: im_livechat
 #: model:ir.model.fields.selection,name:im_livechat.selection__chatbot_script__first_step_warning__first_step_invalid
@@ -822,7 +804,6 @@ msgstr "ライブチャットへのアクセスあり"
 #. odoo-python
 #: code:addons/im_livechat/models/im_livechat_channel.py:0
 #: model:im_livechat.channel,button_text:im_livechat.im_livechat_channel_data
-#, python-format
 msgid "Have a Question? Chat with us."
 msgstr "ご質問ですか？チャットでお問い合わせください。"
 
@@ -843,7 +824,6 @@ msgstr "非表示"
 
 #. module: im_livechat
 #: model:ir.actions.act_window,name:im_livechat.discuss_channel_action
-#: model_terms:ir.ui.view,arch_db:im_livechat.discuss_channel_view_form
 #: model_terms:ir.ui.view,arch_db:im_livechat.discuss_channel_view_tree
 msgid "History"
 msgstr "履歴"
@@ -862,7 +842,6 @@ msgstr "セッション開始日の時間"
 #. module: im_livechat
 #. odoo-python
 #: code:addons/im_livechat/models/im_livechat_channel.py:0
-#, python-format
 msgid "How may I help you?"
 msgstr "どのようなご用件でしょうか？"
 
@@ -956,11 +935,6 @@ msgid "Is Forward Operator Child"
 msgstr "オペレーター子に転送"
 
 #. module: im_livechat
-#: model:ir.model.fields,field_description:im_livechat.field_res_users_settings__is_discuss_sidebar_category_livechat_open
-msgid "Is category livechat open"
-msgstr "ライブチャットカテゴリがオープン"
-
-#. module: im_livechat
 #: model:ir.model.fields,field_description:im_livechat.field_discuss_channel__livechat_active
 msgid "Is livechat ongoing?"
 msgstr "ライブチャットが進行中ですか？"
@@ -974,6 +948,12 @@ msgstr "匿名訪問者"
 #: model_terms:ir.ui.view,arch_db:im_livechat.im_livechat_channel_view_kanban
 msgid "Join"
 msgstr "参加"
+
+#. module: im_livechat
+#. odoo-javascript
+#: code:addons/im_livechat/static/src/core/web/livechat_channel_model_patch.js:0
+msgid "Join %s"
+msgstr "参加%s"
 
 #. module: im_livechat
 #: model_terms:ir.ui.view,arch_db:im_livechat.im_livechat_channel_view_form
@@ -999,7 +979,6 @@ msgstr "KPI ライブチャットレスポンス値"
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/core/web/channel_invitation_patch.xml:0
 #: code:addons/im_livechat/static/src/core/web/channel_member_list_patch.xml:0
-#, python-format
 msgid "Lang"
 msgstr "Lang"
 
@@ -1035,6 +1014,12 @@ msgid "Leave"
 msgstr "解除"
 
 #. module: im_livechat
+#. odoo-javascript
+#: code:addons/im_livechat/static/src/core/web/livechat_channel_model_patch.js:0
+msgid "Leave %s"
+msgstr "退出%s"
+
+#. module: im_livechat
 #: model_terms:ir.ui.view,arch_db:im_livechat.im_livechat_channel_view_form
 msgid "Leave Channel"
 msgstr "チャネルから退席"
@@ -1058,11 +1043,10 @@ msgstr "ライブチャットチャネル検索"
 
 #. module: im_livechat
 #. odoo-javascript
-#: code:addons/im_livechat/static/src/core/web/discuss_app_model_patch.js:0
-#: code:addons/im_livechat/static/src/core/web/messaging_menu_patch.js:0
-#: code:addons/im_livechat/static/src/core/web/thread_icon_patch.xml:0
+#: code:addons/im_livechat/static/src/core/public_web/discuss_app_model_patch.js:0
+#: code:addons/im_livechat/static/src/core/public_web/messaging_menu_patch.js:0
+#: code:addons/im_livechat/static/src/core/web/thread_icon_patch.js:0
 #: model_terms:ir.ui.view,arch_db:im_livechat.res_users_form_view
-#, python-format
 msgid "Livechat"
 msgstr "ライブチャット"
 
@@ -1098,7 +1082,7 @@ msgid "Livechat Conversation"
 msgstr "Webチャットの会話"
 
 #. module: im_livechat
-#: model_terms:ir.ui.view,arch_db:im_livechat.qunit_embed_suite
+#: model_terms:ir.ui.view,arch_db:im_livechat.unit_embed_suite
 msgid "Livechat External Tests"
 msgstr "ライブチャット外部テスト"
 
@@ -1207,7 +1191,6 @@ msgstr "名称"
 #. module: im_livechat
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/embed/common/livechat_service.js:0
-#, python-format
 msgid "No available collaborator, please try again later."
 msgstr "対応可能な協力者がいません。後で試して下さい。"
 
@@ -1223,8 +1206,7 @@ msgstr "まだデータはありません！"
 
 #. module: im_livechat
 #. odoo-python
-#: code:addons/im_livechat/models/discuss_channel.py:0
-#, python-format
+#: code:addons/im_livechat/models/res_partner.py:0
 msgid "No history found"
 msgstr "履歴が見つかりません"
 
@@ -1385,14 +1367,12 @@ msgstr "電話"
 #. module: im_livechat
 #. odoo-python
 #: code:addons/im_livechat/models/chatbot_script_step.py:0
-#, python-format
 msgid "Please call me on: "
 msgstr "以下にお電話下さい:"
 
 #. module: im_livechat
 #. odoo-python
 #: code:addons/im_livechat/models/chatbot_script_step.py:0
-#, python-format
 msgid "Please contact me on: "
 msgstr "以下にご連絡下さい:"
 
@@ -1416,8 +1396,8 @@ msgstr "質問"
 #: code:addons/im_livechat/controllers/main.py:0
 #: model:ir.model,name:im_livechat.model_rating_rating
 #: model:ir.model.fields,field_description:im_livechat.field_im_livechat_report_channel__rating
+#: model_terms:ir.ui.view,arch_db:im_livechat.discuss_channel_view_kanban
 #: model_terms:ir.ui.view,arch_db:im_livechat.discuss_channel_view_tree
-#, python-format
 msgid "Rating"
 msgstr "評価"
 
@@ -1472,7 +1452,6 @@ msgstr "ライブチャットチャネル評価"
 #. module: im_livechat
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/embed/common/feedback_panel/transcript_sender.xml:0
-#, python-format
 msgid "Receive a copy of this conversation."
 msgstr "この会話のコピーを受取る"
 
@@ -1493,11 +1472,6 @@ msgid "Related Mail Message"
 msgstr "関連するメールメッセージ"
 
 #. module: im_livechat
-#: model_terms:ir.ui.view,arch_db:im_livechat.discuss_channel_view_form
-msgid "Replied to"
-msgstr "以下へ回答:"
-
-#. module: im_livechat
 #: model:ir.ui.menu,name:im_livechat.menu_reporting_livechat
 msgid "Report"
 msgstr "レポート"
@@ -1505,22 +1479,18 @@ msgstr "レポート"
 #. module: im_livechat
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/js/colors_reset_button/colors_reset_button.xml:0
-#: code:addons/im_livechat/static/src/js/colors_reset_button/colors_reset_button.xml:0
-#, python-format
 msgid "Reset to default colors"
 msgstr "デフォルト色へ再設定"
 
 #. module: im_livechat
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/embed/common/thread_actions.js:0
-#, python-format
 msgid "Restart Conversation"
 msgstr "会話を再開する"
 
 #. module: im_livechat
 #. odoo-python
 #: code:addons/im_livechat/models/discuss_channel.py:0
-#, python-format
 msgid "Restarting conversation..."
 msgstr "会話を再開しています..."
 
@@ -1548,14 +1518,12 @@ msgstr "チャネルを保存すると、設定ウィジェットが表示され
 #. module: im_livechat
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/embed/common/chatbot/chatbot_service.js:0
-#, python-format
 msgid "Say something"
 msgstr "何かお話し下さい"
 
 #. module: im_livechat
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/embed/common/composer_patch.js:0
-#, python-format
 msgid "Say something..."
 msgstr "何かお話下さい..."
 
@@ -1593,21 +1561,18 @@ msgstr "レポートを検索"
 #. module: im_livechat
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/core/web/channel_commands_patch.js:0
-#, python-format
 msgid "See 15 last visited pages"
 msgstr "最後に訪問された15ページを見る"
 
 #. module: im_livechat
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/embed/common/chatbot/chatbot_service.js:0
-#, python-format
 msgid "Select an option above"
 msgstr "上記のオプションを選択"
 
 #. module: im_livechat
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/embed/common/feedback_panel/feedback_panel.xml:0
-#, python-format
 msgid "Send"
 msgstr "送信"
 
@@ -1697,8 +1662,8 @@ msgstr "ステップタイプ"
 
 #. module: im_livechat
 #. odoo-javascript
+#: code:addons/im_livechat/static/src/core/web/composer_patch.js:0
 #: code:addons/im_livechat/static/src/core/web/composer_patch.xml:0
-#, python-format
 msgid "Tab to next livechat"
 msgstr "次のライブチャットへのタブ"
 
@@ -1725,7 +1690,6 @@ msgstr "通知に表示されるテキスト"
 #. module: im_livechat
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/embed/common/feedback_panel/feedback_panel.xml:0
-#, python-format
 msgid "Thank you for your feedback"
 msgstr "ご意見頂きありがとうございます"
 
@@ -1737,7 +1701,6 @@ msgstr "規則のチャネル"
 #. module: im_livechat
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/embed/common/feedback_panel/transcript_sender.xml:0
-#, python-format
 msgid "The conversation was sent."
 msgstr "会話が送信されました。"
 
@@ -1903,10 +1866,8 @@ msgstr "ユーザの生の回答"
 #. odoo-javascript
 #. odoo-python
 #: code:addons/im_livechat/controllers/main.py:0
-#: code:addons/im_livechat/controllers/main.py:0
 #: code:addons/im_livechat/models/im_livechat_channel.py:0
 #: code:addons/im_livechat/static/src/embed/common/livechat_service.js:0
-#, python-format
 msgid "Visitor"
 msgstr "訪問者"
 
@@ -1918,7 +1879,6 @@ msgstr "高満足度訪問者"
 #. module: im_livechat
 #. odoo-python
 #: code:addons/im_livechat/models/discuss_channel.py:0
-#, python-format
 msgid "Visitor left the conversation."
 msgstr "訪問者は会話から退出しました。"
 
@@ -1974,6 +1934,12 @@ msgid ""
 msgstr "折り返しご連絡させていただきますので、メールアドレスを教えていただけますでしょうか？"
 
 #. module: im_livechat
+#. odoo-javascript
+#: code:addons/im_livechat/static/src/embed/common/close_confirmation.xml:0
+msgid "Yes, leave conversation"
+msgstr ""
+
+#. module: im_livechat
 #: model_terms:ir.ui.view,arch_db:im_livechat.livechat_email_template
 msgid "You"
 msgstr "あなた"
@@ -1981,7 +1947,6 @@ msgstr "あなた"
 #. module: im_livechat
 #. odoo-python
 #: code:addons/im_livechat/controllers/attachment.py:0
-#, python-format
 msgid "You are not allowed to upload attachments on this channel."
 msgstr "このチャネルに添付をアップロードする権限がありません。"
 
@@ -2004,6 +1969,24 @@ msgstr ""
 "これにより、ウェブサイト訪問者は、オペレータとリアルタイムで会話することができます。"
 
 #. module: im_livechat
+#. odoo-javascript
+#: code:addons/im_livechat/static/src/core/web/livechat_channel_model_patch.js:0
+msgid "You joined %s."
+msgstr "%sに参加しました。"
+
+#. module: im_livechat
+#. odoo-javascript
+#: code:addons/im_livechat/static/src/core/web/livechat_channel_model_patch.js:0
+msgid "You left %s."
+msgstr " %sから退出しました。"
+
+#. module: im_livechat
+#. odoo-javascript
+#: code:addons/im_livechat/static/src/embed/common/close_confirmation.xml:0
+msgid "You're about to leave the conversation, proceed?"
+msgstr ""
+
+#. module: im_livechat
 #: model_terms:ir.actions.act_window,help:im_livechat.discuss_channel_action
 msgid "Your chatter history is empty"
 msgstr "チャッター履歴は空です"
@@ -2011,7 +1994,6 @@ msgstr "チャッター履歴は空です"
 #. module: im_livechat
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/core/web/channel_member_list_patch.xml:0
-#, python-format
 msgid "country"
 msgstr "国"
 
@@ -2043,14 +2025,13 @@ msgstr "例: YourWebsite.com"
 #. module: im_livechat
 #. odoo-javascript
 #: code:addons/im_livechat/static/src/embed/common/feedback_panel/transcript_sender.xml:0
-#, python-format
 msgid "mail@example.com"
 msgstr "mail@example.com"
 
 #. module: im_livechat
 #: model_terms:ir.ui.view,arch_db:im_livechat.im_livechat_channel_view_form
 msgid "or copy this url and send it by email to your customers or suppliers:"
-msgstr "または、このURLをコピーして、顧客やサプライヤにメールで送信してください:"
+msgstr "または、このURLをコピーして、顧客や仕入先にメールで送信して下さい:"
 
 #. module: im_livechat
 #: model_terms:ir.ui.view,arch_db:im_livechat.im_livechat_channel_rule_view_form

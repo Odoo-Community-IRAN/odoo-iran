@@ -11,6 +11,8 @@
     'auto_install': True,
     'data': [
         'security/ir.model.access.csv',
+        'security/website_slides_survey_security.xml',
+        'views/slide_channel_partner_views.xml',
         'views/slide_channel_views.xml',
         'views/slide_slide_partner_views.xml',
         'views/slide_slide_views.xml',
@@ -35,13 +37,11 @@
     'assets': {
         'web.assets_frontend': [
             'website_slides_survey/static/src/scss/website_slides_survey.scss',
-            'website_slides_survey/static/src/js/slides_upload.js',
             'website_slides_survey/static/src/js/slides_course_fullscreen_player.js',
-            'website_slides_survey/static/src/xml/website_slide_upload.xml',
             'website_slides_survey/static/src/xml/website_slides_fullscreen.xml',
+            'website_slides_survey/static/src/js/public/**/*',
         ],
         'survey.survey_assets': [
-            'website_slides_survey/static/src/js/survey_form.js',
             'website_slides_survey/static/src/scss/website_slides_survey_result.scss',
         ],
     },

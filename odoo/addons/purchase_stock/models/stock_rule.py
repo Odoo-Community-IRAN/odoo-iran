@@ -20,7 +20,7 @@ class StockRule(models.Model):
 
     def _get_message_dict(self):
         message_dict = super(StockRule, self)._get_message_dict()
-        __, destination, __ = self._get_message_values()
+        __, destination, __, __ = self._get_message_values()
         message_dict.update({
             'buy': _('When products are needed in <b>%s</b>, <br/> '
                      'a request for quotation is created to fulfill the need.<br/>'
@@ -146,9 +146,7 @@ class StockRule(models.Model):
                     # order to create it in batch.
                     partner = procurement.values['supplier'].partner_id
                     po_line_values.append(self.env['purchase.order.line']._prepare_purchase_order_line_from_procurement(
-                        procurement.product_id, procurement.product_qty,
-                        procurement.product_uom, procurement.company_id,
-                        procurement.values, po))
+                        *procurement, po))
                     # Check if we need to advance the order date for the new line
                     order_date_planned = procurement.values['date_planned'] - relativedelta(
                         days=procurement.values['supplier'].delay)
@@ -251,7 +249,7 @@ class StockRule(models.Model):
             date=line.order_id.date_order and line.order_id.date_order.date(),
             uom_id=product_id.uom_po_id)
 
-        price_unit = self.env['account.tax']._fix_tax_included_price_company(seller.price, line.product_id.supplier_taxes_id, line.sudo().taxes_id, company_id) if seller else 0.0
+        price_unit = self.env['account.tax']._fix_tax_included_price_company(seller.price, line.product_id.supplier_taxes_id, line.taxes_id, company_id) if seller else 0.0
         if price_unit and seller and line.order_id.currency_id and seller.currency_id != line.order_id.currency_id:
             price_unit = seller.currency_id._convert(
                 price_unit, line.order_id.currency_id, line.order_id.company_id, fields.Date.today())

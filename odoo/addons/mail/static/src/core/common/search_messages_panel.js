@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { Component, onWillUpdateProps, useExternalListener, useState } from "@odoo/owl";
 import { useAutofocus } from "@web/core/utils/hooks";
 import { useMessageSearch } from "@mail/core/common/message_search_hook";
@@ -25,6 +23,7 @@ export class SearchMessagesPanel extends Component {
     static template = "mail.SearchMessagesPanel";
 
     setup() {
+        super.setup();
         this.state = useState({ searchTerm: "", searchedTerm: "" });
         this.messageSearch = useMessageSearch(this.props.thread);
         useAutofocus();

@@ -3,16 +3,15 @@
 # 	* account_edi_proxy_client
 # 
 # Translators:
-# Wil Odoo, 2023
-# Marianna Ciofani, 2023
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:55+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Marianna Ciofani, 2023\n"
+"POT-Creation-Date: 2024-09-25 08:39+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Italian (https://app.transifex.com/odoo/teams/41243/it/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -59,6 +58,11 @@ msgstr "Creato da"
 #: model:ir.model.fields,field_description:account_edi_proxy_client.field_account_edi_proxy_client_user__create_date
 msgid "Created on"
 msgstr "Data creazione"
+
+#. module: account_edi_proxy_client
+#: model:ir.model,name:account_edi_proxy_client.model_certificate_key
+msgid "Cryptographic Keys"
+msgstr ""
 
 #. module: account_edi_proxy_client
 #: model:ir.model.fields.selection,name:account_edi_proxy_client.selection__account_edi_proxy_client_user__edi_mode__demo
@@ -111,14 +115,9 @@ msgid "Last Updated on"
 msgstr "Ultimo aggiornamento il"
 
 #. module: account_edi_proxy_client
-#: model:ir.model.fields,field_description:account_edi_proxy_client.field_account_edi_proxy_client_user__private_key
+#: model:ir.model.fields,field_description:account_edi_proxy_client.field_account_edi_proxy_client_user__private_key_id
 msgid "Private Key"
 msgstr "Chiave privata"
-
-#. module: account_edi_proxy_client
-#: model:ir.model.fields,field_description:account_edi_proxy_client.field_account_edi_proxy_client_user__private_key_filename
-msgid "Private Key Filename"
-msgstr "Nome file chiave privata"
 
 #. module: account_edi_proxy_client
 #: model:ir.model.fields.selection,name:account_edi_proxy_client.selection__account_edi_proxy_client_user__edi_mode__prod
@@ -141,7 +140,7 @@ msgid "Test mode"
 msgstr "Modalità di prova"
 
 #. module: account_edi_proxy_client
-#: model:ir.model.fields,help:account_edi_proxy_client.field_account_edi_proxy_client_user__private_key
+#: model:ir.model.fields,help:account_edi_proxy_client.field_account_edi_proxy_client_user__private_key_id
 msgid "The key to encrypt all the user's data"
 msgstr "La chiave per criptare tutti i dati dell'utente"
 
@@ -153,7 +152,16 @@ msgstr "L'ID univoco che identifica questo utente, tipicamente l'iva."
 #. module: account_edi_proxy_client
 #. odoo-python
 #: code:addons/account_edi_proxy_client/models/account_edi_proxy_user.py:0
-#, python-format
+msgid ""
+"The url that this service requested returned an error. The url it tried to "
+"contact was %(url)s. %(error_message)s"
+msgstr ""
+"L'URL richiesto dal servizio ha restituito un errore. URL richiesto %(url)s."
+" %(error_message)s"
+
+#. module: account_edi_proxy_client
+#. odoo-python
+#: code:addons/account_edi_proxy_client/models/account_edi_proxy_user.py:0
 msgid ""
 "The url that this service requested returned an error. The url it tried to "
 "contact was %s"
@@ -164,22 +172,11 @@ msgstr ""
 #. module: account_edi_proxy_client
 #. odoo-python
 #: code:addons/account_edi_proxy_client/models/account_edi_proxy_user.py:0
-#, python-format
 msgid ""
-"The url that this service requested returned an error. The url it tried to "
-"contact was %s. %s"
+"The url that this service tried to contact does not exist. The url was “%s”"
 msgstr ""
-"L'URL richiesto da questo servizio ha riportato un errore. L'URL che ha "
-"cercato di contattare era %s. %s"
-
-#. module: account_edi_proxy_client
-#. odoo-python
-#: code:addons/account_edi_proxy_client/models/account_edi_proxy_user.py:0
-#, python-format
-msgid ""
-"The url that this service tried to contact does not exist. The url was %r"
-msgstr ""
-"L'url che questo servizio ha cercato di contattare non esiste. L'url era %r"
+"L'url che questo servizio ha cercato di contattare non esiste. L'url era "
+"\"%s\""
 
 #. module: account_edi_proxy_client
 #: model:ir.model.constraint,message:account_edi_proxy_client.constraint_account_edi_proxy_client_user_unique_active_company_proxy

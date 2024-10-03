@@ -1,15 +1,12 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
 import { evaluateBooleanExpr } from "@web/core/py_js/py";
 import { registry } from "@web/core/registry";
 import { omit } from "@web/core/utils/objects";
 
-import { CopyButton } from "./copy_button";
-import { UrlField } from "../url/url_field";
+import { CopyButton } from "@web/core/copy_button/copy_button";
 import { CharField } from "../char/char_field";
-import { TextField } from "../text/text_field";
 import { standardFieldProps } from "../standard_field_props";
+import { UrlField } from "../url/url_field";
 
 import { Component } from "@odoo/owl";
 
@@ -50,20 +47,24 @@ export class CopyClipboardButtonField extends CopyClipboardField {
     static components = { CopyButton };
 
     get copyButtonClassName() {
-        return `o_btn_${this.type}_copy rounded-2`;
+        return `o_btn_${this.type}_copy btn-primary rounded-2`;
     }
 }
 
 export class CopyClipboardCharField extends CopyClipboardField {
     static components = { Field: CharField, CopyButton };
-}
 
-export class CopyClipboardTextField extends CopyClipboardField {
-    static components = { Field: TextField, CopyButton };
+    get copyButtonIcon() {
+        return "fa-clone";
+    }
 }
 
 export class CopyClipboardURLField extends CopyClipboardField {
     static components = { Field: UrlField, CopyButton };
+
+    get copyButtonIcon() {
+        return "fa-link";
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -91,15 +92,6 @@ export const copyClipboardCharField = {
 };
 
 registry.category("fields").add("CopyClipboardChar", copyClipboardCharField);
-
-export const copyClipboardTextField = {
-    component: CopyClipboardTextField,
-    displayName: _t("Copy Multiline Text to Clipboard"),
-    supportedTypes: ["text"],
-    extractProps,
-};
-
-registry.category("fields").add("CopyClipboardText", copyClipboardTextField);
 
 export const copyClipboardURLField = {
     component: CopyClipboardURLField,

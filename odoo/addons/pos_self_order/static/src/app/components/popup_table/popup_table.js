@@ -1,6 +1,4 @@
-/** @odoo-module */
-
-import { Component, onWillStart, useState } from "@odoo/owl";
+import { Component, useState } from "@odoo/owl";
 import { useSelfOrder } from "@pos_self_order/app/self_order_service";
 import { useService } from "@web/core/utils/hooks";
 import { groupBy } from "@web/core/utils/arrays";
@@ -12,27 +10,9 @@ export class PopupTable extends Component {
     setup() {
         this.selfOrder = useSelfOrder();
         this.router = useService("router");
-        this.rpc = useService("rpc");
-        this.tables = [];
         this.state = useState({
-            selectedTable: null,
+            selectedTable: "0",
         });
-
-        onWillStart(async () => {
-            await this.getTable();
-        });
-    }
-
-    async getTable() {
-        try {
-            this.tables = await this.rpc("/pos-self-order/get-tables", {
-                access_token: this.selfOrder.access_token,
-            });
-        } catch (e) {
-            this.selfOrder.handleErrorNotification(e);
-        }
-
-        this.state.selectedTable = this.tables[0]?.id;
     }
 
     get availableFloor() {
@@ -45,11 +25,24 @@ export class PopupTable extends Component {
     }
 
     setTable() {
-        const table = this.tables.find((t) => t.id === parseInt(this.state.selectedTable));
+        const table = this.selectedTable;
+
+        if (!table) {
+            return;
+        }
+
         this.props.selectTable(table);
     }
 
     close() {
         this.props.selectTable(null);
+    }
+
+    get validSelection() {
+        return Boolean(this.selectedTable);
+    }
+
+    get selectedTable() {
+        return this.selfOrder.models["restaurant.table"].get(this.state.selectedTable);
     }
 }

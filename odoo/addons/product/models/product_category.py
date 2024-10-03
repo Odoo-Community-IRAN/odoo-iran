@@ -7,6 +7,7 @@ from odoo.exceptions import UserError, ValidationError
 
 class ProductCategory(models.Model):
     _name = "product.category"
+    _inherit = ['mail.thread']
     _description = "Product Category"
     _parent_name = "parent_id"
     _parent_store = True
@@ -18,7 +19,7 @@ class ProductCategory(models.Model):
         'Complete Name', compute='_compute_complete_name', recursive=True,
         store=True)
     parent_id = fields.Many2one('product.category', 'Parent Category', index=True, ondelete='cascade')
-    parent_path = fields.Char(index=True, unaccent=False)
+    parent_path = fields.Char(index=True)
     child_id = fields.One2many('product.category', 'parent_id', 'Child Categories')
     product_count = fields.Integer(
         '# Products', compute='_compute_product_count',
@@ -44,7 +45,7 @@ class ProductCategory(models.Model):
 
     @api.constrains('parent_id')
     def _check_category_recursion(self):
-        if not self._check_recursion():
+        if self._has_cycle():
             raise ValidationError(_('You cannot create recursive categories.'))
 
     @api.model

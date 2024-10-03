@@ -182,16 +182,14 @@ class TestDiscussChannelMember(MailCommon):
         channel_members = self.env['discuss.channel.member'].search([('channel_id', '=', self.group_restricted_channel.id)])
         self.assertEqual(channel_members.mapped('partner_id'), self.user_1.partner_id)
 
-        # user 1 can not invite user 3 because they are not in the channel
-        with self.assertRaises(UserError):
-            self.group_restricted_channel.with_user(self.user_1).add_members(self.user_portal.partner_id.ids)
+        self.group_restricted_channel.with_user(self.user_1).add_members(self.user_portal.partner_id.ids)
         channel_members = self.env['discuss.channel.member'].search([('channel_id', '=', self.group_restricted_channel.id)])
-        self.assertEqual(channel_members.mapped('partner_id'), self.user_1.partner_id)
+        self.assertEqual(channel_members.mapped('partner_id'), self.user_1.partner_id | self.user_portal.partner_id)
 
         # but user 2 is in the channel and can be invited by user 1
         self.group_restricted_channel.with_user(self.user_1).add_members(self.user_2.partner_id.ids)
         channel_members = self.env['discuss.channel.member'].search([('channel_id', '=', self.group_restricted_channel.id)])
-        self.assertEqual(channel_members.mapped('partner_id'), self.user_1.partner_id | self.user_2.partner_id)
+        self.assertEqual(channel_members.mapped('partner_id'), self.user_1.partner_id | self.user_2.partner_id | self.user_portal.partner_id)
 
     # ------------------------------------------------------------
     # PUBLIC CHANNELS
@@ -223,9 +221,11 @@ class TestDiscussChannelMember(MailCommon):
             'user_ids': self.user_1,
         })
         self.public_channel.add_members(guest_ids=[guest.id])
-        search = self.env['res.partner'].search_for_channel_invite(partner.name, channel_id=self.public_channel.id)
-        self.assertEqual(len(search['partners']), 1)
-        self.assertEqual(search['partners'][0]['id'], partner.id)
+        data = self.env["res.partner"].search_for_channel_invite(
+            partner.name, channel_id=self.public_channel.id
+        )["data"]
+        self.assertEqual(len(data["res.partner"]), 1)
+        self.assertEqual(data["res.partner"][0]["id"], partner.id)
 
     # ------------------------------------------------------------
     # UNREAD COUNTER TESTS

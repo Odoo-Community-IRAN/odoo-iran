@@ -17,7 +17,8 @@ class TestEventSale(TestEventSaleCommon):
 
         product = cls.env['product.product'].create({
             'name': 'Event',
-            'detailed_type': 'event',
+            'type': 'service',
+            'service_tracking': 'event',
         })
 
         cls.user_salesperson = mail_new_test_user(cls.env, login='user_salesman', groups='sales_team.group_sale_salesman')
@@ -469,8 +470,6 @@ class TestEventSale(TestEventSaleCommon):
             'product_tmpl_id': event_product.id,
         })
 
-        pricelist.discount_policy = 'without_discount'
-
         so = self.env['sale.order'].create({
             'partner_id': self.env.user.partner_id.id,
             'pricelist_id': pricelist.id,
@@ -520,8 +519,18 @@ class TestEventSale(TestEventSaleCommon):
         registration = self.event_0.registration_ids
         self.assertEqual(registration.sale_status, 'to_pay')
         registration.sale_order_line_id.price_total = 0.0
-        self.assertEqual(registration.sale_status, 'free', "Price of $0.00 should be free")
-        registration.sale_order_line_id.price_total = 0.01
+        self.assertEqual(registration.sale_status, 'to_pay', "Free SO line on SO with non zero amount should be paid")
+        registration.sale_order_id.amount_total = 0.0
+        self.assertEqual(registration.sale_status, 'free', "Free SO line on SO with zero amount should be free")
+        # Remove the SO and so_line relations to test the "free ticket without SO" case
+        sale_order = registration.sale_order_id
+        so_line = registration.sale_order_line_id
+        registration.sale_order_id = False
+        registration.sale_order_line_id = False
+        self.assertEqual(registration.sale_status, 'free', "Price of $0.00 without so_line should be free")
+        registration.sale_order_id = sale_order
+        registration.sale_order_line_id = so_line
+        registration.sale_order_id.amount_total = 0.01
         self.assertEqual(registration.sale_status, 'to_pay', "Price of $0.01 should be paid")
         registration.sale_order_id.action_confirm()
         self.assertEqual(registration.sale_status, 'sold')

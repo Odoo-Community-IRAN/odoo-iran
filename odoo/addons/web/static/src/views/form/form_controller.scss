@@ -12,10 +12,13 @@
     }
 }
 
-// XXS form view specific rules
-@mixin form-break-table {
+// Form view rules to break the default table layout
+@mixin form-break-table($-is-editable: false) {
+    --fieldWidget-margin-bottom: 0;
+
     grid-template-columns: 1fr;
     margin-bottom: $o-form-spacing-unit * 4;
+    row-gap: 0;
 
     .o_wrap_field {
         .o_cell {
@@ -26,14 +29,8 @@
             }
 
             .o_field_widget {
-                margin-bottom: $o-form-spacing-unit * 2;
-
                 &:not(.o_field_boolean){
                     width: 100%;
-                }
-
-                > .o_field_widget {
-                    margin-bottom: 0;
                 }
 
                 &.o_field_boolean {
@@ -47,9 +44,17 @@
             }
         }
     }
+
+    @if $-is-editable {
+        .o_address_type, .o_address_format {
+            --fieldWidget-margin-bottom: #{$o-form-spacing-unit * 2};
+        }
+    }
 }
 
 .o_form_view {
+    --fieldWidget-margin-bottom: #{$o-form-spacing-unit};
+
     @include media-breakpoint-up(md) {
         display: flex;
         flex-flow: column nowrap;
@@ -164,13 +169,16 @@
                 flex: 1 1 auto;
                 width: 0!important; // 3rd flex argument does not work with input (must be auto and real width 0)
 
-                &.o_field_boolean, &.o_priority {
+                &.o_field_boolean, &.o_field_boolean_toggle, &.o_priority {
                     flex: 0 0 auto;
                     width: auto!important;
                 }
             }
             .o_field_many2one_selection {
                 width: 100% !important;
+            }
+            .fb-mincontent {
+                flex-basis: min-content !important;
             }
         }
     }
@@ -233,11 +241,13 @@
 
     // Sheet BG
     .o_form_sheet_bg {
-        --formView-sheetBg-padding-x: #{map-get($spacers, 3)};
+        @include media-only(screen) {
+            --formView-sheetBg-padding-x: #{map-get($spacers, 3)};
+        }
 
         padding-top: map-get($spacers, 2);
         padding-left: var(--formView-sheetBg-padding-x);
-        padding-right: var(--formView-sheetBg-padding-x);
+        padding-right: var(--formView-sheetBg-padding-right, var(--formView-sheetBg-padding-x));
         width: 100%;
         max-width: $o-form-view-sheet-max-width;
         margin-right: auto; // Always align to le left
@@ -313,9 +323,16 @@
             }
         }
 
-        > .o_field_widget {
+        .o_field_widget {
+            --fieldWidget-margin-bottom: 0;
+
             align-self: flex-start;
-            margin-bottom: 0px;
+
+            &:first-child:last-child {
+                @include media-breakpoint-down(md) {
+                    width: 100%;
+                }
+            }
         }
     }
 
@@ -420,6 +437,10 @@
         gap: map-get($spacers, 2) $o-horizontal-padding;
         margin-bottom: map-get($spacers, 2);
 
+        .o_cell:first-child:last-child {
+            grid-column: span 2;
+        }
+
         span, .o_field_boolean, .oe_avatar, .o_form_uri {
             &.o_field_widget {
                 width: auto;
@@ -510,13 +531,6 @@
                         .note-editor.panel {
                             border: none;
                         }
-                        .note-toolbar.panel-heading {
-                            @include o-form-sheet-inner-left-padding;
-                            @include o-form-sheet-inner-right-padding;
-                            border-top: none;
-                            padding-top: 0;
-                            background: white;
-                        }
 
                         .note-editing-area, .o_readonly {
                             padding: $card-spacer-y $card-spacer-x;
@@ -538,10 +552,20 @@
                     // Full width on first x2many or on second x2many if first is invisible
                     &:not(.o_group), &.o_invisible_modifier {
                         .o_field_x2many.o_field_x2many_list .o_list_renderer {
-                            --ListRenderer-margin-x: var(--notebook-margin-x);
-                            --ListRenderer-table-padding-x: var(--notebook-padding-x);
+                            @include media-only(screen) {
+                                --ListRenderer-margin-x: var(--notebook-margin-x);
+                                --ListRenderer-table-padding-x: var(--notebook-padding-x);
 
-                            margin-top: -$o-horizontal-padding;
+                                margin-top: -$o-horizontal-padding;
+                            }
+
+                            @include media-only(print) {
+                                --ListRenderer-margin-x: 0;
+                                --ListRenderer-table-padding-x: var(--notebook-padding-x);
+
+                                margin-top: -$o-horizontal-padding * 0.5;
+                            }
+
 
                             // use original padding-left for handle cell in editable list
                             tr > :first-child.o_handle_cell {
@@ -574,11 +598,8 @@
         }
     }
 
-    // Form fields
+    // One2Many List views
     .o_field_widget {
-        margin-bottom: $o-form-spacing-unit;
-
-        // One2Many List views
         .o_list_table {
             &.table-striped {
                 > tbody {
@@ -602,7 +623,7 @@
     }
     .o_field_widget, .btn {
         .o_field_widget {
-            margin-bottom: 0px;
+            --fieldWidget-margin-bottom: 0;
         }
     }
     .o_cell:not(.o_field_cell) .o_form_uri > span:first-child {
@@ -621,6 +642,21 @@
             display: inline-block;
             text-align: right;
             border: none;  // usefull for textarea
+            visibility: hidden;
+    }
+
+    div {
+        div:focus-within > div.o_field_char_buttons > span.o_field_translate,
+        div:hover > div.o_field_char_buttons > span.o_field_translate {
+            visibility: visible !important;
+        }
+    }
+
+    div {
+        div:focus-within > span.o_field_translate,
+        div:hover > span.o_field_translate {
+            visibility: visible !important;
+        }
     }
 
     input, textarea {
@@ -845,7 +881,7 @@
         }
     }
 
-    // Boolean 
+    // Boolean
     .o_field_boolean + .o_form_label {
         margin-right: $o-form-spacing-unit * 3;
     }
@@ -889,7 +925,8 @@
 
     // One2Many List views
     .o_field_widget .o_list_renderer {
-        --ListRenderer-thead-bg-color:  #{$o-view-background-color};
+        --ListRenderer-thead-bg-color: #{$o-view-background-color};
+        --ListRenderer-thead-bg-active-color: #{$o-form-lightsecondary};
         --ListRenderer-tfoot-bg-color: #{$o-view-background-color};
 
         margin-bottom: 10px;
@@ -930,13 +967,6 @@
         }
     }
     @include media-breakpoint-down(md) {
-        .o_cp_buttons {
-            width: 100%;
-            > button {
-                width: 100%;
-            }
-        }
-
         .o_form_label:not(.o_invisible_modifier) {
             padding-bottom: 4px;
         }
@@ -1059,6 +1089,10 @@
         .o_inner_group {
             @include form-break-table;
         }
+
+        .o_form_editable .o_inner_group {
+            @include form-break-table($-is-editable: true);
+        }
     }
 }
 
@@ -1111,7 +1145,7 @@
             @include media-breakpoint-down(md) {
                 &:not(.oe_subtotal_footer) > .o_cell {
                     > .o_field_widget {
-                        margin-bottom: $o-form-spacing-unit * 4;
+                        --fieldWidget-margin-bottom: #{$o-form-spacing-unit * 4};
                     }
                 }
             }
@@ -1128,6 +1162,10 @@
 .o_form_view.o_xxs_form_view {
     .o_inner_group {
         @include form-break-table;
+    }
+
+    .o_form_editable .o_inner_group {
+        @include form-break-table($-is-editable: true);
     }
 }
 

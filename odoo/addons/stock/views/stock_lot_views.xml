@@ -35,7 +35,7 @@
                 </div>
                 <group name="main_group">
                     <group>
-                        <field name="product_id" context="{'default_detailed_type': 'product', 'default_tracking': 'lot'}" readonly="context.get('set_product_readonly', False)" force_save="1" help="Product this lot/serial number contains. You cannot change it anymore if it has already been moved."/>
+                        <field name="product_id" context="{'default_is_storable': True, 'default_tracking': 'lot'}" readonly="context.get('set_product_readonly', False)" force_save="1" help="Product this lot/serial number contains. You cannot change it anymore if it has already been moved."/>
                         <label for="product_qty" invisible="not display_complete"/>
                         <div class="o_row" invisible="not display_complete">
                             <field name="product_qty"/>
@@ -55,20 +55,16 @@
                     </page>
                 </notebook>
                 </sheet>
-                <div class="oe_chatter">
-                    <field name="message_follower_ids"/>
-                    <field name="activity_ids"/>
-                    <field name="message_ids"/>
-                </div>
+                <chatter/>
             </form>
         </field>
     </record>
 
     <record id="view_production_lot_tree" model="ir.ui.view">
-        <field name="name">stock.production.lot.tree</field>
+        <field name="name">stock.production.lot.list</field>
         <field name="model">stock.lot</field>
         <field name="arch" type="xml">
-            <tree string="Lots/Serial Numbers" multi_edit="1">
+            <list string="Lots/Serial Numbers" multi_edit="1">
                 <field name="name" decoration-bf="1"/>
                 <field name="ref" optional="show"/>
                 <field name="product_id" readonly="1"/>
@@ -78,7 +74,7 @@
                 <field name="activity_ids" widget="list_activity" optional="show"/>
                 <field name="lot_properties" optional="hide"/>
                 <field name="product_qty" optional="hide"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -87,29 +83,12 @@
         <field name="model">stock.lot</field>
         <field name="arch" type="xml">
             <kanban group_create="false" group_delete="false">
-                <field name="name"/>
-                <field name="ref"/>
-                <field name="product_id"/>
-                <field name="create_date"/>
-                <field name="company_id" groups="base.group_multi_company"/>
-                <field name="last_delivery_partner_id"/>
-                <field name="lot_properties"/>
                 <templates>
-                    <t t-name="kanban-box">
-                        <div class="oe_kanban_global_click">
-                            <div class="oe_kanban_details">
-                                <strong class="o_kanban_record_title">
-                                    <field name="name"/>
-                                </strong>
-                                <div name="product_name">
-                                    <small><field name="product_id"/></small>
-                                </div>
-                                <div>
-                                    <field name="lot_properties" widget="properties"/>
-                                </div>
-                            </div>
-                            <field name="activity_ids" widget="kanban_activity"/>
-                        </div>
+                    <t t-name="card">
+                        <field name="name" class="fw-bolder fs-5"/>
+                        <field name="product_id" class="small"/>
+                        <field name="lot_properties" widget="properties"/>
+                        <field name="activity_ids" widget="kanban_activity"/>
                     </t>
                 </templates>
             </kanban>
@@ -130,7 +109,7 @@
                 <filter string="Creation Date" name="creation_date" date="create_date"/>
                 <group expand="0" string="Group By">
                     <filter name="group_by_product" string="Product" domain="[]" context="{'group_by': 'product_id'}"/>
-                    <filter name="group_by_location" string="Location" domain="[]" context="{'group_by': 'location_id'}"/>
+                    <filter name="group_by_location" string="Location" domain="[]" context="{'group_by': 'location_id'}" groups="stock.group_stock_multi_locations"/>
                     <filter name="group_by_creation_date" string="Creation date" domain="[]" context="{'group_by': 'create_date'}"/>
                     <filter name="group_by_Company" string="Company" domain="[]" context="{'group_by': 'company_id'}"/>
                 </group>
@@ -139,15 +118,17 @@
     </record>
 
     <record id="action_production_lot_form" model="ir.actions.act_window">
-        <field name="name">Lots/Serial Numbers</field>
+        <field name="name">Lots / Serial Numbers</field>
         <field name="res_model">stock.lot</field>
+        <field name="path">lots</field>
         <field name="view_ids"
                    eval="[(5, 0, 0),
-                          (0, 0, {'view_mode': 'tree', 'view_id': ref('view_production_lot_tree')}),
+                          (0, 0, {'view_mode': 'list', 'view_id': ref('view_production_lot_tree')}),
                           (0, 0, {'view_mode': 'kanban', 'view_id': ref('view_production_lot_kanban')}),
                           (0, 0, {'view_mode': 'form', 'view_id': ref('view_production_lot_form')})]"/>
         <field name="search_view_id" ref="search_product_lot_filter"/>
-        <field name="context">{'search_default_group_by_product': 1, 'display_complete': True, 'default_company_id': allowed_company_ids[0]}</field>
+        <field name="context">{'search_default_group_by_location': True, 'display_complete': True}</field>
+        <field name="domain">['|', ('location_id', '=', False), ('location_id.company_id', 'in', allowed_company_ids + [False])]</field>
         <field name="help" type="html">
           <p class="o_view_nocontent_smiling_face">
             Add a lot/serial number
@@ -164,10 +145,11 @@
         <field name="view_ids"
                    eval="[(5, 0, 0),
                           (0, 0, {'view_mode': 'kanban', 'view_id': ref('view_production_lot_kanban')}),
-                          (0, 0, {'view_mode': 'tree', 'view_id': ref('view_production_lot_tree')}),
+                          (0, 0, {'view_mode': 'list', 'view_id': ref('view_production_lot_tree')}),
                           (0, 0, {'view_mode': 'form', 'view_id': ref('view_production_lot_form')})]"/>
         <field name="search_view_id" ref="search_product_lot_filter"/>
         <field name="context">{'search_default_group_by_product': 1, 'display_complete': True, 'default_company_id': allowed_company_ids[0]}</field>
+        <field name="domain">['|', ('location_id', '=', False), ('location_id.company_id', 'in', allowed_company_ids + [False])]</field>
         <field name="help" type="html">
           <p class="o_view_nocontent_smiling_face">
             Add a lot/serial number

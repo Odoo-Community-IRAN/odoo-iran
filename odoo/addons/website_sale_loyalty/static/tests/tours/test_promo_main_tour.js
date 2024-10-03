@@ -1,8 +1,8 @@
 /** @odoo-module **/
 
-import { jsonrpc } from "@web/core/network/rpc_service";
+import { rpc } from "@web/core/network/rpc";
 import { registry } from "@web/core/registry";
-import tourUtils from '@website_sale/js/tours/tour_utils';
+import * as tourUtils from '@website_sale/js/tours/tour_utils';
 
 registry.category("web_tour.tours").add('shop_sale_loyalty', {
     test: true,
@@ -10,46 +10,51 @@ registry.category("web_tour.tours").add('shop_sale_loyalty', {
     steps: () => [
         /* 1. Buy 1 Small Cabinet, enable coupon code & insert 10% code */
         {
+            trigger: ".oe_search_found",
+        },
+        {
             content: "select Small Cabinet",
-            extra_trigger: '.oe_search_found',
             trigger: '.oe_product_cart a:contains("Small Cabinet")',
+            run: "click",
         },
         {
             content: "add 2 Small Cabinet into cart",
             trigger: '#product_details input[name="add_qty"]',
-            run: "text 2",
+            run: "edit 2",
         },
         {
             content: "click on 'Add to Cart' button",
             trigger: "a:contains(Add to cart)",
+            run: "click",
         },
             tourUtils.goToCart({quantity: 2}),
         {
+            trigger: 'form[name="coupon_code"]',
+        },
+        {
             content: "insert promo code 'testcode'",
-            extra_trigger: 'form[name="coupon_code"]',
             trigger: 'form[name="coupon_code"] input[name="promo"]',
-            run: "text testcode",
+            run: "edit testcode",
         },
         {
             content: "validate the coupon",
             trigger: 'form[name="coupon_code"] .a-submit',
+            run: "click",
         },
         {
             content: "check reward product",
             trigger: 'div>strong:contains("10.0% discount on total amount")',
-            run: function () {}, // it's a check
         },
         {
             content: "check loyalty points",
             trigger: '.oe_website_sale_gift_card span:contains("372.03 Points")',
-            run: function () {}, // it's a check
         },
         /* 2. Add some cabinet to get a free one, play with quantity */
         {
             content: "go to shop",
             trigger: 'div>strong:contains("10.0% discount on total amount")',
             run: function () {
-                jsonrpc('/web/dataset/call_kw/account.tax/create', {
+                rpc('/web/dataset/call_kw/account.tax/create', {
                     model: 'account.tax',
                     method: 'create',
                     args: [{
@@ -58,7 +63,7 @@ registry.category("web_tour.tours").add('shop_sale_loyalty', {
                     }],
                     kwargs: {},
                 }).then(function (tax_id) {
-                    jsonrpc('/web/dataset/call_kw/product.template/create', {
+                    rpc('/web/dataset/call_kw/product.template/create', {
                         model: 'product.template',
                         method: 'create',
                         args: [{
@@ -77,46 +82,45 @@ registry.category("web_tour.tours").add('shop_sale_loyalty', {
             ...tourUtils.addToCart({productName: "Taxed Product"}),
             tourUtils.goToCart({quantity: 3}),
         {
+            trigger: ".oe_currency_value:contains(/74.00/):not(#cart_total)",
+        },
+        {
             content: "check reduction amount got recomputed and merged both discount lines into one only",
-            extra_trigger: '.oe_currency_value:contains("-﻿74.00"):not(#cart_total .oe_currency_value:contains("-﻿74.00"))',
             trigger: '.oe_website_sale .oe_cart',
-            run: function () {}, // it's a check
         },
         /* 3. Add some cabinet to get a free one, play with quantity */
         {
             content: "add one Small Cabinet",
             trigger: '#cart_products input.js_quantity',
-            run: "text 3",
+            run: "edit 3 && click body",
         },
         {
             content: "check reduction amount got recomputed when changing qty",
-            trigger: '.oe_currency_value:contains("-﻿106.00")',
-            run: function () {}, // it's a check
+            trigger: '.oe_currency_value:contains("- 106.00")',
         },
         {
             content: "add more Small Cabinet into cart",
             trigger: '#cart_products input.js_quantity',
-            run: "text 4",
+            run: "edit 4 && click body",
         },
         {
             content: "check free product is added",
             trigger: '#wrap:has(div>strong:contains("Free Product - Small Cabinet"))',
-            run: function () {}, // it's a check
         },
         {
             content: "remove one cabinet from cart",
             trigger: '#cart_products input.js_quantity[value="4"]',
-            run: "text 3",
+            run: "edit 3 && click body",
         },
         {
             content: "check free product is removed",
             trigger: '#wrap:not(:has(div>strong:contains("Free Product - Small Cabinet")))',
-            run: function () {}, // it's a check
         },
         /* 4. Check /shop/payment does not break the `merged discount lines split per tax` (eg: with _compute_tax_id) */
         {
             content: "go to checkout",
-            trigger: 'a[href="/shop/checkout?express=1"]',
+            trigger: 'a[href="/shop/checkout?try_skip_step=true"]',
+            run: "click",
         },
         ...tourUtils.assertCartAmounts({
             total: '967.50',

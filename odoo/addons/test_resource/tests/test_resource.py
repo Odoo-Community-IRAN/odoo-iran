@@ -590,7 +590,7 @@ class TestCalendar(TestResourceCommon):
 
         # Jean changes working schedule to Jules'
         self.jean.resource_calendar_id = self.calendar_jules
-        self.assertEqual(leave.calendar_id, self.calendar_jules, "Leave calendar should be updated")
+        self.assertEqual(leave.calendar_id, self.calendar_jules, "Leave calendar should update")
         self.assertEqual(holiday.calendar_id, self.calendar_jean, "Global leave shouldn't change")
 
 
@@ -897,8 +897,7 @@ class TestResMixin(TestResourceCommon):
             datetime_tz(2018, 4, 9, 0, 0, 0, tzinfo=self.john.tz),
             datetime_tz(2018, 4, 13, 23, 59, 59, tzinfo=self.john.tz),
         )[self.john.id]
-        # For some reason float_round fails to limit precision to 3 decimals here
-        self.assertEqual(data, {'days': 0.9580000000000001, 'hours': 10})
+        self.assertEqual(data, {'days': 0.958, 'hours': 10})
 
         # half days
         leave = self.env['resource.calendar.leaves'].create({
@@ -1022,10 +1021,10 @@ class TestResMixin(TestResourceCommon):
         leave.unlink()
 
     def test_list_work_time_per_day(self):
-        working_time = self.john.list_work_time_per_day(
+        working_time = self.john._list_work_time_per_day(
             datetime_tz(2018, 4, 9, 0, 0, 0, tzinfo=self.john.tz),
             datetime_tz(2018, 4, 13, 23, 59, 59, tzinfo=self.john.tz),
-        )
+        )[self.john.id]
         self.assertEqual(working_time, [
             (date(2018, 4, 10), 8),
             (date(2018, 4, 13), 12),
@@ -1035,10 +1034,10 @@ class TestResMixin(TestResourceCommon):
         self.john.resource_id.tz = 'Europe/Brussels'
         self.assertEqual(self.john.tz, 'Europe/Brussels')
         self.assertEqual(self.calendar_john.tz, 'America/Los_Angeles')
-        working_time = self.john.list_work_time_per_day(
+        working_time = self.john._list_work_time_per_day(
             datetime_tz(2018, 4, 9, 0, 0, 0, tzinfo=self.john.tz),
             datetime_tz(2018, 4, 13, 23, 59, 59, tzinfo=self.john.tz),
-        )
+        )[self.john.id]
         self.assertEqual(working_time, [
             (date(2018, 4, 10), 8),
             (date(2018, 4, 13), 12),
@@ -1053,10 +1052,10 @@ class TestResMixin(TestResourceCommon):
             'date_to': datetime_str(2018, 4, 2, 14, 0, 0, tzinfo=self.jean.tz),
         })
 
-        working_time = self.jean.list_work_time_per_day(
+        working_time = self.jean._list_work_time_per_day(
             datetime_tz(2018, 4, 2, 0, 0, 0, tzinfo=self.jean.tz),
             datetime_tz(2018, 4, 6, 23, 0, 0, tzinfo=self.jean.tz),
-        )
+        )[self.jean.id]
         self.assertEqual(working_time, [
             (date(2018, 4, 2), 4),
             (date(2018, 4, 3), 8),
@@ -1076,10 +1075,10 @@ class TestResMixin(TestResourceCommon):
             'date_to': datetime_str(2018, 4, 2, 10, 0, 1, tzinfo=self.jean.tz),
         })
 
-        working_time = self.jean.list_work_time_per_day(
+        working_time = self.jean._list_work_time_per_day(
             datetime_tz(2018, 4, 2, 0, 0, 0, tzinfo=self.jean.tz),
             datetime_tz(2018, 4, 6, 23, 0, 0, tzinfo=self.jean.tz),
-        )
+        )[self.jean.id]
         self.assertEqual(len(working_time), 5)
         self.assertEqual(working_time[0][0], date(2018, 4, 2))
         self.assertAlmostEqual(working_time[0][1], 8, 2)
@@ -1095,10 +1094,10 @@ class TestResMixin(TestResourceCommon):
             'date_to': datetime_str(2018, 4, 2, 10, 0, 0, tzinfo=self.jean.tz),
         })
 
-        working_time = self.jean.list_work_time_per_day(
+        working_time = self.jean._list_work_time_per_day(
             datetime_tz(2018, 4, 2, 0, 0, 0, tzinfo=self.jean.tz),
             datetime_tz(2018, 4, 6, 23, 0, 0, tzinfo=self.jean.tz),
-        )
+        )[self.jean.id]
         self.assertEqual(working_time, [
             (date(2018, 4, 2), 8),
             (date(2018, 4, 3), 8),
@@ -1274,10 +1273,10 @@ class TestTimezones(TestResourceCommon):
         self.assertEqual(leaves, [(date(2018, 4, 9), 6, leave)])
 
     def test_works(self):
-        work = self.jean.list_work_time_per_day(
+        work = self.jean._list_work_time_per_day(
             datetime_tz(2018, 4, 9, 8, 0, 0),
             datetime_tz(2018, 4, 13, 16, 0, 0),
-        )
+        )[self.jean.id]
         self.assertEqual(work, [
             (date(2018, 4, 9), 6),
             (date(2018, 4, 10), 8),
@@ -1286,10 +1285,10 @@ class TestTimezones(TestResourceCommon):
             (date(2018, 4, 13), 8),
         ])
 
-        work = self.jean.list_work_time_per_day(
+        work = self.jean._list_work_time_per_day(
             datetime_tz(2018, 4, 9, 8, 0, 0, tzinfo=self.tz3),
             datetime_tz(2018, 4, 13, 16, 0, 0, tzinfo=self.tz3),
-        )
+        )[self.jean.id]
         self.assertEqual(len(work), 4)
         self.assertEqual(work, [
             (date(2018, 4, 9), 8),
@@ -1298,10 +1297,10 @@ class TestTimezones(TestResourceCommon):
             (date(2018, 4, 12), 8),
         ])
 
-        work = self.jean.list_work_time_per_day(
+        work = self.jean._list_work_time_per_day(
             datetime_tz(2018, 4, 9, 8, 0, 0, tzinfo=self.tz2),
             datetime_tz(2018, 4, 13, 16, 0, 0, tzinfo=self.tz4),
-        )
+        )[self.jean.id]
         self.assertEqual(work, [
             (date(2018, 4, 9), 8),
             (date(2018, 4, 10), 8),

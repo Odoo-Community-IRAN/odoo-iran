@@ -5,6 +5,8 @@ from . import account_invoice
 from . import account_tax
 from . import analytic_account
 from . import analytic_applicability
+from . import ir_actions_report
+from . import purchase_bill_line_match
 from . import purchase_order
 from . import purchase_order_line
 from . import product

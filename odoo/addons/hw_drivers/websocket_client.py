@@ -14,31 +14,29 @@ from odoo.addons.hw_drivers.tools import helpers
 _logger = logging.getLogger(__name__)
 websocket.enableTrace(True, level=logging.getLevelName(_logger.getEffectiveLevel()))
 
-
-def send_to_controller(print_id, device_identifier):
+def send_to_controller(device_type, params):
     """
-    Send back to odoo's server the completion of the operation
+    Confirm the operation's completion by sending a response back to the Odoo server
     """
-    server = helpers.get_odoo_server_url()
+    routes = {
+        "printer": "/iot/printer/status",
+    }
+    params['iot_mac'] = helpers.get_mac_address()
+    server_url = helpers.get_odoo_server_url() + routes[device_type]
     try:
         urllib3.disable_warnings()
         http = urllib3.PoolManager(cert_reqs='CERT_NONE')
         http.request(
             'POST',
-            server + "/iot/printer/status",
-            body=json.dumps(
-                {'params': {
-                    'print_id': print_id,
-                    'device_identifier': device_identifier,
-                    'iot_mac': helpers.get_mac_address(),
-                    }}).encode('utf8'),
+            server_url,
+            body=json.dumps({'params': params}).encode('utf8'),
             headers={
                 'Content-type': 'application/json',
                 'Accept': 'text/plain',
             },
         )
     except Exception:
-        _logger.exception('Could not reach configured server: %s', server)
+        _logger.exception('Could not reach confirmation status URL: %s', server_url)
 
 
 def on_message(ws, messages):
@@ -47,20 +45,19 @@ def on_message(ws, messages):
     """
     messages = json.loads(messages)
     _logger.debug("websocket received a message: %s", pprint.pformat(messages))
-    for document in messages:
-        message_type = document['message']['type']
-        if message_type in ['print', 'iot_action']:
-            payload = document['message']['payload']
-            iot_mac = helpers.get_mac_address()
+    iot_mac = helpers.get_mac_address()
+    for message in messages:
+        message_type = message['message']['type']
+        if message_type == 'iot_action':
+            payload = message['message']['payload']
             if iot_mac in payload['iotDevice']['iotIdentifiers']:
                 for device in payload['iotDevice']['identifiers']:
                     device_identifier = device['identifier']
                     if device_identifier in main.iot_devices:
                         start_operation_time = time.perf_counter()
                         _logger.debug("device '%s' action started with: %s", device_identifier, pprint.pformat(payload))
-                        main.iot_devices[device_identifier]._action_default(payload)
+                        main.iot_devices[device_identifier].action(payload)
                         _logger.info("device '%s' action finished - %.*f", device_identifier, 3, time.perf_counter() - start_operation_time)
-                        send_to_controller(payload['print_id'], device_identifier)
             else:
                 # likely intended as IoT share the same channel
                 _logger.debug("message ignored due to different iot mac: %s", iot_mac)
@@ -84,7 +81,7 @@ class WebsocketClient(Thread):
             When the client is setup, this function send a message to subscribe to the iot websocket channel
         """
         ws.send(
-            json.dumps({'event_name': 'subscribe', 'data': {'channels': [self.iot_channel], 'last': 0}})
+            json.dumps({'event_name': 'subscribe', 'data': {'channels': [self.iot_channel], 'last': 0, 'mac_address': helpers.get_mac_address()}})
         )
 
     def __init__(self, url):

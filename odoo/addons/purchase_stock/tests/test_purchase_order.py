@@ -2,13 +2,12 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 import re
 from datetime import datetime, timedelta
-from freezegun import freeze_time
 
 from odoo import Command
 from odoo.tools import DEFAULT_SERVER_DATETIME_FORMAT
 from odoo.addons.stock_account.tests.test_anglo_saxon_valuation_reconciliation_common import ValuationReconciliationTestCommon
 from odoo.exceptions import UserError
-from odoo.tests import Form, tagged
+from odoo.tests import Form, tagged, freeze_time
 
 
 @freeze_time("2021-01-14 09:12:15")
@@ -16,8 +15,8 @@ from odoo.tests import Form, tagged
 class TestPurchaseOrder(ValuationReconciliationTestCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref=None):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
 
         cls.product_id_1 = cls.env['product.product'].create({'name': 'Large Desk', 'purchase_method': 'purchase'})
         cls.product_id_2 = cls.env['product.product'].create({'name': 'Conference Chair', 'purchase_method': 'purchase'})
@@ -131,7 +130,7 @@ class TestPurchaseOrder(ValuationReconciliationTestCommon):
             active_model='stock.picking'))
         return_wiz = stock_return_picking_form.save()
         return_wiz.product_return_moves.write({'quantity': 2.0, 'to_refund': True})  # Return only 2
-        res = return_wiz.create_returns()
+        res = return_wiz.action_create_returns()
         return_pick = self.env['stock.picking'].browse(res['res_id'])
 
         # Validate picking
@@ -206,7 +205,7 @@ class TestPurchaseOrder(ValuationReconciliationTestCommon):
                 'quantity': 5,
                 'to_refund': True
             })
-        res = return_wiz.create_returns()
+        res = return_wiz.action_create_returns()
         return_pick = self.env['stock.picking'].browse(res['res_id'])
         return_pick.button_validate()
 
@@ -406,7 +405,7 @@ class TestPurchaseOrder(ValuationReconciliationTestCommon):
 
         super_product = self.env['product.product'].create({
             'name': 'Super Product',
-            'type': 'product',
+            'is_storable': True,
             'categ_id': self.stock_account_product_categ.id,
             'standard_price': 9.876543,
         })
@@ -456,21 +455,15 @@ class TestPurchaseOrder(ValuationReconciliationTestCommon):
 
         first_picking = _purchase_order.picking_ids[0]
         first_picking.move_ids.quantity = 5
-        backorder_wizard_dict = first_picking.button_validate()
-        backorder_wizard = Form(self.env[backorder_wizard_dict['res_model']].with_context(backorder_wizard_dict['context'])).save()
-        backorder_wizard.process()
+        Form.from_action(self.env, first_picking.button_validate()).save().process()
 
         second_picking = _purchase_order.picking_ids[1]
         second_picking.move_ids.quantity = 5
-        backorder_wizard_dict = second_picking.button_validate()
-        backorder_wizard = Form(self.env[backorder_wizard_dict['res_model']].with_context(backorder_wizard_dict['context'])).save()
-        backorder_wizard.process()
+        Form.from_action(self.env, second_picking.button_validate()).save().process()
 
         third_picking = _purchase_order.picking_ids[2]
         third_picking.move_ids.quantity = 5
-        backorder_wizard_dict = third_picking.button_validate()
-        backorder_wizard = Form(self.env[backorder_wizard_dict['res_model']].with_context(backorder_wizard_dict['context'])).save()
-        backorder_wizard.process()
+        Form.from_action(self.env, third_picking.button_validate()).save().process()
 
         _message_content = _purchase_order.message_ids.mapped("body")[0]
         self.assertIsNotNone(re.search(r"Received Quantity: 5.0 -&gt; 10.0", _message_content), "Already received quantity isn't correctly taken into consideration")
@@ -504,7 +497,7 @@ class TestPurchaseOrder(ValuationReconciliationTestCommon):
         orderpoint_form = Form(self.env['stock.warehouse.orderpoint'])
         orderpoint_form.product_id = product
         orderpoint_form.product_min_qty = 1
-        orderpoint_form.product_max_qty = 0.000
+        orderpoint_form.product_max_qty = 1.000
         orderpoint_form.save()
 
         self.env['procurement.group'].run_scheduler()
@@ -541,8 +534,7 @@ class TestPurchaseOrder(ValuationReconciliationTestCommon):
         self.assertEqual(po.picking_ids.move_ids.product_uom_qty, 8)
 
     def test_packaging_propagation(self):
-        """
-        Editing the packaging on an purchase.order.line
+        """ Editing the packaging on an purchase.order.line
         should propagate to the delivery order, so that
         when we are editing the packaging, the lines can be merged
         with the new packaging and quantity.
@@ -575,24 +567,16 @@ class TestPurchaseOrder(ValuationReconciliationTestCommon):
         po.button_confirm()
         # the 3 moves for the 3 steps
         step_1 = po.order_line.move_ids
-        step_2 = step_1.move_dest_ids
-        step_3 = step_2.move_dest_ids
         self.assertEqual(step_1.product_packaging_id, packOf10)
-        self.assertEqual(step_2.product_packaging_id, packOf10)
-        self.assertEqual(step_3.product_packaging_id, packOf10)
 
         po.order_line[0].write({
             'product_packaging_id': packOf20.id,
             'product_uom_qty': 20
         })
         self.assertEqual(step_1.product_packaging_id, packOf20)
-        self.assertEqual(step_2.product_packaging_id, packOf20)
-        self.assertEqual(step_3.product_packaging_id, packOf20)
 
         po.order_line[0].write({'product_packaging_id': False})
         self.assertFalse(step_1.product_packaging_id)
-        self.assertFalse(step_2.product_packaging_id)
-        self.assertFalse(step_3.product_packaging_id)
 
     def test_putaway_strategy_in_backorder(self):
         stock_location = self.company_data['default_warehouse'].lot_stock_id
@@ -629,7 +613,7 @@ class TestPurchaseOrder(ValuationReconciliationTestCommon):
         """ check that the quant created by a PO can be applied in an inventory adjustment correctly """
         product = self.env['product.product'].create({
             'name': 'Product A',
-            'type': 'product',
+            'is_storable': True,
         })
         po_form = Form(self.env['purchase.order'])
         po_form.partner_id = self.partner_a
@@ -670,16 +654,18 @@ class TestPurchaseOrder(ValuationReconciliationTestCommon):
         receipt01.button_validate()
 
         wizard = Form(self.env['stock.return.picking'].with_context(active_ids=receipt01.ids, active_id=receipt01.id, active_model='stock.picking')).save()
+        wizard.product_return_moves.quantity = 5
         wizard.product_return_moves.to_refund = False
-        res = wizard.create_returns()
+        res = wizard.action_create_returns()
 
         return_pick = self.env['stock.picking'].browse(res['res_id'])
         return_pick.move_ids.quantity = 5
         return_pick.button_validate()
 
         wizard = Form(self.env['stock.return.picking'].with_context(active_ids=return_pick.ids, active_id=return_pick.id, active_model='stock.picking')).save()
+        wizard.product_return_moves.quantity = 5
         wizard.product_return_moves.to_refund = False
-        res = wizard.create_returns()
+        res = wizard.action_create_returns()
 
         receipt02 = self.env['stock.picking'].browse(res['res_id'])
         receipt02.move_ids.quantity = 5
@@ -693,7 +679,7 @@ class TestPurchaseOrder(ValuationReconciliationTestCommon):
         Create a purchase order, confirm it, invoice it, but don't post the invoice.
         Receive the products.
         """
-        self.product_id_1.type = 'product'
+        self.product_id_1.is_storable = True
         self.product_id_1.categ_id.property_cost_method = 'average'
         po = self.env['purchase.order'].create(self.po_vals)
         po.button_confirm()
@@ -721,7 +707,7 @@ class TestPurchaseOrder(ValuationReconciliationTestCommon):
         """
         product = self.env['product.product'].create({
             'name': 'Super product',
-            'type': 'product',
+            'is_storable': True,
             'seller_ids': [Command.create({
                 'partner_id': self.partner_a.id,
                 'price': 100.0,

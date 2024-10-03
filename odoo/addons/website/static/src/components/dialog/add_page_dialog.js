@@ -1,24 +1,45 @@
-/** @odoo-module **/
-
 import { isBrowserFirefox } from "@web/core/browser/feature_detection";
+import { ensureJQuery } from "@web/core/ensure_jquery";
+import { rpc } from "@web/core/network/rpc";
 import { Deferred } from "@web/core/utils/concurrency";
+import { renderToElement } from "@web/core/utils/render";
 import { useAutofocus, useService } from '@web/core/utils/hooks';
 import { _t } from "@web/core/l10n/translation";
 import { WebsiteDialog } from '@website/components/dialog/dialog';
 import { Switch } from '@website/components/switch/switch';
+import { applyTextHighlight } from "@website/js/text_processing";
 import { useRef, useState, useSubEnv, Component, onWillStart, onMounted } from "@odoo/owl";
 import wUtils from '@website/js/utils';
 
 const NO_OP = () => {};
 
 export class AddPageConfirmDialog extends Component {
+    static template = "website.AddPageConfirmDialog";
+    static props = {
+        close: Function,
+        onAddPage: {
+            type: Function,
+            optional: true,
+        },
+        websiteId: Number,
+        sectionsArch: {
+            type: String,
+            optional: true,
+        },
+        name: String,
+    };
+    static defaultProps = {
+        onAddPage: NO_OP,
+    };
+    static components = {
+        Switch,
+        WebsiteDialog,
+    };
+
     setup() {
         super.setup();
         useAutofocus();
 
-        this.title = _t("New Page");
-        this.primaryTitle = _t("Create");
-        this.switchLabel = _t("Add to menu");
         this.website = useService('website');
         this.http = useService('http');
         this.action = useService('action');
@@ -57,29 +78,16 @@ export class AddPageConfirmDialog extends Component {
         this.props.onAddPage(this.state);
     }
 }
-AddPageConfirmDialog.props = {
-    close: Function,
-    onAddPage: {
-        type: Function,
-        optional: true,
-    },
-    websiteId: Number,
-    sectionsArch: {
-        type: String,
-        optional: true,
-    },
-    name: String,
-};
-AddPageConfirmDialog.defaultProps = {
-    onAddPage: NO_OP,
-};
-AddPageConfirmDialog.components = {
-    Switch,
-    WebsiteDialog,
-};
-AddPageConfirmDialog.template = "website.AddPageConfirmDialog";
 
 export class AddPageTemplateBlank extends Component {
+    static template = "website.AddPageTemplateBlank";
+    static props = {
+        firstRow: {
+            type: Boolean,
+            optional: true,
+        },
+    };
+
     setup() {
         super.setup();
         this.holderRef = useRef("holder");
@@ -93,15 +101,22 @@ export class AddPageTemplateBlank extends Component {
         this.env.addPage();
     }
 }
-AddPageTemplateBlank.props = {
-    firstRow: {
-        type: Boolean,
-        optional: true,
-    },
-};
-AddPageTemplateBlank.template = "website.AddPageTemplateBlank";
 
 export class AddPageTemplatePreview extends Component {
+    static template = "website.AddPageTemplatePreview";
+    static props = {
+        template: Object,
+        animationDelay: Number,
+        firstRow: {
+            type: Boolean,
+            optional: true,
+        },
+        isCustom: {
+            type: Boolean,
+            optional: true,
+        },
+    };
+
     setup() {
         super.setup();
         this.iframeRef = useRef("iframe");
@@ -142,16 +157,22 @@ export class AddPageTemplatePreview extends Component {
             const fullHeight = getComputedStyle(document.querySelector(".o_action_manager")).height;
             const halfHeight = `${Math.round(parseInt(fullHeight) / 2)}px`;
             const css = `
-                #wrapwrap {
+                html, body {
+                    /* Needed to prevent scrollbar to appear on chrome */
                     overflow: hidden;
+                }
+                #wrapwrap {
                     padding-right: 0px;
                     padding-left: 0px;
+                    --snippet-preview-height: 340px;
                 }
                 section {
                     /* Avoid the zoom's missing pixel. */
                     transform: scale(101%);
                 }
                 section[data-snippet="s_carousel"],
+                section[data-snippet="s_carousel_intro"],
+                section[data-snippet="s_quotes_carousel_minimal"],
                 section[data-snippet="s_quotes_carousel"] {
                     height: ${carouselHeight} !important;
                 }
@@ -190,6 +211,7 @@ export class AddPageTemplatePreview extends Component {
                 imgEl.setAttribute("loading", "eager");
             }
             mainEl.appendChild(wrapEl);
+            await ensureJQuery();
             await wUtils.onceAllImagesLoaded($(wrapEl));
             // Restore image lazy loading.
             for (const imgEl of lazyLoadedImgEls) {
@@ -218,7 +240,33 @@ export class AddPageTemplatePreview extends Component {
                 holderEl.classList.add("o_ready");
             };
             adjustHeight();
+            if (this.props.isCustom) {
+                this.adaptCustomTemplate(wrapEl);
+            }
+            // We need this to correctly compute the highlights size (the
+            // `ResizeObserver` that adapts the effects when a custom font
+            // is applied is not available), for now, we need a setTimeout.
+            setTimeout(() => {
+                for (const textEl of iframeEl.contentDocument?.querySelectorAll(".o_text_highlight") || []) {
+                    applyTextHighlight(textEl);
+                }
+            }, 200);
         });
+    }
+
+    adaptCustomTemplate(wrapEl) {
+        for (const sectionEl of wrapEl.querySelectorAll("section:not(.o_snippet_desktop_invisible)")) {
+            const style = window.getComputedStyle(sectionEl);
+            if (!style.height || style.display === 'none') {
+                const messageEl = renderToElement("website.AddPageTemplatePreviewDynamicMessage", {
+                    message: _t(
+                        "No preview for the %s block because it is dynamically rendered.",
+                        sectionEl.dataset.name
+                    ),
+                });
+                sectionEl.insertAdjacentElement("beforebegin", messageEl);
+            }
+        }
     }
 
     select() {
@@ -226,23 +274,30 @@ export class AddPageTemplatePreview extends Component {
             return;
         }
         const wrapEl = this.iframeRef.el.contentDocument.getElementById("wrap").cloneNode(true);
-        for (const previewEl of wrapEl.querySelectorAll(".o_new_page_snippet_preview")) {
+        for (const previewEl of wrapEl.querySelectorAll(".o_new_page_snippet_preview, .s_dialog_preview")) {
             previewEl.remove();
         }
-        this.env.addPage(wrapEl.innerHTML);
+        this.env.addPage(wrapEl.innerHTML, this.props.template.name && _t("Copy of %s", this.props.template.name));
     }
 }
-AddPageTemplatePreview.props = {
-    template: Object,
-    animationDelay: Number,
-    firstRow: {
-        type: Boolean,
-        optional: true,
-    },
-};
-AddPageTemplatePreview.template = "website.AddPageTemplatePreview";
 
 export class AddPageTemplatePreviews extends Component {
+    static template = "website.AddPageTemplatePreviews";
+    static props = {
+        isCustom: {
+            type: Boolean,
+            optional: true,
+        },
+        templates: {
+            type: Array,
+            element: Object,
+        },
+    };
+    static components = {
+        AddPageTemplateBlank,
+        AddPageTemplatePreview,
+    };
+
     setup() {
         super.setup();
     }
@@ -257,24 +312,20 @@ export class AddPageTemplatePreviews extends Component {
         return result;
     }
 }
-AddPageTemplatePreviews.props = {
-    templates: {
-        type: Array,
-        element: Object,
-    },
-};
-AddPageTemplatePreviews.components = {
-    AddPageTemplateBlank,
-    AddPageTemplatePreview,
-};
-AddPageTemplatePreviews.template = "website.AddPageTemplatePreviews";
 
 export class AddPageTemplates extends Component {
+    static template = "website.AddPageTemplates";
+    static props = {
+        onTemplatePageChanged: Function,
+    };
+    static components = {
+        AddPageTemplatePreviews,
+    };
+
     setup() {
         super.setup();
         this.tabsRef = useRef("tabs");
         this.panesRef = useRef("panes");
-        this.rpc = useService('rpc');
 
         this.state = useState({
             pages: [{
@@ -308,7 +359,7 @@ export class AddPageTemplates extends Component {
             return this.pages;
         }
 
-        const newPageTemplates = await this.rpc("/website/get_new_page_templates");
+        const newPageTemplates = await rpc("/website/get_new_page_templates");
         newPageTemplates[0].templates.unshift({
             isBlank: true,
         });
@@ -342,35 +393,45 @@ export class AddPageTemplates extends Component {
         this.props.onTemplatePageChanged(tabEl.dataset.id === "basic" ? "" : tabEl.textContent);
     }
 }
-AddPageTemplates.props = {
-    onTemplatePageChanged: Function,
-};
-AddPageTemplates.components = {
-    AddPageTemplatePreviews,
-};
-AddPageTemplates.template = "website.AddPageTemplates";
 
 export class AddPageDialog extends Component {
+    static template = "website.AddPageDialog";
+    static props = {
+        close: Function,
+        onAddPage: {
+            type: Function,
+            optional: true,
+        },
+        websiteId: {
+            type: Number,
+        },
+    };
+    static defaultProps = {
+        onAddPage: NO_OP,
+    };
+    static components = {
+        WebsiteDialog,
+        AddPageTemplates,
+        AddPageTemplatePreviews,
+    };
+
     setup() {
         super.setup();
         useAutofocus();
 
-        this.title = _t("New Page");
         this.primaryTitle = _t("Create");
         this.switchLabel = _t("Add to menu");
         this.website = useService('website');
         this.dialogs = useService("dialog");
         this.orm = useService('orm');
-        this.rpc = useService('rpc');
         this.http = useService('http');
         this.action = useService('action');
-        this.userService = useService('user');
 
         this.cssLinkEls = undefined;
         this.lastTabName = "";
 
         useSubEnv({
-            addPage: sectionsArch => this.addPage(sectionsArch),
+            addPage: (sectionsArch, name) => this.addPage(sectionsArch, name),
             getCssLinkEls: () => this.getCssLinkEls(),
         });
     }
@@ -379,7 +440,7 @@ export class AddPageDialog extends Component {
         this.lastTabName = name;
     }
 
-    async addPage(sectionsArch) {
+    async addPage(sectionsArch, name) {
         const props = this.props;
         this.dialogs.add(AddPageConfirmDialog, {
             onAddPage: () => {
@@ -388,7 +449,7 @@ export class AddPageDialog extends Component {
             },
             websiteId: this.props.websiteId,
             sectionsArch: sectionsArch,
-            name: this.lastTabName,
+            name: name || this.lastTabName,
         });
     }
 
@@ -414,22 +475,3 @@ export class AddPageDialog extends Component {
         return this.cssLinkEls;
     }
 }
-AddPageDialog.props = {
-    close: Function,
-    onAddPage: {
-        type: Function,
-        optional: true,
-    },
-    websiteId: {
-        type: Number,
-    },
-};
-AddPageDialog.defaultProps = {
-    onAddPage: NO_OP,
-};
-AddPageDialog.components = {
-    WebsiteDialog,
-    AddPageTemplates,
-    AddPageTemplatePreviews,
-};
-AddPageDialog.template = "website.AddPageDialog";

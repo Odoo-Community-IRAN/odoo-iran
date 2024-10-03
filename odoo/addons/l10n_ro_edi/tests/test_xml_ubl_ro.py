@@ -8,10 +8,11 @@ from odoo.tests import tagged
 class TestUBLRO(TestUBLCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref="ro"):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    @TestUBLCommon.setup_country('ro')
+    def setUpClass(cls):
+        super().setUpClass()
         cls.company_data['company'].write({
-            'country_id': cls.env.ref('base.ro').id,
+            'country_id': cls.env.ref('base.ro').id,  # needed to compute peppol_endpoint based on VAT
             'state_id': cls.env.ref('base.RO_B').id,
             'name': 'Hudson Construction',
             'city': 'SECTOR1',
@@ -19,10 +20,7 @@ class TestUBLRO(TestUBLCommon):
             'vat': 'RO1234567897',
             'phone': '+40 123 456 789',
             'street': "Strada Kunst, 3",
-            'invoice_is_ubl_cii': True,
         })
-
-        cls.currency_data['currency'] = cls.env.ref('base.RON')
 
         cls.env['res.partner.bank'].create({
             'acc_type': 'iban',
@@ -55,7 +53,7 @@ class TestUBLRO(TestUBLCommon):
     # Test export - import
     ####################################################
 
-    def create_move(self, move_type, send=True):
+    def create_move(self, move_type, send=True, **kwargs):
         return self._generate_move(
             self.env.company.partner_id,
             self.partner_a,
@@ -63,16 +61,19 @@ class TestUBLRO(TestUBLCommon):
             move_type=move_type,
             invoice_line_ids=[
                 {
+                    'name': 'Test Product A',
                     'product_id': self.product_a.id,
                     'price_unit': 500.0,
                     'tax_ids': [Command.set(self.tax_19.ids)],
                 },
                 {
+                    'name': 'Test Product B',
                     'product_id': self.product_b.id,
                     'price_unit': 1000.0,
                     'tax_ids': [Command.set(self.tax_19.ids)],
                 },
             ],
+            **kwargs
         )
 
     def get_attachment(self, move):
@@ -81,40 +82,38 @@ class TestUBLRO(TestUBLCommon):
         return move.ubl_cii_xml_id
 
     def test_export_invoice(self):
-        invoice = self.create_move("out_invoice")
+        invoice = self.create_move("out_invoice", currency_id=self.company.currency_id.id)
         attachment = self.get_attachment(invoice)
         self._assert_invoice_attachment(attachment, xpaths=None, expected_file_path='from_odoo/ciusro_out_invoice.xml')
 
     def test_export_credit_note(self):
-        refund = self.create_move("out_refund")
+        refund = self.create_move("out_refund", currency_id=self.company.currency_id.id)
         attachment = self.get_attachment(refund)
         self._assert_invoice_attachment(attachment, xpaths=None, expected_file_path='from_odoo/ciusro_out_refund.xml')
 
     def test_export_invoice_different_currency(self):
-        self.currency_data['currency'] = self.env.ref('base.USD')
         invoice = self.create_move("out_invoice")
         attachment = self.get_attachment(invoice)
         self._assert_invoice_attachment(attachment, xpaths=None, expected_file_path='from_odoo/ciusro_out_invoice_different_currency.xml')
-        self.currency_data['currency'] = self.env.ref('base.RON')
 
     def test_export_invoice_without_country_code_prefix_in_vat(self):
         self.company_data['company'].write({'vat': '1234567897'})
         self.partner_a.write({'vat': '1234567897'})
-        invoice = self.create_move("out_invoice")
+        invoice = self.create_move("out_invoice", currency_id=self.company.currency_id.id)
         attachment = self.get_attachment(invoice)
         self._assert_invoice_attachment(attachment, xpaths=None, expected_file_path='from_odoo/ciusro_out_invoice_no_prefix_vat.xml')
 
     def test_export_no_vat_but_have_company_registry(self):
         self.company_data['company'].write({'vat': False, 'company_registry': 'RO1234567897'})
         self.partner_a.write({'vat': False, 'company_registry': 'RO1234567897'})
-        invoice = self.create_move("out_invoice")
+        invoice = self.create_move("out_invoice", currency_id=self.company.currency_id.id)
         attachment = self.get_attachment(invoice)
         self._assert_invoice_attachment(attachment, xpaths=None, expected_file_path='from_odoo/ciusro_out_invoice.xml')
 
     def test_export_no_vat_but_have_company_registry_without_prefix(self):
         self.company_data['company'].write({'vat': False, 'company_registry': '1234567897'})
         self.partner_a.write({'vat': False, 'company_registry': '1234567897'})
-        invoice = self.create_move("out_invoice")
+        invoice = self.create_move("out_invoice", currency_id=self.company.currency_id.id)
         attachment = self.get_attachment(invoice)
         self._assert_invoice_attachment(attachment, xpaths=None, expected_file_path='from_odoo/ciusro_out_invoice_no_prefix_vat.xml')
 
@@ -123,7 +122,7 @@ class TestUBLRO(TestUBLCommon):
         self.partner_a.write({'vat': False, 'company_registry': False})
         invoice = self.create_move("out_invoice", send=False)
         with self.assertRaisesRegex(UserError, "doesn't have a VAT nor Company ID"):
-            invoice._generate_pdf_and_send_invoice(self.move_template, allow_fallback_pdf=False)
+            invoice._generate_and_send(allow_fallback_pdf=False, mail_template_id=self.move_template.id)
 
     def test_export_constraints(self):
         self.company_data['company'].company_registry = False
@@ -132,10 +131,10 @@ class TestUBLRO(TestUBLCommon):
             self.company_data["company"][required_field] = False
             invoice = self.create_move("out_invoice", send=False)
             with self.assertRaisesRegex(UserError, "required"):
-                invoice._generate_pdf_and_send_invoice(self.move_template, allow_fallback_pdf=False)
+                invoice._generate_and_send(allow_fallback_pdf=False, mail_template_id=self.move_template.id)
             self.company_data["company"][required_field] = prev_val
 
         self.company_data["company"].city = "Bucharest"
         invoice = self.create_move("out_invoice", send=False)
         with self.assertRaisesRegex(UserError, "city name must be 'SECTORX'"):
-            invoice._generate_pdf_and_send_invoice(self.move_template, allow_fallback_pdf=False)
+            invoice._generate_and_send(allow_fallback_pdf=False, mail_template_id=self.move_template.id)

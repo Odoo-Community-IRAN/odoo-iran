@@ -3,11 +3,15 @@
 import logging
 
 from werkzeug.urls import url_encode
+from werkzeug.exceptions import NotFound, Unauthorized
 
 from odoo import _, http
 from odoo.exceptions import AccessError
 from odoo.http import request
 from odoo.tools import consteq
+from odoo.addons.mail.controllers.discuss.public_page import PublicPageController
+from odoo.addons.mail.models.discuss.mail_guest import add_guest_to_context
+from odoo.addons.mail.tools.discuss import Store
 
 _logger = logging.getLogger(__name__)
 
@@ -17,7 +21,7 @@ class MailController(http.Controller):
 
     @classmethod
     def _redirect_to_messaging(cls):
-        url = '/web#%s' % url_encode({'action': 'mail.action_discuss'})
+        url = '/odoo/action-mail.action_discuss'
         return request.redirect(url)
 
     @classmethod
@@ -62,33 +66,34 @@ class MailController(http.Controller):
             # record does not seem to exist -> redirect to login
             return cls._redirect_to_messaging()
 
-        suggested_company = record_sudo._get_mail_redirect_suggested_company()
+        suggested_company = record_sudo._get_redirect_suggested_company()
         # the record has a window redirection: check access rights
         if uid is not None:
-            if not RecordModel.with_user(uid).check_access_rights('read', raise_exception=False):
+            if not RecordModel.with_user(uid).has_access('read'):
                 return cls._redirect_to_messaging()
             try:
                 # We need here to extend the "allowed_company_ids" to allow a redirection
                 # to any record that the user can access, regardless of currently visible
                 # records based on the "currently allowed companies".
-                cids_str = request.httprequest.cookies.get('cids', str(user.company_id.id))
-                cids = [int(cid) for cid in cids_str.split(',')]
+                cids_str = request.cookies.get('cids', str(user.company_id.id))
+                cids = [int(cid) for cid in cids_str.split('-')]
                 try:
-                    record_sudo.with_user(uid).with_context(allowed_company_ids=cids).check_access_rule('read')
+                    record_sudo.with_user(uid).with_context(allowed_company_ids=cids).check_access('read')
                 except AccessError:
                     # In case the allowed_company_ids from the cookies (i.e. the last user configuration
                     # on their browser) is not sufficient to avoid an ir.rule access error, try to following
                     # heuristic:
                     # - Guess the supposed necessary company to access the record via the method
-                    #   _get_mail_redirect_suggested_company
+                    #   _get_redirect_suggested_company
                     #   - If no company, then redirect to the messaging
                     #   - Merge the suggested company with the companies on the cookie
-                    # - Make a new access test if it succeeds, redirect to the record. Otherwise, 
+                    # - Make a new access test if it succeeds, redirect to the record. Otherwise,
                     #   redirect to the messaging.
                     if not suggested_company:
                         raise AccessError('')
                     cids = cids + [suggested_company.id]
-                    record_sudo.with_user(uid).with_context(allowed_company_ids=cids).check_access_rule('read')
+                    record_sudo.with_user(uid).with_context(allowed_company_ids=cids).check_access('read')
+                    request.future_response.set_cookie('cids', '-'.join([str(cid) for cid in cids]))
             except AccessError:
                 return cls._redirect_to_messaging()
             else:
@@ -105,7 +110,7 @@ class MailController(http.Controller):
                     'action': record_action.get('id'),
                 }
                 if cids:
-                    url_params['cids'] = cids[0]
+                    request.future_response.set_cookie('cids', '-'.join([str(cid) for cid in cids]))
                 view_id = record_sudo.get_formview_id()
                 if view_id:
                     url_params['view_id'] = view_id
@@ -120,19 +125,16 @@ class MailController(http.Controller):
         elif not record_action['type'] == 'ir.actions.act_window':
             return cls._redirect_to_messaging()
 
-        url_params = {
-            'model': model,
-            'id': res_id,
-            'active_id': res_id,
-            'action': record_action.get('id'),
-        }
+        url_params = {}
+        menu_id = request.env['ir.ui.menu']._get_best_backend_root_menu_id_for_model(model)
+        if menu_id:
+            url_params['menu_id'] = menu_id
         view_id = record_sudo.get_formview_id()
         if view_id:
             url_params['view_id'] = view_id
-
         if cids:
-            url_params['cids'] = ','.join([str(cid) for cid in cids])
-        url = '/web?#%s' % url_encode(url_params)
+            request.future_response.set_cookie('cids', '-'.join([str(cid) for cid in cids]))
+        url = f'/odoo/{model}/{res_id}?{url_encode(url_params)}'
         return request.redirect(url)
 
     @http.route('/mail/view', type='http', auth='public')
@@ -182,14 +184,39 @@ class MailController(http.Controller):
 
         display_link = True
         if request.session.uid:
-            try:
-                record.check_access_rights('read')
-                record.check_access_rule('read')
-            except AccessError:
-                display_link = False
+            display_link = record.has_access('read')
 
         return request.render('mail.message_document_unfollowed', {
             'name': record_sudo.display_name,
             'model_name': request.env['ir.model'].sudo()._get(model).display_name,
             'access_url': record._notify_get_action_link('view', model=model, res_id=res_id) if display_link else False,
         })
+
+    @http.route('/mail/message/<int:message_id>', type='http', auth='public')
+    @add_guest_to_context
+    def mail_thread_message_redirect(self, message_id, **kwargs):
+        message = request.env['mail.message'].search([('id', '=', message_id)])
+        if not message:
+            if request.env.user._is_public():
+                return request.redirect(f'/web/login?redirect=/mail/message/{message_id}')
+            raise Unauthorized()
+
+        # sudo: public user can access some relational fields of mail.message
+        if message.sudo()._filter_empty():
+            raise NotFound()
+        if not request.env.user._is_internal():
+            thread = request.env[message.model].search([('id', '=', message.res_id)])
+            if message.model == 'discuss.channel':
+                store = Store({'isChannelTokenSecret': True})
+                store.add(thread, {'highlightMessage': Store.one(message, only_id=True)})
+                return PublicPageController()._response_discuss_channel_invitation(store, thread)
+            elif hasattr(thread, '_get_share_url'):
+                return request.redirect(thread._get_share_url(share_token=False))
+            else:
+                raise Unauthorized()
+
+        if message.model == 'discuss.channel':
+            url = f'/odoo/action-mail.action_discuss?active_id={message.res_id}&highlight_message_id={message_id}'
+        else:
+            url = f'/odoo/{message.model}/{message.res_id}?highlight_message_id={message_id}'
+        return request.redirect(url)

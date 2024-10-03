@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import json
@@ -6,7 +5,7 @@ import json
 from werkzeug.urls import url_encode
 
 from odoo import tests
-from odoo.tools import mute_logger, submap
+from odoo.tools.misc import mute_logger, submap
 
 
 @tests.tagged('post_install', '-at_install')
@@ -64,9 +63,9 @@ class TestControllers(tests.HttpCase):
         self.authenticate("admin", "admin")
         for url in urls:
             resp = self.url_open(f'/@{url}')
-            backend_params = url_encode(dict(action='website.website_preview', path=url))
+            backend_params = url_encode(dict(path=url))
             self.assertURLEqual(
-                resp.url, f'/web#{backend_params}',
+                resp.url, f'/odoo/action-website.website_preview?{backend_params}',
                 "Internal user should have landed in the backend")
 
     def test_03_website_image(self):

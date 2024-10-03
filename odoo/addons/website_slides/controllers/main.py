@@ -11,7 +11,6 @@ import math
 import werkzeug
 
 from odoo import fields, http, tools, _
-from odoo.addons.http_routing.models.ir_http import slug, unslug
 from odoo.addons.website.controllers.main import QueryURL
 from odoo.addons.website.models.ir_http import sitemap_qs2dom
 from odoo.addons.website_profile.controllers.main import WebsiteProfile
@@ -43,7 +42,7 @@ class WebsiteSlides(WebsiteProfile):
         dom = sitemap_qs2dom(qs=qs, route='/slides/', field=Channel._rec_name)
         dom += env['website'].get_current_website().website_domain()
         for channel in Channel.search(dom):
-            loc = '/slides/%s' % slug(channel)
+            loc = '/slides/%s' % env['ir.http']._slug(channel)
             if not qs or qs.lower() in loc:
                 yield {'loc': loc}
 
@@ -63,10 +62,7 @@ class WebsiteSlides(WebsiteProfile):
         slide = request.env['slide.slide'].browse(int(slide_id)).exists()
         if not slide:
             return {'error': 'slide_wrong'}
-        try:
-            slide.check_access_rights('read')
-            slide.check_access_rule('read')
-        except AccessError:
+        if not slide.has_access('read'):
             return {'error': 'slide_access'}
         return {'slide': slide}
 
@@ -83,9 +79,11 @@ class WebsiteSlides(WebsiteProfile):
                 # e.g. upgrade from Odoo 15.0 to 18.0.
                 request.session.viewed_slides = dict.fromkeys(request.session.get('viewed_slides', []), 1)
             viewed_slides = request.session['viewed_slides']
-            if slide.id not in viewed_slides:
+            # Convert `slide.id` to string is necessary because of the JSON format of the session
+            slide_id = str(slide.id)
+            if slide_id not in viewed_slides:
                 if tools.sql.increment_fields_skiplock(slide, 'public_views', 'total_views'):
-                    viewed_slides[slide.id] = 1
+                    viewed_slides[slide_id] = 1
                     request.session.touch()
         else:
             slide.action_set_viewed(quiz_attempts_inc=quiz_attempts_inc)
@@ -286,7 +284,7 @@ class WebsiteSlides(WebsiteProfile):
             tag_ids.remove(toggle_tag_id)
         elif toggle_tag_id:
             tag_ids.append(toggle_tag_id)
-        return ','.join(slug(tag) for tag in request.env['slide.channel.tag'].browse(tag_ids))
+        return ','.join(request.env['ir.http']._slug(tag) for tag in request.env['slide.channel.tag'].browse(tag_ids))
 
     def _channel_search_tags_ids(self, search_tags):
         """ Input: %5B4%5D """
@@ -302,7 +300,7 @@ class WebsiteSlides(WebsiteProfile):
         """ Input: hotels-1,adventure-2 """
         ChannelTag = request.env['slide.channel.tag']
         try:
-            tag_ids = list(filter(None, [unslug(tag)[1] for tag in (search_tags or '').split(',')]))
+            tag_ids = list(filter(None, [request.env['ir.http']._unslug(tag)[1] for tag in (search_tags or '').split(',')]))
         except Exception:
             return ChannelTag
         # perform a search to filter on existing / valid tags implicitly
@@ -402,16 +400,15 @@ class WebsiteSlides(WebsiteProfile):
 
     @http.route(['/slides/all', '/slides/all/tag/<string:slug_tags>'], type='http', auth="public", website=True, sitemap=True)
     def slides_channel_all(self, slide_category=None, slug_tags=None, my=False, **post):
-        if slug_tags and request.httprequest.method == 'GET':
-            # Redirect `tag-1,tag-2` to `tag-1` to disallow multi tags
-            # in GET request for proper bot indexation;
-            # if the search term is available, do not remove any existing
-            # tags because it is user who provided search term with GET
-            # request and so clearly it's not SEO bot.
-            tag_list = slug_tags.split(',')
-            if len(tag_list) > 1 and not post.get('search'):
-                url = QueryURL('/slides/all', ['tag'], tag=tag_list[0], my=my, slide_category=slide_category)()
-                return request.redirect(url, code=302)
+        if slug_tags and slug_tags.count(',') > 0 and request.httprequest.method == 'GET' and not post.get('prevent_redirect'):
+            # Previously, the tags were searched using GET, which caused issues with crawlers (too many hits)
+            # We replaced those with POST to avoid that, but it's not sufficient as bots "remember" crawled pages for a while
+            # This permanent redirect is placed to instruct the bots that this page is no longer valid
+            # TODO: remove in a few stable versions (v19?), including the "prevent_redirect" param in templates
+            # Note: We allow a single tag to be GET, to keep crawlers & indexes on those pages
+            # What we really want to avoid is combinatorial explosions
+            return request.redirect('/slides/all', code=301)
+
         render_values = self.slides_channel_all_values(slide_category=slide_category, slug_tags=slug_tags, my=my, **post)
         return request.render('website_slides.courses_all', render_values)
 
@@ -488,10 +485,8 @@ class WebsiteSlides(WebsiteProfile):
         """
         status = 'authorized'
         try:
-            slide_model = request.env['slide.slide']
-            slide_model.check_access_rights('read')
-            slide = slide_model.browse(slide_id)
-            slide.check_access_rule('read')
+            slide = request.env['slide.slide'].browse(slide_id)
+            slide.check_access('read')
         except (AccessError, MissingError):
             try:
                 slide = request.env['slide.slide'].sudo().browse([slide_id])
@@ -560,10 +555,7 @@ class WebsiteSlides(WebsiteProfile):
             channel = request.env['slide.channel'].browse(channel_id).exists()
             if not channel:
                 return self._redirect_to_slides_main('no_channel')
-        try:
-            channel.check_access_rights('read')
-            channel.check_access_rule('read')
-        except AccessError:
+        if not channel.has_access('read'):
             return self._redirect_to_slides_main('no_rights')
 
         if category_id and not category:
@@ -686,12 +678,12 @@ class WebsiteSlides(WebsiteProfile):
         if request.env.user.has_group('base.group_system'):
             module = request.env.ref('base.module_survey')
             if module.state != 'installed':
-                render_values['modules_to_install'] = [{
+                render_values['modules_to_install'] = json.dumps([{
                     'id': module.id,
                     'name': module.shortdesc,
                     'motivational': _('Want to test and certify your students?'),
                     'default_slide_category': 'certification',
-                }]
+                }])
 
         render_values = self._prepare_additional_channel_values(render_values, **kw)
         return request.render('website_slides.course_main', render_values)
@@ -734,7 +726,7 @@ class WebsiteSlides(WebsiteProfile):
 
     @staticmethod
     def _redirect_to_channel(channel):
-        return request.redirect(f"/slides/{slug(channel)}")
+        return request.redirect(f"/slides/{request.env['ir.http']._slug(channel)}")
 
     def _slide_channel_prepare_review_values(self, channel):
         values = {
@@ -806,13 +798,7 @@ class WebsiteSlides(WebsiteProfile):
             return self._redirect_to_slides_main('no_channel')
 
         # --- Compute rights of current user
-        try:
-            channel.check_access_rights('read')
-            channel.check_access_rule('read')
-        except AccessError:
-            has_rights = False
-        else:
-            has_rights = True
+        has_rights = channel.has_access('read')
 
         invite_values = self._get_channel_values_from_invite(channel_id, invite_hash, int(invite_partner_id))
         if invite_values.get('invite_error'):
@@ -882,7 +868,7 @@ class WebsiteSlides(WebsiteProfile):
 
     @http.route(['/slides/channel/tag/search_read'], type='json', auth='user', methods=['POST'], website=True)
     def slide_channel_tag_search_read(self, fields, domain):
-        can_create = request.env['slide.channel.tag'].check_access_rights('create', raise_exception=False)
+        can_create = request.env['slide.channel.tag'].has_access('create')
         return {
             'read_results': request.env['slide.channel.tag'].search_read(domain, fields),
             'can_create': can_create,
@@ -890,7 +876,7 @@ class WebsiteSlides(WebsiteProfile):
 
     @http.route(['/slides/channel/tag/group/search_read'], type='json', auth='user', methods=['POST'], website=True)
     def slide_channel_tag_group_search_read(self, fields, domain):
-        can_create = request.env['slide.channel.tag.group'].check_access_rights('create', raise_exception=False)
+        can_create = request.env['slide.channel.tag.group'].has_access('create')
         return {
             'read_results': request.env['slide.channel.tag.group'].search_read(domain, fields),
             'can_create': can_create,
@@ -907,8 +893,8 @@ class WebsiteSlides(WebsiteProfile):
                               tag group to generate and expects a second list value of the name of the
                               new tag group. This value is required for when a new tag is being created.
 
-        tag_id and group_id values are provided by a Select2. Default "None" values allow for
-        graceful failures in exceptional cases when values are not provided.
+        tag_id and group_id values are provided by a SelectMenu OWL component. Default "None" values
+        allow for graceful failures in exceptional cases when values are not provided.
 
         :return: channel's course page
         """
@@ -929,7 +915,7 @@ class WebsiteSlides(WebsiteProfile):
         tag = self._create_or_get_channel_tag(tag_id, group_id)
         tag.write({'channel_ids': [(4, channel.id, 0)]})
 
-        return {'url': "/slides/%s" % (slug(channel))}
+        return {'url': "/slides/%s" % (request.env['ir.http']._slug(channel))}
 
     @http.route(['/slides/channel/send_share_email'], type='json', auth='user', website=True)
     def slide_channel_send_share_email(self, channel_id, emails):
@@ -1062,7 +1048,7 @@ class WebsiteSlides(WebsiteProfile):
         next_slide = None
         if next_slide_id:
             next_slide = self._fetch_slide(next_slide_id).get('slide', None)
-        return request.redirect("/slides/slide/%s" % (slug(next_slide) if next_slide else slug(slide)))
+        return request.redirect("/slides/slide/%s" % (request.env['ir.http']._slug(next_slide) if next_slide else request.env['ir.http']._slug(slide)))
 
     @http.route('/slides/slide/set_completed', website=True, type="json", auth="public")
     def slide_set_completed(self, slide_id):
@@ -1082,7 +1068,7 @@ class WebsiteSlides(WebsiteProfile):
                 website=True, type='http', auth='user', handle_params_access_error=handle_wslide_error)
     def slide_set_uncompleted_and_redirect(self, slide):
         self._slide_mark_uncompleted(slide)
-        return request.redirect(f'/slides/slide/{slug(slide)}')
+        return request.redirect(f'/slides/slide/{request.env["ir.http"]._slug(slide)}')
 
     @http.route('/slides/slide/set_uncompleted', website=True, type='json', auth='public')
     def slide_set_uncompleted(self, slide_id):
@@ -1122,8 +1108,8 @@ class WebsiteSlides(WebsiteProfile):
         # hence calling format_decimalized_number
         return {
             'user_vote': slide.user_vote,
-            'likes': tools.format_decimalized_number(slide.likes),
-            'dislikes': tools.format_decimalized_number(slide.dislikes),
+            'likes': tools.misc.format_decimalized_number(slide.likes),
+            'dislikes': tools.misc.format_decimalized_number(slide.dislikes),
         }
 
     @http.route('/slides/slide/archive', type='json', auth='user', website=True)
@@ -1328,7 +1314,7 @@ class WebsiteSlides(WebsiteProfile):
     def slide_category_search_read(self, fields, domain):
         category_slide_domain = domain if domain else []
         category_slide_domain = expression.AND([category_slide_domain, [('is_category', '=', True)]])
-        can_create = request.env['slide.slide'].check_access_rights('create', raise_exception=False)
+        can_create = request.env['slide.slide'].has_access('create')
         return {
             'read_results': request.env['slide.slide'].search_read(category_slide_domain, fields),
             'can_create': can_create,
@@ -1344,7 +1330,7 @@ class WebsiteSlides(WebsiteProfile):
 
         request.env['slide.slide'].create(self._get_new_slide_category_values(channel, name))
 
-        return request.redirect("/slides/%s" % (slug(channel)))
+        return request.redirect("/slides/%s" % (request.env['ir.http']._slug(channel)))
 
     # --------------------------------------------------
     # SLIDE.UPLOAD
@@ -1477,7 +1463,7 @@ class WebsiteSlides(WebsiteProfile):
         elif slide.slide_category == 'quiz':
             redirect_url += "?quiz_quick_create"
         elif channel.channel_type == "training":
-            redirect_url = "/slides/%s" % (slug(channel))
+            redirect_url = "/slides/%s" % (request.env['ir.http']._slug(channel))
         return {
             'url': redirect_url,
             'channel_type': channel.channel_type,
@@ -1491,7 +1477,7 @@ class WebsiteSlides(WebsiteProfile):
 
     @http.route(['/slides/tag/search_read'], type='json', auth='user', methods=['POST'], website=True)
     def slide_tag_search_read(self, fields, domain):
-        can_create = request.env['slide.tag'].check_access_rights('create', raise_exception=False)
+        can_create = request.env['slide.tag'].has_access('create')
         return {
             'read_results': request.env['slide.tag'].search_read(domain, fields),
             'can_create': can_create,

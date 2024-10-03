@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { registry } from "@web/core/registry";
 import { booleanField, BooleanField } from "@web/views/fields/boolean/boolean_field";
 import { useService } from "@web/core/utils/hooks";
@@ -37,7 +35,6 @@ export class UpgradeBooleanField extends BooleanField {
 export const upgradeBooleanField = {
     ...booleanField,
     component: UpgradeBooleanField,
-    isUpgradeField: true,
     additionalClasses: [...(booleanField.additionalClasses || []), "o_field_boolean"],
 };
 

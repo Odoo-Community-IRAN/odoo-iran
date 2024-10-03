@@ -80,9 +80,6 @@ $o-theme-color-palettes: map-merge($o-theme-color-palettes,
 
 $o-theme-h1-font-size-multiplier: (62 / 16);
 $o-theme-h2-font-size-multiplier: (48 / 16);
-$o-theme-h3-font-size-multiplier: (32 / 16);
-$o-theme-h4-font-size-multiplier: (24 / 16);
-$o-theme-h5-font-size-multiplier: (20 / 16);
 $o-theme-h6-font-size-multiplier: (18 / 16);
 
 $o-theme-font-configs: (
@@ -130,6 +127,14 @@ $o-theme-font-configs: (
         'family': ('Vollkorn', serif),
         'url': 'Vollkorn:300,300i,400,400i,700,700i',
     ),
+    'Inter': (
+        'family': ('Inter', sans-serif),
+        'url': 'Inter:300,300i,400,400i,700,700i',
+    ),
+    'Oxygen': (
+        'family': ('Oxygen', sans-serif),
+        'url': 'Oxygen:300,400,700',
+    ),
 );
 
 //------------------------------------------------------------------------------
@@ -138,19 +143,18 @@ $o-theme-font-configs: (
 
 $o-website-values-palettes: (
     (
-        'color-palettes-name': 'enark-1',
+        'color-palettes-name':  'default-light-12',
         'header-font-size':     1rem,
-        'font':                 'Open Sans',
-        'headings-font':        'Bitter',
-        'navbar-font':          'Bitter',
-        'buttons-font':         'Bitter',
+        'font':                 'Inter',
+        'headings-font':        'Oxygen',
         'footer-template':      'descriptive',
-        'header-links-style':   'outline',
-        'btn-primary-outline':  true,
+        'header-links-style':   'flat',
+        'btn-primary-flat':     true,
+        'btn-secondary-flat':   true,
+        'btn-border-radius':    0,
+        'input-border-radius':  0,
     ),
 );
-
-$o-selected-color-palettes-names: append($o-selected-color-palettes-names, 'enark-1');
 
 $o-color-palettes-compatibility-indexes: (
     1: 'enark-1',

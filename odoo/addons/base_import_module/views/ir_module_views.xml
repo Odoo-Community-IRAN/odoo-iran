@@ -16,12 +16,12 @@
                 <xpath expr="//button[@name='button_immediate_install']" position="attributes">
                     <attribute name="invisible">state != 'uninstalled' or (module_type and module_type != 'official')</attribute>
                 </xpath>
-                <xpath expr="//t[@t-name='kanban-menu']/a[@type='edit']" position="attributes">
+                <xpath expr="//t[@t-name='menu']/a[@type='open']" position="attributes">
                     <attribute name="context">{'module_type': module_type, 'module_name':name}</attribute>
                     <attribute name="type">object</attribute>
                     <attribute name="name">more_info</attribute>
                 </xpath>
-                <xpath expr="//div[hasclass('oe_module_action')]/a[@type='edit']" position="attributes">
+                <xpath expr="//footer/a[@type='edit']" position="attributes">
                     <attribute name="context">{'module_type': module_type, 'module_name':name}</attribute>
                     <attribute name="type">object</attribute>
                     <attribute name="name">more_info</attribute>
@@ -33,13 +33,13 @@
             <field name="model">ir.module.module</field>
             <field name="inherit_id" ref="base.module_tree"/>
             <field name="arch" type="xml">
-                <xpath expr="//field[@name='category_id']" position="after">
-                    <field name="module_type" column_invisible="1"/>
-                    <field name="name" column_invisible="1"/>
-                </xpath>
-                <tree position="attributes">
+                <field name="installed_version" position="after">
+                    <field name="module_type" column_invisible="1"/> <!-- Needed in js_class below -->
+                    <field name="name" column_invisible="1"/> <!-- Needed in js_class below -->
+                </field>
+                <list position="attributes">
                     <attribute name="js_class">ir_module_module_tree_view</attribute>
-                </tree>
+                </list>
             </field>
         </record>
         <record model="ir.ui.view" id="module_form_apps_inherit">
@@ -47,9 +47,6 @@
             <field name="model">ir.module.module</field>
             <field name="inherit_id" ref="base.module_form"/>
             <field name="arch" type="xml">
-                <xpath expr="//field[@name='has_iap']" position="after">
-                    <field name="module_type" invisible="1"/>
-                </xpath>
                 <xpath expr="//page[@name='technical_data']" position="attributes">
                     <attribute name="invisible">module_type != 'official'</attribute>
                 </xpath>

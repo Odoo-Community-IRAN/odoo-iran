@@ -9,8 +9,8 @@ class ProjectProjectStage(models.Model):
     _description = 'Project Stage'
     _order = 'sequence, id'
 
-    active = fields.Boolean(default=True)
-    sequence = fields.Integer(default=50)
+    active = fields.Boolean(default=True, export_string_translation=False)
+    sequence = fields.Integer(default=50, export_string_translation=False)
     name = fields.Char(required=True, translate=True)
     mail_template_id = fields.Many2one('mail.template', string='Email Template', domain=[('model', '=', 'project.project')],
         help="If set, an email will be automatically sent to the customer when the project reaches this stage.")
@@ -18,11 +18,9 @@ class ProjectProjectStage(models.Model):
         help="If enabled, this stage will be displayed as folded in the Kanban view of your projects. Projects in a folded stage are considered as closed.")
     company_id = fields.Many2one('res.company', string="Company")
 
-    def copy(self, default=None):
-        default = dict(default or {})
-        if not default.get('name'):
-            default['name'] = _("%s (copy)", self.name)
-        return super().copy(default)
+    def copy_data(self, default=None):
+        vals_list = super().copy_data(default=default)
+        return [dict(vals, name=self.env._("%s (copy)", stage.name)) for stage, vals in zip(self, vals_list)]
 
     def unlink_wizard(self, stage_view=False):
         wizard = self.with_context(active_test=False).env['project.project.stage.delete.wizard'].create({

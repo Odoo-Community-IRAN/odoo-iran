@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from dateutil.relativedelta import relativedelta
@@ -108,19 +107,35 @@ class AccrualPlanLevel(models.Model):
     yearly_day = fields.Integer(default=1)
     yearly_day_display = fields.Selection(
         _get_selection_days, compute='_compute_days_display', inverse='_inverse_yearly_day_display')
-    cap_accrued_time = fields.Boolean("Cap accrued time", default=True)
+    cap_accrued_time = fields.Boolean("Cap accrued time", default=True,
+        help="When the field is checked the balance of an allocation using this accrual plan will never exceed the specified amount.")
     maximum_leave = fields.Float(
         'Limit to', digits=(16, 2), compute="_compute_maximum_leave", readonly=False, store=True,
         help="Choose a cap for this accrual.")
+    cap_accrued_time_yearly = fields.Boolean(string="Milestone cap",
+        help="When the field is checked the total amount accrued each year will be capped at the specified amount")
+    maximum_leave_yearly = fields.Float(string="Yearly limit to", digits=(16, 2))
     action_with_unused_accruals = fields.Selection(
         [('lost', 'None. Accrued time reset to 0'),
          ('all', 'All accrued time carried over'),
          ('maximum', 'Carry over with a maximum')],
         string="Carry over",
-        default='all', required=True)
+        default='all', required=True,
+        help="When the Carry-Over Time is reached, according to Plan's setting, select what you want "
+        "to happen with the unused time off: None (time will be reset to zero), All accrued time carried over to "
+        "the next period; or Carryover with a maximum).")
     postpone_max_days = fields.Integer("Maximum amount of accruals to transfer",
         help="Set a maximum of accruals an allocation keeps at the end of the year.")
     can_modify_value_type = fields.Boolean(compute="_compute_can_modify_value_type")
+    accrual_validity = fields.Boolean(string="Accrual Validity")
+    accrual_validity_count = fields.Integer(
+        "Accrual Validity Count",
+        help="You can define a period of time where the days carried over will be available", default="1")
+    accrual_validity_type = fields.Selection(
+        [('day', 'Days'),
+         ('month', 'Months')],
+        default='day', string="Accrual Validity Type", required=True,
+        help="This field defines the unit of time after which the accrual ends.")
 
     _sql_constraints = [
         ('check_dates',
@@ -132,10 +147,15 @@ class AccrualPlanLevel(models.Model):
          "(yearly_day > 0 AND yearly_day <= 31 AND frequency = 'yearly'))",
          "The dates you've set up aren't correct. Please check them."),
         ('start_count_check', "CHECK( start_count >= 0 )", "You can not start an accrual in the past."),
-        ('added_value_greater_than_zero', 'CHECK(added_value > 0)', 'You must give a rate greater than 0 in accrual plan levels.')
+        ('added_value_greater_than_zero', 'CHECK(added_value > 0)', "You must give a rate greater than 0 in accrual plan levels."),
+        (
+            'valid_yearly_cap_value',
+            'CHECK(cap_accrued_time_yearly IS NOT TRUE OR COALESCE(maximum_leave_yearly, 0) > 0)',
+            "You cannot have a cap on yearly accrued time without setting a maximum amount."
+        ),
     ]
 
-    @api.constrains('maximum_leave')
+    @api.constrains('cap_accrued_time', 'maximum_leave')
     def _check_maximum_leave(self):
         for level in self:
             if level.cap_accrued_time and level.maximum_leave < 1:

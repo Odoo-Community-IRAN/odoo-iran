@@ -25,37 +25,31 @@ Allow website visitors to chat with the collaborators. This module also brings a
         'data/website_livechat_chatbot_demo.xml',
     ],
     'assets': {
-        'im_livechat.assets_embed_core': [
-            'website_livechat/static/src/embed/common/**/*',
-        ],
         'website.assets_wysiwyg': [
             'website_livechat/static/src/scss/**/*',
         ],
         'website.assets_editor': [
             'website_livechat/static/src/js/**/*',
         ],
+        'web.assets_frontend': [
+            'website_livechat/static/src/patch/assets_frontend/website.scss',
+        ],
         'web.assets_backend': [
             'website_livechat/static/src/**/*',
-            ('remove', 'website_livechat/static/src/embed/**/*'),
             ('remove', 'website_livechat/static/src/scss/**/*'),
         ],
-        'web.assets_tests': [
-            'website_livechat/static/tests/tours/**/*',
-        ],
-        'web.tests_assets': [
-            'website_livechat/static/tests/helpers/**/*.js',
-        ],
-        'web.qunit_suite_tests': [
+        'web.assets_unit_tests': [
             'website_livechat/static/tests/**/*',
             ('remove', 'website_livechat/static/tests/embed/**/*'),
             ('remove', 'website_livechat/static/tests/tours/**/*'),
-            ('remove', 'website_livechat/static/tests/helpers/**/*.js'),
         ],
-        'im_livechat.embed_test_assets': [
-            'website_livechat/static/src/embed/**/*',
-        ],
-        'im_livechat.qunit_embed_suite': [
+        'im_livechat.embed_assets_unit_tests': [
+            'website_livechat/static/tests/mock_server/**/*',
+            'website_livechat/static/tests/website_livechat_test_helpers.js',
             'website_livechat/static/tests/embed/**/*',
+        ],
+        'web.assets_tests': [
+            'website_livechat/static/tests/tours/**/*',
         ],
     },
     'license': 'LGPL-3',

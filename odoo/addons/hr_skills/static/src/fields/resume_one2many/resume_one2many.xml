@@ -5,11 +5,17 @@
             <attribute name="t-attf-class" add="table-borderless {{ !showTable ? 'd-none' : ''}}" remove="table-striped" separator=" "/>
         </xpath>
         <xpath expr="//table" position="after">
-             <t t-if="!showTable">
-                 <button t-on-click="props.onAdd" class="btn btn-secondary ms-4 mt-3" role="button" t-if="isEditable">
+            <t t-if="!showTable">
+                <div name="no_resume_line" class="ms-3 mt-3">
+                    <p>
+                        There are no resume lines on this employee.
+                        Why not add a new one?
+                    </p>
+                </div>
+                <button t-on-click="props.onAdd" class="btn btn-secondary ms-4 mt-3" role="button" t-if="isEditable">
                     Create a new entry
-                 </button>
-             </t>
+                </button>
+            </t>
         </xpath>
         <xpath expr="//div[@name='skills_header']" position="replace"/>
         <xpath expr="//thead/tr" position="replace">
@@ -38,14 +44,14 @@
                 <div class="rounded-circle bg-info position-relative"/>
             </td>
             <td class="o_data_cell pt-0" t-on-click="(ev) => this.onCellClicked(record, null, ev)">
-                <div class="o_resume_line" t-att-data-id="id">
+                <div t-attf-class="o_resume_line {{data.display_type == 'certification' ? 'o_resume_line_display_certification' : ''}}" t-att-data-id="id">
                     <small class="o_resume_line_dates fw-bold">
-                        <t t-esc="formatDate(data.date_start)"/> -
-                        <t t-if="data.date_end and +data.date_end != +data.date_start" t-esc="formatDate(data.date_end)"/>
+                        <t t-out="formatDate(data.date_start)"/> -
+                        <t t-if="data.date_end" t-out="formatDate(data.date_end)"/>
                         <t t-else="">Current</t>
                     </small>
                     <h4 class="o_resume_line_title mt-2" t-esc="data.name"/>
-                    <p t-if="data.description" class="o_resume_line_desc" t-esc="data.description"/>
+                    <p t-if="data.description" class="o_resume_line_desc" t-out="data.description" t-ref="link-target-blank"/>
                 </div>
             </td>
         </xpath>

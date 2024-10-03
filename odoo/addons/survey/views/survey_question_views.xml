@@ -15,6 +15,7 @@
                 <field name="page_id" invisible="1" required="False"/>
                 <field name="sequence" invisible="1"/>
                 <field name="scoring_type" invisible="1"/>
+                <field name="has_image_only_suggested_answer" invisible="1"/>
                 <sheet>
                     <field name="survey_id" invisible="not context.get('show_survey_field')" readonly="1"/>
                     <div class="float-end d-flex flex-column text-center" invisible="not is_page">
@@ -109,12 +110,35 @@
                                         <div class="col-3"><i class="fa fa-circle-o fa-lg" role="img" aria-label="Not checked" title="Not checked"/></div>
                                     </div>
                                 </div>
+                                <!-- Scale -->
+                                <div invisible="question_type != 'scale'">
+                                    <span>Do you like it?</span><br/>
+                                    <div class="btn-group w-100" role="group" aria-label="Scale">
+                                        <a role="button" type="button" class="btn btn-secondary disabled o_preview_questions_choice">1</a>
+                                        <a role="button" type="button" class="btn btn-secondary disabled o_preview_questions_choice">2</a>
+                                        <a role="button" type="button" class="btn btn-secondary disabled o_preview_questions_choice">3</a>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <div>Label</div>
+                                        <div>Label</div>
+                                        <div>Label</div>
+                                    </div>
+                                </div>
                             </div>
                         </group>
                     </group>
                     <notebook>
                         <page string="Answers" name="answers" invisible="is_page or question_type == 'text_box' or scoring_type == 'no_scoring' and question_type in ['numerical_box', 'date', 'datetime']">
                             <group>
+                                <group invisible="question_type != 'scale'">
+                                    <field name="scale_min" placeholder="Scale Minimum Value (0 to 10)"/>
+                                    <field name="scale_max" placeholder="Scale Maximum Value (0 to 10)"/>
+                                </group>
+                                <group invisible="question_type != 'scale'">
+                                    <field name="scale_min_label" placeholder="Not likely at all"/>
+                                    <field name="scale_mid_label" placeholder="Neutral"/>
+                                    <field name="scale_max_label" placeholder="Extremely likely"/>
+                                </group>
                                 <group invisible="question_type not in ['char_box', 'numerical_box', 'date', 'datetime']">
                                     <field name="answer_numerical_box" string="Correct Answer" class="oe_inline"
                                         invisible="question_type != 'numerical_box'"
@@ -141,25 +165,25 @@
                                 </group>
                             </group>
                             <field name="suggested_answer_ids" context="{'default_question_id': id}" invisible="question_type not in ['simple_choice', 'multiple_choice', 'matrix']">
-                                <tree editable="bottom">
+                                <list editable="bottom">
                                     <field name="sequence" widget="handle"/>
-                                    <field name="value" string="Choices"/>
+                                    <field name="value" string="Choices" required="not value_image"/>
                                     <field name="is_correct"
                                         column_invisible="parent.scoring_type == 'no_scoring' or parent.question_type == 'matrix'"/>
                                     <field name="answer_score"
                                         column_invisible="parent.scoring_type == 'no_scoring' or parent.question_type == 'matrix'"/>
-                                    <field name="value_image_filename" column_invisible="True"/>
+                                    <field name="value_image_filename" column_invisible="not parent.has_image_only_suggested_answer"/>
                                     <field name="value_image" width="200px" filename="value_image_filename" options="{'accepted_file_extensions': 'image/*'}"
-                                        column_invisible="parent.question_type == 'matrix'"/>
-                                </tree>
+                                           column_invisible="parent.question_type in ['matrix', 'scale']" required="not value"/>
+                                </list>
                             </field>
 
                             <field name="matrix_row_ids" context="{'default_matrix_question_id': id}"
                                 invisible="question_type != 'matrix'">
-                                <tree editable="bottom">
+                                <list editable="bottom">
                                     <field name="sequence" widget="handle"/>
                                     <field name="value" string="Rows"/>
-                                </tree>
+                                </list>
                             </field>
                         </page>
                         <page string="Description" name="survey_description">
@@ -168,7 +192,7 @@
                         </page>
                         <page string="Options" name="options" invisible="is_page">
                             <group>
-                                <group string="Answers">
+                                <group string="Answers" invisible="question_type == 'scale'">
                                     <!-- Global validation setting -->
                                     <field name="validation_required"
                                            invisible="question_type not in ['char_box', 'numerical_box', 'date', 'datetime']"/>
@@ -237,12 +261,22 @@
                                         placeholder="This question requires an answer."/>
                                 </group>
                                 <group string="Live Sessions">
-                                    <label for="is_time_limited" string="Question Time Limit"/>
-                                    <div>
-                                        <field name="is_time_limited" nolabel="1"/>
+                                    <field name="is_time_customized" invisible="True"/>
+                                    <field name="session_available" invisible="True"/>
+                                    <p class="text-muted" colspan="2" invisible="session_available">
+                                        Time limits are only available for Live Sessions.
+                                    </p>
+                                    <label for="is_time_limited" string="Time Limit (seconds)" invisible="not session_available"/>
+                                    <div invisible="not session_available">
+                                        <field name="is_time_limited" nolabel="1" class="oe_inline"
+                                            widget="boolean_update_flag"
+                                            options="{'flagFieldName': 'is_time_customized'}"
+                                            context="{'referenceValue': parent.session_speed_rating}"/>
                                         <field name="time_limit" nolabel="1" class="oe_inline"
+                                            widget="integer_update_flag"
+                                            options="{'flagFieldName': 'is_time_customized'}"
+                                            context="{'referenceValue': parent.session_speed_rating_time_limit}"
                                             invisible="not is_time_limited" />
-                                        <span invisible="not is_time_limited"> seconds</span>
                                     </div>
                                 </group>
                             </group>
@@ -253,15 +287,15 @@
         </field>
     </record>
     <record model="ir.ui.view" id="survey_question_tree">
-        <field name="name">Tree view for survey question</field>
+        <field name="name">List view for survey question</field>
         <field name="model">survey.question</field>
         <field name="arch" type="xml">
-            <tree string="Survey Question" create="false">
+            <list string="Survey Question" create="false">
                 <field name="title"/>
                 <field name="survey_id"/>
                 <field name="question_type"/>
                 <field name="constr_mandatory" optional="1"/>
-            </tree>
+            </list>
         </field>
     </record>
     <record model="ir.ui.view" id="survey_question_search">
@@ -283,7 +317,7 @@
     <record model="ir.actions.act_window" id="action_survey_question_form">
         <field name="name">Questions</field>
         <field name="res_model">survey.question</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="survey_question_search"/>
         <field name="context">{'search_default_group_by_page': True, 'show_survey_field': True}</field>
         <field name="domain">[('is_page', '=', False)]</field>
@@ -298,15 +332,15 @@
 
     <!-- LABELS -->
     <record id="survey_question_answer_view_tree" model="ir.ui.view">
-        <field name="name">survey.question.answer.view.tree</field>
+        <field name="name">survey.question.answer.view.list</field>
         <field name="model">survey.question.answer</field>
         <field name="arch" type="xml">
-            <tree string="Survey Label" create="false" default_order="question_id">
+            <list string="Survey Label" create="false" default_order="question_id">
                 <field name="sequence" widget="handle"/>
                 <field name="question_id"/>
                 <field name="value" string="Answer"/>
                 <field name="answer_score" groups="base.group_no_one"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -352,7 +386,7 @@
     <record id="survey_question_answer_action" model="ir.actions.act_window">
         <field name="name">Suggested Values</field>
         <field name="res_model">survey.question.answer</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="survey_question_answer_view_search"/>
         <field name="context">{'search_default_group_by_question': True}</field>
         <field name="help" type="html">

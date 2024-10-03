@@ -1,10 +1,9 @@
-/* @odoo-module */
-
 import { Component, useState } from "@odoo/owl";
 import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
 import { FollowerSubtypeDialog } from "./follower_subtype_dialog";
 import { useVisible } from "@mail/utils/common/hooks";
+import { DropdownItem } from "@web/core/dropdown/dropdown_item";
 
 /**
  * @typedef {Object} Props
@@ -13,33 +12,35 @@ import { useVisible } from "@mail/utils/common/hooks";
  * @property {import('@mail/core/common/thread_model').Thread} thread
  * @extends {Component<Props, Env>}
  */
+
 export class FollowerList extends Component {
     static template = "mail.FollowerList";
-    static props = ["onAddFollowers?", "onFollowerChanged?", "thread"];
+    static components = { DropdownItem };
+    static props = ["onAddFollowers?", "onFollowerChanged?", "thread", "dropdown"];
 
     setup() {
+        super.setup();
         this.action = useService("action");
-        this.messaging = useState(useService("mail.messaging"));
-        this.threadService = useState(useService("mail.thread"));
-        this.loadMoreState = useVisible("load-more", () => {
-            if (this.loadMoreState.isVisible) {
-                this.threadService.loadMoreFollowers(this.props.thread);
+        this.store = useState(useService("mail.store"));
+        useVisible("load-more", (isVisible) => {
+            if (isVisible) {
+                this.props.thread.loadMoreFollowers();
             }
         });
     }
 
     onClickAddFollowers() {
-        document.body.click(); // hack to close dropdown
         const action = {
             type: "ir.actions.act_window",
             res_model: "mail.wizard.invite",
             view_mode: "form",
             views: [[false, "form"]],
-            name: _t("Invite Follower"),
+            name: _t("Add followers to this document"),
             target: "new",
             context: {
                 default_res_model: this.props.thread.model,
                 default_res_id: this.props.thread.id,
+                dialog_size: "medium",
             },
         };
         this.action.doAction(action, {
@@ -54,8 +55,8 @@ export class FollowerList extends Component {
      * @param {import("models").Follower} follower
      */
     onClickDetails(ev, follower) {
-        this.messaging.openDocument({ id: follower.partner.id, model: "res.partner" });
-        document.body.click(); // hack to close dropdown
+        this.store.openDocument({ id: follower.partner.id, model: "res.partner" });
+        this.props.dropdown.close();
     }
 
     /**
@@ -67,7 +68,7 @@ export class FollowerList extends Component {
             follower,
             onFollowerChanged: () => this.props.onFollowerChanged?.(this.props.thread),
         });
-        document.body.click(); // hack to close dropdown
+        this.props.dropdown.close();
     }
 
     /**
@@ -76,7 +77,7 @@ export class FollowerList extends Component {
      */
     async onClickRemove(ev, follower) {
         const thread = this.props.thread;
-        await this.threadService.removeFollower(follower);
+        await follower.remove();
         this.props.onFollowerChanged?.(thread);
     }
 }

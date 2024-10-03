@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { cleanTerm } from "@mail/utils/common/format";
 import { registry } from "@web/core/registry";
 
@@ -14,8 +12,8 @@ export const partnerCompareRegistry = registry.category("mail.partner_compare");
 partnerCompareRegistry.add(
     "mail.archived-last-except-odoobot",
     (p1, p2) => {
-        const p1active = p1.active || p1.eq(p1._store.odoobot);
-        const p2active = p2.active || p2.eq(p2._store.odoobot);
+        const p1active = p1.active || p1.eq(p1.store.odoobot);
+        const p2active = p2.active || p2.eq(p2.store.odoobot);
         if (!p1active && p2active) {
             return 1;
         }
@@ -29,8 +27,8 @@ partnerCompareRegistry.add(
 partnerCompareRegistry.add(
     "mail.internal-users",
     (p1, p2) => {
-        const isAInternalUser = p1.user?.isInternalUser;
-        const isBInternalUser = p2.user?.isInternalUser;
+        const isAInternalUser = p1.isInternalUser;
+        const isBInternalUser = p2.isInternalUser;
         if (isAInternalUser && !isBInternalUser) {
             return -1;
         }

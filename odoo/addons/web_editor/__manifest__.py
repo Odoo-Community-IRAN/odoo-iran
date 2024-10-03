@@ -9,7 +9,7 @@ Odoo Web Editor widget.
 ==========================
 
 """,
-    'depends': ['bus', 'web'],
+    'depends': ['bus', 'web', 'html_editor'],
     'data': [
         'security/ir.model.access.csv',
         'data/editor_assets.xml',
@@ -22,7 +22,8 @@ Odoo Web Editor widget.
         # MAIN BUNDLES
         #----------------------------------------------------------------------
 
-        'web_editor.assets_legacy_wysiwyg': [
+        'web_editor.assets_snippets_menu': [
+            'web_editor/static/src/js/core/owl_utils.js',
             'web_editor/static/src/js/editor/snippets.editor.js',
             'web_editor/static/src/js/editor/snippets.options.js',
         ],
@@ -31,18 +32,17 @@ Odoo Web Editor widget.
 
             'web/static/src/scss/pre_variables.scss',
             'web/static/lib/bootstrap/scss/_variables.scss',
+            'web/static/lib/bootstrap/scss/_variables-dark.scss',
+            'web/static/lib/bootstrap/scss/_maps.scss',
 
             'web/static/src/libs/fontawesome/css/font-awesome.css',
             'web/static/lib/odoo_ui_icons/*',
-            'web/static/lib/select2/select2.css',
-            'web/static/lib/select2-bootstrap-css/select2-bootstrap.css',
             'web/static/src/webclient/navbar/navbar.scss',
             'web/static/src/scss/animation.scss',
             'web/static/src/core/colorpicker/colorpicker.scss',
             'web/static/src/scss/mimetypes.scss',
             'web/static/src/scss/ui.scss',
             'web/static/src/legacy/scss/ui.scss',
-            'web/static/src/legacy/scss/modal.scss',
             'web/static/src/views/fields/translation_dialog.scss',
             'web/static/src/scss/fontawesome_overridden.scss',
 
@@ -52,10 +52,19 @@ Odoo Web Editor widget.
             'web/static/lib/owl/odoo_module.js',
             'web/static/lib/jquery/jquery.js',
             'web/static/lib/popper/popper.js',
+            'web/static/lib/bootstrap/js/dist/util/index.js',
             'web/static/lib/bootstrap/js/dist/dom/data.js',
             'web/static/lib/bootstrap/js/dist/dom/event-handler.js',
             'web/static/lib/bootstrap/js/dist/dom/manipulator.js',
             'web/static/lib/bootstrap/js/dist/dom/selector-engine.js',
+            'web/static/lib/bootstrap/js/dist/util/config.js',
+            'web/static/lib/bootstrap/js/dist/util/component-functions.js',
+            'web/static/lib/bootstrap/js/dist/util/backdrop.js',
+            'web/static/lib/bootstrap/js/dist/util/focustrap.js',
+            'web/static/lib/bootstrap/js/dist/util/sanitizer.js',
+            'web/static/lib/bootstrap/js/dist/util/scrollbar.js',
+            'web/static/lib/bootstrap/js/dist/util/swipe.js',
+            'web/static/lib/bootstrap/js/dist/util/template-factory.js',
             'web/static/lib/bootstrap/js/dist/base-component.js',
             'web/static/lib/bootstrap/js/dist/alert.js',
             'web/static/lib/bootstrap/js/dist/button.js',
@@ -69,10 +78,12 @@ Odoo Web Editor widget.
             'web/static/lib/bootstrap/js/dist/scrollspy.js',
             'web/static/lib/bootstrap/js/dist/tab.js',
             'web/static/lib/bootstrap/js/dist/toast.js',
-            'web/static/lib/select2/select2.js',
-            'web/static/src/legacy/js/libs/bootstrap.js',
+            'web/static/src/libs/bootstrap.js',
             'web/static/src/legacy/js/libs/jquery.js',
+            'web/static/src/core/utils/scrolling.js',
             'web/static/src/core/registry.js',
+            'web/static/src/core/templates.js',
+            'web/static/src/core/template_inheritance.js',
 
             # odoo-editor
             'web_editor/static/src/js/editor/odoo-editor/src/utils/utils.js',
@@ -91,6 +102,8 @@ Odoo Web Editor widget.
             'web_editor/static/src/scss/bootstrap_overridden.scss',
             'web/static/src/scss/pre_variables.scss',
             'web/static/lib/bootstrap/scss/_variables.scss',
+            'web/static/lib/bootstrap/scss/_variables-dark.scss',
+            'web/static/lib/bootstrap/scss/_maps.scss',
             'web_editor/static/src/js/editor/odoo-editor/src/style.scss',
 
             # integration
@@ -99,7 +112,6 @@ Odoo Web Editor widget.
             'web_editor/static/src/scss/wysiwyg_snippets.scss',
 
             'web_editor/static/src/xml/editor.xml',
-            'web_editor/static/src/xml/commands.xml',
             'web_editor/static/src/xml/grid_layout.xml',
             'web_editor/static/src/xml/snippets.xml',
             'web_editor/static/src/xml/wysiwyg.xml',
@@ -116,14 +128,8 @@ Odoo Web Editor widget.
         'web_editor.assets_wysiwyg': [
             # legacy stuff that are no longer in assets_backend
             'web/static/src/legacy/js/core/class.js',
-            'web/static/src/legacy/js/core/dialog.js',
-            'web/static/src/legacy/xml/dialog.xml',
-            'web/static/src/legacy/js/core/minimal_dom.js',
-            'web/static/src/legacy/js/core/dom.js',
-            'web/static/src/legacy/js/core/mixins.js',
-            'web/static/src/legacy/js/core/service_mixins.js',
-            'web/static/src/legacy/js/core/widget.js',
-            'web/static/src/legacy/utils.js',
+            'web/static/src/legacy/js/public/minimal_dom.js',
+            'web/static/src/legacy/js/public/public_widget.js',
 
             # lib
             'web_editor/static/lib/cropperjs/cropper.css',
@@ -131,7 +137,7 @@ Odoo Web Editor widget.
             'web_editor/static/lib/jquery-cropper/jquery-cropper.js',
             'web_editor/static/lib/jQuery.transfo.js',
             'web_editor/static/lib/webgl-image-filter/webgl-image-filter.js',
-            'web_editor/static/lib/DOMPurify.js',
+            'web/static/lib/dompurify/DOMpurify.js',
 
             # odoo-editor
             'web_editor/static/src/js/editor/odoo-editor/src/OdooEditor.js',
@@ -166,6 +172,8 @@ Odoo Web Editor widget.
             'web_editor/static/src/scss/bootstrap_overridden.scss',
             'web/static/src/scss/pre_variables.scss',
             'web/static/lib/bootstrap/scss/_variables.scss',
+            'web/static/lib/bootstrap/scss/_variables-dark.scss',
+            'web/static/lib/bootstrap/scss/_maps.scss',
             'web_editor/static/src/js/editor/odoo-editor/src/style.scss',
 
             # integration
@@ -180,14 +188,15 @@ Odoo Web Editor widget.
             # widgets & plugins
             'web_editor/static/src/js/wysiwyg/widgets/**/*',
             'web_editor/static/src/js/editor/toolbar.js',
+            'web_editor/static/src/js/editor/add_snippet_dialog.js',
 
             # Launcher
             'web_editor/static/src/js/wysiwyg/wysiwyg_jquery_extention.js',
             'web_editor/static/src/js/wysiwyg/wysiwyg.js',
             'web_editor/static/src/js/wysiwyg/wysiwyg_iframe.js',
 
+            'web_editor/static/src/xml/add_snippet_dialog.xml',
             'web_editor/static/src/xml/editor.xml',
-            'web_editor/static/src/xml/commands.xml',
             'web_editor/static/src/xml/grid_layout.xml',
             'web_editor/static/src/xml/snippets.xml',
             'web_editor/static/src/xml/wysiwyg.xml',
@@ -210,7 +219,6 @@ Odoo Web Editor widget.
 
             'web_editor/static/src/js/backend/**/*',
             'web_editor/static/src/xml/backend.xml',
-            'web_editor/static/src/components/history_dialog/**/*',
         ],
         "web.assets_web_dark": [
             'web_editor/static/src/scss/odoo-editor/powerbox.dark.scss',
@@ -223,13 +231,11 @@ Odoo Web Editor widget.
             'web_editor/static/src/js/frontend/loader_loading.js',
         ],
         'web.assets_frontend': [
-            # legacy stuff that are no longer in assets_backend
-            'web/static/src/legacy/utils.js',
-
             ('include', 'web_editor.assets_media_dialog'),
 
             'web_editor/static/src/js/editor/odoo-editor/src/base_style.scss',
             'web_editor/static/src/js/common/**/*',
+            'web_editor/static/src/js/core/owl_utils.js',
             'web_editor/static/src/js/editor/odoo-editor/src/utils/utils.js',
             'web_editor/static/src/js/wysiwyg/fonts.js',
 
@@ -267,7 +273,7 @@ Odoo Web Editor widget.
         # ----------------------------------------------------------------------
 
         'web.qunit_suite_tests': [
-            ('include', 'web_editor.assets_legacy_wysiwyg'),
+            ('include', 'web_editor.assets_snippets_menu'),
             ('include', 'web_editor.backend_assets_wysiwyg'),
 
             'web_editor/static/tests/**/*',
@@ -281,6 +287,8 @@ Odoo Web Editor widget.
             'web_editor/static/src/js/editor/odoo-editor/src/**/*js',
             'web_editor/static/src/js/editor/odoo-editor/test/spec/*js',
             'web_editor/static/src/js/editor/odoo-editor/test/*js',
+
+            'web/static/lib/dompurify/DOMpurify.js',
         ],
     },
     'auto_install': True,

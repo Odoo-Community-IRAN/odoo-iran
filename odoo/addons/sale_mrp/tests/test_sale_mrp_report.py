@@ -12,12 +12,12 @@ from odoo.tools import html2plaintext
 class TestSaleMrpInvoices(AccountTestInvoicingCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref=None):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
 
         cls.product_by_lot = cls.env['product.product'].create({
             'name': 'Product By Lot',
-            'type': 'product',
+            'is_storable': True,
             'tracking': 'lot',
         })
         cls.warehouse = cls.env['stock.warehouse'].search([('company_id', '=', cls.env.company.id)], limit=1)
@@ -25,7 +25,6 @@ class TestSaleMrpInvoices(AccountTestInvoicingCommon):
         cls.lot = cls.env['stock.lot'].create({
             'name': 'LOT0001',
             'product_id': cls.product_by_lot.id,
-            'company_id': cls.env.company.id,
         })
         cls.env['stock.quant']._update_available_quantity(cls.product_by_lot, cls.stock_location, 10, lot_id=cls.lot)
 
@@ -68,7 +67,7 @@ class TestSaleMrpInvoices(AccountTestInvoicingCommon):
 
         html = self.env['ir.actions.report']._render_qweb_html(
             'account.report_invoice_with_payments', invoice.ids)[0]
-        text = html2plaintext(html)
+        text = html2plaintext(html.decode())
         self.assertRegex(text, r'Product By Lot\n1.00Units\nLOT0001', "There should be a line that specifies 1 x LOT0001")
 
     def test_report_forecast_for_mto_procure_method(self):
@@ -80,7 +79,7 @@ class TestSaleMrpInvoices(AccountTestInvoicingCommon):
         manufacturing_route = self.env.ref('mrp.route_warehouse0_manufacture')
         product = self.env['product.product'].create({
             'name': 'SuperProduct',
-            'type': 'product',
+            'is_storable': True,
             'route_ids': [Command.set((mto_route + manufacturing_route).ids)]
         })
         warehouse = self.warehouse
@@ -117,13 +116,13 @@ class TestSaleMrpInvoices(AccountTestInvoicingCommon):
             [so_1_line['quantity'], so_1_line['move_out']['id'], so_1_line['replenishment_filled']],
             [8.0, so_1.picking_ids.move_ids.id, True]
         )
-        so_2_line = next(filter(lambda line: line.get('document_out') and line['document_out'].get('id') == so_2.id, report_lines))
+        so_2_line = next(filter(lambda line: line.get('document_out') and line['document_out'].get('id') == so_2.id and not line.get('document_in'), report_lines))
         self.assertEqual(
             [so_2_line['quantity'], so_2_line['move_out']['id'], so_2_line['replenishment_filled']],
-            [7.0, so_2.picking_ids.move_ids.id, False]
+            [2.0, so_2.picking_ids.move_ids.id, True]
         )
-        quant_line = next(filter(lambda line: not line.get('document_out'), report_lines))
+        replenisment_line = next(filter(lambda line: line.get('document_in'), report_lines))
         self.assertEqual(
-            [quant_line['document_out'], quant_line['quantity'], quant_line['replenishment_filled']],
-            [False, 2.0, True]
+            [replenisment_line['document_in']['_name'], replenisment_line['document_out']['id'], replenisment_line['quantity'], replenisment_line['move_out']['id'], replenisment_line['replenishment_filled']],
+            ["mrp.production", so_2.id, 5.0, so_2.picking_ids.move_ids.id, True]
         )

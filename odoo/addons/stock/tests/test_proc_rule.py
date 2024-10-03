@@ -3,7 +3,7 @@
 
 from datetime import date, datetime, timedelta
 
-from odoo.tests.common import Form, TransactionCase
+from odoo.tests import Form, TransactionCase
 from odoo.tools import mute_logger
 from odoo.exceptions import UserError
 
@@ -31,7 +31,7 @@ class TestProcRule(TransactionCase):
         orderpoint_form.product_max_qty = 5.1
         orderpoint_form.qty_multiple = 0.1
         orderpoint = orderpoint_form.save()
-        self.assertEqual(orderpoint.qty_to_order, orderpoint.product_max_qty)
+        self.assertAlmostEqual(orderpoint.qty_to_order, orderpoint.product_max_qty)
 
     def test_endless_loop_rules_from_location(self):
         """ Creates and configure a rule the way, when trying to get rules from
@@ -39,7 +39,7 @@ class TestProcRule(TransactionCase):
         rule but finds nothing else than itself and so get stuck in a recursion error."""
         warehouse = self.env['stock.warehouse'].search([('company_id', '=', self.env.company.id)], limit=1)
         reception_route = warehouse.reception_route_id
-        self.product.type = 'product'
+        self.product.is_storable = True
 
         # Creates a delivery for this product, that way, this product will be to resupply.
         picking_form = Form(self.env['stock.picking'])
@@ -53,22 +53,18 @@ class TestProcRule(TransactionCase):
 
         # Then, creates a rule and adds it into the route's rules.
         reception_route.rule_ids.action_archive()
+        self.env['stock.rule'].create({
+            'name': 'Looping Rule',
+            'route_id': reception_route.id,
+            'location_dest_id': warehouse.lot_stock_id.id,
+            'location_src_id': warehouse.lot_stock_id.id,
+            'action': 'pull_push',
+            'procure_method': 'make_to_order',
+            'picking_type_id': warehouse.int_type_id.id,
+        })
 
-        # Tries to create loop in rules -> It should raise an UserError.
-        # As assertRaises() creates a savepoint, resulting in a flush, the UserError would already be triggered on the
-        # 'with self.assertRaises(UserError):' line when computing qty_to_order, failing the test.
-        # To avoid this, we move both the create() and the action_open_orderpoints() inside of the assertRaises.
+        # Tries to open the Replenishment view -> It should raise an UserError.
         with self.assertRaises(UserError):
-            self.env['stock.rule'].create({
-                'name': 'Looping Rule',
-                'route_id': reception_route.id,
-                'location_dest_id': warehouse.lot_stock_id.id,
-                'location_src_id': warehouse.lot_stock_id.id,
-                'action': 'pull_push',
-                'procure_method': 'make_to_order',
-                'picking_type_id': warehouse.int_type_id.id,
-            })
-
             self.env['stock.warehouse.orderpoint'].action_open_orderpoints()
 
     def test_proc_rule(self):
@@ -83,6 +79,7 @@ class TestProcRule(TransactionCase):
                 'picking_type_id': self.ref('stock.picking_type_internal'),
                 'location_src_id': self.ref('stock.stock_location_stock'),
                 'location_dest_id': self.ref('stock.stock_location_output'),
+                'location_dest_from_rule': True,
             })],
         })
 
@@ -164,6 +161,7 @@ class TestProcRule(TransactionCase):
 
     def test_reordering_rule_1(self):
         # Required for `location_id` to be visible in the view
+        self.product.is_storable = True
         self.env.user.groups_id += self.env.ref('stock.group_stock_multi_locations')
         warehouse = self.env['stock.warehouse'].search([], limit=1)
         orderpoint_form = Form(self.env['stock.warehouse.orderpoint'])
@@ -215,12 +213,12 @@ class TestProcRule(TransactionCase):
 
         self.productA = self.env['product.product'].create({
             'name': 'Desk Combination',
-            'type': 'product',
+            'is_storable': True,
         })
 
         self.productB = self.env['product.product'].create({
             'name': 'Desk Decoration',
-            'type': 'product',
+            'is_storable': True,
         })
 
         warehouse = self.env['stock.warehouse'].search([], limit=1)
@@ -294,90 +292,40 @@ class TestProcRule(TransactionCase):
         self.assertEqual(receipt_move2.date.date(), date.today())
         self.assertEqual(receipt_move2.product_uom_qty, 10.0)
 
-    def test_fixed_procurement_01(self):
-        """ Run a procurement for 5 products when there are only 4 in stock then
-        check that MTO is applied on the moves when the rule is set to 'mts_else_mto'
-        """
-        self.partner = self.env['res.partner'].create({'name': 'Partner'})
-        warehouse = self.env['stock.warehouse'].search([('company_id', '=', self.env.user.id)], limit=1)
-        warehouse.delivery_steps = 'pick_ship'
-        final_location = self.partner.property_stock_customer
-
-        # Create a product and add 10 units in stock
-        product_a = self.env['product.product'].create({
-            'name': 'ProductA',
-            'type': 'product',
+    def test_reordering_rule_3(self):
+        """Test how qty_multiple affects qty_to_order"""
+        stock_location = self.stock_location = self.env.ref('stock.stock_location_stock')
+        self.productA = self.env['product.product'].create({
+            'name': 'Desk Combination',
+            'is_storable': True,
         })
-        self.env['stock.quant']._update_available_quantity(product_a, warehouse.lot_stock_id, 10.0)
-
-        # Create a route which will allows 'wave picking'
-        wave_pg = self.env['procurement.group'].create({'name': 'Wave PG'})
-        wave_route = self.env['stock.route'].create({
-            'name': 'Wave for ProductA',
-            'product_selectable': True,
-            'sequence': 1,
-            'rule_ids': [(0, 0, {
-                'name': 'Stock -> output rule',
-                'action': 'pull',
-                'picking_type_id': self.ref('stock.picking_type_internal'),
-                'location_src_id': self.ref('stock.stock_location_stock'),
-                'location_dest_id': self.ref('stock.stock_location_output'),
-                'group_propagation_option': 'fixed',
-                'group_id': wave_pg.id,
-            })],
+        self.env['stock.quant'].with_context(inventory_mode=True).create({
+            'product_id': self.productA.id,
+            'location_id': stock_location.id,
+            'inventory_quantity': 14.5,
+        }).action_apply_inventory()
+        orderpoint = self.env['stock.warehouse.orderpoint'].create({
+            'name': 'ProductA RR',
+            'product_id': self.productA.id,
+            'product_min_qty': 15.0,
+            'product_max_qty': 30.0,
+            'qty_multiple': 10,
         })
-
-        # Set this route on `product_a`
-        product_a.write({
-            'route_ids': [(4, wave_route.id)]
-        })
-
-        # Create a procurement for 2 units
-        pg = self.env['procurement.group'].create({'name': 'Wave 1'})
-        self.env['procurement.group'].run([
-            pg.Procurement(
-                product_a,
-                2.0,
-                product_a.uom_id,
-                final_location,
-                'wave_part_1',
-                'wave_part_1',
-                warehouse.company_id,
-                {
-                    'warehouse_id': warehouse,
-                    'group_id': pg
-                }
-            )
+        self.assertEqual(orderpoint.qty_to_order, 10.0)  # 15.0 < 14.5 + 10 <= 30.0
+        # Test search on computed field
+        rr = self.env['stock.warehouse.orderpoint'].search([
+            ('qty_to_order', '>', 0),
+            ('product_id', '=', self.productA.id),
         ])
-
-        # 2 pickings should be created: 1 for pick, 1 for ship
-        picking_pick = self.env['stock.picking'].search([('group_id', '=', wave_pg.id)])
-        picking_ship = self.env['stock.picking'].search([('group_id', '=', pg.id)])
-        self.assertAlmostEqual(picking_pick.move_ids.product_uom_qty, 2.0)
-        self.assertAlmostEqual(picking_ship.move_ids.product_uom_qty, 2.0)
-
-        # Create a procurement for 3 units
-        pg = self.env['procurement.group'].create({'name': 'Wave 2'})
-        self.env['procurement.group'].run([
-            pg.Procurement(
-                product_a,
-                3.0,
-                product_a.uom_id,
-                final_location,
-                'wave_part_2',
-                'wave_part_2',
-                warehouse.company_id,
-                {
-                    'warehouse_id': warehouse,
-                    'group_id': pg
-                }
-            )
-        ])
-
-        # The picking for the pick operation should be reused and the lines merged.
-        picking_ship = self.env['stock.picking'].search([('group_id', '=', pg.id)])
-        self.assertAlmostEqual(picking_pick.move_ids.product_uom_qty, 5.0)
-        self.assertAlmostEqual(picking_ship.move_ids.product_uom_qty, 3.0)
+        self.assertTrue(rr)
+        orderpoint.write({
+            'qty_multiple': 1,
+        })
+        self.assertEqual(orderpoint.qty_to_order, 15.0)  # 15.0 < 14.5 + 15 <= 30.0
+        orderpoint.write({
+            'qty_multiple': 0,
+        })
+        self.assertEqual(orderpoint.qty_to_order, 15.5)  # 15.0 < 14.5 + 15.5 <= 30.0
 
     def test_orderpoint_replenishment_view_1(self):
         """ Create two warehouses + two moves
@@ -402,7 +350,7 @@ class TestProcRule(TransactionCase):
         ])
         product = self.env['product.product'].create({
             'name': 'Super Product',
-            'type': 'product',
+            'is_storable': True,
             'route_ids': [route_2.id, route_3.id]
         })
         moves = self.env['stock.move'].create([{
@@ -448,7 +396,7 @@ class TestProcRule(TransactionCase):
         })
         product = self.env['product.product'].create({
             'name': 'Rep Product',
-            'type': 'product',
+            'is_storable': True,
         })
         move = self.env['stock.move'].create({
             'name': 'Move WH2',
@@ -517,7 +465,7 @@ class TestProcRule(TransactionCase):
 
     def test_replenishment_order_to_max(self):
         warehouse = self.env['stock.warehouse'].search([('company_id', '=', self.env.user.id)], limit=1)
-        self.product.detailed_type = 'product'
+        self.product.is_storable = True
         self.env['stock.quant']._update_available_quantity(self.product, warehouse.lot_stock_id, 10)
         orderpoint = self.env['stock.warehouse.orderpoint'].create({
             'name': 'ProductB RR',
@@ -543,7 +491,7 @@ class TestProcRule(TransactionCase):
             'usage': 'internal',
             'name': 'shelf1'
         })
-        product = self.env['product.product'].create({'name': 'Test Product', 'type': 'product'})
+        product = self.env['product.product'].create({'name': 'Test Product', 'is_storable': True})
         stock_move = self.env['stock.move'].create({
             'name': 'Test Move',
             'product_id': product.id,
@@ -556,6 +504,30 @@ class TestProcRule(TransactionCase):
         shelf1.active = False
         # opening the replenishment should not raise a KeyError even if the location is archived
         self.env['stock.warehouse.orderpoint'].action_open_orderpoints()
+
+    def test_compute_qty_to_order(self):
+        """
+        Check that the quantity to order is updated in the orderpoint when a new demand is created.
+        """
+        orderpoint = self.env['stock.warehouse.orderpoint'].create({
+            'name': 'auto orderpoint',
+            'product_id': self.product.id,
+            'product_min_qty': 5,
+            'product_max_qty': 5,
+            'qty_to_order': 5,
+            'trigger': 'auto',
+        })
+        self.assertEqual(orderpoint.qty_to_order, 5)
+        stock_move = self.env['stock.move'].create({
+            'name': 'Test Move',
+            'product_id': self.product.id,
+            'product_uom': self.product.uom_id.id,
+            'product_uom_qty': 1,
+            'location_id': self.ref('stock.stock_location_stock'),
+            'location_dest_id': self.ref('stock.stock_location_customers'),
+        })
+        stock_move._action_confirm()
+        self.assertEqual(orderpoint.qty_to_order, 6)
 
 
 class TestProcRuleLoad(TransactionCase):
@@ -585,7 +557,7 @@ class TestProcRuleLoad(TransactionCase):
             'name': 'shelf2'
         })
 
-        products = self.env['product.product'].create([{'name': i, 'type': 'product'} for i in range(500)])
+        products = self.env['product.product'].create([{'name': i, 'is_storable': True} for i in range(500)])
         self.env['stock.warehouse.orderpoint'].create([{
             'product_id': products[i // 2].id,
             'location_id': (i % 2 == 0) and shelf1.id or shelf2.id,

@@ -1,15 +1,20 @@
 /** @odoo-module **/
 
 import { _t } from "@web/core/l10n/translation";
-import { Component, onWillStart, onMounted, useState } from "@odoo/owl";
+import { Component, onWillStart, onMounted, useRef, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
+import { useFileUploader } from "@web/core/utils/files";
 import { useService } from "@web/core/utils/hooks";
 import { FileInput } from "@web/core/file_input/file_input";
+import { useDropzone } from "@web/core/dropzone/dropzone_hook";
 import { useImportModel } from "../import_model";
 import { ImportDataContent } from "../import_data_content/import_data_content";
 import { ImportDataProgress } from "../import_data_progress/import_data_progress";
 import { ImportDataSidepanel } from "../import_data_sidepanel/import_data_sidepanel";
 import { Layout } from "@web/search/layout";
+import { router } from "@web/core/browser/router";
+import { standardActionServiceProps } from "@web/webclient/actions/action_service";
+import { DocumentationLink } from "@web/views/widgets/documentation_link/documentation_link";
 
 export class ImportAction extends Component {
     static template = "ImportAction";
@@ -19,14 +24,13 @@ export class ImportAction extends Component {
         ImportDataContent,
         ImportDataSidepanel,
         Layout,
+        DocumentationLink,
     };
+    static props = { ...standardActionServiceProps };
 
     setup() {
         this.notification = useService("notification");
         this.orm = useService("orm");
-        this.router = useService("router");
-        this.user = useService("user");
-
         this.env.config.setDisplayName(this.props.action.name || _t("Import a File"));
         this.resModel = this.props.action.params.model;
         this.model = useImportModel({
@@ -48,13 +52,45 @@ export class ImportAction extends Component {
             previewError: "",
         });
 
+        this.uploadFiles = useFileUploader();
+        useDropzone(useRef("root"), async event => {
+            const { files } = event.dataTransfer;
+            if (files.length === 0) {
+                this.notification.add(_t("Please upload an Excel (.xls or .xlsx) or .csv file to import."), {
+                    type: "danger",
+                });
+            } else if (files.length > 1) {
+                this.notification.add(_t("Please upload a single file."), {
+                    type: "danger",
+                });
+            } else {
+                const file = files[0];
+                const isValidFile = file.name.endsWith(".csv")
+                                 || file.name.endsWith(".xls")
+                                 || file.name.endsWith(".xlsx");
+                if (!isValidFile) {
+                    this.notification.add(_t("Please upload an Excel (.xls or .xlsx) or .csv file to import."), {
+                        type: "danger",
+                    });
+                } else {
+                    await this.uploadFiles(this.uploadFilesRoute, {
+                        csrf_token: odoo.csrf_token,
+                        ufile: [file],
+                        model: this.resModel,
+                        id: this.model.id,
+                    });
+                    this.handleFilesUpload([file]);
+                }
+            }
+        });
+
         onWillStart(() => this.model.init());
         onMounted(() => this.enter());
     }
 
     enter() {
         const newState = { action: "import", model: this.resModel };
-        this.router.pushState(newState, { replace: true });
+        router.pushState(newState, { replace: true });
     }
 
     exit(resIds) {
@@ -69,6 +105,10 @@ export class ImportAction extends Component {
 
     get importTemplates() {
         return this.model.importTemplates;
+    }
+
+    get uploadFilesRoute () {
+        return "/base_import/set_file";
     }
 
     //--------------------------------------------------------------------------
@@ -198,6 +238,10 @@ export class ImportAction extends Component {
 
     isFieldSet(column) {
         return column.fieldInfo != null;
+    }
+
+    get hasBinaryFields() {
+        return this.model.columns.some((column) => column.fieldInfo?.type === "binary");
     }
 }
 

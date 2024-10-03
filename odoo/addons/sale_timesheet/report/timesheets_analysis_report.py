@@ -3,7 +3,7 @@
 
 from odoo import fields, models, api
 
-from odoo.addons.sale_timesheet.models.account import TIMESHEET_INVOICE_TYPES
+from odoo.addons.sale_timesheet.models.hr_timesheet import TIMESHEET_INVOICE_TYPES
 
 
 class TimesheetsAnalysisReport(models.Model):
@@ -13,10 +13,10 @@ class TimesheetsAnalysisReport(models.Model):
     so_line = fields.Many2one("sale.order.line", string="Sales Order Item", readonly=True)
     timesheet_invoice_type = fields.Selection(TIMESHEET_INVOICE_TYPES, string="Billable Type", readonly=True)
     timesheet_invoice_id = fields.Many2one("account.move", string="Invoice", readonly=True, help="Invoice created from the timesheet")
-    timesheet_revenues = fields.Float("Timesheet Revenues", readonly=True, help="Number of hours spent multiplied by the unit price per hour/day.")
-    margin = fields.Float("Margin", readonly=True, help="Timesheets revenues minus the costs")
-    billable_time = fields.Float("Billable Hours", readonly=True, help="Number of hours/days linked to a SOL.")
-    non_billable_time = fields.Float("Non-billable Hours", readonly=True, help="Number of hours/days not linked to a SOL.")
+    timesheet_revenues = fields.Monetary("Timesheet Revenues", currency_field="currency_id", readonly=True, help="Number of hours spent multiplied by the unit price per hour/day.")
+    margin = fields.Monetary("Margin", currency_field="currency_id", readonly=True, help="Timesheets revenues minus the costs")
+    billable_time = fields.Float("Billable Time", readonly=True, help="Number of hours/days linked to a SOL.")
+    non_billable_time = fields.Float("Non-billable Time", readonly=True, help="Number of hours/days not linked to a SOL.")
 
     @property
     def _table_query(self):

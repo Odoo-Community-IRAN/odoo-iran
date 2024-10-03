@@ -6,6 +6,11 @@ import { escape, sprintf } from "@web/core/utils/strings";
 import { _t } from "@web/core/l10n/translation";
 
 export class FullscreenIndication extends Component {
+    static props = {
+        bus: EventBus,
+    };
+    static template = "website.FullscreenIndication";
+
     setup() {
         this.state = useState({ isVisible: false });
         useBus(this.props.bus, "FULLSCREEN-INDICATION-SHOW", this.show.bind(this));
@@ -28,7 +33,3 @@ export class FullscreenIndication extends Component {
         return markup(sprintf(escape(_t("Press %(key)s to exit full screen")), {key: "<span>esc</span>"}));
     }
 }
-FullscreenIndication.props = {
-    bus: EventBus,
-};
-FullscreenIndication.template = "website.FullscreenIndication";

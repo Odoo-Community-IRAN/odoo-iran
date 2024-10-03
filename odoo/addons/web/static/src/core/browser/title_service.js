@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { registry } from "../registry";
 
 export const titleService = {
@@ -19,7 +17,7 @@ export const titleService = {
                     titleParts[key] = val;
                 }
             }
-            document.title = Object.values(titleParts).join(" - ");
+            document.title = Object.values(titleParts).join(" - ") || "Odoo";
         }
 
         return {

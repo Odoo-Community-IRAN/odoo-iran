@@ -57,8 +57,12 @@ GROUP  BY m.id
     def _read_group_select(self, aggregate_spec, query):
         if aggregate_spec == 'on_time_rate:sum':
             # Make a weigthed average instead of simple average for these fields
-            sql_expr = SQL('CASE WHEN SUM(qty_total) !=0 THEN SUM(qty_on_time) / SUM(qty_total) * 100 ELSE 100 END')
-            return sql_expr, ['on_time_rate', 'qty_on_time', 'qty_total']
+            return SQL(
+                'CASE WHEN SUM(%s) !=0 THEN SUM(%s) / SUM(%s) * 100 ELSE 100 END',
+                self._field_to_sql(self._table, 'qty_total', query),
+                self._field_to_sql(self._table, 'qty_on_time', query),
+                self._field_to_sql(self._table, 'qty_total', query),
+            )
         return super()._read_group_select(aggregate_spec, query)
 
     def _read_group(self, domain, groupby=(), aggregates=(), having=(), offset=0, limit=None, order=None):

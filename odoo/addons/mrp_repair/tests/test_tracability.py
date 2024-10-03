@@ -17,8 +17,6 @@ class TestRepairTraceability(TestMrpCommon):
         Test that removing a tracked component with a repair does not block the flow of using that component in another
         bom
         """
-        picking_type = self.env['stock.picking.type'].search([('code', '=', 'mrp_operation')])[0]
-        picking_type.use_auto_consume_components_lots = True
         product_to_repair = self.env['product.product'].create({
             'name': 'product first serial to act repair',
             'tracking': 'serial',
@@ -26,7 +24,6 @@ class TestRepairTraceability(TestMrpCommon):
         ptrepair_lot = self.env['stock.lot'].create({
             'name': 'A1',
             'product_id': product_to_repair.id,
-            'company_id': self.env.user.company_id.id
         })
         product_to_remove = self.env['product.product'].create({
             'name': 'other first serial to remove with repair',
@@ -35,7 +32,6 @@ class TestRepairTraceability(TestMrpCommon):
         ptremove_lot = self.env['stock.lot'].create({
             'name': 'B2',
             'product_id': product_to_remove.id,
-            'company_id': self.env.user.company_id.id
         })
         # Create a manufacturing order with product (with SN A1)
         mo_form = Form(self.env['mrp.production'])
@@ -77,7 +73,6 @@ class TestRepairTraceability(TestMrpCommon):
         mo2.lot_producing_id = self.env['stock.lot'].create({
             'name': 'A2',
             'product_id': product_to_repair.id,
-            'company_id': self.env.user.company_id.id
         })
         # Set component serial to B2 again, it is possible
         mo2.move_raw_ids.move_line_ids.lot_id = ptremove_lot
@@ -104,24 +99,21 @@ class TestRepairTraceability(TestMrpCommon):
             mo.button_mark_done()
             return mo
 
-        picking_type = self.env['stock.picking.type'].search([('code', '=', 'mrp_operation')])[0]
-        picking_type.use_auto_consume_components_lots = True
 
         stock_location = self.env.ref('stock.stock_location_stock')
 
         finished, component = self.env['product.product'].create([{
             'name': 'Finished Product',
-            'type': 'product',
+            'is_storable': True,
         }, {
             'name': 'SN Componentt',
-            'type': 'product',
+            'is_storable': True,
             'tracking': 'serial',
         }])
 
         sn_lot = self.env['stock.lot'].create({
             'product_id': component.id,
             'name': 'USN01',
-            'company_id': self.env.company.id,
         })
         self.env['stock.quant']._update_available_quantity(component, stock_location, 1, lot_id=sn_lot)
 
@@ -195,10 +187,10 @@ class TestRepairTraceability(TestMrpCommon):
         """
         finished, component = self.env['product.product'].create([{
             'name': 'Finished Product',
-            'type': 'product',
+            'is_storable': True,
         }, {
             'name': 'SN Componentt',
-            'type': 'product',
+            'is_storable': True,
             'tracking': 'serial',
         }])
 
@@ -273,7 +265,7 @@ class TestRepairTraceability(TestMrpCommon):
         finished = self.bom_4.product_id
         component = self.bom_4.bom_line_ids.product_id
         component.write({
-            'type': 'product',
+            'is_storable': True,
             'tracking': 'serial',
         })
 
@@ -340,18 +332,3 @@ class TestRepairTraceability(TestMrpCommon):
         self.assertRecordValues(mo.move_raw_ids.move_line_ids, [
             {'product_id': component.id, 'lot_id': sn_lot.id, 'quantity': 1.0, 'state': 'done'},
         ])
-
-    def test_repair_with_consumable_kit(self):
-        """Test that a consumable kit can be repaired."""
-        self.assertEqual(self.bom_2.type, 'phantom')
-        kit_product = self.bom_2.product_id
-        kit_product.type = 'consu'
-        self.assertEqual(kit_product.type, 'consu')
-        ro = self.env['repair.order'].create({
-            'product_id': kit_product.id,
-            'picking_type_id': self.warehouse_1.repair_type_id.id,
-        })
-        ro.action_validate()
-        ro.action_repair_start()
-        ro.action_repair_end()
-        self.assertEqual(ro.state, 'done')

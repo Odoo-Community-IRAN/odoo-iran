@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo import api, fields, models, tools, SUPERUSER_ID
@@ -22,24 +21,29 @@ class LeaveReportCalendar(models.Model):
     job_id = fields.Many2one('hr.job', readonly=True)
     company_id = fields.Many2one('res.company', readonly=True)
     state = fields.Selection([
-        ('draft', 'To Submit'),
-        ('cancel', 'Cancelled'),  # YTI This state seems to be unused. To remove
+        ('cancel', 'Cancelled'),
         ('confirm', 'To Approve'),
         ('refuse', 'Refused'),
         ('validate1', 'Second Approval'),
         ('validate', 'Approved')
     ], readonly=True)
+    description = fields.Char("Description", readonly=True, groups='hr_holidays.group_hr_holidays_user')
+    holiday_status_id = fields.Many2one('hr.leave.type', readonly=True, string="Time Off Type")
 
     is_hatched = fields.Boolean('Hatched', readonly=True)
     is_striked = fields.Boolean('Striked', readonly=True)
 
     is_absent = fields.Boolean(related='employee_id.is_absent')
+    leave_manager_id = fields.Many2one(related='employee_id.leave_manager_id')
+    leave_id = fields.Many2one(comodel_name='hr.leave', readonly=True)
+    is_manager = fields.Boolean("Manager", compute="_compute_is_manager")
 
     def init(self):
         tools.drop_view_if_exists(self._cr, 'hr_leave_report_calendar')
         self._cr.execute("""CREATE OR REPLACE VIEW hr_leave_report_calendar AS
-        (SELECT 
+        (SELECT
             hl.id AS id,
+            hl.id AS leave_id,
             CONCAT(em.name, ': ', hl.duration_display) AS name,
             hl.date_from AS start_datetime,
             hl.date_to AS stop_datetime,
@@ -47,10 +51,13 @@ class LeaveReportCalendar(models.Model):
             hl.state AS state,
             hl.department_id AS department_id,
             hl.number_of_days as duration,
+            hl.private_name AS description,
+            hl.holiday_status_id AS holiday_status_id,
             em.company_id AS company_id,
             em.job_id AS job_id,
             COALESCE(
-                CASE WHEN hl.holiday_type = 'employee' THEN COALESCE(rr.tz, rc.tz) END,
+                rr.tz,
+                rc.tz,
                 cc.tz,
                 'UTC'
             ) AS tz,
@@ -67,9 +74,8 @@ class LeaveReportCalendar(models.Model):
                 ON co.id = em.company_id
             LEFT JOIN resource_calendar cc
                 ON cc.id = co.resource_calendar_id
-        WHERE 
-            hl.state IN ('confirm', 'validate', 'validate1')
-            AND hl.active IS TRUE
+        WHERE
+            hl.state IN ('confirm', 'validate', 'validate1', 'refuse')
         );
         """)
 
@@ -85,3 +91,17 @@ class LeaveReportCalendar(models.Model):
     @api.model
     def get_unusual_days(self, date_from, date_to=None):
         return self.env.user.employee_id._get_unusual_days(date_from, date_to)
+
+    @api.depends('leave_manager_id')
+    def _compute_is_manager(self):
+        for leave in self:
+            leave.is_manager = self.env.user.has_group('hr_holidays.group_hr_holidays_user') or leave.leave_manager_id == self.env.user
+
+    def action_approve(self):
+        self.leave_id.action_approve(check_state=False)
+
+    def action_validate(self):
+        self.leave_id.action_validate()
+
+    def action_refuse(self):
+        self.leave_id.action_refuse()

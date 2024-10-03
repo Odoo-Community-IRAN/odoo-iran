@@ -23,8 +23,8 @@ class PurchaseOrderGroup(models.Model):
 class PurchaseOrder(models.Model):
     _inherit = 'purchase.order'
 
-    requisition_id = fields.Many2one('purchase.requisition', string='Blanket Order', copy=False)
-    is_quantity_copy = fields.Selection(related='requisition_id.is_quantity_copy', readonly=False)
+    requisition_id = fields.Many2one('purchase.requisition', string='Agreement', copy=False)
+    requisition_type = fields.Selection(related='requisition_id.requisition_type')
 
     purchase_group_id = fields.Many2one('purchase.order.group')
     alternative_po_ids = fields.One2many(
@@ -39,7 +39,8 @@ class PurchaseOrder(models.Model):
     @api.depends('purchase_group_id')
     def _compute_has_alternatives(self):
         self.has_alternatives = False
-        self.filtered(lambda po: po.purchase_group_id).has_alternatives = True
+        if self.env.user.has_group('purchase_requisition.group_purchase_alternatives'):
+            self.filtered(lambda po: po.purchase_group_id).has_alternatives = True
 
     @api.onchange('requisition_id')
     def _onchange_requisition_id(self):
@@ -69,10 +70,10 @@ class PurchaseOrder(models.Model):
             else:
                 self.origin = requisition.name
         self.notes = requisition.description
-        self.date_order = fields.Datetime.now()
-
-        if requisition.type_id.line_copy != 'copy':
-            return
+        if requisition.date_start:
+            self.date_order = max(fields.Datetime.now(), fields.Datetime.to_datetime(requisition.date_start))
+        else:
+            self.date_order = fields.Datetime.now()
 
         # Create PO lines if necessary
         order_lines = []
@@ -97,7 +98,7 @@ class PurchaseOrder(models.Model):
                 product_qty = line.product_qty
                 price_unit = line.price_unit
 
-            if requisition.type_id.quantity_copy != 'copy':
+            if requisition.requisition_type != 'purchase_template':
                 product_qty = 0
 
             # Create PO line
@@ -122,14 +123,6 @@ class PurchaseOrder(models.Model):
                     'context': dict(self.env.context, default_alternative_po_ids=alternative_po_ids.ids, default_po_ids=self.ids),
                 }
         res = super(PurchaseOrder, self).button_confirm()
-        for po in self:
-            if not po.requisition_id:
-                continue
-            if po.requisition_id.type_id.exclusive == 'exclusive':
-                others_po = po.requisition_id.mapped('purchase_ids').filtered(lambda r: r.id != po.id)
-                others_po.button_cancel()
-                if po.state not in ['draft', 'sent', 'to approve']:
-                    po.requisition_id.action_done()
         return res
 
     @api.model_create_multi
@@ -217,12 +210,8 @@ class PurchaseOrder(models.Model):
         product_to_best_price_unit = defaultdict(lambda: self.env['purchase.order.line'])
         po_alternatives = self | self.alternative_po_ids
 
-        multiple_currencies = False
-        if len(po_alternatives.currency_id) > 1:
-            multiple_currencies = True
-
         for line in po_alternatives.order_line:
-            if not line.product_qty or not line.price_subtotal or line.state in ['cancel', 'purchase', 'done']:
+            if not line.product_qty or not line.price_total_cc or line.state in ['cancel', 'purchase', 'done']:
                 continue
 
             # if no best price line => no best price unit line either
@@ -230,15 +219,10 @@ class PurchaseOrder(models.Model):
                 product_to_best_price_line[line.product_id] = line
                 product_to_best_price_unit[line.product_id] = line
             else:
-                price_subtotal = line.price_subtotal
-                price_unit = line.price_unit
-                current_price_subtotal = product_to_best_price_line[line.product_id][0].price_subtotal
-                current_price_unit = product_to_best_price_unit[line.product_id][0].price_unit
-                if multiple_currencies:
-                    price_subtotal /= line.order_id.currency_rate
-                    price_unit /= line.order_id.currency_rate
-                    current_price_subtotal /= product_to_best_price_line[line.product_id][0].order_id.currency_rate
-                    current_price_unit /= product_to_best_price_unit[line.product_id][0].order_id.currency_rate
+                price_subtotal = line.price_total_cc
+                price_unit = line.price_total_cc / line.product_qty
+                current_price_subtotal = product_to_best_price_line[line.product_id][0].price_total_cc
+                current_price_unit = product_to_best_price_unit[line.product_id][0].price_total_cc / product_to_best_price_unit[line.product_id][0].product_qty
 
                 if current_price_subtotal > price_subtotal:
                     product_to_best_price_line[line.product_id] = line
@@ -265,9 +249,26 @@ class PurchaseOrder(models.Model):
             best_price_unit_ids.update(lines.ids)
         return list(best_price_ids), list(best_date_ids), list(best_price_unit_ids)
 
+    def _prepare_grouped_data(self, rfq):
+        match_fields = super()._prepare_grouped_data(rfq)
+        return match_fields + (rfq.requisition_id.id,)
+
+    def _merge_alternative_po(self, rfqs):
+        if self.alternative_po_ids:
+            super()._merge_alternative_po(rfqs)
+            self.alternative_po_ids += rfqs.mapped('alternative_po_ids')
+
 
 class PurchaseOrderLine(models.Model):
     _inherit = 'purchase.order.line'
+
+    price_total_cc = fields.Monetary(compute='_compute_price_total_cc', string="Company Subtotal", currency_field="company_currency_id", store=True)
+    company_currency_id = fields.Many2one(related="company_id.currency_id", string="Company Currency")
+
+    @api.depends('price_subtotal', 'order_id.currency_rate')
+    def _compute_price_total_cc(self):
+        for line in self:
+            line.price_total_cc = line.price_subtotal / line.order_id.currency_rate
 
     def _compute_price_unit_and_date_planned_and_name(self):
         po_lines_without_requisition = self.env['purchase.order.line']

@@ -37,7 +37,7 @@ This module provides the core of the Odoo Web Client.
         # 3) an arbitrary name, relevant to the content of the bundle.
         #
         # Examples:
-        #   > web_editor.assets_legacy_wysiwyg = assets needed by components defined in the "web_editor" module.
+        #   > web_editor.assets_snippets_menu = assets needed by components defined in the "web_editor" module.
 
         'web.assets_emoji': [
             'web/static/src/core/emoji_picker/emoji_data.js'
@@ -47,6 +47,8 @@ This module provides the core of the Odoo Web Client.
             ('include', 'web._assets_backend_helpers'),
             'web/static/src/scss/pre_variables.scss',
             'web/static/lib/bootstrap/scss/_variables.scss',
+            'web/static/lib/bootstrap/scss/_variables-dark.scss',
+            'web/static/lib/bootstrap/scss/_maps.scss',
             ('include', 'web._assets_bootstrap_backend'),
 
             ('include', 'web._assets_core'),
@@ -63,12 +65,20 @@ This module provides the core of the Odoo Web Client.
 
             'web/static/src/polyfills/clipboard.js',
 
-            'web/static/lib/jquery/jquery.js',
             'web/static/lib/popper/popper.js',
+            'web/static/lib/bootstrap/js/dist/util/index.js',
             'web/static/lib/bootstrap/js/dist/dom/data.js',
             'web/static/lib/bootstrap/js/dist/dom/event-handler.js',
             'web/static/lib/bootstrap/js/dist/dom/manipulator.js',
             'web/static/lib/bootstrap/js/dist/dom/selector-engine.js',
+            'web/static/lib/bootstrap/js/dist/util/config.js',
+            'web/static/lib/bootstrap/js/dist/util/component-functions.js',
+            'web/static/lib/bootstrap/js/dist/util/backdrop.js',
+            'web/static/lib/bootstrap/js/dist/util/focustrap.js',
+            'web/static/lib/bootstrap/js/dist/util/sanitizer.js',
+            'web/static/lib/bootstrap/js/dist/util/scrollbar.js',
+            'web/static/lib/bootstrap/js/dist/util/swipe.js',
+            'web/static/lib/bootstrap/js/dist/util/template-factory.js',
             'web/static/lib/bootstrap/js/dist/base-component.js',
             'web/static/lib/bootstrap/js/dist/alert.js',
             'web/static/lib/bootstrap/js/dist/button.js',
@@ -82,8 +92,9 @@ This module provides the core of the Odoo Web Client.
             'web/static/lib/bootstrap/js/dist/scrollspy.js',
             'web/static/lib/bootstrap/js/dist/tab.js',
             'web/static/lib/bootstrap/js/dist/toast.js',
-            'web/static/src/legacy/js/libs/bootstrap.js',
-            'web/static/src/legacy/js/libs/jquery.js',
+            'web/static/src/libs/bootstrap.js',
+
+            'web/static/lib/dompurify/DOMpurify.js',
 
             'base/static/src/css/modules.css',
 
@@ -92,6 +103,9 @@ This module provides the core of the Odoo Web Client.
             'web/static/src/search/**/*',
             'web/static/src/webclient/icons.scss', # variables required in list_controller.scss
             'web/static/src/views/**/*',
+            ('remove', 'web/static/src/views/graph/**'),
+            ('remove', 'web/static/src/views/pivot/**'),
+
             'web/static/src/webclient/**/*',
             ('remove', 'web/static/src/webclient/clickbot/clickbot.js'), # lazy loaded
             ('remove', 'web/static/src/views/form/button_box/*.scss'),
@@ -113,9 +127,22 @@ This module provides the core of the Odoo Web Client.
             # Form style should be computed before
             'web/static/src/views/form/button_box/*.scss',
 
-            'web/static/src/legacy/xml/base.xml',
             # Don't include dark mode files in light mode
             ('remove', 'web/static/src/**/*.dark.scss'),
+        ],
+        'web.assets_backend_lazy': [
+            ('include', 'web._assets_helpers'),
+            ('include', 'web._assets_backend_helpers'),
+            'web/static/src/scss/pre_variables.scss',
+            'web/static/lib/bootstrap/scss/_variables.scss',
+            'web/static/lib/bootstrap/scss/_variables-dark.scss',
+            'web/static/lib/bootstrap/scss/_maps.scss',
+
+            'web/static/src/views/graph/**',
+            'web/static/src/views/pivot/**',
+        ],
+        'web.assets_backend_lazy_dark': [
+            ('include', 'web.assets_backend_lazy'),
         ],
         'web.assets_web': [
             ('include', 'web.assets_backend'),
@@ -128,7 +155,8 @@ This module provides the core of the Odoo Web Client.
             'web/static/src/module_loader.js',
             'web/static/src/session.js',
             'web/static/src/core/browser/cookie.js',
-            'web/static/src/legacy/js/core/minimal_dom.js',
+            'web/static/src/core/utils/ui.js',
+            'web/static/src/legacy/js/public/minimal_dom.js',
             'web/static/src/legacy/js/public/lazyloader.js',
         ],
         'web.assets_frontend': [
@@ -143,14 +171,14 @@ This module provides the core of the Odoo Web Client.
 
             'web/static/src/scss/pre_variables.scss',
             'web/static/lib/bootstrap/scss/_variables.scss',
+            'web/static/lib/bootstrap/scss/_variables-dark.scss',
+            'web/static/lib/bootstrap/scss/_maps.scss',
             'web/static/lib/luxon/luxon.js',
 
             ('include', 'web._assets_bootstrap_frontend'),
 
             'web/static/src/libs/fontawesome/css/font-awesome.css',
             'web/static/lib/odoo_ui_icons/*',
-            'web/static/lib/select2/select2.css',
-            'web/static/lib/select2-bootstrap-css/select2-bootstrap.css',
             'web/static/src/webclient/navbar/navbar.scss',
             'web/static/src/scss/animation.scss',
             'web/static/src/scss/base_frontend.scss',
@@ -161,9 +189,6 @@ This module provides the core of the Odoo Web Client.
             'web/static/src/views/fields/signature/signature_field.scss',
 
             'web/static/src/legacy/scss/ui.scss',
-            'web/static/src/legacy/scss/modal.scss',
-
-            'web/static/src/legacy/scss/lazyloader.scss',
 
             ('include', 'web.assets_frontend_minimal'),
 
@@ -171,10 +196,19 @@ This module provides the core of the Odoo Web Client.
             'web/static/lib/owl/odoo_module.js',
             'web/static/lib/jquery/jquery.js',
             'web/static/lib/popper/popper.js',
+            'web/static/lib/bootstrap/js/dist/util/index.js',
             'web/static/lib/bootstrap/js/dist/dom/data.js',
             'web/static/lib/bootstrap/js/dist/dom/event-handler.js',
             'web/static/lib/bootstrap/js/dist/dom/manipulator.js',
             'web/static/lib/bootstrap/js/dist/dom/selector-engine.js',
+            'web/static/lib/bootstrap/js/dist/util/config.js',
+            'web/static/lib/bootstrap/js/dist/util/component-functions.js',
+            'web/static/lib/bootstrap/js/dist/util/backdrop.js',
+            'web/static/lib/bootstrap/js/dist/util/focustrap.js',
+            'web/static/lib/bootstrap/js/dist/util/sanitizer.js',
+            'web/static/lib/bootstrap/js/dist/util/scrollbar.js',
+            'web/static/lib/bootstrap/js/dist/util/swipe.js',
+            'web/static/lib/bootstrap/js/dist/util/template-factory.js',
             'web/static/lib/bootstrap/js/dist/base-component.js',
             'web/static/lib/bootstrap/js/dist/alert.js',
             'web/static/lib/bootstrap/js/dist/button.js',
@@ -188,20 +222,13 @@ This module provides the core of the Odoo Web Client.
             'web/static/lib/bootstrap/js/dist/scrollspy.js',
             'web/static/lib/bootstrap/js/dist/tab.js',
             'web/static/lib/bootstrap/js/dist/toast.js',
-            'web/static/lib/select2/select2.js',
-            'web/static/src/legacy/js/libs/bootstrap.js',
+            'web/static/src/libs/bootstrap.js',
             'web/static/src/legacy/js/libs/jquery.js',
             'web/static/src/legacy/js/core/class.js',
-            'web/static/src/legacy/js/core/dialog.js',
-            'web/static/src/legacy/xml/dialog.xml',
-            'web/static/src/legacy/js/core/dom.js',
-            'web/static/src/legacy/js/core/mixins.js',
-            'web/static/src/legacy/js/core/service_mixins.js',
-            'web/static/src/legacy/js/core/widget.js',
 
             'web/static/src/env.js',
             'web/static/src/core/utils/transitions.scss',  # included early because used by other files
-            'web/static/src/core/**/*',
+            'web/static/src/core/**/*',  # Note that 'web/static/src/core/utils/ui.js' is included in assets_frontend_minimal already
             ('remove', 'web/static/src/core/commands/**/*'),
             ('remove', 'web/static/src/core/debug/debug_menu.js'),
             ('remove', 'web/static/src/core/file_viewer/file_viewer.dark.scss'),
@@ -225,30 +252,45 @@ This module provides the core of the Odoo Web Client.
             ('remove', 'web/static/src/module_loader.js'),
             ('remove', 'web/static/src/session.js'),
             ('remove', 'web/static/src/core/browser/cookie.js'),
-            ('remove', 'web/static/src/legacy/js/core/minimal_dom.js'),
+            ('remove', 'web/static/src/core/utils/ui.js'),
+            ('remove', 'web/static/src/legacy/js/public/minimal_dom.js'),
             ('remove', 'web/static/src/legacy/js/public/lazyloader.js'),
         ],
-        # Optional Bundle for PDFJS lib
-        # Since PDFJS is quite huge (80000≈ lines), please only load it when it is necessary.
-        # For now, it is only use to display the PDF slide Viewer during an embed.
-        # Bundlized, the size is reduced to 5300≈ lines.
-        'web.pdf_js_lib': [
-            'web/static/lib/pdfjs/build/pdf.js',
-            'web/static/lib/pdfjs/build/pdf.worker.js',
-        ],
         'web.report_assets_common': [
-            ('include', 'web._assets_helpers'),
+            # Include some helpers early to define $enable-rfs before
+            # _mixin file and use primary_variables in bs_overridden_report
+            'web/static/src/scss/functions.scss',
+            'web/static/src/scss/utils.scss',
+            ('include', 'web._assets_primary_variables'),
+            ('include', 'web._assets_secondary_variables'),
 
             'web/static/src/webclient/actions/reports/bootstrap_overridden_report.scss',
+            ('include', 'web._assets_helpers'),
+            ('include', 'web._assets_backend_helpers'),
             'web/static/src/scss/pre_variables.scss',
             'web/static/lib/bootstrap/scss/_variables.scss',
+            'web/static/lib/bootstrap/scss/_variables-dark.scss',
+            'web/static/lib/bootstrap/scss/_maps.scss',
 
             ('include', 'web._assets_bootstrap_backend'),
+            ('remove', 'web/static/src/scss/utilities_custom_backend.scss'),
+            ('remove', 'web/static/src/scss/bootstrap_review_backend.scss'),
+            ('after', 'web/static/src/scss/utilities_custom.scss', 'web/static/src/webclient/actions/reports/utilities_custom_report.scss'),
 
+            'web/static/lib/popper/popper.js',
+            'web/static/lib/bootstrap/js/dist/util/index.js',
             'web/static/lib/bootstrap/js/dist/dom/data.js',
             'web/static/lib/bootstrap/js/dist/dom/event-handler.js',
             'web/static/lib/bootstrap/js/dist/dom/manipulator.js',
             'web/static/lib/bootstrap/js/dist/dom/selector-engine.js',
+            'web/static/lib/bootstrap/js/dist/util/config.js',
+            'web/static/lib/bootstrap/js/dist/util/component-functions.js',
+            'web/static/lib/bootstrap/js/dist/util/backdrop.js',
+            'web/static/lib/bootstrap/js/dist/util/focustrap.js',
+            'web/static/lib/bootstrap/js/dist/util/sanitizer.js',
+            'web/static/lib/bootstrap/js/dist/util/scrollbar.js',
+            'web/static/lib/bootstrap/js/dist/util/swipe.js',
+            'web/static/lib/bootstrap/js/dist/util/template-factory.js',
             'web/static/lib/bootstrap/js/dist/base-component.js',
             'web/static/lib/bootstrap/js/dist/alert.js',
             'web/static/lib/bootstrap/js/dist/button.js',
@@ -269,11 +311,10 @@ This module provides the core of the Odoo Web Client.
             'web/static/lib/odoo_ui_icons/*',
             'web/static/fonts/fonts.scss',
 
+            'web/static/src/webclient/actions/reports/bootstrap_review_report.scss',
             'web/static/src/webclient/actions/reports/report.scss',
-            'web/static/src/webclient/actions/reports/layout_assets/layout_standard.scss',
-            'web/static/src/webclient/actions/reports/layout_assets/layout_background.scss',
-            'web/static/src/webclient/actions/reports/layout_assets/layout_boxed.scss',
-            'web/static/src/webclient/actions/reports/layout_assets/layout_clean.scss',
+            'web/static/src/webclient/actions/reports/report_tables.scss',
+            'web/static/src/webclient/actions/reports/layout_assets/layout_*.scss',
             'web/static/asset_styles_company_report.scss',
         ],
         'web.report_assets_pdf': [
@@ -282,13 +323,23 @@ This module provides the core of the Odoo Web Client.
 
         'web.ace_lib': [
             "web/static/lib/ace/ace.js",
-            "web/static/lib/ace/mode-js.js",
-            "web/static/lib/ace/javascript_highlight_rules.js",
+            "web/static/lib/ace/mode-javascript.js",
             "web/static/lib/ace/mode-xml.js",
             "web/static/lib/ace/mode-qweb.js",
             "web/static/lib/ace/mode-python.js",
             "web/static/lib/ace/mode-scss.js",
             "web/static/lib/ace/theme-monokai.js",
+        ],
+
+        # ---------------------------------------------------------------------
+        # "DIRECT PRINT" BUNDLE
+        # ---------------------------------------------------------------------
+        "web.assets_web_print": [
+            'web/static/src/scss/functions.scss',
+            'web/static/src/scss/primary_variables_print.scss',
+
+            'web/static/src/**/*.print_variables.scss',
+            ('include', 'web.assets_backend'),
         ],
 
         # ---------------------------------------------------------------------
@@ -342,9 +393,12 @@ This module provides the core of the Odoo Web Client.
             ('include', 'web._assets_primary_variables'),
             ('include', 'web._assets_secondary_variables'),
         ],
+        'web._assets_jquery': [
+            'web/static/lib/jquery/jquery.js',
+            'web/static/src/legacy/js/libs/jquery.js',
+        ],
         'web._assets_bootstrap': [
             'web/static/src/scss/import_bootstrap.scss',
-            'web/static/src/scss/helpers_backport.scss',
             'web/static/src/scss/utilities_custom.scss',
             'web/static/lib/bootstrap/scss/utilities/_api.scss',
             'web/static/src/scss/bootstrap_review.scss',
@@ -371,86 +425,112 @@ This module provides the core of the Odoo Web Client.
         # ---------------------------------------------------------------------
 
         'web.assets_tests': [
-            # No tours are defined in web, but the bundle "assets_tests" is
-            # first called in web.
-            'web/static/tests/helpers/cleanup.js',
-            'web/static/tests/helpers/utils.js',
-            'web/static/tests/utils.js',
+            # the bundle "assets_tests" is first called in web.
+            'web/static/tests/legacy/helpers/cleanup.js',
+            'web/static/tests/legacy/helpers/utils.js',
+            'web/static/tests/legacy/utils.js',
+            'web/static/tests/tours/**/*'
         ],
         'web.__assets_tests_call__': [
-            'web/static/tests/ignore_missing_deps_start.js',
+            'web/static/tests/legacy/ignore_missing_deps_start.js',
             ('include', 'web.assets_tests'),
-            'web/static/tests/ignore_missing_deps_stop.js',
+            'web/static/tests/legacy/ignore_missing_deps_stop.js',
+        ],
+        # Assets for test framework and setup
+        'web.assets_unit_tests_setup': [
+            'web/static/src/module_loader.js',
+
+            'web/static/lib/owl/owl.js',
+            'web/static/lib/owl/odoo_module.js',
+
+            'web/static/lib/jquery/jquery.js',
+
+            'web/static/lib/hoot/**/*',
+            'web/static/lib/hoot-dom/**/*',
+            ('remove', 'web/static/lib/hoot/ui/hoot_style.css'),
+            ('remove', 'web/static/lib/hoot/tests/**/*'),
+
+            # Odoo mocks
+            # ! must be loaded before other @web assets
+            'web/static/tests/_framework/mock_module_loader.js',
+
+            # Assets for features to test (views, services, fields, ...)
+            # Typically includes most files in 'web.web.assets_backend'
+            ('include', 'web.assets_backend'),
+            ('include', 'web.assets_backend_lazy'),
+
+            'web/static/src/public/public_component_service.js',
+            'web/static/src/webclient/clickbot/clickbot.js',
+        ],
+        # Unit test files
+        'web.assets_unit_tests': [
+            'web/static/tests/**/*',
+
+            ('remove', 'web/static/tests/_framework/mock_module_loader.js'),
+            ('remove', 'web/static/tests/tours/**/*'),
+            ('remove', 'web/static/tests/legacy/**/*'), # to remove when all legacy tests are ported
         ],
         'web.tests_assets': [
             ('include', 'web.assets_backend'),
+            ('include', 'web.assets_backend_lazy'),
 
             'web/static/src/public/public_component_service.js',
-            'web/static/tests/patch_translations.js',
+            'web/static/tests/legacy/patch_translations.js',
             'web/static/lib/qunit/qunit-2.9.1.css',
             'web/static/lib/qunit/qunit-2.9.1.js',
-            'web/static/tests/legacy/helpers/**/*',
-            ('remove', 'web/static/tests/legacy/helpers/test_utils_tests.js'),
+            'web/static/tests/legacy/legacy_tests/helpers/**/*',
+            ('remove', 'web/static/tests/legacy/legacy_tests/helpers/test_utils_tests.js'),
 
-            'web/static/lib/fullcalendar/core/main.css',
-            'web/static/lib/fullcalendar/daygrid/main.css',
-            'web/static/lib/fullcalendar/timegrid/main.css',
-            'web/static/lib/fullcalendar/list/main.css',
-            'web/static/lib/fullcalendar/core/main.js',
-            'web/static/lib/fullcalendar/interaction/main.js',
-            'web/static/lib/fullcalendar/daygrid/main.js',
-            'web/static/lib/fullcalendar/timegrid/main.js',
-            'web/static/lib/fullcalendar/list/main.js',
-            'web/static/lib/fullcalendar/luxon/main.js',
+            'web/static/lib/jquery/jquery.js',
+
+            'web/static/lib/fullcalendar/core/index.global.js',
+            'web/static/lib/fullcalendar/interaction/index.global.js',
+            'web/static/lib/fullcalendar/daygrid/index.global.js',
+            'web/static/lib/fullcalendar/timegrid/index.global.js',
+            'web/static/lib/fullcalendar/list/index.global.js',
+            'web/static/lib/fullcalendar/luxon3/index.global.js',
 
             'web/static/lib/zxing-library/zxing-library.js',
 
             'web/static/lib/ace/ace.js',
-            'web/static/lib/ace/javascript_highlight_rules.js',
             'web/static/lib/ace/mode-python.js',
             'web/static/lib/ace/mode-xml.js',
-            'web/static/lib/ace/mode-js.js',
+            'web/static/lib/ace/mode-javascript.js',
             'web/static/lib/ace/mode-qweb.js',
             'web/static/lib/ace/theme-monokai.js',
             'web/static/lib/stacktracejs/stacktrace.js',
             ('include', "web.chartjs_lib"),
-            'web/static/lib/jSignature/jSignatureCustom.js',
-            'web/static/src/libs/jSignatureCustom.js',
+            'web/static/lib/signature_pad/signature_pad.umd.js',
 
-            'web/static/tests/helpers/**/*.js',
-            'web/static/tests/views/helpers.js',
-            'web/static/tests/search/helpers.js',
-            'web/static/tests/views/calendar/helpers.js',
-            'web/static/tests/webclient/**/helpers.js',
-            'web/static/tests/qunit.js',
-            'web/static/tests/main.js',
-            'web/static/tests/mock_server_tests.js',
-            'web/static/tests/setup.js',
-            'web/static/tests/utils.js',
+            'web/static/tests/legacy/helpers/**/*.js',
+            'web/static/tests/legacy/views/helpers.js',
+            'web/static/tests/legacy/search/helpers.js',
+            'web/static/tests/legacy/views/calendar/helpers.js',
+            'web/static/tests/legacy/webclient/**/helpers.js',
+            'web/static/tests/legacy/qunit.js',
+            'web/static/tests/legacy/main.js',
+            'web/static/tests/legacy/mock_server_tests.js',
+            'web/static/tests/legacy/setup.js',
+            'web/static/tests/legacy/utils.js',
             'web/static/src/webclient/clickbot/clickbot.js',
         ],
         'web.qunit_suite_tests': [
-            'web/static/tests/env_tests.js',
-            'web/static/tests/dependencies_tests.js',
-            'web/static/tests/reactivity_tests.js',
-            'web/static/tests/core/**/*.js',
-            'web/static/tests/l10n/**/*.js',
-            'web/static/tests/search/**/*.js',
-            'web/static/tests/model/**/*.js',
-            ('remove', 'web/static/tests/search/helpers.js'),
-            'web/static/tests/views/**/*.js',
-            ('remove', 'web/static/tests/views/helpers.js'),
-            ('remove', 'web/static/tests/views/calendar/helpers.js'),
-            'web/static/tests/webclient/**/*.js',
-            ('remove', 'web/static/tests/webclient/**/helpers.js'),
-            'web/static/tests/public/**/*.js',
+            'web/static/tests/legacy/core/**/*.js',
+            'web/static/tests/legacy/search/**/*.js',
+            ('remove', 'web/static/tests/legacy/search/helpers.js'),
+            'web/static/tests/legacy/views/**/*.js',
+            ('remove', 'web/static/tests/legacy/views/helpers.js'),
+            ('remove', 'web/static/tests/legacy/views/calendar/helpers.js'),
+            'web/static/tests/legacy/webclient/**/*.js',
+            ('remove', 'web/static/tests/legacy/webclient/**/helpers.js'),
+            'web/static/tests/legacy/public/**/*.js',
 
             # Legacy
-            'web/static/tests/legacy/**/*.js',
-            ('remove', 'web/static/tests/legacy/helpers/**/*.js'),
+            'web/static/tests/legacy/legacy_tests/**/*.js',
+            ('remove', 'web/static/tests/legacy/legacy_tests/helpers/**/*.js'),
         ],
         'web.qunit_mobile_suite_tests': [
-            'web/static/tests/mobile/**/*.js',
+            'web/static/tests/legacy/mobile/**/*.js',
         ],
         'web.assets_clickbot': [
             'web/static/src/webclient/clickbot/clickbot.js',
@@ -458,7 +538,16 @@ This module provides the core of the Odoo Web Client.
         "web.chartjs_lib" : [
             '/web/static/lib/Chart/Chart.js',
             '/web/static/lib/chartjs-adapter-luxon/chartjs-adapter-luxon.js',
-        ]
+        ],
+        "web.fullcalendar_lib" : [
+            '/web/static/lib/fullcalendar/core/index.global.js',
+            '/web/static/lib/fullcalendar/core/locales-all.global.js',
+            '/web/static/lib/fullcalendar/interaction/index.global.js',
+            '/web/static/lib/fullcalendar/daygrid/index.global.js',
+            '/web/static/lib/fullcalendar/luxon3/index.global.js',
+            '/web/static/lib/fullcalendar/timegrid/index.global.js',
+            '/web/static/lib/fullcalendar/list/index.global.js',
+        ],
     },
     'bootstrap': True,  # load translations for login screen,
     'license': 'LGPL-3',

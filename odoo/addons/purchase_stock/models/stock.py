@@ -1,5 +1,6 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
+
+from collections import defaultdict
 
 from odoo import api, fields, models, _
 from odoo.osv.expression import AND
@@ -12,6 +13,31 @@ class StockPicking(models.Model):
         'purchase.order', related='move_ids.purchase_line_id.order_id',
         string="Purchase Orders", readonly=True)
 
+    days_to_arrive = fields.Datetime(compute='_compute_effective_date', search="_search_days_to_arrive", copy=False)
+    delay_pass = fields.Datetime(compute='_compute_date_order', search="_search_delay_pass", index=True, copy=False)
+
+    @api.depends('state', 'location_dest_id.usage', 'date_done')
+    def _compute_effective_date(self):
+        for picking in self:
+            if picking.state == 'done' and picking.location_dest_id.usage != 'supplier' and picking.date_done:
+                picking.days_to_arrive = picking.date_done
+            else:
+                picking.days_to_arrive = False
+
+    def _compute_date_order(self):
+        for picking in self:
+            picking.delay_pass = picking.purchase_id.date_order if picking.purchase_id else fields.Datetime.now()
+
+    @api.model
+    def _search_days_to_arrive(self, operator, value):
+        date_value = fields.Datetime.from_string(value)
+        return [('date_done', operator, date_value)]
+
+    @api.model
+    def _search_delay_pass(self, operator, value):
+        date_value = fields.Datetime.from_string(value)
+        return [('purchase_id.date_order', operator, date_value)]
+
 
 class StockWarehouse(models.Model):
     _inherit = 'stock.warehouse'
@@ -22,7 +48,7 @@ class StockWarehouse(models.Model):
 
     def _generate_global_route_rules_values(self):
         rules = super()._generate_global_route_rules_values()
-        location_id = self.in_type_id.default_location_dest_id
+        location_id = self.lot_stock_id
         rules.update({
             'buy_pull_id': {
                 'depends': ['reception_steps', 'buy_to_resupply'],
@@ -55,6 +81,13 @@ class StockWarehouse(models.Model):
             result[warehouse.id].update(warehouse._get_receive_rules_dict())
         return result
 
+    def _get_receive_rules_dict(self):
+        rules = super()._get_receive_rules_dict()
+        customer_loc, __ = self._get_partner_locations()
+        # Sets the right order for new warehouses: buy then push.
+        rules['crossdock'].insert(0, self.Routing(self.env['stock.location'], customer_loc, self.in_type_id, 'buy'))
+        return rules
+
     def _get_routes_values(self):
         routes = super(StockWarehouse, self)._get_routes_values()
         routes.update(self._get_receive_routes_values('buy_to_resupply'))
@@ -73,17 +106,16 @@ class ReturnPicking(models.TransientModel):
     _inherit = "stock.return.picking"
 
     def _prepare_move_default_values(self, return_line, new_picking):
-        vals = super(ReturnPicking, self)._prepare_move_default_values(return_line, new_picking)
+        vals = super()._prepare_move_default_values(return_line, new_picking)
         if self.location_id.usage == "supplier":
             vals['purchase_line_id'], vals['partner_id'] = return_line.move_id._get_purchase_line_and_partner_from_chain()
         return vals
 
-    def _create_returns(self):
-        new_picking_id, picking_type_id = super()._create_returns()
-        picking = self.env['stock.picking'].browse(new_picking_id)
+    def _create_return(self):
+        picking = super()._create_return()
         if len(picking.move_ids.partner_id) == 1:
             picking.partner_id = picking.move_ids.partner_id
-        return new_picking_id, picking_type_id
+        return picking
 
 
 class Orderpoint(models.Model):
@@ -91,20 +123,16 @@ class Orderpoint(models.Model):
 
     show_supplier = fields.Boolean('Show supplier column', compute='_compute_show_suppplier')
     supplier_id = fields.Many2one(
-        'product.supplierinfo', string='Product Supplier', check_company=True,
+        'product.supplierinfo', string='Supplier', check_company=True,
         domain="['|', ('product_id', '=', product_id), '&', ('product_id', '=', False), ('product_tmpl_id', '=', product_tmpl_id)]")
     vendor_id = fields.Many2one(related='supplier_id.partner_id', string="Vendor", store=True)
     purchase_visibility_days = fields.Float(default=0.0, help="Visibility Days applied on the purchase routes.")
+    product_supplier_id = fields.Many2one('res.partner', compute='_compute_product_supplier_id', store=True, string='Product Supplier')
 
     @api.depends('product_id.purchase_order_line_ids.product_qty', 'product_id.purchase_order_line_ids.state')
     def _compute_qty(self):
         """ Extend to add more depends values """
         return super()._compute_qty()
-
-    @api.depends('product_id.purchase_order_line_ids.product_qty', 'product_id.purchase_order_line_ids.state')
-    def _compute_qty_to_order(self):
-        """ Extend to add more depends values """
-        return super()._compute_qty_to_order()
 
     @api.depends('supplier_id')
     def _compute_lead_days(self):
@@ -116,6 +144,11 @@ class Orderpoint(models.Model):
             if 'buy' in orderpoint.rule_ids.mapped('action'):
                 orderpoint.visibility_days = orderpoint.purchase_visibility_days
         return res
+
+    @api.depends('product_tmpl_id', 'product_tmpl_id.seller_ids', 'product_tmpl_id.seller_ids.sequence', 'product_tmpl_id.seller_ids.partner_id')
+    def _compute_product_supplier_id(self):
+        for orderpoint in self:
+            orderpoint.product_supplier_id = orderpoint.product_tmpl_id.seller_ids.sorted('sequence')[:1].partner_id.id
 
     def _set_visibility_days(self):
         res = super()._set_visibility_days()
@@ -167,7 +200,6 @@ class Orderpoint(models.Model):
             domain = AND([domain, [('write_date', '>=', self.env.context.get('written_after'))]])
         order = self.env['purchase.order.line'].search(domain, limit=1).order_id
         if order:
-            action = self.env.ref('purchase.action_rfq_form')
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
@@ -176,7 +208,7 @@ class Orderpoint(models.Model):
                     'message': '%s',
                     'links': [{
                         'label': order.display_name,
-                        'url': f'#action={action.id}&id={order.id}&model=purchase.order',
+                        'url': f'/odoo/action-purchase.action_rfq_form/{order.id}',
                     }],
                     'sticky': False,
                     'next': {'type': 'ir.actions.act_window_close'},
@@ -220,14 +252,13 @@ class StockLot(models.Model):
 
     @api.depends('name')
     def _compute_purchase_order_ids(self):
+        purchase_orders = defaultdict(lambda: self.env['purchase.order'])
+        for move_line in self.env['stock.move.line'].search([('lot_id', 'in', self.ids), ('state', '=', 'done')]):
+            move = move_line.move_id
+            if move.picking_id.location_id.usage in ('supplier', 'transit') and move.purchase_line_id.order_id:
+                purchase_orders[move_line.lot_id.id] |= move.purchase_line_id.order_id
         for lot in self:
-            stock_moves = self.env['stock.move.line'].search([
-                ('lot_id', '=', lot.id),
-                ('state', '=', 'done')
-            ]).mapped('move_id')
-            stock_moves = stock_moves.search([('id', 'in', stock_moves.ids)]).filtered(
-                lambda move: move.picking_id.location_id.usage == 'supplier' and move.state == 'done')
-            lot.purchase_order_ids = stock_moves.mapped('purchase_line_id.order_id')
+            lot.purchase_order_ids = purchase_orders[lot.id]
             lot.purchase_order_count = len(lot.purchase_order_ids)
 
     def action_view_po(self):
@@ -240,6 +271,8 @@ class StockLot(models.Model):
 
 class ProcurementGroup(models.Model):
     _inherit = 'procurement.group'
+
+    purchase_line_ids = fields.One2many('purchase.order.line', 'group_id', string='Linked Purchase Order Lines', copy=False)
 
     @api.model
     def run(self, procurements, raise_user_error=True):

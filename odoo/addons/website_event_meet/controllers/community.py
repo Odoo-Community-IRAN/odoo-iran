@@ -6,7 +6,6 @@ from werkzeug.exceptions import Forbidden, NotFound
 
 from odoo import exceptions, http
 from odoo.http import request
-from odoo.addons.http_routing.models.ir_http import slug
 from odoo.addons.website_event.controllers.community import EventCommunityController
 from odoo.osv import expression
 
@@ -74,7 +73,7 @@ class WebsiteEventMeetController(EventCommunityController):
     @http.route("/event/<model('event.event'):event>/meeting_room_create",
                 type="http", auth="public", methods=["POST"], website=True)
     def create_meeting_room(self, event, **post):
-        if not event or (not event.is_published and not request.env.user.user_has_groups('base.group_user')) or not event.meeting_room_allow_creation:
+        if not event or (not event.is_published and not request.env.user._is_internal()) or not event.meeting_room_allow_creation:
             raise Forbidden()
 
         name = post.get("name")
@@ -101,7 +100,7 @@ class WebsiteEventMeetController(EventCommunityController):
         })
         _logger.info("New meeting room (%s) created by %s (uid %s)" % (name, request.httprequest.remote_addr, request.env.uid))
 
-        return request.redirect(f"/event/{slug(event)}/meeting_room/{slug(meeting_room)}")
+        return request.redirect(f"/event/{request.env['ir.http']._slug(event)}/meeting_room/{request.env['ir.http']._slug(meeting_room)}")
 
     @http.route(["/event/active_langs"], type="json", auth="public")
     def active_langs(self):
@@ -122,9 +121,7 @@ class WebsiteEventMeetController(EventCommunityController):
         if meeting_room not in event.sudo().meeting_room_ids:
             raise NotFound()
 
-        try:
-            meeting_room.check_access_rule('read')
-        except exceptions.AccessError:
+        if not meeting_room.has_access('read'):
             raise Forbidden()
 
         meeting_room = meeting_room.sudo()

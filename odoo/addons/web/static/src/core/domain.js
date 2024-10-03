@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { shallowEqual } from "@web/core/utils/arrays";
 import { evaluate, formatAST, parseExpr } from "./py_js/py";
 import { toPyValue } from "./py_js/py_utils";
@@ -392,6 +390,9 @@ function matchCondition(record, condition) {
                 return false;
             }
             return new RegExp(escapeRegExp(value).replace(/%/g, ".*"), "i").test(fieldValue);
+        case "any":
+        case "not_any":
+            return true;
     }
     throw new InvalidDomainError("could not match domain");
 }

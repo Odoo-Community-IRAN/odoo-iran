@@ -239,7 +239,7 @@ class TestPortalFormatPerformance(FullBaseMailPerformance):
     def test_portal_message_format_norating(self):
         messages_all = self.messages_all.with_user(self.env.user)
 
-        with self.assertQueryCount(employee=31):
+        with self.assertQueryCount(employee=13):
             # res = messages_all.portal_message_format(options=None)
             res = messages_all.portal_message_format(options={'rating_include': False})
 
@@ -271,10 +271,11 @@ class TestPortalFormatPerformance(FullBaseMailPerformance):
                     }
                 ]
             )
-            self.assertEqual(format_res['author_id'], (record.customer_id.id, record.customer_id.display_name))
+            self.assertEqual(format_res["author"]["id"], record.customer_id.id)
+            self.assertEqual(format_res["author"]["name"], record.customer_id.display_name)
             self.assertEqual(format_res['author_avatar_url'], f'/web/image/mail.message/{message.id}/author_avatar/50x50')
             self.assertEqual(format_res['date'], datetime(2023, 5, 15, 10, 30, 5))
-            self.assertEqual(format_res['published_date_str'], 'May 15, 2023, 10:30:05 AM')
+            self.assertEqual(' '.join(format_res['published_date_str'].split()), 'May 15, 2023, 10:30:05 AM')
             self.assertEqual(format_res['id'], message.id)
             self.assertFalse(format_res['is_internal'])
             self.assertFalse(format_res['is_message_subtype_note'])
@@ -290,7 +291,7 @@ class TestPortalFormatPerformance(FullBaseMailPerformance):
     def test_portal_message_format_rating(self):
         messages_all = self.messages_all.with_user(self.env.user)
 
-        with self.assertQueryCount(employee=45):
+        with self.assertQueryCount(employee=27):
             res = messages_all.portal_message_format(options={'rating_include': True})
 
         self.assertEqual(len(res), len(messages_all))
@@ -298,7 +299,7 @@ class TestPortalFormatPerformance(FullBaseMailPerformance):
             self.assertEqual(format_res['rating']['publisher_avatar'], f'/web/image/res.partner/{self.partner_admin.id}/avatar_128/50x50')
             self.assertEqual(format_res['rating']['publisher_comment'], 'Comment')
             self.assertEqual(format_res['rating']['publisher_id'], self.partner_admin.id)
-            self.assertEqual(format_res['rating']['publisher_datetime'], 'May 13, 2023, 10:30:05 AM')
+            self.assertEqual(" ".join(format_res['rating']['publisher_datetime'].split()), 'May 13, 2023, 10:30:05 AM')
             self.assertEqual(format_res['rating']['publisher_name'], self.partner_admin.display_name)
             self.assertDictEqual(
                 format_res['rating_stats'],
@@ -312,7 +313,7 @@ class TestPortalFormatPerformance(FullBaseMailPerformance):
     def test_portal_message_format_monorecord(self):
         message = self.messages_all[0].with_user(self.env.user)
 
-        with self.assertQueryCount(employee=18):
+        with self.assertQueryCount(employee=19):
             res = message.portal_message_format(options={'rating_include': True})
 
         self.assertEqual(len(res), 1)

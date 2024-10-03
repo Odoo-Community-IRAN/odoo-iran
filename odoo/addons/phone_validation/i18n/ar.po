@@ -3,15 +3,15 @@
 # 	* phone_validation
 # 
 # Translators:
-# Wil Odoo, 2023
+# Wil Odoo, 2024
 # Malaz Abuidris <msea@odoo.com>, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:56+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
+"POT-Creation-Date: 2024-09-26 08:57+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
 "Last-Translator: Malaz Abuidris <msea@odoo.com>, 2024\n"
 "Language-Team: Arabic (https://app.transifex.com/odoo/teams/41243/ar/)\n"
 "MIME-Version: 1.0\n"
@@ -23,10 +23,8 @@ msgstr ""
 #. module: phone_validation
 #. odoo-python
 #: code:addons/phone_validation/models/phone_blacklist.py:0
-#: code:addons/phone_validation/models/phone_blacklist.py:0
-#, python-format
-msgid " Please correct the number and try again."
-msgstr "يرجى تصحيح الرقم والمحاولة من جديد. "
+msgid "%(error)s Please correct the number and try again."
+msgstr ""
 
 #. module: phone_validation
 #: model:ir.model.fields,field_description:phone_validation.field_mail_thread_phone__message_needaction
@@ -53,8 +51,7 @@ msgstr "مؤرشف"
 #. module: phone_validation
 #. odoo-python
 #: code:addons/phone_validation/models/phone_blacklist.py:0
-#, python-format
-msgid "Are you sure you want to unblacklist this Phone Number?"
+msgid "Are you sure you want to unblacklist this phone number?"
 msgstr "هل أنت متأكد من أنك ترغب في إزالة رقم الهاتف هذا من القائمة السوداء؟ "
 
 #. module: phone_validation
@@ -103,18 +100,12 @@ msgstr ""
 #. module: phone_validation
 #. odoo-python
 #: code:addons/phone_validation/models/res_users.py:0
-#, python-format
 msgid ""
 "Blocked by deletion of portal account %(portal_user_name)s by %(user_name)s "
 "(#%(user_id)s)"
 msgstr ""
 "تم الحجب عن طريق حذف حساب البوابة %(portal_user_name)s من قِبَل "
 "%(user_name)s (#%(user_id)s) "
-
-#. module: phone_validation
-#: model_terms:ir.ui.view,arch_db:phone_validation.phone_blacklist_remove_view_form
-msgid "Confirm"
-msgstr "تأكيد"
 
 #. module: phone_validation
 #: model:ir.model,name:phone_validation.model_res_partner
@@ -201,30 +192,24 @@ msgstr ""
 #. module: phone_validation
 #. odoo-python
 #: code:addons/phone_validation/tools/phone_validation.py:0
-#, python-format
 msgid "Impossible number %s: not a valid country prefix."
 msgstr "الرقم مستحيل %s: ليس بادئة صحيحة للدولة. "
 
 #. module: phone_validation
 #. odoo-python
 #: code:addons/phone_validation/tools/phone_validation.py:0
-#, python-format
 msgid "Impossible number %s: not enough digits."
 msgstr "الرقم مستحيل %s: لا توجد أرقام كافية. "
 
 #. module: phone_validation
 #. odoo-python
 #: code:addons/phone_validation/tools/phone_validation.py:0
-#, python-format
 msgid "Impossible number %s: probably invalid number of digits."
 msgstr "الرقم المستحيل %s: على الأغلب عدد غير صحيح من الأرقام. "
 
 #. module: phone_validation
 #. odoo-python
 #: code:addons/phone_validation/tools/phone_validation.py:0
-#: code:addons/phone_validation/tools/phone_validation.py:0
-#: code:addons/phone_validation/tools/phone_validation.py:0
-#, python-format
 msgid "Impossible number %s: too many digits."
 msgstr "الرقم مستحيل %s: الرقم طويل جداً. "
 
@@ -253,15 +238,12 @@ msgstr ""
 #. module: phone_validation
 #. odoo-python
 #: code:addons/phone_validation/tools/phone_validation.py:0
-#, python-format
 msgid "Invalid number %s: probably incorrect prefix."
 msgstr "رقم غير صالح %s: يحتوي غالباً على بادئة خاطئة. "
 
 #. module: phone_validation
 #. odoo-python
 #: code:addons/phone_validation/models/mail_thread_phone.py:0
-#: code:addons/phone_validation/models/mail_thread_phone.py:0
-#, python-format
 msgid "Invalid primary phone field on model %s"
 msgstr "حقل رقم الهاتف الأساسي غير صالح في النموذج %s "
 
@@ -298,7 +280,6 @@ msgstr "الرسائل"
 #. module: phone_validation
 #. odoo-python
 #: code:addons/phone_validation/models/mail_thread_phone.py:0
-#, python-format
 msgid "Missing definition of phone fields."
 msgstr "تعريف حقول الهاتف غير موجود. "
 
@@ -374,7 +355,6 @@ msgstr "الهاتف/الهاتف المتحرك "
 #. module: phone_validation
 #. odoo-python
 #: code:addons/phone_validation/models/mail_thread_phone.py:0
-#, python-format
 msgid ""
 "Please enter at least 3 characters when searching a Phone/Mobile number."
 msgstr "يرجى إدخال آخر 3 خانات عند البحث عن رقم هاتف/رقم هاتف محمول. "
@@ -387,6 +367,7 @@ msgstr "السبب"
 
 #. module: phone_validation
 #: model:ir.model,name:phone_validation.model_phone_blacklist_remove
+#: model_terms:ir.ui.view,arch_db:phone_validation.phone_blacklist_remove_view_form
 msgid "Remove phone from blacklist"
 msgstr "إزالة رقم الهاتف من القائمة السوداء "
 
@@ -398,7 +379,6 @@ msgstr "رقم هاتف سليم "
 #. module: phone_validation
 #. odoo-python
 #: code:addons/phone_validation/tools/phone_validation.py:0
-#, python-format
 msgid "Unable to parse %(phone)s: %(error)s"
 msgstr "تعذر تحليل %(phone)s: %(error)s "
 
@@ -410,7 +390,6 @@ msgstr "إزالة من القائمة السوداء "
 #. module: phone_validation
 #. odoo-python
 #: code:addons/phone_validation/wizard/phone_blacklist_remove.py:0
-#, python-format
 msgid "Unblock Reason: %(reason)s"
 msgstr "سبب إلغاء الحظر: %(reason)s"
 
@@ -418,6 +397,11 @@ msgstr "سبب إلغاء الحظر: %(reason)s"
 #: model:ir.model,name:phone_validation.model_res_users
 msgid "User"
 msgstr "المستخدم"
+
+#. module: phone_validation
+#: model_terms:ir.ui.view,arch_db:phone_validation.phone_blacklist_remove_view_form
+msgid "e.g \"Asked to receive our next newsletters\""
+msgstr "مثال: \"طلب استلام النشرة الإخبارية التالية\" "
 
 #. module: phone_validation
 #: model_terms:ir.ui.view,arch_db:phone_validation.phone_blacklist_remove_view_form

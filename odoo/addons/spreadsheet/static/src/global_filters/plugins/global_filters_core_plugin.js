@@ -1,51 +1,27 @@
-/** @odoo-module */
-
-/**
- * @typedef {"fixedPeriod"|"relative"|"from_to"} RangeType
- *
- * @typedef {"last_month" | "last_week" | "last_year" | "last_three_years" | "this_month" | "this_quarter" | "this_year"} RelativePeriod
- * @typedef {"quarter" | "month"} FixedPeriods
- *
- * @typedef {Object} FieldMatching
- * @property {string} chain name of the field
- * @property {string} type type of the field
- * @property {number} [offset] offset to apply to the field (for date filters)
- *
- * @typedef TextGlobalFilter
- * @property {"text"} type
- * @property {string} id
- * @property {string} label
- * @property {object} [rangeOfAllowedValues]
- * @property {string} [defaultValue]
- *
- * @typedef DateGlobalFilter
- * @property {"date"} type
- * @property {string} id
- * @property {string} label
- * @property {RangeType} rangeType
- * @property {RelativePeriod} [defaultValue]
- * @property {FixedPeriods[]} [disabledPeriods]
- *
- *
- * @typedef RelationalGlobalFilter
- * @property {"relation"} type
- * @property {string} id
- * @property {string} label
- * @property {string} modelName
- * @property {"current_user" | number[]} [defaultValue]
- *
- * @typedef {TextGlobalFilter | DateGlobalFilter | RelationalGlobalFilter} GlobalFilter
- */
+/** @ts-check */
 
 export const globalFiltersFieldMatchers = {};
 
-import * as spreadsheet from "@odoo/o-spreadsheet";
 import { CommandResult } from "@spreadsheet/o_spreadsheet/cancelled_reason";
 import { checkFilterValueIsValid } from "@spreadsheet/global_filters/helpers";
 import { _t } from "@web/core/l10n/translation";
 import { escapeRegExp } from "@web/core/utils/strings";
+import { OdooCorePlugin } from "@spreadsheet/plugins";
 
-export class GlobalFiltersCorePlugin extends spreadsheet.CorePlugin {
+/**
+ * @typedef {import("@spreadsheet").GlobalFilter} GlobalFilter
+ * @typedef {import("@spreadsheet").CmdGlobalFilter} CmdGlobalFilter
+ * @typedef {import("@spreadsheet").FieldMatching} FieldMatching
+ */
+
+export class GlobalFiltersCorePlugin extends OdooCorePlugin {
+    static getters = /** @type {const} */ ([
+        "getGlobalFilter",
+        "getGlobalFilters",
+        "getGlobalFilterDefaultValue",
+        "getGlobalFilterLabel",
+        "getFieldMatchingForModel",
+    ]);
     constructor(config) {
         super(config);
         /** @type {Array.<GlobalFilter>} */
@@ -207,6 +183,8 @@ export class GlobalFiltersCorePlugin extends spreadsheet.CorePlugin {
     /**
      * Returns the field matching for a given model by copying the matchings of another DataSource that
      * share the same model, including only the chain and type.
+     *
+     * @returns {Record<string, FieldMatching> | {}}
      */
     getFieldMatchingForModel(newModel) {
         const globalFilters = this.getGlobalFilters();
@@ -242,15 +220,16 @@ export class GlobalFiltersCorePlugin extends spreadsheet.CorePlugin {
     /**
      * Edit a global filter
      *
-     * @param {GlobalFilter} newFilter
+     * @param {CmdGlobalFilter} cmdFilter
      */
-    _editGlobalFilter(newFilter) {
-        newFilter = { ...newFilter };
-        if (newFilter.type === "text" && newFilter.rangeOfAllowedValues) {
-            newFilter.rangeOfAllowedValues = this.getters.getRangeFromRangeData(
-                newFilter.rangeOfAllowedValues
-            );
-        }
+    _editGlobalFilter(cmdFilter) {
+        const rangeOfAllowedValues =
+            cmdFilter.type === "text" && cmdFilter.rangeOfAllowedValues
+                ? this.getters.getRangeFromRangeData(cmdFilter.rangeOfAllowedValues)
+                : undefined;
+        /** @type {GlobalFilter} */
+        const newFilter =
+            cmdFilter.type === "text" ? { ...cmdFilter, rangeOfAllowedValues } : { ...cmdFilter };
         const id = newFilter.id;
         const currentLabel = this.getGlobalFilter(id).label;
         const index = this.globalFilters.findIndex((filter) => filter.id === id);
@@ -295,13 +274,15 @@ export class GlobalFiltersCorePlugin extends spreadsheet.CorePlugin {
      */
     export(data) {
         data.globalFilters = this.globalFilters.map((filter) => {
-            filter = { ...filter };
+            /** @type {Object} */
+            const filterData = { ...filter };
             if (filter.type === "text" && filter.rangeOfAllowedValues) {
-                filter.rangeOfAllowedValues = this.getters.getRangeString(
-                    filter.rangeOfAllowedValues
+                filterData.rangeOfAllowedValues = this.getters.getRangeString(
+                    filter.rangeOfAllowedValues,
+                    "" // force the range string to be fully qualified (with the sheet name)
                 );
             }
-            return filter;
+            return filterData;
         });
     }
 
@@ -367,11 +348,3 @@ export class GlobalFiltersCorePlugin extends spreadsheet.CorePlugin {
         this.history.update("globalFilters", filters);
     }
 }
-
-GlobalFiltersCorePlugin.getters = [
-    "getGlobalFilter",
-    "getGlobalFilters",
-    "getGlobalFilterDefaultValue",
-    "getGlobalFilterLabel",
-    "getFieldMatchingForModel",
-];

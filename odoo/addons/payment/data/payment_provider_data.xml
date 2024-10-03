@@ -301,6 +301,8 @@
                          ref('payment.payment_method_netbanking'),
                          ref('payment.payment_method_upi'),
                          ref('payment.payment_method_wallets_india'),
+                         ref('payment.payment_method_paylater_india'),
+                         ref('payment.payment_method_emi_india'),
                      ])]"
         />
     </record>
@@ -316,30 +318,6 @@
            eval="[Command.set([
                      ref('payment.payment_method_sepa_direct_debit'),
                  ])]"
-        />
-    </record>
-
-    <record id="payment_provider_sips" model="payment.provider">
-        <field name="name">Sips</field>
-        <field name="image_128" type="base64" file="payment_sips/static/description/icon.png"/>
-        <field name="module_id" ref="base.module_payment_sips"/>
-        <!-- See http://sips.worldline.com/en-us/home/features/payment-types-and-acquirers.html -->
-        <field name="payment_method_ids"
-               eval="[Command.set([
-                         ref('payment.payment_method_card'),
-                         ref('payment.payment_method_ideal'),
-                         ref('payment.payment_method_sofort'),
-                         ref('payment.payment_method_giropay'),
-                         ref('payment.payment_method_kbc_cbc'),
-                         ref('payment.payment_method_paypal'),
-                         ref('payment.payment_method_samsung_pay'),
-                         ref('payment.payment_method_bancontact'),
-                         ref('payment.payment_method_lyfpay'),
-                         ref('payment.payment_method_lydia'),
-                         ref('payment.payment_method_floa_bank'),
-                         ref('payment.payment_method_cofidis'),
-                         ref('payment.payment_method_frafinance'),
-                     ])]"
         />
     </record>
 
@@ -392,6 +370,33 @@
         <field name="sequence">30</field>
         <field name="image_128" type="base64" file="payment_custom/static/description/icon.png"/>
         <field name="module_id" ref="base.module_payment_custom"/>
+    </record>
+
+    <record id="payment_provider_worldline" model="payment.provider">
+        <field name="name">Worldline</field>
+        <field name="image_128" type="base64" file="payment_worldline/static/description/icon.png"/>
+        <field name="module_id" ref="base.module_payment_worldline"/>
+        <!-- https://docs.direct.worldline-solutions.com/en/payment-methods-and-features/index -->
+        <field name="payment_method_ids"
+               eval="[Command.set([
+                         ref('payment.payment_method_alipay_plus'),
+                         ref('payment.payment_method_bancontact'),
+                         ref('payment.payment_method_bizum'),
+                         ref('payment.payment_method_card'),
+                         ref('payment.payment_method_cofidis'),
+                         ref('payment.payment_method_eps'),
+                         ref('payment.payment_method_floa_bank'),
+                         ref('payment.payment_method_ideal'),
+                         ref('payment.payment_method_klarna'),
+                         ref('payment.payment_method_mbway'),
+                         ref('payment.payment_method_multibanco'),
+                         ref('payment.payment_method_p24'),
+                         ref('payment.payment_method_paypal'),
+                         ref('payment.payment_method_post_finance'),
+                         ref('payment.payment_method_twint'),
+                         ref('payment.payment_method_wechat_pay'),
+                     ])]"
+        />
     </record>
 
     <record id="payment_provider_xendit" model="payment.provider">

@@ -2,30 +2,28 @@
 <templates id="template" xml:space="preserve">
 
     <t t-name="point_of_sale.PaymentScreenPaymentLines">
-            <div class="paymentlines d-flex flex-column">
-                <h4 class="title-category pt-3 pb-2 px-3 m-0 bg-view border-bottom border-2">Summary</h4>
-                <t t-foreach="props.paymentLines" t-as="line" t-key="line.cid">
-                    <t t-if="line.selected">
-                        <div class="paymentline selected d-flex align-items-center bg-200"
+            <div class="paymentlines d-flex flex-column overflow-y-auto gap-1">
+                <t t-foreach="props.paymentLines" t-as="line" t-key="line.uuid">
+                    <t t-if="line.isSelected()">
+                        <div t-attf-class="paymentline selected d-flex align-items-center {{ this.ui.isSmall ? 'bg-100' : 'bg-200'}} border rounded-3"
                             t-att-class="selectedLineClass(line)">
-                            <div class="payment-infos d-flex align-items-center justify-content-between flex-grow-1 px-3 py-4 my-2 text-truncate cursor-pointer" t-on-click="() => this.selectLine(line)">
-                                 <span class="payment-name"><t t-esc="line.payment_method.name"/></span>
+                            <div class="payment-infos d-flex align-items-center justify-content-between flex-grow-1 px-3 py-3 text-truncate cursor-pointer fs-2" t-on-click="() => this.selectLine(line)">
+                                 <span class="payment-name"><t t-esc="line.payment_method_id.name"/></span>
                                  <div class="payment-amount px-3">
-                                    <t t-if="line and line.payment_status and ['done', 'waitingCard', 'waiting', 'reversing', 'reversed'].includes(line.payment_status)">
-                                            <t t-esc="env.utils.formatCurrency(line.get_amount(), false)" />
-                                    </t>
-                                    <t t-else="">
-                                            <t t-esc="formatLineAmount(line)" />
-                                    </t>
+                                    <t t-esc="env.utils.formatCurrency(line.get_amount())" />
                                 </div>
                             </div>
-                            
                             <t t-if="!line.payment_status or !['done', 'reversed', 'waitingCard', 'waitingCapture'].includes(line.payment_status)">
                                 <button class="delete-button btn btn-link mx-2 px-3"
-                                    t-on-click="() => this.props.deleteLine(line.cid)"
+                                    t-on-click="() => this.props.deleteLine(line.uuid)"
                                     aria-label="Delete" title="Delete">
-                                    <i class="fa fa-2x fa-times-circle" />
+                                    <i class="oi oi-close text-danger" />
                                 </button>
+                            </t>
+                           <t t-elif="line.payment_status and ['waitingCard', 'waitingCapture'].includes(line.payment_status)">
+                                <div class="mx-2 px-3">
+                                    <i class="fa fa-circle-o-notch fa-spin" role="img" />
+                                </div>
                             </t>
                         </div>
                         <t t-if="line and line.payment_status">
@@ -101,24 +99,19 @@
                         </t>
                     </t>
                     <t t-else="">
-                        <div class="paymentline d-flex align-items-center bg-view"
+                        <div class="paymentline d-flex align-items-center bg-view border rounded-3"
                             t-att-class="unselectedLineClass(line)">
-                             <div class="payment-infos d-flex align-items-center justify-content-between flex-grow-1 px-3 py-4 my-2 text-truncate cursor-pointer" t-on-click="() => this.selectLine(line)">
-                                 <t t-esc="line.payment_method.name" />
+                             <div class="payment-infos d-flex align-items-center justify-content-between flex-grow-1 px-3 py-3 text-truncate cursor-pointer fs-2" t-on-click="() => this.selectLine(line)">
+                                 <t t-esc="line.payment_method_id.name" />
                                  <div class="payment-amount px-3">
-                                    <t t-if="line and line.payment_status and ['done', 'waitingCard', 'waiting', 'reversing', 'reversed'].includes(line.payment_status)">
-                                            <t t-esc="env.utils.formatCurrency(line.get_amount(), false)" />
-                                    </t>
-                                    <t t-else="">
-                                            <t t-esc="formatLineAmount(line)" />
-                                    </t>
+                                    <t t-esc="env.utils.formatCurrency(line.get_amount())" />
                                 </div>
                              </div>
                             <t t-if="!line.payment_status or !['done', 'reversed'].includes(line.payment_status)">
                                 <div class="delete-button delete-button btn btn-link mx-2 px-3"
-                                    t-on-click="() => this.props.deleteLine(line.cid)"
+                                    t-on-click="() => this.props.deleteLine(line.uuid)"
                                     aria-label="Delete" title="Delete">
-                                    <i class="fa fa-2x fa-times-circle" />
+                                    <i class="oi oi-close text-danger" />
                                 </div>
                             </t>
                         </div>

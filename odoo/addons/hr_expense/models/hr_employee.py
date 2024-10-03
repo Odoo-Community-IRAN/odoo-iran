@@ -6,7 +6,7 @@ from odoo import fields, models, api
 class EmployeeBase(models.AbstractModel):
     _inherit = 'hr.employee.base'
 
-    filter_for_expense = fields.Boolean(store=False, search='_search_filter_for_expense')
+    filter_for_expense = fields.Boolean(store=False, search='_search_filter_for_expense', groups="hr.group_hr_user")
 
     def _search_filter_for_expense(self, operator, value):
         assert operator == '=' and value, "Operation not supported"
@@ -14,9 +14,9 @@ class EmployeeBase(models.AbstractModel):
         res = [('id', '=', 0)]  # Nothing accepted by domain, by default
         user = self.env.user
         employee = user.employee_id
-        if self.user_has_groups('hr_expense.group_hr_expense_user') or self.user_has_groups('account.group_account_user'):
+        if user.has_groups('hr_expense.group_hr_expense_user') or user.has_groups('account.group_account_user'):
             res = ['|', ('company_id', '=', False), ('company_id', 'child_of', self.env.company.root_id.id)]  # Then, domain accepts everything
-        elif self.user_has_groups('hr_expense.group_hr_expense_team_approver') and user.employee_ids:
+        elif user.has_groups('hr_expense.group_hr_expense_team_approver') and user.employee_ids:
             res = [
                 '|', '|', '|',
                 ('department_id.manager_id', '=', employee.id),

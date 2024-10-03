@@ -1,46 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 <template id="snippets" groups="base.group_user">
-    <div class="o_we_website_top_actions">
-        <div class="o_we_external_history_buttons d-flex">
-            <button type="button" data-action="undo" class="btn btn-secondary fa fa-undo" disabled="true"/>
-            <button type="button" data-action="redo" class="btn btn-secondary fa fa-repeat" disabled="true"/>
-        </div>
-        <form class="ms-auto d-flex">
-            <!-- Uncomment the following line when the mobile preview will be available. -->
-            <!-- <button type="button" class="btn btn-secondary fa fa-mobile" name="mobile" data-action="mobilePreview"/> -->
-            <button type="button" class="btn btn-secondary" data-action="cancel" title="Discard record" accesskey="j">Discard</button>
-            <button type="button" class="btn btn-primary" data-action="save" title="Save record" accesskey="s">Save</button>
-        </form>
-    </div>
-    <div id="snippets_menu">
-        <button type="button" tabindex="1" class="o_we_add_snippet_btn active text-uppercase" accesskey="1">
-            <span>Blocks</span>
-        </button>
-        <button type="button" tabindex="2" class="o_we_customize_snippet_btn text-uppercase">
-            <span>Customize</span>
-        </button>
-    </div>
-
-    <div class="o_snippet_search_filter">
-        <input type="text" class="o_snippet_search_filter_input" placeholder="Search for a block (e.g. numbers, image wall, ...)"/>
-        <i role="button" class="fa fa-times o_snippet_search_filter_reset d-none"/>
-    </div>
-
-    <div id="o_scroll">
-        <div id="snippet_custom" class="o_panel d-none">
-            <div class="o_panel_header">Custom</div>
-            <div id="snippet_custom_body" class="o_panel_body"/>
-        </div>
-        <t id="default_snippets">
-            <div id="snippet_structure" class="o_panel">
-                <div class="o_panel_header">First Panel</div>
-                <div class="o_panel_body">
-                    <t t-snippet="web_editor.s_hr" string="Separator" t-thumbnail="/web_editor/static/src/img/snippets_thumbs/s_hr.svg"/>
-                </div>
-            </div>
-        </t>
-    </div>
+    <snippets id="snippet_custom" string="Custom"/>
+    <t id="default_snippets">
+        <snippets id="snippet_structure" string="First Panel">
+            <t t-snippet="web_editor.s_hr" string="Separator" t-thumbnail="/web_editor/static/src/img/snippets_thumbs/s_hr.svg"/>
+        </snippets>
+    </t>
 
     <div id="snippet_options" class="d-none">
         <t t-call="web_editor.snippet_options"/>
@@ -217,7 +183,7 @@
              t-att-data-exclude="exclude"
              t-att-data-target="target">
             <t t-set="color_filter_dependencies" t-valuef="bg_image_toggle_opt"/>
-            <we-colorpicker string="Color filter"
+            <we-colorpicker string="Color Filter"
                             class="o_we_sublevel_2"
                             t-att-data-dependencies="color_filter_dependencies"
                             data-name="bg_filter_opt"
@@ -269,6 +235,7 @@
                                 <we-button data-shape="web_editor/Origins/16" data-select-label="Origins 10" data-animated="true"/>
                                 <we-button data-shape="web_editor/Origins/17" data-select-label="Origins 11" data-animated="true"/>
                                 <we-button data-shape="web_editor/Origins/18" data-select-label="Origins 12" data-animated="true"/>
+                                <we-button data-shape="web_editor/Origins/19" data-select-label="Origins 13"/>
                             </we-select-page>
                             <we-title>Bold</we-title>
                             <we-select-page string="Bold">
@@ -375,8 +342,8 @@
                                 <we-button data-shape="web_editor/Rainy/08_001" data-select-label="Rainy 09" data-animated="true"/>
                                 <we-button data-shape="web_editor/Rainy/09_001" data-select-label="Rainy 10"/>
                             </we-select-page>
-                            <we-title>Floating shapes</we-title>
-                            <we-select-page string="Floating shapes">
+                            <we-title>Floating Shapes</we-title>
+                            <we-select-page string="Floating Shapes">
                                 <we-button data-shape="web_editor/Floats/01" data-select-label="Float 01" data-animated="true"/>
                                 <we-button data-shape="web_editor/Floats/02" data-select-label="Float 02" data-animated="true"/>
                                 <we-button data-shape="web_editor/Floats/03" data-select-label="Float 03" data-animated="true"/>
@@ -407,8 +374,25 @@
             <we-row string="Colors" class="o_we_sublevel_2" data-name="colors">
                 <we-colorpicker data-select-style="" data-css-property="background-color" data-color-prefix="bg-" data-apply-to="> .o_we_shape"/>
             </we-row>
+            <we-row string="Speed" class="o_we_sublevel_2">
+                <we-range data-name="bg_shape_anim_speed_opt"
+                          data-no-preview="true"
+                          data-display-range-value="true"
+                          data-set-bg-shape-animation-speed=""
+                          data-max="2"
+                          data-min="-2"
+                          data-step="0.1"
+                          data-to-ratio="true"/>
+            </we-row>
         </div>
     </t>
+</template>
+
+<template id="snippet_options_version_control">
+    <div data-js="VersionControl"
+        t-att-data-selector="selector"
+        t-att-data-exclude="exclude"
+        t-att-data-target="target"/>
 </template>
 
 <!-- options (data-selector, data-drop-in, data-drop-near, data-js to link js object ) -->
@@ -421,8 +405,9 @@
     <div data-selector=".s_hr"
          data-drop-near="p, h1, h2, h3, blockquote, .s_hr"/>
 
-    <div data-js="VersionControl"
-         data-selector="[data-snippet]"/>
+    <t t-call="web_editor.snippet_options_version_control">
+        <t t-set="selector" t-value="'[data-snippet]'"/>
+    </t>
 
     <!-- Replace a media -->
     <!-- TODO probably review this system once the new editor is merged to not duplicate the selector, etc -->
@@ -444,7 +429,7 @@
             data-set-url="" data-no-preview="true"
             placeholder="www.example.com"
             data-request-focus="true"/>
-        <we-checkbox string="Open in new window"
+        <we-checkbox string="Open in New Window"
             class="o_we_sublevel_1"
             data-dependencies="media_url_opt"
             data-set-new-window="true" data-no-preview="true"/>
@@ -508,24 +493,24 @@
                             <we-title class="">Geometrics</we-title>
                             <we-select-page string="Geometrics">
                                 <we-button data-set-img-shape="web_editor/geometric/geo_square" data-no-transform="true" data-name="shape_img_square_opt"/> <!-- hidden and only used for hover effects -->
-                                <we-button data-set-img-shape="web_editor/geometric/geo_shuriken" data-select-label="Shuriken" data-no-transform="true"/>
-                                <we-button data-set-img-shape="web_editor/geometric/geo_diamond" data-select-label="Diamond" data-no-transform="true"/>
-                                <we-button data-set-img-shape="web_editor/geometric/geo_triangle" data-select-label="Triangle"/>
-                                <we-button data-set-img-shape="web_editor/geometric/geo_cornered_triangle" data-select-label="Corner Triangle"/>
-                                <we-button data-set-img-shape="web_editor/geometric/geo_pentagon" data-select-label="Pentagon"/>
-                                <we-button data-set-img-shape="web_editor/geometric/geo_hexagon" data-select-label="Hexagon"/>
-                                <we-button data-set-img-shape="web_editor/geometric/geo_heptagon" data-select-label="Heptagon"/>
-                                <we-button data-set-img-shape="web_editor/geometric/geo_star" data-select-label="Star 1"/>
-                                <we-button data-set-img-shape="web_editor/geometric/geo_star_8pin" data-select-label="Star 2" data-no-transform="true"/>
-                                <we-button data-set-img-shape="web_editor/geometric/geo_star_16pin" data-select-label="Star 3" data-no-transform="true"/>
-                                <we-button data-set-img-shape="web_editor/geometric/geo_slanted" data-select-label="Slanted"/>
-                                <we-button data-set-img-shape="web_editor/geometric/geo_emerald" data-select-label="Emerald"/>
-                                <we-button data-set-img-shape="web_editor/geometric/geo_tetris" data-select-label="Tetris"/>
-                                <we-button data-set-img-shape="web_editor/geometric/geo_kayak" data-select-label="Kayak"/>
-                                <we-button data-set-img-shape="web_editor/geometric/geo_tear" data-select-label="Tear"/>
-                                <we-button data-set-img-shape="web_editor/geometric/geo_gem" data-select-label="Gem"/>
-                                <we-button data-set-img-shape="web_editor/geometric/geo_sonar" data-select-label="Sonar"/>
-                                <we-button data-set-img-shape="web_editor/geometric/geo_door" data-select-label="Door"/>
+                                <we-button data-set-img-shape="web_editor/geometric/geo_shuriken" data-select-label="Shuriken" data-no-transform="true" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric/geo_diamond" data-select-label="Diamond" data-no-transform="true" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric/geo_triangle" data-select-label="Triangle" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric/geo_cornered_triangle" data-select-label="Corner Triangle" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric/geo_pentagon" data-select-label="Pentagon" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric/geo_hexagon" data-select-label="Hexagon" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric/geo_heptagon" data-select-label="Heptagon" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric/geo_star" data-select-label="Star 1" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric/geo_star_8pin" data-select-label="Star 2" data-no-transform="true" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric/geo_star_16pin" data-select-label="Star 3" data-no-transform="true" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric/geo_slanted" data-select-label="Slanted" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric/geo_emerald" data-select-label="Emerald" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric/geo_tetris" data-select-label="Tetris" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric/geo_kayak" data-select-label="Kayak" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric/geo_tear" data-select-label="Tear" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric/geo_gem" data-select-label="Gem" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric/geo_sonar" data-select-label="Sonar" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric/geo_door" data-select-label="Door" data-unstretch="true"/>
                                 <t t-if="not no_animations">
                                     <we-button data-set-img-shape="web_editor/geometric/geo_square_1" data-select-label="Square 1" data-animated="true"/>
                                     <we-button data-set-img-shape="web_editor/geometric/geo_square_2" data-select-label="Square 2" data-animated="true"/>
@@ -538,28 +523,28 @@
 
                             <we-title>Geometrics Rounded</we-title>
                             <we-select-page string="Geometrics Rounded">
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_circle" data-select-label="Circle" data-no-transform="true"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_square" data-select-label="Square (R)" data-no-transform="true"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_diamond" data-select-label="Diamond (R)" data-no-transform="true"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_shuriken" data-select-label="Shuriken (R)" data-no-transform="true"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_triangle" data-select-label="Triangle (R)"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_pentagon" data-select-label="Pentagon (R)"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_hexagon" data-select-label="Hexagon (R)"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_heptagon" data-select-label="Heptagon (R)"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_star" data-select-label="Star 1 (R)"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_star_7pin" data-select-label="Star 2 (R)"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_star_8pin" data-select-label="Star 3 (R)" data-no-transform="true"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_star_16pin" data-select-label="Star 4 (R)" data-no-transform="true"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_emerald" data-select-label="Emerald (R)"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_lemon" data-select-label="Lemon (R)"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_tear" data-select-label="Tear (R)"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_pill" data-select-label="Pill (R)"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_gem" data-select-label="Gem (R)"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_cornered" data-select-label="Cornered"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_door" data-select-label="Door (R)"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_sonar" data-select-label="Sonar (R)"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_clover" data-select-label="Clover (R)" data-no-transform="true"/>
-                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_bread" data-select-label="Bread (R)" data-no-transform="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_circle" data-select-label="Circle" data-no-transform="true" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_square" data-select-label="Square (R)" data-no-transform="true" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_diamond" data-select-label="Diamond (R)" data-no-transform="true" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_shuriken" data-select-label="Shuriken (R)" data-no-transform="true" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_triangle" data-select-label="Triangle (R)" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_pentagon" data-select-label="Pentagon (R)" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_hexagon" data-select-label="Hexagon (R)" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_heptagon" data-select-label="Heptagon (R)" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_star" data-select-label="Star 1 (R)" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_star_7pin" data-select-label="Star 2 (R)" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_star_8pin" data-select-label="Star 3 (R)" data-no-transform="true" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_star_16pin" data-select-label="Star 4 (R)" data-no-transform="true" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_emerald" data-select-label="Emerald (R)" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_lemon" data-select-label="Lemon (R)" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_tear" data-select-label="Tear (R)" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_pill" data-select-label="Pill (R)" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_gem" data-select-label="Gem (R)" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_cornered" data-select-label="Cornered" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_door" data-select-label="Door (R)" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_sonar" data-select-label="Sonar (R)" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_clover" data-select-label="Clover (R)" data-no-transform="true" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/geometric_round/geo_round_bread" data-select-label="Bread (R)" data-no-transform="true" data-unstretch="true"/>
                                 <t t-if="not no_animations">
                                     <we-button data-set-img-shape="web_editor/geometric_round/geo_round_square_1" data-select-label="Square 1 (R)" data-animated="true"/>
                                     <we-button data-set-img-shape="web_editor/geometric_round/geo_round_square_2" data-select-label="Square 2 (R)" data-animated="true"/>
@@ -577,7 +562,7 @@
                                 <we-button data-set-img-shape="web_editor/panel/panel_duo_step_pill" data-select-label="Duo Step Pill"/>
                                 <we-button data-set-img-shape="web_editor/panel/panel_trio_in_r" data-select-label="Trio In (R)"/>
                                 <we-button data-set-img-shape="web_editor/panel/panel_trio_out_r" data-select-label="Trio Out (R)"/>
-                                <we-button data-set-img-shape="web_editor/panel/panel_window" data-select-label="Window" data-no-transform="true"/>
+                                <we-button data-set-img-shape="web_editor/panel/panel_window" data-select-label="Window" data-no-transform="true" data-unstretch="true"/>
                             </we-select-page>
 
                             <we-title>Composites</we-title>
@@ -592,9 +577,9 @@
                         <div class="o_scroll_shapes_decorative">
                             <we-title>Brushed</we-title>
                             <we-select-page string="Brushed">
-                                <we-button data-set-img-shape="web_editor/brushed/brush_1" data-select-label="Brush 1"/>
-                                <we-button data-set-img-shape="web_editor/brushed/brush_2" data-select-label="Brush 2"/>
-                                <we-button data-set-img-shape="web_editor/brushed/brush_3" data-select-label="Brush 3"/>
+                                <we-button data-set-img-shape="web_editor/brushed/brush_1" data-select-label="Brush 1" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/brushed/brush_2" data-select-label="Brush 2" data-unstretch="true"/>
+                                <we-button data-set-img-shape="web_editor/brushed/brush_3" data-select-label="Brush 3" data-unstretch="true"/>
                                 <we-button data-set-img-shape="web_editor/brushed/brush_4" data-select-label="Brush 4"/>
                             </we-select-page>
 
@@ -718,6 +703,20 @@
                     data-no-preview="true" data-dependencies="shape_img_opt" title="Rotate left"/>
                 <we-button class="fa fa-fw fa-rotate-right" data-name="img_shape_transform_rotate_y_opt" data-set-img-shape-rotate-right="true"
                     data-no-preview="true" data-dependencies="shape_img_opt" title="Rotate right"/>
+            </we-row>
+            <we-row string="Speed" class="o_we_sublevel_1">
+                <we-range data-name="shape_anim_speed_opt"
+                    data-no-preview="true"
+                    data-display-range-value="true"
+                    data-attribute-name="shapeAnimationSpeed"
+                    data-select-data-attribute=""
+                    data-max="2"
+                    data-min="-2"
+                    data-step="0.1"
+                    data-to-ratio="true"/>
+            </we-row>
+            <we-row string="Stretch" class="o_we_sublevel_1">
+                <we-checkbox data-remove-stretch="true" data-dependencies="shape_img_opt" data-no-preview="true" data-name="toggle_stretch_opt"/>
             </we-row>
         </div>
         <we-input string="Description" class="o_we_large"

@@ -14,7 +14,6 @@ class PaymentWizard(models.TransientModel):
         ('manual', "Custom payment instructions"),
     ], string="Payment Method", default=lambda self: self._get_default_payment_provider_onboarding_value('payment_method'))
     paypal_email_account = fields.Char("Email", default=lambda self: self._get_default_payment_provider_onboarding_value('paypal_email_account'))
-    paypal_pdt_token = fields.Char("PDT Identity Token", default=lambda self: self._get_default_payment_provider_onboarding_value('paypal_pdt_token'))
 
     # Account-specific logic. It's kept here rather than moved in `account_payment` as it's not used by `account` module.
     manual_name = fields.Char("Method", default=lambda self: self._get_default_payment_provider_onboarding_value('manual_name'))
@@ -27,10 +26,10 @@ class PaymentWizard(models.TransientModel):
     @api.onchange('journal_name', 'acc_number')
     def _set_manual_post_msg_value(self):
         self.manual_post_msg = _(
-            '<h3>Please make a payment to: </h3><ul><li>Bank: %s</li><li>Account Number: %s</li><li>Account Holder: %s</li></ul>',
-            self.journal_name or _("Bank"),
-            self.acc_number or _("Account"),
-            self.env.company.name
+            '<h3>Please make a payment to: </h3><ul><li>Bank: %(bank)s</li><li>Account Number: %(account_number)s</li><li>Account Holder: %(account_holder)s</li></ul>',
+            bank=self.journal_name or _("Bank"),
+            account_number=self.acc_number or _("Account"),
+            account_holder=self.env.company.name,
         )
 
     _payment_provider_onboarding_cache = {}
@@ -67,7 +66,6 @@ class PaymentWizard(models.TransientModel):
 
             ], limit=1)
             self._payment_provider_onboarding_cache['paypal_email_account'] = provider['paypal_email_account'] or self.env.company.email
-            self._payment_provider_onboarding_cache['paypal_pdt_token'] = provider['paypal_pdt_token']
         else:
             self._payment_provider_onboarding_cache['paypal_email_account'] = self.env.company.email
 
@@ -106,7 +104,6 @@ class PaymentWizard(models.TransientModel):
                     provider = base_provider.sudo().copy(default={'company_id':self.env.company.id})
                 provider.write({
                     'paypal_email_account': self.paypal_email_account,
-                    'paypal_pdt_token': self.paypal_pdt_token,
                     'state': 'enabled',
                     'is_published': 'True',
                 })

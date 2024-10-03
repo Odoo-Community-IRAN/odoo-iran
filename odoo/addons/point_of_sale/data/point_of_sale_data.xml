@@ -32,36 +32,8 @@
             <field name="taxes_id" eval="[(5,)]"/>
         </record>
 
-        <record model="pos.config" id="pos_config_main" forcecreate="0">
-            <field name="name">Shop</field>
-        </record>
-
-        <record id="product_product_consumable" model="product.product">
-            <field name="name">Discount</field>
-            <field name="available_in_pos">True</field>
-            <field name="standard_price">0.00</field>
-            <field name="list_price">0.00</field>
-            <field name="weight">0.00</field>
-            <field name="type">consu</field>
-            <field name="categ_id" ref="point_of_sale.product_category_pos"/>
-            <field name="uom_id" ref="uom.product_uom_unit"/>
-            <field name="uom_po_id" ref="uom.product_uom_unit"/>
-            <field name="default_code">DISC</field>
-            <field name="purchase_ok">False</field>
-        </record>
-
         <record id="uom.product_uom_categ_unit" model="uom.category">
             <field name="is_pos_groupable">True</field>
-        </record>
-
-        <record model="pos.bill" id="0_01" forcecreate="0">
-            <field name="name">0.01</field>
-            <field name="value">0.01</field>
-        </record>
-
-        <record model="pos.bill" id="0_02" forcecreate="0">
-            <field name="name">0.02</field>
-            <field name="value">0.02</field>
         </record>
 
         <record model="pos.bill" id="0_05" forcecreate="0">
@@ -128,7 +100,5 @@
             <field name="name">200.00</field>
             <field name="value">200.00</field>
         </record>
-
-        <function model="pos.config" name="post_install_pos_localisation" />
     </data>
 </odoo>

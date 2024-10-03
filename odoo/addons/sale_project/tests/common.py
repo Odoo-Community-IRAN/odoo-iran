@@ -6,8 +6,8 @@ from odoo.addons.sale.tests.common import TestSaleCommon
 
 class TestSaleProjectCommon(TestSaleCommon):
     @classmethod
-    def setUpClass(cls, chart_template_ref=None):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
 
         cls.env['res.config.settings'] \
             .create({'group_project_milestone': True}) \
@@ -26,7 +26,7 @@ class TestSaleProjectCommon(TestSaleCommon):
         Project = cls.env['project.project'].with_context(tracking_disable=True)
         cls.project_global = Project.create({
             'name': 'Project Global',
-            'analytic_account_id': cls.analytic_account_sale.id,
+            'account_id': cls.analytic_account_sale.id,
             'allow_billable': True,
         })
         cls.project_template = Project.create({

@@ -7,31 +7,32 @@
             {
                 content: "Go to page Event",
                 trigger: '.nav-link:contains("Event")',
+                run: "click",
             },
             {
                 content: 'Open "Test Event Booths" event',
                 trigger: `h5.card-title span:contains(${eventName})`,
+                run: "click",
             },
             {
                 content: 'Go to "Get A Booth" page',
                 trigger: 'li.nav-item a:has(span:contains("Get A Booth"))',
+                run: "click",
             },
             {
                 content: 'Select the booth',
                 trigger: '.o_wbooth_booths input[name="event_booth_ids"]',
                 run: function () {
-                    $('.o_wbooth_booths input[name="event_booth_ids"]:lt(1)').click();
+                    document.querySelector('.o_wbooth_booths input[name="event_booth_ids"]:nth-child(1)').click();
                 },
             },
             {
                 content: "Verify Price displayed",
                 trigger: `.oe_currency_value:contains(${price})`,
-                run: function () {}, // it's a check
             },
             {
                 content: "Verify Price of selected booth",
                 trigger: `div.o_wbooth_booth_total_price span.oe_currency_value:contains(${priceSelected})`,
-                run: function () {}, // it's a check
             },
         ]
     }
@@ -41,7 +42,6 @@
             {
                 content: "Verify Price before discount",
                 trigger: `del:contains(${discount})`,
-                run: function () {}, // it's a check
             },
         ]
     }

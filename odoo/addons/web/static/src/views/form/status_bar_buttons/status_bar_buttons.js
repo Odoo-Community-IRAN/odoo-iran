@@ -1,11 +1,18 @@
-/** @odoo-module **/
-
 import { Dropdown } from "@web/core/dropdown/dropdown";
 import { DropdownItem } from "@web/core/dropdown/dropdown_item";
 
 import { Component } from "@odoo/owl";
 
 export class StatusBarButtons extends Component {
+    static template = "web.StatusBarButtons";
+    static components = {
+        Dropdown,
+        DropdownItem,
+    };
+    static props = {
+        slots: { type: Object, optional: 1 },
+    };
+
     get visibleSlotNames() {
         if (!this.props.slots) {
             return [];
@@ -15,11 +22,3 @@ export class StatusBarButtons extends Component {
             .map((entry) => entry[0]);
     }
 }
-StatusBarButtons.template = "web.StatusBarButtons";
-StatusBarButtons.components = {
-    Dropdown,
-    DropdownItem,
-};
-StatusBarButtons.props = {
-    slots: { type: Object, optional: 1 },
-};

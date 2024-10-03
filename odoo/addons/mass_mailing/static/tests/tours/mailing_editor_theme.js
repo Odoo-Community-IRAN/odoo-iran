@@ -1,145 +1,152 @@
 /** @odoo-module **/
-    
+
 import { registry } from "@web/core/registry";
 import { stepUtils } from "@web_tour/tour_service/tour_utils";
 import { boundariesIn, setSelection } from "@web_editor/js/editor/odoo-editor/src/utils/utils";
 
 registry.category("web_tour.tours").add('mailing_editor_theme', {
     test: true,
-    url: '/web',
+    url: '/odoo',
     steps: () => [
         stepUtils.showAppsMenuItem(),
         {
             content: "Select the 'Email Marketing' app.",
             trigger: '.o_app[data-menu-xmlid="mass_mailing.mass_mailing_menu_root"]',
+            run: "click",
         },
         {
             content: "Click on the create button to create a new mailing.",
             trigger: 'button.o_list_button_add',
+            run: "click",
         },
         {
             content: "Fill in Subject",
             trigger: '#subject_0',
-            run: 'text Test Basic Theme',
+            run: "edit Test Basic Theme",
         },
         {
             content: "Fill in Mailing list",
             trigger: '#contact_list_ids_0',
-            run: 'text Newsletter',
+            run: "edit Newsletter",
         },
         {
             content: "Pick 'Newsletter' option",
             trigger: '.o_input_dropdown a:contains(Newsletter)',
+            run: "click",
+        },
+        {
+            trigger: ":iframe .o_mail_theme_selector_new",
         },
         {
             content: "Pick the basic theme",
-            trigger: 'iframe #basic',
-            extra_trigger: 'iframe .o_mail_theme_selector_new',
+            trigger: ':iframe #basic',
+            run: "click",
+        },
+        {
+            trigger: ":iframe html:not(:has(.o_mail_theme_selector_new))",
         },
         {
             content: "Make sure the snippets menu is hidden",
-            trigger: 'iframe html:has(#oe_snippets.d-none)',
-            run: () => null, // no click, just check
+            trigger: 'html:has(#oe_snippets.d-none)',
         },
+        ...stepUtils.saveForm(),
         {
             content: "Click on the New button to create another mailing",
             trigger: 'button.o_form_button_create',
+            run: "click",
+        },
+        {
+            trigger: ":iframe .o_mail_theme_selector_new",
         },
         {
             content: "Fill in Subject",
             trigger: '#subject_0',
-            extra_trigger: 'iframe .o_mail_theme_selector_new',
-            run: 'text Test Newsletter Theme',
+            run: "edit Test Newsletter Theme",
         },
         {
             content: "Fill in Mailing list",
             trigger: '#contact_list_ids_0',
-            run: 'text Newsletter',
+            run: "edit Newsletter",
         },
         {
             content: "Pick 'Newsletter' option",
             trigger: '.o_input_dropdown a:contains(Newsletter)',
+            run: "click",
         },
         {
             content: "Pick the newsletter theme",
-            trigger: 'iframe #newsletter',
+            trigger: ':iframe #newsletter',
+            run: "click",
         },
         {
             content: "Make sure the snippets menu is displayed",
-            trigger: 'iframe #oe_snippets',
-            run: () => null, // no click, just check
+            trigger: '#oe_snippets',
         },
-        {
-            content: 'Save form',
-            trigger: '.o_form_button_save',
-        },
+        ...stepUtils.discardForm(),
         {
             content: 'Go back to previous mailing',
-            trigger: 'button.o_pager_previous',
+            trigger: 'td[name="subject"]:contains(Test Basic Theme)',
+            run: "click",
         },
         {
             content: "Make sure the snippets menu is hidden",
-            trigger: 'iframe html:has(#oe_snippets.d-none)',
-            run: () => null,
+            trigger: 'html:has(#oe_snippets.d-none)',
         },
         {
             content: "Add some content to be selected afterwards",
-            trigger: 'iframe p',
-            run: 'text content',
+            trigger: ':iframe p',
+            run: "editor content",
         },
         {
             content: "Select text",
-            trigger: 'iframe p:contains(content)',
+            trigger: ':iframe p:contains(content)',
             run() {
-                setSelection(...boundariesIn(this.$anchor[0]), false);
+                setSelection(...boundariesIn(this.anchor), false);
             }
         },
         {
             content: "Make sure the floating toolbar is visible",
             trigger: '#toolbar.oe-floating[style*="visible"]',
-            run: () => null,
         },
         {
             content: "Open the color picker",
             trigger: '#toolbar #oe-text-color',
+            run: "click",
         },
         {
             content: "Pick a color",
             trigger: '#toolbar button[data-color="o-color-1"]',
+            run: "click",
         },
         {
             content: "Check that color was applied",
-            trigger: 'iframe p font.text-o-color-1',
-            run: () => null,
+            trigger: ':iframe p font.text-o-color-1',
         },
-        {
-            content: 'Save changes',
-            trigger: '.o_form_button_save',
-        },
+        ...stepUtils.saveForm(),
         {
             content: "Go to 'Mailings' list view",
-            trigger: '.breadcrumb a:contains(Mailings)'
+            trigger: '.breadcrumb a:contains(Mailings)',
+            run: "click",
         },
         {
             content: "Open newly created mailing",
             trigger: 'td:contains("Test Basic Theme")',
+            run: "click",
         },
         {
             content: "Make sure the snippets menu is hidden",
-            trigger: 'iframe html:has(#oe_snippets.d-none)',
-            run: () => null,
+            trigger: 'html:has(#oe_snippets.d-none)',
         },
         {
             content: "Select content",
-            trigger: 'iframe p:contains(content)',
+            trigger: ':iframe p:contains(content)',
             run() {
-                setSelection(...boundariesIn(this.$anchor[0]), false);
+                setSelection(...boundariesIn(this.anchor), false);
             }
         },
         {
             content: "Make sure the floating toolbar is visible",
             trigger: '#toolbar.oe-floating[style*="visible"]',
-            run: () => null,
         },
         ...stepUtils.discardForm(),
     ]

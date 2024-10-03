@@ -13,6 +13,12 @@ class PosPaymentMethod(models.Model):
     has_an_online_payment_provider = fields.Boolean(compute='_compute_has_an_online_payment_provider', readonly=True)
     type = fields.Selection(selection_add=[('online', 'Online')])
 
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        params = super()._load_pos_data_fields(config_id)
+        params += ['is_online_payment']
+        return params
+
     @api.depends('is_online_payment')
     def _compute_type(self):
         opm = self.filtered('is_online_payment')
@@ -78,14 +84,17 @@ class PosPaymentMethod(models.Model):
         if 'type' in vals:
             vals['type'] = 'online'
 
-        disabled_fields_name = ('split_transactions', 'receivable_account_id', 'outstanding_account_id', 'journal_id', 'is_cash_count', 'use_payment_terminal')
+        disabled_fields_name = ('split_transactions', 'receivable_account_id', 'outstanding_account_id', 'journal_id', 'is_cash_count', 'use_payment_terminal', 'qr_code_method')
         if if_present:
             for name in disabled_fields_name:
                 if name in vals:
                     vals[name] = False
+            if 'payment_method_type' in vals:
+                vals['payment_method_type'] = 'none'
         else:
             for name in disabled_fields_name:
                 vals[name] = False
+            vals['payment_method_type'] = 'none'
 
     def _get_payment_terminal_selection(self):
         return super(PosPaymentMethod, self)._get_payment_terminal_selection() if not self.is_online_payment else []
@@ -114,5 +123,9 @@ class PosPaymentMethod(models.Model):
                     'company_id': company_id,
                 })
                 if not payment_method_id:
-                    raise ValidationError(_('Could not create an online payment method (company_id=%d, pos_config_id=%d)', company_id, pos_config_id))
+                    raise ValidationError(_(
+                        "Could not create an online payment method (company_id=%(company_id)d, pos_config_id=%(pos_config_id)d)",
+                        company_id=company_id,
+                        pos_config_id=pos_config_id,
+                    ))
         return payment_method_id

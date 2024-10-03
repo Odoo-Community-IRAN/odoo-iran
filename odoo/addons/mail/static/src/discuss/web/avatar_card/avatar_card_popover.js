@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { useService } from "@web/core/utils/hooks";
 import { Component, onWillStart } from "@odoo/owl";
 import { useOpenChat } from "@mail/core/web/open_chat_hook";
@@ -13,6 +11,7 @@ export class AvatarCardPopover extends Component {
     };
 
     setup() {
+        this.actionService = useService("action");
         this.orm = useService("orm");
         this.openChat = useOpenChat("res.users");
         onWillStart(async () => {
@@ -21,7 +20,7 @@ export class AvatarCardPopover extends Component {
     }
 
     get fieldNames() {
-        return ["name", "email", "phone", "im_status", "share"];
+        return ["name", "email", "phone", "im_status", "share", "partner_id"];
     }
 
     get email() {
@@ -32,8 +31,30 @@ export class AvatarCardPopover extends Component {
         return this.user.phone;
     }
 
+    get showViewProfileBtn() {
+        return true;
+    }
+
+    async getProfileAction() {
+        return {
+            res_id: this.user.partner_id[0],
+            res_model: "res.partner",
+            type: "ir.actions.act_window",
+            views: [[false, "form"]],
+        };
+    }
+
+    get userId() {
+        return this.user.id;
+    }
+
     onSendClick() {
-        this.openChat(this.user.id);
+        this.openChat(this.userId);
         this.props.close();
+    }
+
+    async onClickViewProfile() {
+        const action = await this.getProfileAction();
+        this.actionService.doAction(action);
     }
 }

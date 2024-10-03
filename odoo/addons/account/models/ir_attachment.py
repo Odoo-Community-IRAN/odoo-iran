@@ -166,16 +166,6 @@ class IrAttachment(models.Model):
 
         return to_process
 
-    # -------------------------------------------------------------------------
-    # XSD validation
-    # -------------------------------------------------------------------------
-
-    @api.model
-    def action_download_xsd_files(self):
-        # To be extended by localisations, where they can download their necessary XSD files
-        # Note: they should always return super().action_download_xsd_files()
-        return
-
     def _post_add_create(self, **kwargs):
         move_attachments = self.filtered(lambda attachment: attachment.res_model == 'account.move')
         moves_per_id = self.env['account.move'].browse([attachment.res_id for attachment in move_attachments]).grouped('id')

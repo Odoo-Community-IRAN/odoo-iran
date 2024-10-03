@@ -1,16 +1,24 @@
 # -*- coding: utf-8 -*-
 """Utilities for generating, parsing and checking XML/XSD files on top of the lxml.etree module."""
 
+import base64
+import contextlib
 import logging
 import re
-import requests
 import zipfile
 from io import BytesIO
+
+import requests
 from lxml import etree
-import contextlib
 
 from odoo.exceptions import UserError
+from odoo.tools.misc import file_open
 
+__all__ = [
+    "cleanup_xml_node",
+    "load_xsd_files_from_url",
+    "validate_xml_from_attachment",
+]
 
 _logger = logging.getLogger(__name__)
 
@@ -55,6 +63,29 @@ class odoo_resolver(etree.Resolver):
             return self.resolve_string(attachment.raw, context)
 
 
+def _validate_xml(env, url, path, xmls):
+    # Get the XSD data
+    xsd_attachment = env['ir.attachment']
+    if path:
+        with file_open(path, filter_ext=('.xsd',)) as file:
+            content = file.read()
+        attachment_vals = {
+            'name': path.split('/')[-1],
+            'datas': base64.b64encode(content.encode()),
+        }
+        xsd_attachment = env['ir.attachment'].create(attachment_vals)
+    elif url:
+        xsd_attachment = load_xsd_files_from_url(env, url)
+
+    # Validate the XML against the XSD
+    if not isinstance(xmls, list):
+        xmls = [xmls]
+
+    for xml in xmls:
+        validate_xml_from_attachment(env, xml, xsd_attachment.name)
+    xsd_attachment.unlink()
+
+
 def _check_with_xsd(tree_or_str, stream, env=None, prefix=None):
     """Check an XML against an XSD schema.
 
@@ -94,7 +125,7 @@ def create_xml_node_chain(first_parent_node, nodes_list, last_node_value=None):
     in `nodes_list`, under the given node `first_parent_node`.
 
     :param etree._Element first_parent_node: parent of the created tree/chain
-    :param iterable[str] nodes_list: tag names to be created
+    :param Iterable[str] nodes_list: tag names to be created
     :param str last_node_value: if specified, set the last node's text to this value
     :returns: the list of created nodes
     :rtype: list[etree._Element]
@@ -284,7 +315,6 @@ def load_xsd_files_from_url(env, url, file_name=None, force_reload=False,
 def validate_xml_from_attachment(env, xml_content, xsd_name, reload_files_function=None, prefix=None):
     """Try and validate the XML content with an XSD attachment.
     If the XSD attachment cannot be found in database, skip validation without raising.
-    If the skip_xsd context key is truthy, skip validation.
 
     :param odoo.api.Environment env: environment of calling module
     :param xml_content: the XML content to validate
@@ -292,8 +322,6 @@ def validate_xml_from_attachment(env, xml_content, xsd_name, reload_files_functi
     :param reload_files_function: Deprecated.
     :return: the result of the function :func:`odoo.tools.xml_utils._check_with_xsd`
     """
-    if env.context.get('skip_xsd', False):
-        return
 
     prefixed_xsd_name = f"{prefix}.{xsd_name}" if prefix else xsd_name
     try:
@@ -302,6 +330,10 @@ def validate_xml_from_attachment(env, xml_content, xsd_name, reload_files_functi
         _logger.info("XSD validation successful!")
     except FileNotFoundError:
         _logger.info("XSD file not found, skipping validation")
+    except etree.XMLSchemaParseError as e:
+        _logger.error("XSD file not valid: ")
+        for arg in e.args:
+            _logger.error(arg)
 
 
 def find_xml_value(xpath, xml_element, namespaces=None):

@@ -8,12 +8,6 @@
     .form-check {
         pointer-events: none !important;
     }
-
-    .o_nocontent_help {
-        border-radius: 20%;
-        background-color: $o-view-background-color;
-        box-shadow: 0 0 120px 100px $o-view-background-color;
-    }
 }
 
 // No content helper
@@ -24,7 +18,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background-image:  radial-gradient(at 50% 50%, #{$o-view-background-color} 0px, #{rgba($o-view-background-color, 0.5)} 100%);
 
     .o_nocontent_help {
         @include o-nocontent-empty;
@@ -57,6 +50,13 @@
     }
 }
 
+// Naive heuristic to leave enough space for the nocontent helper in dialogs
+.o_dialog {
+    .o_content:has(.o_view_nocontent) {
+        min-height: 20rem;
+    }
+}
+
 // Invisible modifier (can be inside the view, the button area, ...)
 .o_invisible_modifier {
     display: none!important;
@@ -68,8 +68,8 @@
 .o_status {
     border-radius: 50%;
     background-color: map-get($grays, '200');
-    height: 12px;
-    width: 12px;
+    height: var(--Status-size, 12px);
+    width: var(--Status-size, 12px);
     box-shadow: inset 0 0 0 1px rgba($black, .2);
 
     &.o_status_green {

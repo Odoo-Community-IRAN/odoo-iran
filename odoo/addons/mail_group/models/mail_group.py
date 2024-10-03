@@ -12,11 +12,11 @@ from markupsafe import Markup
 from werkzeug import urls
 
 from odoo import _, api, fields, models, tools
-from odoo.addons.http_routing.models.ir_http import slug
 from odoo.addons.mail.tools.alias_error import AliasError
 from odoo.exceptions import ValidationError, UserError
 from odoo.osv import expression
-from odoo.tools import email_normalize, hmac, generate_tracking_message_id
+from odoo.tools import hmac
+from odoo.tools.mail import email_normalize, generate_tracking_message_id, append_content_to_html
 
 _logger = logging.getLogger(__name__)
 
@@ -429,7 +429,7 @@ class MailGroup(models.Model):
 
                 headers = {
                     ** self._notify_by_email_get_headers(),
-                    'List-Archive': f'<{base_url}/groups/{slug(self)}>',
+                    'List-Archive': f'<{base_url}/groups/{self.env["ir.http"]._slug(self)}>',
                     'List-Subscribe': f'<{base_url}/groups?email={email_url_encoded}>',
                     'List-Unsubscribe': f'<{unsubscribe_url}>',
                     'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
@@ -449,12 +449,12 @@ class MailGroup(models.Model):
                 # Add the footer (member specific) in the body
                 template_values = {
                     'mailto': f'{self.alias_email}',
-                    'group_url': f'{base_url}/groups/{slug(self)}',
+                    'group_url': f'{base_url}/groups/{self.env["ir.http"]._slug(self)}',
                     'unsub_label': f'{base_url}/groups?unsubscribe',
                     'unsub_url':  unsubscribe_url,
                 }
                 footer = self.env['ir.qweb']._render('mail_group.mail_group_footer', template_values, minimal_qcontext=True)
-                member_body = tools.append_content_to_html(body, footer, plaintext=False)
+                member_body = append_content_to_html(body, footer, plaintext=False)
 
                 mail_values.append({
                     'auto_delete': True,
@@ -528,16 +528,14 @@ class MailGroup(models.Model):
     # ------------------------------------------------------------
 
     def action_join(self):
-        self.check_access_rights('read')
-        self.check_access_rule('read')
+        self.check_access('read')
         partner = self.env.user.partner_id
         self.sudo()._join_group(partner.email, partner.id)
 
         _logger.info('"%s" (#%s) joined mail.group "%s" (#%s)', partner.name, partner.id, self.name, self.id)
 
     def action_leave(self):
-        self.check_access_rights('read')
-        self.check_access_rule('read')
+        self.check_access('read')
         partner = self.env.user.partner_id
         self.sudo()._leave_group(partner.email, partner.id)
 

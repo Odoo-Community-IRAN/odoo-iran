@@ -12,6 +12,13 @@ import { Component, useState } from "@odoo/owl";
 class CodeEditorDialog extends Component {
     static template = "website.s_embed_code_dialog";
     static components = { Dialog, CodeEditor };
+    static props = {
+        title: String,
+        value: String,
+        mode: String,
+        confirm: Function,
+        close: Function,
+    };
     setup() {
         this.dialog = useService("dialog");
         this.state = useState({ value: this.props.value });

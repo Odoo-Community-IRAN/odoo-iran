@@ -392,11 +392,17 @@ class TestCalendar(SavepointCaseWithUserDemo):
             'name': 'partner_created_on_the_spot_by_the_appointment_form',
             'email': 'partner_created_on_the_spot_by_the_appointment_form@example.com',
         }])
+        test_user = self.env['res.users'].with_context({'no_reset_password': True}).create({
+            'name': 'test_user',
+            'login': 'test_user',
+            'email': 'test_user@example.com',
+        })
         self.CalendarEvent.with_user(self.env.ref('base.public_user')).sudo().create({
             'name': "publicUserEvent",
             'partner_ids': [(6, False, [partner_staff.id, new_partner.id])],
             'start': "2023-10-06 12:00:00",
             'stop': "2023-10-06 13:00:00",
+            'user_id': test_user.id,
         })
         _test_emails_has_attachment(self, partners=[partner_staff, new_partner], attachments_names=[a.name for a in attachments])
 
@@ -476,11 +482,12 @@ class TestCalendar(SavepointCaseWithUserDemo):
             'partner_ids': [Command.link(new_partner) for new_partner in new_partners]
         })
         self.assertTrue(set(new_partners) == set(self.event_tech_presentation.videocall_channel_id.channel_partner_ids.ids), 'new partners must be invited to the channel')
+
 @tagged('post_install', '-at_install')
 class TestCalendarTours(HttpCaseWithUserDemo):
     def test_calendar_month_view_start_hour_displayed(self):
         """ Test that the time is displayed in the month view. """
-        self.start_tour("/web", 'calendar_appointments_hour_tour', login="demo")
+        self.start_tour("/odoo", 'calendar_appointments_hour_tour', login="demo")
 
     def test_calendar_delete_tour(self):
         """
@@ -500,7 +507,7 @@ class TestCalendarTours(HttpCaseWithUserDemo):
             'show_as': 'busy',
         })
         action_id = self.env.ref('calendar.action_calendar_event')
-        url = "/web#action=" + str(action_id.id) + '&view_type=calendar'
+        url = "/odoo/action-" + str(action_id.id)
         self.start_tour(url, 'test_calendar_delete_tour', login='admin')
         event = self.env['calendar.event'].search([('name', '=', 'Test Event')])
         self.assertFalse(event) # Check if the event has been correctly deleted
@@ -525,7 +532,7 @@ class TestCalendarTours(HttpCaseWithUserDemo):
         })
         event.partner_ids = [Command.link(user_demo.partner_id.id)]
         action_id = self.env.ref('calendar.action_calendar_event')
-        url = "/web#action=" + str(action_id.id) + '&view_type=calendar'
+        url = "/odoo/action-" + str(action_id.id)
         self.start_tour(url, 'test_calendar_decline_tour', login='demo')
         attendee = self.env['calendar.attendee'].search([('event_id', '=', event.id), ('partner_id', '=', user_demo.partner_id.id)])
         self.assertEqual(attendee.state, 'declined') # Check if the event has been correctly declined
@@ -550,7 +557,25 @@ class TestCalendarTours(HttpCaseWithUserDemo):
         })
         event.partner_ids = [Command.link(user_demo.partner_id.id)]
         action_id = self.env.ref('calendar.action_calendar_event')
-        url = "/web#action=" + str(action_id.id) + '&view_type=calendar'
+        url = "/odoo/action-" + str(action_id.id)
         self.start_tour(url, 'test_calendar_decline_with_everybody_filter_tour', login='demo')
         attendee = self.env['calendar.attendee'].search([('event_id', '=', event.id), ('partner_id', '=', user_demo.partner_id.id)])
         self.assertEqual(attendee.state, 'declined') # Check if the event has been correctly declined
+
+    def test_default_duration(self):
+        # Check the default duration depending on various parameters
+        user_demo = self.user_demo
+        second_company = self.env['res.company'].sudo().create({'name': "Second Company"})
+
+        duration = self.env['calendar.event'].get_default_duration()
+        self.assertEqual(duration, 1, "By default, the duration is 1 hour")
+
+        IrDefault = self.env['ir.default'].sudo()
+        IrDefault.with_user(user_demo).set('calendar.event', 'duration', 2, user_id=True, company_id=False)
+        IrDefault.with_company(second_company).set('calendar.event', 'duration', 8, company_id=True)
+
+        duration = self.env['calendar.event'].with_user(user_demo).get_default_duration()
+        self.assertEqual(duration, 2, "Custom duration is 2 hours")
+
+        duration = self.env['calendar.event'].with_company(second_company).get_default_duration()
+        self.assertEqual(duration, 8, "Custom duration is 8 hours in the other company")

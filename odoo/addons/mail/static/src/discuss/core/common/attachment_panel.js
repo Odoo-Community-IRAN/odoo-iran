@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { DateSection } from "@mail/core/common/date_section";
 import { ActionPanel } from "@mail/discuss/core/common/action_panel";
 import { AttachmentList } from "@mail/core/common/attachment_list";
@@ -18,22 +16,22 @@ export class AttachmentPanel extends Component {
     static template = "mail.AttachmentPanel";
 
     setup() {
+        super.setup();
         this.sequential = useSequential();
         this.store = useService("mail.store");
         this.ormService = useService("orm");
-        this.threadService = useService("mail.thread");
         this.attachmentUploadService = useService("mail.attachment_upload");
         onWillStart(() => {
-            this.threadService.fetchMoreAttachments(this.props.thread);
+            this.props.thread.fetchMoreAttachments();
         });
         onWillUpdateProps((nextProps) => {
             if (nextProps.thread.notEq(this.props.thread)) {
-                this.threadService.fetchMoreAttachments(nextProps.thread);
+                nextProps.thread.fetchMoreAttachments();
             }
         });
-        const loadOlderState = useVisible("load-older", () => {
-            if (loadOlderState.isVisible) {
-                this.threadService.fetchMoreAttachments(this.props.thread);
+        useVisible("load-older", (isVisible) => {
+            if (isVisible) {
+                this.props.thread.fetchMoreAttachments();
             }
         });
     }
@@ -54,8 +52,8 @@ export class AttachmentPanel extends Component {
     get hasToggleAllowPublicUpload() {
         return (
             this.props.thread.model !== "mail.box" &&
-            this.props.thread.type !== "chat" &&
-            this.store.user?.user?.isInternalUser
+            this.props.thread.channel_type !== "chat" &&
+            this.store.self.isInternalUser
         );
     }
 

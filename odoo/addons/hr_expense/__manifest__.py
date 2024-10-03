@@ -37,6 +37,7 @@ This module also uses analytic accounting and is compatible with the invoice on 
         'data/mail_templates.xml',
         'data/hr_expense_sequence.xml',
         'data/hr_expense_data.xml',
+        'data/hr_expense_tour.xml',
         'wizard/hr_expense_refuse_reason_views.xml',
         'wizard/hr_expense_approve_duplicate_views.xml',
         'wizard/hr_expense_split_wizard_views.xml',
@@ -48,7 +49,6 @@ This module also uses analytic accounting and is compatible with the invoice on 
         'views/account_payment_views.xml',
         'views/hr_department_views.xml',
         'views/res_config_settings_views.xml',
-        'views/account_journal_dashboard.xml',
     ],
     'demo': ['data/hr_expense_demo.xml'],
     'installable': True,
@@ -62,20 +62,15 @@ This module also uses analytic accounting and is compatible with the invoice on 
             'hr_expense/static/src/views/*.xml',
             'hr_expense/static/src/scss/hr_expense.scss',
             'hr_expense/static/src/js/tours/*.js',
+            'hr_expense/static/src/js/web/*.js',
         ],
         'web.assets_tests': [
             'hr_expense/static/tests/tours/expense_upload_tours.js',
             'hr_expense/static/tests/tours/expense_form_tours.js',
+            'hr_expense/static/tests/tours/expense_form_in_sheet_tours.js',
         ],
         'web.report_assets_common': [
             'hr_expense/static/src/scss/hr_expense.scss',
-        ],
-        'web.qunit_suite_tests': [
-            'hr_expense/static/tests/**/*.js',
-            ('remove', 'hr_expense/static/tests/mobile/**/*.js'),
-        ],
-        'web.qunit_mobile_suite_tests': [
-            'hr_expense/static/tests/mobile/**/*.js',
         ],
     },
     'license': 'LGPL-3',

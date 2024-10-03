@@ -1,42 +1,37 @@
-/* @odoo-module */
-
-import { useState, Component } from "@odoo/owl";
+import { Component, useState, xml } from "@odoo/owl";
+import { ActionPanel } from "@mail/discuss/core/common/action_panel";
 import { Dropdown } from "@web/core/dropdown/dropdown";
 import { DropdownItem } from "@web/core/dropdown/dropdown_item";
-import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
+import { DiscussNotificationSettingsClientAction } from "./discuss_notification_settings_client_action";
+import { Dialog } from "@web/core/dialog/dialog";
+
+class NotificationDialog extends Component {
+    static props = ["close?"];
+    static components = { Dialog, DiscussNotificationSettingsClientAction };
+    static template = xml`
+        <Dialog size="'md'" footer="false">
+            <DiscussNotificationSettingsClientAction/>
+        </Dialog>
+    `;
+}
 
 export class NotificationSettings extends Component {
-    static components = { Dropdown, DropdownItem };
-    static props = ["hasSizeConstraints?", "thread", "close", "className?"];
+    static components = { ActionPanel, Dropdown, DropdownItem };
+    static props = ["hasSizeConstraints?", "thread", "close?", "className?"];
     static template = "discuss.NotificationSettings";
 
     setup() {
-        this.threadService = useState(useService("mail.thread"));
-    }
-
-    get muteUntilText() {
-        if (
-            this.props.thread.muteUntilDateTime &&
-            this.props.thread.muteUntilDateTime.year <= new Date().getFullYear() + 2
-        ) {
-            return _t("Until ") + this.props.thread.muteUntilDateTime.toFormat("MM/dd, HH:mm");
-        }
-        // Forever is a special case, so we don't want to display the date.
-        return undefined;
-    }
-
-    selectUnmute() {
-        this.threadService.muteThread(this.props.thread);
-        this.props.close();
+        this.store = useState(useService("mail.store"));
+        this.dialog = useService("dialog");
     }
 
     setMute(minutes) {
-        this.threadService.muteThread(this.props.thread, { minutes });
-        this.props.close();
+        this.store.settings.setMuteDuration(minutes, this.props.thread);
+        this.props.close?.();
     }
 
-    setSetting(setting) {
-        this.threadService.updateCustomNotifications(this.props.thread, setting.id);
+    onClickServerMuted() {
+        this.dialog.add(NotificationDialog);
     }
 }

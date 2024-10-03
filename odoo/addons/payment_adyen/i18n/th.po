@@ -3,16 +3,15 @@
 # 	* payment_adyen
 # 
 # Translators:
-# Wil Odoo, 2023
-# Rasareeyar Lappiam, 2024
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:56+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Rasareeyar Lappiam, 2024\n"
+"POT-Creation-Date: 2024-09-26 08:56+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Thai (https://app.transifex.com/odoo/teams/41243/th/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -32,9 +31,10 @@ msgstr ""
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
-msgid "A request was sent to void the transaction with reference %s (%s)."
-msgstr "มีการส่งคำขอให้ยกเลิกธุรกรรมโดยมีการอ้างอิง %s (%s)."
+msgid ""
+"A request was sent to void the transaction with reference %(reference)s "
+"(%(provider)s)."
+msgstr ""
 
 #. module: payment_adyen
 #: model:ir.model.fields,field_description:payment_adyen.field_payment_provider__adyen_api_key
@@ -54,7 +54,6 @@ msgstr "Adyen"
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid ""
 "An error occurred during the processing of your payment. Please try again."
 msgstr ""
@@ -63,7 +62,6 @@ msgstr ""
 #. module: payment_adyen
 #. odoo-javascript
 #: code:addons/payment_adyen/static/src/js/payment_form.js:0
-#, python-format
 msgid "Cannot display the payment form"
 msgstr "ไม่สามารถแสดงแบบฟอร์มการชำระเงินได้"
 
@@ -80,7 +78,6 @@ msgstr "โค้ด"
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_provider.py:0
-#, python-format
 msgid "Could not establish the connection to the API."
 msgstr "ไม่สามารถสร้างการเชื่อมต่อกับ API ได้"
 
@@ -97,7 +94,6 @@ msgstr "มี Adyen Tx"
 #. module: payment_adyen
 #. odoo-javascript
 #: code:addons/payment_adyen/static/src/js/payment_form.js:0
-#, python-format
 msgid "Incorrect payment details"
 msgstr "รายละเอียดการชำระเงินไม่ถูกต้อง"
 
@@ -114,7 +110,6 @@ msgstr "บัญชีการค้า"
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "No transaction found matching reference %s."
 msgstr "ไม่พบธุรกรรมที่ตรงกับการอ้างอิง %s"
 
@@ -141,44 +136,36 @@ msgstr "ธุรกรรมสำหรับการชำระเงิน
 #. module: payment_adyen
 #. odoo-javascript
 #: code:addons/payment_adyen/static/src/js/payment_form.js:0
-#: code:addons/payment_adyen/static/src/js/payment_form.js:0
-#: code:addons/payment_adyen/static/src/js/payment_form.js:0
-#, python-format
 msgid "Payment processing failed"
 msgstr "การประมวลผลการชำระเงินล้มเหลว"
 
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "Received data for child transaction with missing transaction values"
 msgstr "ได้รับข้อมูลสำหรับธุรกรรมย่อยที่ไม่มีมูลค่าธุรกรรม"
 
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with invalid payment state: %s"
 msgstr "ข้อมูลที่ได้รับมีสถานะการชำระเงินไม่ถูกต้อง: %s"
 
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with missing merchant reference"
-msgstr "ได้รับข้อมูลโดยไม่มีการอ้างอิงผู้ขาย"
+msgstr "ได้รับข้อมูลโดยไม่มีเอกสารอ้างอิงจากผู้ขาย"
 
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with missing payment state."
 msgstr "ได้รับข้อมูลโดยไม่มีสถานะการชำระเงิน"
 
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/controllers/main.py:0
-#, python-format
 msgid "Received tampered payment request data."
 msgstr "ได้รับข้อมูลคำขอการชำระเงินที่ถูกแก้ไข"
 
@@ -200,7 +187,6 @@ msgstr "คีย์ HMAC ของเว็บฮุค"
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid ""
 "The amount processed by Adyen for the transaction %s is different than the "
 "one requested. Another transaction is created with the correct amount."
@@ -216,8 +202,6 @@ msgstr "URL พื้นฐานสำหรับจุดสิ้นสุ�
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "The capture of the transaction with reference %s failed."
 msgstr "การบันทึกธุรกรรมที่มีการอ้างอิง %s ล้มเหลว"
 
@@ -233,7 +217,6 @@ msgstr ""
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid ""
 "The capture request of %(amount)s for the transaction with reference %(ref)s"
 " has been requested (%(provider_name)s)."
@@ -254,7 +237,6 @@ msgstr "รหัสของบัญชีผู้ค้าที่จะใ
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_provider.py:0
-#, python-format
 msgid "The communication with the API failed. Details: %s"
 msgstr "การสื่อสารกับ API ล้มเหลว รายละเอียด: %s"
 
@@ -266,7 +248,6 @@ msgstr "รหัสทางเทคนิคของผู้ให้บร
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "The transaction is not linked to a token."
 msgstr "ธุรกรรมไม่ได้เชื่อมโยงกับโทเค็น"
 
@@ -278,14 +259,11 @@ msgstr "ข้อมูลอ้างอิงเฉพาะของพาร
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "The void of the transaction with reference %s failed."
 msgstr "การเป็นโมฆะของธุรกรรมที่มีการอ้างอิง %s ล้มเหลว"
 
 #. module: payment_adyen
 #. odoo-python
 #: code:addons/payment_adyen/models/payment_transaction.py:0
-#, python-format
 msgid "Your payment was refused. Please try again."
 msgstr "การชำระเงินของคุณถูกปฏิเสธ กรุณาลองใหม่อีกครั้ง"

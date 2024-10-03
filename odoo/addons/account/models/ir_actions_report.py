@@ -6,13 +6,18 @@ try:
 except ImportError:
     from PyPDF2.utils import PdfStreamError, PdfReadError
 
-from odoo import api, models, _
+from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 from odoo.tools import pdf
 
 
 class IrActionsReport(models.Model):
     _inherit = 'ir.actions.report'
+
+    is_invoice_report = fields.Boolean(
+        string="Invoice report",
+        copy=True,
+    )
 
     def _render_qweb_pdf_prepare_streams(self, report_ref, data, res_ids=None):
         # Custom behavior for 'account.report_original_vendor_bill'.
@@ -45,9 +50,20 @@ class IrActionsReport(models.Model):
         return collected_streams
 
     def _is_invoice_report(self, report_ref):
-        return self._get_report(report_ref).report_name in ('account.report_invoice_with_payments', 'account.report_invoice')
+        return self._get_report(report_ref).is_invoice_report
 
-    def _render_qweb_pdf(self, report_ref, res_ids=None, data=None):
+    def _get_splitted_report(self, report_ref, content, report_type):
+        if report_type == 'html':
+            report = self._get_report(report_ref)
+            bodies, res_ids, *_unused = self._prepare_html(content, report_model=report.model)
+            return {res_id: str(body).encode() for res_id, body in zip(res_ids, bodies)}
+        elif report_type == 'pdf':
+            pdf_dict = {res_id: stream['stream'].getvalue() for res_id, stream in content.items()}
+            for stream in content.values():
+                stream['stream'].close()
+            return pdf_dict
+
+    def _pre_render_qweb_pdf(self, report_ref, res_ids=None, data=None):
         # Check for reports only available for invoices.
         # + append context data with the display_name_in_footer parameter
         if self._is_invoice_report(report_ref):
@@ -58,7 +74,7 @@ class IrActionsReport(models.Model):
             if any(x.move_type == 'entry' for x in invoices):
                 raise UserError(_("Only invoices could be printed."))
 
-        return super()._render_qweb_pdf(report_ref, res_ids=res_ids, data=data)
+        return super()._pre_render_qweb_pdf(report_ref, res_ids=res_ids, data=data)
 
     @api.ondelete(at_uninstall=False)
     def _unlink_except_master_tags(self):

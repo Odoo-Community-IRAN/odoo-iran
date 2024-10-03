@@ -1,45 +1,63 @@
 /** @odoo-module **/
 
-    import { registry } from "@web/core/registry";
-    import { getPriceListChecksSteps } from "@website_event_sale/../tests/tours/helpers/WebsiteEventSaleTourMethods";
+import { registry } from "@web/core/registry";
+import { getPriceListChecksSteps } from "@website_event_sale/../tests/tours/helpers/WebsiteEventSaleTourMethods";
 
-    registry.category("web_tour.tours").add('event_sale_pricelists_different_currencies', {
-        test: true,
-        url: '/event',
-        steps: () => [
+registry.category("web_tour.tours").add("event_sale_pricelists_different_currencies", {
+    test: true,
+    url: "/event",
+    steps: () => [
         // Register for tickets
         {
             content: "Open the Pycon event",
             trigger: '.o_wevent_events_list a:contains("Pycon")',
+            run: "click",
         },
         {
             content: "Open the register modal",
             trigger: 'button:contains("Register")',
+            run: "click",
         },
         {
             content: "Click on Register button inside modal",
-            trigger: 'div.modal-footer button:contains("Register")',
-            run: 'click'
+            trigger: '.modal .modal-footer button:contains("Register")',
+            run: "click",
         },
         {
-            content: "Fill attendees details",
-            trigger: 'form[id="attendee_registration"]',
-            run: function () {
-                $("input[name*='1-name']").val("Great Name");
-                $("input[name*='1-phone']").val("111 111");
-                $("input[name*='1-email']").val("great@name.com");
-            },
+            trigger:
+                '.modal#modal_attendees_registration:not(.o_inactive_modal) form[id="attendee_registration"]',
+        },
+        {
+            trigger:
+                ".modal#modal_attendees_registration:not(.o_inactive_modal) input[name*='1-name']",
+            run: "edit Great Name",
+        },
+        {
+            trigger:
+                ".modal#modal_attendees_registration:not(.o_inactive_modal) input[name*='1-phone']",
+            run: "edit 111 111",
+        },
+        {
+            trigger:
+                ".modal#modal_attendees_registration:not(.o_inactive_modal) input[name*='1-email']",
+            run: "edit great@name.com",
+        },
+        {
+            trigger:
+                ".modal#modal_attendees_registration input[name*='1-name'], .modal#modal_attendees_registration input[name*='2-name']",
+        },
+        {
+            trigger: "input[name*='1-name'], input[name*='2-name']",
         },
         {
             content: "Validate attendees details",
-            extra_trigger: "input[name*='1-name'], input[name*='2-name']",
-            trigger: 'button[type=submit]',
+            trigger:
+                ".modal#modal_attendees_registration:not(.o_inactive_modal) button[type=submit]",
+            run: "click",
         },
-        ...getPriceListChecksSteps({
-            pricelistName: "EUR With Discount Included",
-            eventName: "Pycon",
-            price: "90.00",
-        }),
+        {
+            trigger: "body:not(:has(.modal#modal_attendees_registration))",
+        },
         ...getPriceListChecksSteps({
             pricelistName: "EUR Without Discount Included",
             eventName: "Pycon",
@@ -47,14 +65,10 @@
             priceBeforeDiscount: "100.00",
         }),
         ...getPriceListChecksSteps({
-            pricelistName: "EX With Discount Included",
-            eventName: "Pycon",
-            price: "900.00",
-        }),
-        ...getPriceListChecksSteps({
             pricelistName: "EX Without Discount Included",
             eventName: "Pycon",
             price: "900.00",
             priceBeforeDiscount: "1,000.00",
         }),
-    ]});
+    ],
+});

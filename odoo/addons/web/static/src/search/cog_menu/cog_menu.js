@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { registry } from "@web/core/registry";
 import { Dropdown } from "@web/core/dropdown/dropdown";
 import { ActionMenus } from "@web/search/action_menus/action_menus";
@@ -49,7 +47,7 @@ export class CogMenu extends ActionMenus {
     }
 
     get hasItems() {
-        return this.cogItems.length || this.printItems.length;
+        return this.cogItems.length || this.props.items.print?.length;
     }
 
     async _registryItems() {

@@ -27,6 +27,7 @@ class Currency(models.Model):
 
     # Note: 'code' column was removed as of v6.0, the 'name' should now hold the ISO code.
     name = fields.Char(string='Currency', size=3, required=True, help="Currency Code (ISO 4217)")
+    iso_numeric = fields.Integer(string="Currency numeric code.", help="Currency Numeric Code (ISO 4217).")
     full_name = fields.Char(string='Name')
     symbol = fields.Char(help="Currency sign, to be used when printing amounts.", required=True)
     rate = fields.Float(compute='_compute_current_rate', string='Current Rate', digits=0,
@@ -43,8 +44,8 @@ class Currency(models.Model):
     position = fields.Selection([('after', 'After Amount'), ('before', 'Before Amount')], default='after',
         string='Symbol Position', help="Determines where the currency symbol should be placed after or before the amount.")
     date = fields.Date(compute='_compute_date')
-    currency_unit_label = fields.Char(string="Currency Unit")
-    currency_subunit_label = fields.Char(string="Currency Subunit")
+    currency_unit_label = fields.Char(string="Currency Unit", translate=True)
+    currency_subunit_label = fields.Char(string="Currency Subunit", translate=True)
     is_current_company_currency = fields.Boolean(compute='_compute_is_current_company_currency')
 
     _sql_constraints = [
@@ -114,7 +115,7 @@ class Currency(models.Model):
             return
 
         currencies = self.filtered(lambda c: not c.active)
-        if self.env['res.company'].search([('currency_id', 'in', currencies.ids)]):
+        if self.env['res.company'].search_count([('currency_id', 'in', currencies.ids)], limit=1):
             raise UserError(_("This currency is set on a company and therefore cannot be deactivated."))
 
     def _get_rates(self, company, date):
@@ -180,22 +181,23 @@ class Currency(models.Model):
             logging.getLogger(__name__).warning("The library 'num2words' is missing, cannot render textual amounts.")
             return ""
 
-        formatted = "%.{0}f".format(self.decimal_places) % amount
-        parts = formatted.partition('.')
-        integer_value = int(parts[0])
-        fractional_value = int(parts[2] or 0)
-
+        integral, _sep, fractional = f"{amount:.{self.decimal_places}f}".partition('.')
+        integer_value = int(integral)
         lang = tools.get_lang(self.env)
-        amount_words = tools.ustr('{amt_value} {amt_word}').format(
-                        amt_value=_num2words(integer_value, lang=lang.iso_code),
-                        amt_word=self.currency_unit_label,
-                        )
-        if not self.is_zero(amount - integer_value):
-            amount_words += ' ' + _('and') + tools.ustr(' {amt_value} {amt_word}').format(
-                        amt_value=_num2words(fractional_value, lang=lang.iso_code),
-                        amt_word=self.currency_subunit_label,
-                        )
-        return amount_words
+        if self.is_zero(amount - integer_value):
+            return _(
+                '%(integral_amount)s %(currency_unit)s',
+                integral_amount=_num2words(integer_value, lang=lang.iso_code),
+                currency_unit=self.currency_unit_label,
+            )
+        else:
+            return _(
+                '%(integral_amount)s %(currency_unit)s and %(fractional_amount)s %(currency_subunit)s',
+                integral_amount=_num2words(integer_value, lang=lang.iso_code),
+                currency_unit=self.currency_unit_label,
+                fractional_amount=_num2words(int(fractional or 0), lang=lang.iso_code),
+                currency_subunit=self.currency_subunit_label,
+            )
 
     def format(self, amount):
         """Return ``amount`` formatted according to ``self``'s rounding rules, symbols and positions.
@@ -311,14 +313,14 @@ class Currency(models.Model):
     @api.model
     def _get_view(self, view_id=None, view_type='form', **options):
         arch, view = super()._get_view(view_id, view_type, **options)
-        if view_type in ('tree', 'form'):
+        if view_type in ('list', 'form'):
             currency_name = (self.env['res.company'].browse(self._context.get('company_id')) or self.env.company.root_id).currency_id.name
             fields_maps = [
                 [['company_rate', 'rate'], _('Unit per %s', currency_name)],
                 [['inverse_company_rate', 'inverse_rate'], _('%s per Unit', currency_name)],
             ]
             for fnames, label in fields_maps:
-                xpath_expression = '//tree//field[' + " or ".join(f"@name='{f}'" for f in fnames) + "][1]"
+                xpath_expression = '//list//field[' + " or ".join(f"@name='{f}'" for f in fnames) + "][1]"
                 node = arch.xpath(xpath_expression)
                 if node:
                     node[0].set('string', label)
@@ -335,7 +337,7 @@ class CurrencyRate(models.Model):
                            default=fields.Date.context_today)
     rate = fields.Float(
         digits=0,
-        group_operator="avg",
+        aggregator="avg",
         help='The rate of the currency to the currency of rate 1',
         string='Technical Rate'
     )
@@ -343,14 +345,14 @@ class CurrencyRate(models.Model):
         digits=0,
         compute="_compute_company_rate",
         inverse="_inverse_company_rate",
-        group_operator="avg",
+        aggregator="avg",
         help="The currency of rate 1 to the rate of the currency.",
     )
     inverse_company_rate = fields.Float(
         digits=0,
         compute="_compute_inverse_company_rate",
         inverse="_inverse_inverse_company_rate",
-        group_operator="avg",
+        aggregator="avg",
         help="The rate of the currency to the currency of rate 1 ",
     )
     currency_id = fields.Many2one('res.currency', string='Currency', readonly=True, required=True, ondelete="cascade")
@@ -454,8 +456,9 @@ class CurrencyRate(models.Model):
                 raise ValidationError("Currency rates should only be created for main companies")
 
     @api.model
-    def _name_search(self, name, domain=None, operator='ilike', limit=None, order=None):
-        return super()._name_search(parse_date(self.env, name), domain, operator, limit, order)
+    def _search_display_name(self, operator, value):
+        value = parse_date(self.env, value)
+        return super()._search_display_name(operator, value)
 
     @api.model
     def _get_view_cache_key(self, view_id=None, view_type='form', **options):
@@ -467,14 +470,14 @@ class CurrencyRate(models.Model):
     @api.model
     def _get_view(self, view_id=None, view_type='form', **options):
         arch, view = super()._get_view(view_id, view_type, **options)
-        if view_type in ('tree'):
+        if view_type == 'list':
             names = {
                 'company_currency_name': (self.env['res.company'].browse(self._context.get('company_id')) or self.env.company.root_id).currency_id.name,
                 'rate_currency_name': self.env['res.currency'].browse(self._context.get('active_id')).name or 'Unit',
             }
-            for field in [['company_rate', _('%(rate_currency_name)s per %(company_currency_name)s', **names)],
-                          ['inverse_company_rate', _('%(company_currency_name)s per %(rate_currency_name)s', **names)]]:
-                node = arch.xpath("//tree//field[@name='%s']" % field[0])
-                if node:
-                    node[0].set('string', field[1])
+            for name, label in [['company_rate', _('%(rate_currency_name)s per %(company_currency_name)s', **names)],
+                                ['inverse_company_rate', _('%(company_currency_name)s per %(rate_currency_name)s', **names)]]:
+
+                if (node := arch.find(f"./field[@name='{name}']")) is not None:
+                    node.set('string', label)
         return arch, view

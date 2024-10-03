@@ -1,17 +1,18 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+from ast import literal_eval
 import logging
 import pytz
 
 from collections import defaultdict, Counter
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
-from odoo import api, exceptions, fields, models, _, Command
-from odoo.osv import expression
+from odoo import api, fields, models, _
+from odoo.exceptions import AccessError
 from odoo.tools import is_html_empty
 from odoo.tools.misc import clean_context, get_lang, groupby
+from odoo.addons.mail.tools.discuss import Store
 
 _logger = logging.getLogger(__name__)
 
@@ -92,6 +93,7 @@ class MailActivity(models.Model):
         'res.users', 'Assigned to',
         default=lambda self: self.env.user,
         index=True, required=True, ondelete='cascade')
+    user_tz = fields.Selection(string='Timezone', related="user_id.tz", store=True)
     request_partner_id = fields.Many2one('res.partner', string='Requesting Partner')
     state = fields.Selection([
         ('overdue', 'Overdue'),
@@ -170,7 +172,7 @@ class MailActivity(models.Model):
 
     @api.depends('res_model', 'res_id', 'user_id')
     def _compute_can_write(self):
-        valid_records = self._filter_access_rules('write')
+        valid_records = self._filtered_access('write')
         for record in self:
             record.can_write = record in valid_records
 
@@ -179,141 +181,88 @@ class MailActivity(models.Model):
         if self.activity_type_id:
             if self.activity_type_id.summary:
                 self.summary = self.activity_type_id.summary
-            self.date_deadline = self._calculate_date_deadline(self.activity_type_id)
+            self.date_deadline = self.activity_type_id._get_date_deadline()
             self.user_id = self.activity_type_id.default_user_id or self.env.user
             if self.activity_type_id.default_note:
                 self.note = self.activity_type_id.default_note
-
-    @api.model
-    def _calculate_date_deadline(self, activity_type, force_base_date=None):
-        """ Compute the activity deadline given its type, the force_base_date and the context.
-
-        The deadline is computed by adding the activity type delay to a base date defined as:
-        - the force_base_date
-        - or the activity_previous_deadline context value if the activity type delay_from is
-          previous_activity
-        - or the current date
-
-        :param activity_type: activity type
-        :param date force_base_date: if set, this force the base date for computation
-        """
-        if force_base_date:
-            # Date.context_today is correct because date_deadline is a Date and is meant to be
-            # expressed in user TZ
-            base = force_base_date
-        elif activity_type.delay_from == 'previous_activity' and 'activity_previous_deadline' in self.env.context:
-            base = fields.Date.from_string(self.env.context.get('activity_previous_deadline'))
-        else:
-            base = fields.Date.context_today(self)
-        return base + relativedelta(**{activity_type.delay_unit: activity_type.delay_count})
 
     @api.onchange('recommended_activity_type_id')
     def _onchange_recommended_activity_type_id(self):
         if self.recommended_activity_type_id:
             self.activity_type_id = self.recommended_activity_type_id
 
-    def _filter_access_rules(self, operation):
-        # write / unlink: valid for creator / assigned
-        if operation in ('write', 'unlink'):
-            valid = super(MailActivity, self)._filter_access_rules(operation)
-            if valid and valid == self:
-                return self
-        elif operation == 'read':
-            # Not in the ACL otherwise it would break the custom _search method
-            valid = self.sudo().filtered_domain([('user_id', '=', self.env.uid)])
-        else:
-            valid = self.env[self._name]
-        return self._filter_access_rules_remaining(valid, operation, '_filter_access_rules')
-
-    def _filter_access_rules_python(self, operation):
-        # write / unlink: valid for creator / assigned
-        if operation in ('write', 'unlink'):
-            valid = super(MailActivity, self)._filter_access_rules_python(operation)
-            if valid and valid == self:
-                return self
-        elif operation == 'read':
-            valid = self.sudo().filtered_domain([('user_id', '=', self.env.uid)])
-        else:
-            valid = self.env[self._name]
-        return self._filter_access_rules_remaining(valid, operation, '_filter_access_rules_python')
-
-    def _filter_access_rules_remaining(self, valid, operation, filter_access_rules_method):
-        """ Return the subset of ``self`` for which ``operation`` is allowed.
+    def _check_access(self, operation: str) -> tuple | None:
+        """ Determine the subset of ``self`` for which ``operation`` is allowed.
         A custom implementation is done on activities as this document has some
         access rules and is based on related document for activities that are
         not covered by those rules.
 
         Access on activities are the following :
 
-          * create: (``mail_post_access`` or write) right on related documents;
-          * read: read rights on related documents;
-          * write: access rule OR
-                   (``mail_post_access`` or write) rights on related documents);
-          * unlink: access rule OR
-                    (``mail_post_access`` or write) rights on related documents);
+          * read: access rule AND (assigned to user OR read rights on related documents);
+          * write: access rule OR (``mail_post_access`` or write) rights on related documents);
+          * create: access rule AND (``mail_post_access`` or write) right on related documents;
+          * unlink: access rule OR (``mail_post_access`` or write) rights on related documents);
         """
-        # compute remaining for hand-tailored rules
-        remaining = self - valid
-        remaining_sudo = remaining.sudo()
+        result = super()._check_access(operation)
+        if not self:
+            return result
 
-        # fall back on related document access right checks. Use the same as defined for mail.thread
-        # if available; otherwise fall back on read for read, write for other operations.
-        activity_to_documents = dict()
-        for activity in remaining_sudo:
-            # write / unlink: As unlinking a document bypasses access rights checks on related activities
-            # this will not prevent people from deleting documents with activities
-            # create / read: just check rights on related document
-            activity_to_documents.setdefault(activity.res_model, list()).append(activity.res_id)
-        for doc_model, doc_ids in activity_to_documents.items():
-            if hasattr(self.env[doc_model], '_mail_post_access'):
-                doc_operation = self.env[doc_model]._mail_post_access
-            elif operation == 'read':
-                doc_operation = 'read'
+        # determine activities on which to check the related document
+        if operation == 'read':
+            # check activities allowed by access rules
+            activities = self - result[0] if result else self
+            activities -= activities.sudo().filtered_domain([('user_id', '=', self.env.uid)])
+        elif operation == 'create':
+            # check activities allowed by access rules
+            activities = self - result[0] if result else self
+        else:
+            assert operation in ('write', 'unlink'), f"Unexpected operation {operation!r}"
+            # check access to the model, and check the forbidden records only
+            if self.browse()._check_access(operation):
+                return result
+            activities = result[0] if result else self.browse()
+            result = None
+
+        if not activities:
+            return result
+
+        # now check access on related document of 'activities', and collect the
+        # ids of forbidden activities
+        model_docid_actids = defaultdict(lambda: defaultdict(list))
+        for activity in activities.sudo():
+            model_docid_actids[activity.res_model][activity.res_id].append(activity.id)
+
+        forbidden_ids = []
+        for doc_model, docid_actids in model_docid_actids.items():
+            documents = self.env[doc_model].browse(docid_actids)
+            doc_operation = getattr(
+                documents, '_mail_post_access', 'read' if operation == 'read' else 'write'
+            )
+            if doc_result := documents._check_access(doc_operation):
+                for document in doc_result[0]:
+                    forbidden_ids.extend(docid_actids[document.id])
+
+        if forbidden_ids:
+            forbidden = self.browse(forbidden_ids)
+            if result:
+                result = (result[0] + forbidden, result[1])
             else:
-                doc_operation = 'write'
-            right = self.env[doc_model].check_access_rights(doc_operation, raise_exception=False)
-            if right:
-                valid_doc_ids = getattr(self.env[doc_model].browse(doc_ids), filter_access_rules_method)(doc_operation)
-                valid += remaining.filtered(lambda activity: activity.res_model == doc_model and activity.res_id in valid_doc_ids.ids)
+                result = (forbidden, lambda: forbidden._make_access_error(operation))
 
-        return valid
+        return result
 
-    def _check_access_assignation(self):
-        """ Check assigned user (user_id field) has access to the document. Purpose
-        is to allow assigned user to handle their activities. For that purpose
-        assigned user should be able to at least read the document. We therefore
-        raise an UserError if the assigned user has no access to the document.
-
-        .. deprecated:: 17.0
-            Deprecated method, we don't check access to the underlying records anymore
-            as user can new see activities without having access to the underlying records.
-        """
-        for model, activity_data in self._classify_by_model().items():
-            # group activities / user, in order to batch the check of ACLs
-            per_user = dict()
-            for activity in activity_data['activities'].filtered(lambda act: act.user_id):
-                if activity.user_id not in per_user:
-                    per_user[activity.user_id] = activity
-                else:
-                    per_user[activity.user_id] += activity
-            for user, activities in per_user.items():
-                RecordModel = self.env[model].with_user(user).with_context(
-                    allowed_company_ids=user.company_ids.ids
-                )
-                try:
-                    RecordModel.check_access_rights('read')
-                except exceptions.AccessError:
-                    raise exceptions.UserError(
-                        _('Assigned user %s has no access to the document and is not able to handle this activity.',
-                          user.display_name))
-                else:
-                    try:
-                        target_records = self.env[model].browse(activities.mapped('res_id'))
-                        target_records.check_access_rule('read')
-                    except exceptions.AccessError:
-                        raise exceptions.UserError(
-                            _('Assigned user %s has no access to the document and is not able to handle this activity.',
-                              user.display_name))
+    def _make_access_error(self, operation: str) -> AccessError:
+        return AccessError(_(
+            "The requested operation cannot be completed due to security restrictions. "
+            "Please contact your system administrator.\n\n"
+            "(Document type: %(type)s, Operation: %(operation)s)\n\n"
+            "Records: %(records)s, User: %(user)s",
+            type=self._description,
+            operation=operation,
+            records=self.ids[:6],
+            user=self.env.uid,
+        ))
 
     # ------------------------------------------------------
     # ORM overrides
@@ -326,7 +275,7 @@ class MailActivity(models.Model):
         # find partners related to responsible users, separate readable from unreadable
         if any(user != self.env.user for user in activities.user_id):
             user_partners = activities.user_id.partner_id
-            readable_user_partners = user_partners._filter_access_rules_python('read')
+            readable_user_partners = user_partners._filtered_access('read')
         else:
             readable_user_partners = self.env.user.partner_id
 
@@ -356,16 +305,13 @@ class MailActivity(models.Model):
         # send notifications about activity creation
         todo_activities = activities.filtered(lambda act: act.date_deadline <= fields.Date.today())
         if todo_activities:
-            self.env['bus.bus']._sendmany([
-                (activity.user_id.partner_id, 'mail.activity/updated', {'activity_created': True})
-                for activity in todo_activities
-            ])
+            activity.user_id._bus_send("mail.activity/updated", {"activity_created": True})
         return activities
 
     def write(self, values):
         if values.get('user_id'):
             user_changes = self.filtered(lambda activity: activity.user_id.id != values.get('user_id'))
-            pre_responsibles = user_changes.mapped('user_id.partner_id')
+            pre_responsibles = user_changes.user_id
         res = super(MailActivity, self).write(values)
 
         if values.get('user_id'):
@@ -378,48 +324,37 @@ class MailActivity(models.Model):
             # send bus notifications
             todo_activities = user_changes.filtered(lambda act: act.date_deadline <= fields.Date.today())
             if todo_activities:
-                self.env['bus.bus']._sendmany([
-                    [partner, 'mail.activity/updated', {'activity_created': True}]
-                    for partner in todo_activities.user_id.partner_id
-                ])
-                self.env['bus.bus']._sendmany([
-                    [partner, 'mail.activity/updated', {'activity_deleted': True}]
-                    for partner in pre_responsibles
-                ])
+                todo_activities.user_id._bus_send(
+                    "mail.activity/updated", {"activity_created": True}
+                )
+                pre_responsibles._bus_send("mail.activity/updated", {"activity_deleted": True})
         return res
 
     def unlink(self):
         todo_activities = self.filtered(lambda act: act.date_deadline <= fields.Date.today())
         if todo_activities:
-            self.env['bus.bus']._sendmany([
-                [partner, 'mail.activity/updated', {'activity_deleted': True}]
-                for partner in todo_activities.user_id.partner_id
-            ])
+            todo_activities.user_id._bus_send("mail.activity/updated", {"activity_deleted": True})
         return super(MailActivity, self).unlink()
 
     @api.model
-    def _search(self, domain, offset=0, limit=None, order=None, access_rights_uid=None):
+    def _search(self, domain, offset=0, limit=None, order=None):
         """ Override that adds specific access rights of mail.activity, to remove
         ids uid could not see according to our custom rules. Please refer to
-        _filter_access_rules_remaining for more details about those rules.
+        :meth:`_check_access` for more details about those rules.
 
         The method is inspired by what has been done on mail.message. """
 
         # Rules do not apply to administrator
         if self.env.is_superuser():
-            return super()._search(domain, offset, limit, order, access_rights_uid)
+            return super()._search(domain, offset, limit, order)
 
         # retrieve activities and their corresponding res_model, res_id
-        self.flush_model(['res_model', 'res_id'])
-        query = super()._search(domain, offset, limit, order, access_rights_uid)
-        query_str, params = query.select(
-            f'"{self._table}"."id"',
-            f'"{self._table}"."res_model"',
-            f'"{self._table}"."res_id"',
-            f'"{self._table}"."user_id"',
-        )
-        self.env.cr.execute(query_str, params)
-        rows = self.env.cr.fetchall()
+        # Don't use the ORM to avoid cache pollution
+        query = super()._search(domain, offset, limit, order)
+        fnames_to_read = ['id', 'res_model', 'res_id', 'user_id']
+        rows = self.env.execute_query(query.select(
+            *[self._field_to_sql(self._table, fname) for fname in fnames_to_read],
+        ))
 
         # group res_ids by model, and determine accessible records
         # Note: the user can read all activities assigned to him (see at the end of the method)
@@ -430,12 +365,11 @@ class MailActivity(models.Model):
 
         allowed_ids = defaultdict(set)
         for res_model, res_ids in model_ids.items():
-            records = self.env[res_model].with_user(access_rights_uid or self._uid).browse(res_ids)
+            records = self.env[res_model].browse(res_ids)
             # fall back on related document access right checks. Use the same as defined for mail.thread
             # if available; otherwise fall back on read
             operation = getattr(records, '_mail_post_access', 'read')
-            if records.check_access_rights(operation, raise_exception=False):
-                allowed_ids[res_model] = set(records._filter_access_rules(operation)._ids)
+            allowed_ids[res_model] = set(records._filtered_access(operation)._ids)
 
         activities = self.browse(
             id_
@@ -490,7 +424,33 @@ class MailActivity(models.Model):
     def action_done(self):
         """ Wrapper without feedback because web button add context as
         parameter, therefore setting context to feedback """
-        return self.action_feedback()
+        return self.filtered(lambda r: r.active).action_feedback()
+
+    def action_done_redirect_to_other(self):
+        """ Mark activity as done and return action mail.mail_activity_without_access_action.
+
+        Goal: Unless "keep done" activity is enabled, when marking an activity as done,
+        the activity is deleted and can no more be displayed. To overcome this, we return
+        an action that will launch the list view displaying the activities corresponding
+        to the active_ids from the context (i.e.: the remaining "other activities"). If the
+        right context is not available, we recompute the activities to display.
+        """
+        self.action_done()
+        action = self.env["ir.actions.actions"]._for_xml_id('mail.mail_activity_without_access_action')
+        action_context = literal_eval(action.get('context', '{}'))
+        if self.env.context.get('active_model') == 'mail.activity':
+            active_ids = self.env.context.get('active_ids', [])
+        else:
+            # Wrong context -> we recompute the activities for which the user has no access to the underlying record
+            activity_groups = self.env['res.users']._get_activity_groups()
+            activity_model_id = self.env['ir.model']._get_id('mail.activity')
+            active_ids = next((g['activity_ids'] for g in activity_groups if g['id'] == activity_model_id), [])
+        action['context'] = {
+            **action_context,
+            'active_ids': active_ids,
+            'active_model': 'mail.activity',
+        }
+        return action
 
     def action_feedback(self, feedback=False, attachment_ids=None):
         messages, _next_activities = self.with_context(
@@ -614,21 +574,33 @@ class MailActivity(models.Model):
             'view_mode': 'form',
         }
 
-    def activity_format(self):
-        activities = self.read()
-        self.mail_template_ids.fetch(['name'])
-        self.attachment_ids.fetch(['name'])
-        for record, activity in zip(self, activities):
-            activity['mail_template_ids'] = [
-                {'id': mail_template.id, 'name': mail_template.name}
-                for mail_template in record.mail_template_ids
-            ]
-            activity['attachment_ids'] = [
-                {'id': attachment.id, 'name': attachment.name}
-                for attachment in record.attachment_ids
-            ]
-        return activities
+    def action_snooze(self):
+        today = date.today()
+        for activity in self:
+            if activity.active:
+                activity.date_deadline = max(activity.date_deadline, today) + timedelta(days=7)
 
+    def action_cancel(self):
+        for activity in self:
+            if activity.active:
+                activity.unlink()
+
+    @api.readonly
+    def activity_format(self):
+        return Store(self).get_result()
+
+    def _to_store(self, store: Store):
+        for activity in self:
+            data = activity.read()[0]
+            data["mail_template_ids"] = [
+                {"id": mail_template.id, "name": mail_template.name}
+                for mail_template in activity.mail_template_ids
+            ]
+            data["attachment_ids"] = Store.many(activity.attachment_ids, fields=["name"])
+            data["persona"] = Store.one(activity.user_id.partner_id)
+            store.add(activity, data)
+
+    @api.readonly
     @api.model
     def get_activity_data(self, res_model, domain, limit=None, offset=0, fetch_done=False):
         """ Get aggregate data about records and their activities.

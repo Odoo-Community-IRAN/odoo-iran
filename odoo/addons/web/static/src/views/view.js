@@ -1,5 +1,4 @@
-/** @odoo-module **/
-
+import { useDebugCategory } from "@web/core/debug/debug_context";
 import { evaluateBooleanExpr } from "@web/core/py_js/py";
 import { registry } from "@web/core/registry";
 import { KeepLast } from "@web/core/utils/concurrency";
@@ -9,9 +8,10 @@ import { nbsp } from "@web/core/utils/strings";
 import { parseXML } from "@web/core/utils/xml";
 import { extractLayoutComponents } from "@web/search/layout";
 import { WithSearch } from "@web/search/with_search/with_search";
-import { OnboardingBanner } from "@web/views/onboarding_banner";
 import { useActionLinks } from "@web/views/view_hook";
 import { computeViewClassName } from "./utils";
+import { loadBundle } from "@web/core/assets";
+import { cookie } from "@web/core/browser/cookie";
 import {
     Component,
     markRaw,
@@ -21,7 +21,15 @@ import {
     useSubEnv,
     reactive,
 } from "@odoo/owl";
+import { session } from "@web/session";
+
 const viewRegistry = registry.category("views");
+
+viewRegistry.addValidation({
+    type: { validate: (t) => t in session.view_info },
+    Controller: { validate: (c) => c.prototype instanceof Component },
+    "*": true,
+});
 
 /** @typedef {Object} Config
  *  @property {integer|false} actionId
@@ -46,6 +54,9 @@ export function getDefaultConfig() {
     const config = {
         actionId: false,
         actionType: false,
+        embeddedActions: [],
+        currentEmbeddedActionId: false,
+        parentActionId: false,
         actionFlags: {},
         breadcrumbs: reactive([
             {
@@ -66,7 +77,6 @@ export function getDefaultConfig() {
         },
         viewSwitcherEntries: [],
         views: [],
-        Banner: OnboardingBanner,
     };
     return config;
 }
@@ -122,6 +132,7 @@ const CALLBACK_RECORDER_NAMES = [
 const STANDARD_PROPS = [
     "resModel",
     "type",
+    "jsClass",
 
     "arch",
     "fields",
@@ -164,6 +175,22 @@ const STANDARD_PROPS = [
 
 const ACTIONS = ["create", "delete", "edit", "group_create", "group_delete", "group_edit"];
 export class View extends Component {
+    static _download = async function () {};
+    static template = "web.View";
+    static components = { WithSearch };
+    static searchMenuTypes = ["filter", "groupBy", "favorite"];
+    static canOrderByCount = false;
+    static defaultProps = {
+        display: {},
+        context: {},
+        loadActionMenus: false,
+        loadIrFilters: false,
+        className: "",
+    };
+    static props = {
+        "*": true,
+    };
+
     setup() {
         const { arch, fields, resModel, searchViewArch, searchViewFields, type } = this.props;
         if (!resModel) {
@@ -197,12 +224,16 @@ export class View extends Component {
 
         onWillStart(() => this.loadView(this.props));
         onWillUpdateProps((nextProps) => this.onWillUpdateProps(nextProps));
+
+        useDebugCategory("view", { component: this });
     }
 
     async loadView(props) {
-        // determine view type
-        let descr = viewRegistry.get(props.type);
-        const type = descr.type;
+        const type = props.type;
+
+        if (!session.view_info[type]) {
+            throw new Error(`Invalid view type: ${type}`);
+        }
 
         // determine views for which descriptions should be obtained
         let { viewId, searchViewId } = props;
@@ -249,7 +280,13 @@ export class View extends Component {
             // a loadViews is done to complete the missing information
             const result = await this.viewService.loadViews(
                 { context, resModel, views },
-                { actionId: this.env.config.actionId, loadActionMenus, loadIrFilters }
+                {
+                    actionId: this.env.config.actionId,
+                    embeddedActionId: this.env.config.currentEmbeddedActionId,
+                    embeddedParentResId: context.active_id,
+                    loadActionMenus,
+                    loadIrFilters,
+                }
             );
             // Note: if props.views is different from views, the cached descriptions
             // will certainly not be reused! (but for the standard flow this will work as
@@ -285,29 +322,30 @@ export class View extends Component {
             }
         }
 
-        let subType = archXmlDoc.getAttribute("js_class");
-        const bannerRoute = archXmlDoc.getAttribute("banner_route");
+        const jsClass = archXmlDoc.hasAttribute("js_class")
+            ? archXmlDoc.getAttribute("js_class")
+            : props.jsClass || type;
+        if (!viewRegistry.contains(jsClass)) {
+            await loadBundle(
+                cookie.get("color_scheme") === "dark"
+                    ? "web.assets_backend_lazy_dark"
+                    : "web.assets_backend_lazy"
+            );
+        }
+        const descr = viewRegistry.get(jsClass);
+
         const sample = archXmlDoc.getAttribute("sample");
         const className = computeViewClassName(type, archXmlDoc, [
             "o_view_controller",
             ...(props.className || "").split(" "),
         ]);
 
-        // determine ViewClass to instantiate (if not already done)
-        if (subType) {
-            if (viewRegistry.contains(subType)) {
-                descr = viewRegistry.get(subType);
-            } else {
-                subType = null;
-            }
-        }
-
         Object.assign(this.env.config, {
+            rawArch: arch,
             viewArch: archXmlDoc,
             viewId: viewDescription.id,
             viewType: type,
-            viewSubType: subType,
-            bannerRoute,
+            viewSubType: jsClass,
             noBreadcrumbs: props.noBreadcrumbs,
             ...extractLayoutComponents(descr),
         });
@@ -358,6 +396,7 @@ export class View extends Component {
         const searchMenuTypes =
             props.searchMenuTypes || descr.searchMenuTypes || this.constructor.searchMenuTypes;
         viewProps.searchMenuTypes = searchMenuTypes;
+        const canOrderByCount = descr.canOrderByCount || this.constructor.canOrderByCount;
 
         const finalProps = descr.props ? descr.props(viewProps, descr, this.env.config) : viewProps;
         // prepare the WithSearch component props
@@ -367,6 +406,7 @@ export class View extends Component {
             ...toRaw(props),
             hideCustomGroupBy: props.hideCustomGroupBy || descr.hideCustomGroupBy,
             searchMenuTypes,
+            canOrderByCount,
             SearchModel: descr.SearchModel,
         };
 
@@ -416,19 +456,3 @@ export class View extends Component {
         Object.assign(this.withSearchProps, { comparison, context, domain, groupBy, orderBy });
     }
 }
-
-View._download = async function () {};
-
-View.template = "web.View";
-View.components = { WithSearch };
-View.defaultProps = {
-    display: {},
-    context: {},
-    loadActionMenus: false,
-    loadIrFilters: false,
-    className: "",
-};
-View.props = {
-    "*": true,
-};
-View.searchMenuTypes = ["filter", "groupBy", "favorite"];

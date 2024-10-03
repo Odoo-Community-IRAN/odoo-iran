@@ -1,20 +1,25 @@
 /** @odoo-module **/
 
-import wTourUtils from "@website/js/tours/tour_utils";
+import {
+    changeOption,
+    clickOnExtraMenuItem,
+    clickOnSave,
+    registerWebsitePreviewTour,
+} from "@website/js/tours/tour_utils";
 
 const toggleMegaMenu = (stepOptions) => Object.assign({}, {
     content: "Toggles the mega menu.",
-    trigger: "iframe .top_menu .nav-item a.o_mega_menu_toggle",
-    run: function () {
+    trigger: ":iframe .top_menu .nav-item a.o_mega_menu_toggle",
+    run(helpers) {
         // If the mega menu is displayed inside the extra menu items, it should
         // already be displayed.
-        if (!this.$anchor[0].closest('.o_extra_menu_items')) {
-            this.$anchor[0].dispatchEvent(new Event('click'))
+        if (!this.anchor.closest(".o_extra_menu_items")) {
+            helpers.click();
         }
     },
 }, stepOptions);
 
-wTourUtils.registerWebsitePreviewTour('edit_megamenu', {
+registerWebsitePreviewTour('edit_megamenu', {
     test: true,
     url: '/',
     edition: true,
@@ -22,87 +27,105 @@ wTourUtils.registerWebsitePreviewTour('edit_megamenu', {
     // Add a megamenu item to the top menu.
     {
         content: "Click on a menu item",
-        trigger: "iframe .top_menu .nav-item a",
+        trigger: ":iframe .top_menu .nav-item a",
+        run: "click",
     },
     {
         content: "Click on 'Link' to open Link Dialog",
-        trigger: 'iframe .o_edit_menu_popover a.js_edit_menu',
+        trigger: ':iframe .o_edit_menu_popover a.js_edit_menu',
+        run: "click",
+    },
+    {
+        trigger: ".o_website_dialog:visible",
     },
     {
         content: "Trigger the link dialog (click 'Add Mega Menu Item')",
-        extra_trigger: '.o_website_dialog:visible',
         trigger: '.modal-body a:eq(1)',
+        run: "click",
     },
     {
         content: "Write a label for the new menu item",
         trigger: '.modal-dialog .o_website_dialog input',
-        run: 'text Megaaaaa!'
+        run: "edit Megaaaaa!",
     },
     {
         content: "Confirm the mega menu label",
-        trigger: '.modal-footer .btn-primary',
+        trigger: ".modal .modal-footer button:contains(ok)",
+        run: "click",
+    },
+    {
+        trigger: '.oe_menu_editor [data-is-mega-menu="true"] .js_menu_label:contains("Megaaaaa!")',
     },
     {
         content: "Save the website menu with a new mega menu",
-        trigger: '.modal-footer .btn-primary',
-        extra_trigger: '.oe_menu_editor [data-is-mega-menu="true"] .js_menu_label:contains("Megaaaaa!")',
+        trigger: ".modal .modal-footer button:contains(save)",
+        run: "click",
+    },
+    {
+        trigger: "body:not(:has(.modal))",
     },
     {
         trigger: '#oe_snippets.o_loaded',
-        run() {},
+    },
+    {
+        trigger: ".o_website_preview.editor_enable.editor_has_snippets:not(.o_is_blocked)"
     },
     // Edit a menu item
-    wTourUtils.clickOnExtraMenuItem({extra_trigger: ".o_website_preview.editor_enable.editor_has_snippets:not(.o_is_blocked)"}, true),
-    toggleMegaMenu({extra_trigger: 'iframe .top_menu .nav-item a.o_mega_menu_toggle:contains("Megaaaaa!")'}),
+    clickOnExtraMenuItem({}, true),
+    toggleMegaMenu({}),
     {
         content: "Select the last menu link of the first column",
-        trigger: 'iframe .s_mega_menu_odoo_menu .row > div:first-child .nav > :nth-child(6)', // 6th is the last one
+        trigger: ':iframe .s_mega_menu_odoo_menu .row > div:first-child .nav > :nth-child(6)', // 6th is the last one
+        run: "click",
     },
     {
         content: "Hit the delete button to remove the menu link",
-        trigger: 'iframe .oe_overlay .oe_snippet_remove',
+        trigger: ':iframe .oe_overlay .oe_snippet_remove',
+        run: "click",
     },
     {
         content: "Check that the last menu link was deleted",
-        trigger: 'iframe .s_mega_menu_odoo_menu .row > div:first-child .nav:not(:has(> :nth-child(6)))',
-        run: () => null,
+        trigger: ':iframe .s_mega_menu_odoo_menu .row > div:first-child .nav:not(:has(:nth-child(6)))',
     },
     {
-        content: "Clicks on the first title item.",
-        trigger: 'iframe .o_mega_menu h4',
+        content: "Click on the first title item.",
+        trigger: ':iframe .o_mega_menu h4',
+        run: "click",
     },
     {
         content: "Press enter.",
-        trigger: 'iframe .o_mega_menu h4',
-        run: function (actions) {
-            this.$anchor[0].dispatchEvent(new window.InputEvent('input', {bubbles: true, inputType: 'insertParagraph'}));
+        trigger: ':iframe .o_mega_menu h4',
+        run() {
+            this.anchor.dispatchEvent(
+                new window.InputEvent("input", {bubbles: true, inputType: "insertParagraph"})
+            );
         },
     },
     {
         content: "The menu should still be visible. Edit a menu item.",
-        trigger: 'iframe .o_mega_menu h4',
+        trigger: ':iframe .o_mega_menu h4',
         // The content is removed in the previous step so it's now invisible.
-        allowInvisible: true,
-        run: 'text New Menu Item',
+        run: "editor New Menu Item",
     },
     {
         // If this step fails, it means that a patch inside bootstrap was lost.
         content: "Press the 'down arrow' key.",
-        trigger: 'iframe .o_mega_menu h4',
-        run: function (actions) {
-            this.$anchor[0].dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowDown" }));
+        trigger: ':iframe .o_mega_menu h4',
+        run() {
+            this.anchor.dispatchEvent(
+                new window.KeyboardEvent("keydown", {key: "ArrowDown"})
+            );
         },
     },
-    ...wTourUtils.clickOnSave(),
-    wTourUtils.clickOnExtraMenuItem({}, true),
+    ...clickOnSave(),
+    clickOnExtraMenuItem({}, true),
     toggleMegaMenu(),
     {
         content: "The menu item should have been renamed.",
-        trigger: 'iframe .o_mega_menu h4:contains("New Menu Item")',
-        run: function () {}, // it's a check
+        trigger: ':iframe .o_mega_menu h4:contains("New Menu Item")',
     },
 ]);
-wTourUtils.registerWebsitePreviewTour('edit_megamenu_big_icons_subtitles', {
+registerWebsitePreviewTour('edit_megamenu_big_icons_subtitles', {
     test: true,
     url: '/',
     edition: true,
@@ -110,63 +133,75 @@ wTourUtils.registerWebsitePreviewTour('edit_megamenu_big_icons_subtitles', {
     // Add a megamenu item to the top menu.
     {
         content: "Click on a menu item",
-        trigger: 'iframe .top_menu .nav-item a',
+        trigger: ':iframe .top_menu .nav-item a',
+        run: "click",
     },
     {
         content: "Click on 'Link' to open Link Dialog",
-        trigger: 'iframe .o_edit_menu_popover a.js_edit_menu',
+        trigger: ':iframe .o_edit_menu_popover a.js_edit_menu',
+        run: "click",
+    },
+    {
+        trigger: ".o_website_dialog",
     },
     {
         content: "Trigger the link dialog (click 'Add Mega Menu Item')",
-        extra_trigger: ".o_website_dialog",
         trigger: '.modal-body a:eq(1)',
+        run: "click",
     },
     {
         content: "Write a label for the new menu item",
         trigger: '.modal-dialog .o_website_dialog input',
-        run: 'text Megaaaaa2!',
+        run: "edit Megaaaaa2!",
     },
     {
         content: "Confirm the mega menu label",
-        trigger: '.modal-footer .btn-primary',
+        trigger: ".modal .modal-footer .btn-primary:contains(ok)",
+        run: "click",
+    },
+    {
+        trigger: '.oe_menu_editor [data-is-mega-menu="true"] .js_menu_label:contains("Megaaaaa2!")',
     },
     {
         content: "Save the website menu with a new mega menu",
         trigger: '.modal-footer .btn-primary',
-        extra_trigger: '.oe_menu_editor [data-is-mega-menu="true"] .js_menu_label:contains("Megaaaaa2!")',
+        run: "click",
     },
     {
         trigger: '#oe_snippets.o_loaded',
-        run() {},
     },
     {
         content: "Check for the new mega menu",
-        trigger: 'iframe .top_menu:has(.nav-item a.o_mega_menu_toggle:contains("Megaaaaa2!"))',
-        run: function () {}, // it's a check
+        trigger: ':iframe .top_menu:has(.nav-item a.o_mega_menu_toggle:contains("Megaaaaa2!"))',
+    },
+    {
+        trigger: ".o_website_preview.editor_enable.editor_has_snippets:not(.o_is_blocked)"
     },
     // Edit a menu item
-    wTourUtils.clickOnExtraMenuItem({extra_trigger: ".o_website_preview.editor_enable.editor_has_snippets:not(.o_is_blocked)"}, true),
-    toggleMegaMenu({extra_trigger: 'iframe .top_menu .nav-item a.o_mega_menu_toggle:contains("Megaaaaa2!")'}),
+    clickOnExtraMenuItem({}, true),
+    toggleMegaMenu({}),
     {
         content: "Select the first menu link of the first column",
-        trigger: 'iframe .s_mega_menu_odoo_menu .row > div:first-child .nav > :first-child',
+        trigger: ':iframe .s_mega_menu_odoo_menu .row > div:first-child .nav > :first-child',
+        run: "click",
     },
-    wTourUtils.changeOption("MegaMenuLayout", "we-toggler"),
+    changeOption("MegaMenuLayout", "we-toggler"),
     {
         content: "Select Big Icons Subtitles mega menu",
         trigger: '[data-select-label="Big Icons Subtitles"]',
+        run: "click",
     },
     {
         content: "Select the h4 of first menu link of the first column",
-        trigger: 'iframe .s_mega_menu_big_icons_subtitles .row > div:first-child .nav > :first-child h4',
-        run: function (actions) {
+        trigger: ':iframe .s_mega_menu_big_icons_subtitles .row > div:first-child .nav > :first-child h4',
+        async run(actions) {
             // Clicking on the h4 element first time leads to the selection of
             // the entire a.nav-link, due to presence of `o_default_snippet_text` class
             // hence, specify the selection on the h4 element
-            actions.click();
+            await actions.click();
             const iframeDocument = document.querySelector('.o_iframe').contentDocument;
             const range = iframeDocument.createRange();
-            range.selectNodeContents(this.$anchor[0]);
+            range.selectNodeContents(this.anchor);
             const sel = iframeDocument.getSelection();
             sel.removeAllRanges();
             sel.addRange(range);
@@ -175,13 +210,13 @@ wTourUtils.registerWebsitePreviewTour('edit_megamenu_big_icons_subtitles', {
     {
         content: "Convert it to Bold",
         trigger: '#oe_snippets #toolbar #bold',
+        run: "click",
     },
-    ...wTourUtils.clickOnSave(),
-    wTourUtils.clickOnExtraMenuItem({}, true),
+    ...clickOnSave(),
+    clickOnExtraMenuItem({}, true),
     toggleMegaMenu(),
     {
         content: "The menu item should only convert selected text to Bold.",
-        trigger: 'iframe .s_mega_menu_big_icons_subtitles .row > div:first-child .nav > :first-child span:not(:has(strong))',
-        run: function () {}, // it's a check
+        trigger: ':iframe .s_mega_menu_big_icons_subtitles .row > div:first-child .nav > :first-child span:not(:has(strong))',
     },
 ]);

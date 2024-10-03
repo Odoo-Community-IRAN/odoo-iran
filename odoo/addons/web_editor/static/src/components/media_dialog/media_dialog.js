@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
 import { useService, useChildRef } from '@web/core/utils/hooks';
 import { Mutex } from "@web/core/utils/concurrency";
@@ -36,13 +34,22 @@ export const TABS = {
 };
 
 export class MediaDialog extends Component {
+    static template = "web_editor.MediaDialog";
+    static defaultProps = {
+        useMediaLibrary: true,
+    };
+    static components = {
+        ...Object.keys(TABS).map((key) => TABS[key].Component),
+        Dialog,
+        Notebook,
+    };
+    static props = ["*"];
+
     setup() {
         this.size = 'xl';
         this.contentClass = 'o_select_media_dialog h-100';
-        this.title = _t("Select a media");
         this.modalRef = useChildRef();
 
-        this.rpc = useService('rpc');
         this.orm = useService('orm');
         this.notificationService = useService('notification');
         this.mutex = new Mutex();
@@ -160,7 +167,7 @@ export class MediaDialog extends Component {
         // static, the mutex has to be set on the media dialog itself to be
         // destroyed with its instance.
         const elements = await this.mutex.exec(async() =>
-            await TABS[this.state.activeTab].Component.createElements(selectedMedia, { rpc: this.rpc, orm: this.orm })
+            await TABS[this.state.activeTab].Component.createElements(selectedMedia, { orm: this.orm })
         );
         elements.forEach(element => {
             if (this.props.media) {
@@ -193,6 +200,9 @@ export class MediaDialog extends Component {
                     }
                     if (this.props.media.dataset.hoverEffectIntensity) {
                         element.dataset.hoverEffectIntensity = this.props.media.dataset.hoverEffectIntensity;
+                    }
+                    if (this.props.media.dataset.shapeAnimationSpeed) {
+                        element.dataset.shapeAnimationSpeed = this.props.media.dataset.shapeAnimationSpeed;
                     }
                 }
             }
@@ -280,12 +290,3 @@ export class MediaDialog extends Component {
         this.state.activeTab = tab;
     }
 }
-MediaDialog.template = 'web_editor.MediaDialog';
-MediaDialog.defaultProps = {
-    useMediaLibrary: true,
-};
-MediaDialog.components = {
-    ...Object.keys(TABS).map(key => TABS[key].Component),
-    Dialog,
-    Notebook,
-};

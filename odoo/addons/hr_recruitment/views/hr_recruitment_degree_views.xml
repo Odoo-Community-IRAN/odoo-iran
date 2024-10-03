@@ -2,13 +2,13 @@
 <odoo>
     <data>
         <record model="ir.ui.view" id="hr_recruitment_degree_tree">
-            <field name="name">hr.recruitment.degree.tree</field>
+            <field name="name">hr.recruitment.degree.list</field>
             <field name="model">hr.recruitment.degree</field>
             <field name="arch" type="xml">
-                <tree string="Degree" editable="bottom">
+                <list string="Degree" editable="bottom">
                     <field name="sequence" widget="handle"/>
                     <field name="name"/>
-                </tree>
+                </list>
             </field>
         </record>
 
@@ -28,7 +28,7 @@
         </record>
 
         <record id="hr_recruitment_degree_action" model="ir.actions.act_window">
-            <field name="name">Degree</field>
+            <field name="name">Degrees</field>
             <field name="res_model">hr.recruitment.degree</field>
             <field name="view_id" ref="hr_recruitment_degree_tree"/>
         </record>

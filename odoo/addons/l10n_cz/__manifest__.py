@@ -5,7 +5,7 @@
     'countries': ['cz'],
     'version': '1.1',
     'author': '26HOUSE (http://www.26house.com)',
-    'website': 'https://www.odoo.com/documentation/17.0/applications/finance/fiscal_localizations.html',
+    'website': 'https://www.odoo.com/documentation/master/applications/finance/fiscal_localizations.html',
     'category': 'Accounting/Localizations/Account Charts',
     'description': """
 Czech accounting chart and localization.  With Chart of Accounts with taxes and basic fiscal positions.
@@ -23,6 +23,7 @@ Tento modul definuje:
         'base_iban',
         'base_vat',
     ],
+    'auto_install': ['account'],
     'data': [
         'data/tax_report.xml',
         'views/report_invoice.xml',

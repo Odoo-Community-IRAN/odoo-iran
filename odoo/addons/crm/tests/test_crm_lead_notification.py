@@ -69,51 +69,99 @@ class NewLeadNotification(TestCrmCommon):
                 'user_id': self.user_sales_leads.id,
             }, {
               'name': 'Test Suggestion (partner no email)',
-              'partner_id': partner_no_email.id
+              'partner_id': partner_no_email.id,
+              'user_id': self.user_sales_leads.id
             }, {
               'name': 'Test Suggestion (partner no email with cc email)',
               'partner_id': partner_no_email.id,
-              'email_cc': 'test_cc@odoo.com'
+              'email_cc': 'test_cc@odoo.com',
+              'user_id': self.user_sales_leads.id
             }
         ])
         for lead, expected_suggested in zip(
             lead_format + lead_multi + lead_from + lead_partner + lead_partner_no_email + lead_partner_no_email_with_cc,
             [
-                [(False, '"New Customer" <new.customer.format@test.example.com>', None, 'Customer Email',
-                  {'company_name': 'Format Name', 'email': 'new.customer.format@test.example.com',
-                  'name': 'Format Name', 'user_id': self.user_sales_leads.id,
-                  'team_id': self.sales_team_1.id,
-                })],
-                [(False, '"Multi Name" <new.customer.multi.1@test.example.com,new.customer.2@test.example.com>', None, 'Customer Email',
-                  {'company_name': 'Multi Name', 'email': 'new.customer.multi.1@test.example.com',
-                    'name': 'Multi Name', 'user_id': self.user_sales_leads.id,
-                    'team_id': self.sales_team_1.id,
-                })],
-                [(False, '"Std Name" <new.customer.simple@test.example.com>', None, 'Customer Email',
-                  {'company_name': 'Std Name', 'email': 'new.customer.simple@test.example.com',
-                  'name': 'Std Name', 'user_id': self.user_sales_leads.id,
-                  'team_id': self.sales_team_1.id,
-                })],
-                [(self.contact_1.id, '"Philip J Fry" <philip.j.fry@test.example.com>', self.contact_1.lang, 'Customer',
-                {})],
-                [(partner_no_email.id, 'Test Partner', partner_no_email.lang, 'Customer', {})],
+                [{
+                        'name': 'New Customer',
+                        'email': 'new.customer.format@test.example.com',
+                        'lang': None,
+                        'reason': 'Customer Email',
+                        'create_values': {
+                            'company_name': 'Format Name',
+                            'email': 'new.customer.format@test.example.com',
+                            'name': 'Format Name',
+                            'user_id': self.user_sales_leads.id,
+                        },
+                  }],
+                [{
+                        'name': 'Multi Name',
+                        'email': 'new.customer.multi.1@test.example.com,new.customer.2@test.example.com',
+                        'lang': None,
+                        'reason': 'Customer Email',
+                        'create_values': {
+                            'company_name': 'Multi Name',
+                            'email': 'new.customer.multi.1@test.example.com',
+                            'name': 'Multi Name',
+                            'user_id': self.user_sales_leads.id,
+                        },
+                  }],
+                [{
+                        'name': 'Std Name',
+                        'email': 'new.customer.simple@test.example.com',
+                        'lang': None,
+                        'reason': 'Customer Email',
+                        'create_values': {
+                            'company_name': 'Std Name',
+                            'email': 'new.customer.simple@test.example.com',
+                            'name': 'Std Name',
+                            'user_id': self.user_sales_leads.id,
+                        },
+                  }],
+                [{
+                        'partner_id': self.contact_1.id,
+                        'name': 'Philip J Fry',
+                        'email': 'philip.j.fry@test.example.com',
+                        'lang': self.contact_1.lang,
+                        'reason': 'Customer',
+                        'create_values': {}
+                  }],
+                [{
+                  'partner_id': partner_no_email.id,
+                  'name': 'Test Partner',
+                  'lang': partner_no_email.lang,
+                  'reason': 'Customer',
+                  'create_values': {}
+                  }],
                 [
-                    (False, 'test_cc@odoo.com', None, 'CC Email', {}),
-                    (partner_no_email.id, 'Test Partner', partner_no_email.lang, 'Customer', {})
+                    {
+                      'name': False,
+                      'email': 'test_cc@odoo.com',
+                      'lang': None,
+                      'reason': 'CC Email',
+                      'create_values': {}
+                    },
+                    {
+                      'partner_id': partner_no_email.id,
+                      'name': 'Test Partner',
+                      'lang': partner_no_email.lang,
+                      'reason': 'Customer',
+                      'create_values':{}
+                    }
                 ]
             ]
         ):
             with self.subTest(lead=lead, lead_name=lead.name, email_from=lead.email_from):
-                res = lead._message_get_suggested_recipients()[lead.id]
+                res = lead._message_get_suggested_recipients()
                 self.assertEqual(len(res), len(expected_suggested))
-                self.assertEqual(res[0][:4], expected_suggested[0][:4])
-                for index, recepient in enumerate(expected_suggested):
-                    customer_data = recepient[4]
-                    if not customer_data:
-                        self.assertFalse(res[index][4])
+                for index, expected_recepient in enumerate(expected_suggested):
+                    expected_customer_data = expected_recepient.pop('create_values')
+                    res_customer_data = res[index].pop('create_values', {})
+                    self.assertItemsEqual(res[index], expected_recepient)
+                    if not expected_customer_data:
+                        self.assertFalse(res_customer_data)
                     else:
-                        for partner_fname in customer_data:
-                            found, expected_suggested = res[index][4][partner_fname], customer_data[partner_fname]
+                        for partner_fname in expected_customer_data:
+                            found, expected_suggested = res_customer_data[partner_fname], expected_customer_data[partner_fname]
                             self.assertEqual(
                                 found, expected_suggested,
                                 f'Lead suggested customer: wrong value for {partner_fname} got {found} instead of {expected_suggested}')
@@ -135,17 +183,30 @@ class NewLeadNotification(TestCrmCommon):
             }
         ])
         expected_list = [
-            (False, self.test_email, None, 'Customer Email', {'lang': None}),
-            (False, self.test_email, 'en_US', 'Customer Email', {'lang': 'en_US'}),
+            {
+                'name': 'Test Email',
+                'email': 'test.email@example.com',
+                'lang': None,
+                'reason': 'Customer Email',
+                'create_values': {'lang': None},
+            }, {
+                'name': 'Test Email',
+                'email': 'test.email@example.com',
+                'lang': 'en_US',
+                'reason': 'Customer Email',
+                'create_values': {'lang': 'en_US'},
+            },
         ]
         for lead, expected in zip(leads, expected_list):
             with self.subTest(lead=lead):
-                res = lead._message_get_suggested_recipients()[lead.id]
+                res = lead._message_get_suggested_recipients()
                 self.assertEqual(len(res), 1)
-                self.assertEqual(res[0][:4], expected[:4])
-                for partner_fname in expected[4]:
-                    found = res[0][4].get(partner_fname)
-                    expected = expected[4][partner_fname]
+                res_customer_data = res[0].pop('create_values')
+                customer_data = expected.pop('create_values')
+                self.assertItemsEqual(res[0], expected)
+                for partner_fname in customer_data:
+                    found = res_customer_data.get(partner_fname)
+                    expected = customer_data[partner_fname]
                     self.assertEqual(
                         found, expected,
                         f'Lead suggested customer: wrong value for {partner_fname} got {found} instead of {expected}')
@@ -166,7 +227,6 @@ class NewLeadNotification(TestCrmCommon):
             'phone': '678-728-0949',
             'mobile': '661-606-0781',
             'function': 'Delivery Boy',
-            'team_id': self.sales_team_1.id,
             'user_id': self.user_sales_manager.id,
         }
 
@@ -189,12 +249,12 @@ class NewLeadNotification(TestCrmCommon):
                     'partner_name': partner_name,
                     **lead_details_for_contact,
                 })
-                data = lead1._message_get_suggested_recipients()[lead1.id]
-                suggested_partner_id, suggested_partner_email, suggested_lang, suggested_reason, create_vals = data[0]
-                self.assertFalse(suggested_partner_id)
-                self.assertEqual(suggested_partner_email, formatted_email)
-                self.assertEqual(suggested_lang, lang.code)
-                self.assertEqual(suggested_reason, 'Customer Email')
+                data = lead1._message_get_suggested_recipients()[0]
+                create_vals = data.get('create_values')
+                self.assertFalse(data.get('partner_id'))
+                self.assertEqual(data.get('email'), formatted_email)
+                self.assertEqual(data.get('lang'), lang.code)
+                self.assertEqual(data.get('reason'), 'Customer Email')
                 self.assertEqual(create_vals, lead1._get_customer_information().get(email, {}))
                 for field, value in lead_details_for_contact.items():
                     self.assertEqual(create_vals.get(field), value)

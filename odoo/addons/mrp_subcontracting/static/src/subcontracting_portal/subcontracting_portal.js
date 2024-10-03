@@ -8,10 +8,12 @@ import { session } from '@web/session';
 import { Component, useEffect, useExternalListener } from "@odoo/owl";
 
 export class SubcontractingPortalWebClient extends Component {
+    static components = { ActionContainer, MainComponentsContainer };
+    static template = "mrp_subcontracting.SubcontractingPortalWebClient";
+    static props = {};
     setup() {
         window.parent.document.body.style.margin = "0"; // remove the margin in the parent body
         this.actionService = useService('action');
-        this.user = useService("user");
         useOwnDebugContext({ categories: ["default"] });
         useEffect(
             () => {
@@ -57,5 +59,3 @@ export class SubcontractingPortalWebClient extends Component {
     }
 }
 
-SubcontractingPortalWebClient.components = { ActionContainer, MainComponentsContainer };
-SubcontractingPortalWebClient.template = 'mrp_subcontracting.SubcontractingPortalWebClient';

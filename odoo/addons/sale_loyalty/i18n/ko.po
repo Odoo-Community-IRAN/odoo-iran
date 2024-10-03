@@ -3,15 +3,16 @@
 # 	* sale_loyalty
 # 
 # Translators:
-# Wil Odoo, 2023
+# Daye Jeong, 2024
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:55+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Wil Odoo, 2023\n"
+"POT-Creation-Date: 2024-09-26 08:56+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Korean (https://app.transifex.com/odoo/teams/41243/ko/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -22,7 +23,6 @@ msgstr ""
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid " - On product with the following taxes: %(taxes)s"
 msgstr "- 다음 세금이 포함된 품목: %(taxes)s"
 
@@ -32,16 +32,19 @@ msgid "<span class=\"fa fa-clipboard\"/> Copy"
 msgstr "<span class=\"fa fa-clipboard\"/> 복사"
 
 #. module: sale_loyalty
+#: model_terms:ir.ui.view,arch_db:sale_loyalty.sale_order_portal_loyalty_content
+msgid "<strong>Loyalty Card</strong>"
+msgstr ""
+
+#. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid "A better global discount is already applied."
 msgstr "더 유리한 글로벌 할인 항목이 이미 적용되었습니다."
 
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid ""
 "A minimum of %(amount)s %(currency)s should be purchased to get the reward"
 msgstr "혜택을 받으실 수 있는 최소 구매 금액은 %(amount)s%(currency)s 입니다."
@@ -92,7 +95,6 @@ msgstr "쿠폰 포인트"
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/wizard/sale_loyalty_reward_wizard.py:0
-#, python-format
 msgid "Coupon not found while trying to add the following reward: %s"
 msgstr "다음 리워드를 추가할 쿠폰을 찾을 수 없습니다: %s"
 
@@ -129,7 +131,6 @@ msgstr "할인 및 적립"
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid "Discount: %(desc)s%(tax_str)s"
 msgstr "할인: %(desc)s%(tax_str)s"
 
@@ -153,7 +154,6 @@ msgstr "만료일:"
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid "Free Product - %(product)s"
 msgstr "무료 상품 - %(product)s"
 
@@ -173,6 +173,11 @@ msgid "Gift cards & eWallet"
 msgstr "기프트 카드 및 e월렛"
 
 #. module: sale_loyalty
+#: model:ir.model,name:sale_loyalty.model_loyalty_history
+msgid "History for Loyalty cards and Ewallets"
+msgstr ""
+
+#. module: sale_loyalty
 #: model:ir.model.fields,help:sale_loyalty.field_sale_order_line__points_cost
 msgid "How much point this reward costs on the loyalty card."
 msgstr "이 리워드를 받기 위해 적립 카드에서 차감되는 포인트 금액."
@@ -187,14 +192,12 @@ msgstr "ID"
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid "Invalid product to claim."
 msgstr "잘못된 신청 상품입니다."
 
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/wizard/sale_loyalty_coupon_wizard.py:0
-#, python-format
 msgid "Invalid sales order."
 msgstr "잘못된 판매주문서입니다."
 
@@ -202,6 +205,17 @@ msgstr "잘못된 판매주문서입니다."
 #: model:ir.model.fields,field_description:sale_loyalty.field_sale_order_line__is_reward_line
 msgid "Is a program reward line"
 msgstr "프로그램 보상 내역 여부"
+
+#. module: sale_loyalty
+#: model_terms:ir.ui.view,arch_db:sale_loyalty.sale_order_portal_loyalty_content
+msgid "Issued"
+msgstr ""
+
+#. module: sale_loyalty
+#. odoo-javascript
+#: code:addons/sale_loyalty/static/src/views/fields/loyalty_total/loyalty_data_field.xml:0
+msgid "Issued :"
+msgstr ""
 
 #. module: sale_loyalty
 #: model:ir.model.fields,field_description:sale_loyalty.field_sale_loyalty_coupon_wizard__write_uid
@@ -218,9 +232,20 @@ msgid "Last Updated on"
 msgstr "최근 갱신 일자"
 
 #. module: sale_loyalty
+#. odoo-javascript
+#: code:addons/sale_loyalty/static/src/views/fields/loyalty_total/loyalty_data_field.xml:0
+msgid "Loyalty Card :"
+msgstr ""
+
+#. module: sale_loyalty
 #: model:ir.model,name:sale_loyalty.model_loyalty_card
 msgid "Loyalty Coupon"
 msgstr "적립 쿠폰"
+
+#. module: sale_loyalty
+#: model:ir.model.fields,field_description:sale_loyalty.field_sale_order__loyalty_data
+msgid "Loyalty Data"
+msgstr ""
 
 #. module: sale_loyalty
 #: model:ir.model,name:sale_loyalty.model_loyalty_program
@@ -250,7 +275,6 @@ msgstr "여러 개의 제품"
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid ""
 "No card found for this loyalty program and no points will be given with this"
 " order."
@@ -258,8 +282,13 @@ msgstr "이 적립 프로그램용 카드가 없으므로 이 주문에 대해 �
 
 #. module: sale_loyalty
 #. odoo-python
+#: code:addons/sale_loyalty/models/sale_order.py:0
+msgid "No product is compatible with this promotion."
+msgstr ""
+
+#. module: sale_loyalty
+#. odoo-python
 #: code:addons/sale_loyalty/wizard/sale_loyalty_reward_wizard.py:0
-#, python-format
 msgid "No reward selected."
 msgstr "선택한 리워드가 없습니다."
 
@@ -271,7 +300,6 @@ msgstr "이 고객에게 드릴 수 있는 리워드가 없습니다!"
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid "One or more rewards on the sale order is invalid. Please check them."
 msgstr "판매 주문에서 유효하지 않은 리워드 항목이 있습니다. 확인하시기 바랍니다."
 
@@ -281,6 +309,12 @@ msgstr "판매 주문에서 유효하지 않은 리워드 항목이 있습니다
 #: model:ir.model.fields,field_description:sale_loyalty.field_sale_order_coupon_points__order_id
 msgid "Order"
 msgstr "주문"
+
+#. module: sale_loyalty
+#. odoo-python
+#: code:addons/sale_loyalty/models/sale_order.py:0
+msgid "Order %s"
+msgstr "%s 주문"
 
 #. module: sale_loyalty
 #: model:ir.model.fields,field_description:sale_loyalty.field_loyalty_program__order_count
@@ -293,6 +327,8 @@ msgid "Order Reference"
 msgstr "주문 참조"
 
 #. module: sale_loyalty
+#. odoo-python
+#: code:addons/sale_loyalty/models/sale_order.py:0
 #: model:ir.model.fields,field_description:sale_loyalty.field_sale_order_coupon_points__points
 msgid "Points"
 msgstr "포인트"
@@ -303,13 +339,9 @@ msgid "Points Cost"
 msgstr "포인트 비용"
 
 #. module: sale_loyalty
-#: model_terms:ir.ui.view,arch_db:sale_loyalty.sale_order_view_form_inherit_sale_loyalty
-msgid "Promotions"
-msgstr "프로모션"
-
-#. module: sale_loyalty
 #: model:ir.model.fields,field_description:sale_loyalty.field_sale_loyalty_reward_wizard__reward_ids
 #: model:ir.model.fields,field_description:sale_loyalty.field_sale_order_line__reward_id
+#: model_terms:ir.ui.view,arch_db:sale_loyalty.sale_order_view_form_inherit_sale_loyalty
 msgid "Reward"
 msgstr "보상"
 
@@ -372,7 +404,6 @@ msgstr "선택한 리워드"
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid "TEMPORARY DISCOUNT LINE"
 msgstr "임시 할인 내역"
 
@@ -386,14 +417,12 @@ msgstr "여러 개의 리워드 내역을 동일한 리워드 항목에서 함�
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid "The coupon can only be claimed on future orders."
 msgstr "이후 주문 건에 대해서만 쿠폰을 사용할 수 있습니다."
 
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid "The coupon does not have enough points for the selected reward."
 msgstr "쿠폰 포인트가 해당 리워드를 선택하기에 충분하지 않습니다."
 
@@ -405,7 +434,6 @@ msgstr "쿠폰 포인트 항목이 이미 존재합니다."
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid "The program is not available for this order."
 msgstr "이 주문에는 해당 프로그램이 적용되지 않습니다."
 
@@ -417,7 +445,6 @@ msgstr "쿠폰이 생성되는 판매 주문"
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid "There is nothing to discount"
 msgstr "할인을 적용받을 내용이 없습니다."
 
@@ -429,57 +456,64 @@ msgstr "이 규칙에서 신청할 수 있는 상품입니다."
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid "This code is expired (%s)."
 msgstr "만료된 코드입니다 (%s)."
 
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid "This code is invalid (%s)."
 msgstr "유효하지 않은 코드입니다 (%s)."
 
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid "This coupon has already been used."
 msgstr "이미 사용된 쿠폰입니다."
 
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid "This coupon is expired."
 msgstr "만료된 쿠폰입니다."
 
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
+msgid ""
+"This discount (%(discount)s) is not compatible with \"%(other_discount)s\". "
+"Please remove it in order to apply this one."
+msgstr ""
+"이 할인 (%(discount)s)은 \"%(other_discount)s\"와 중복 적용되지 않습니다. 이 할인을 적용하려면 기존 "
+"할인을 제거하세요."
+
+#. module: sale_loyalty
+#. odoo-python
+#: code:addons/sale_loyalty/models/sale_order.py:0
+msgid "This program cannot be applied with code."
+msgstr "이 프로그램은 코드를 적용할 수 없습니다."
+
+#. module: sale_loyalty
+#. odoo-python
+#: code:addons/sale_loyalty/models/sale_order.py:0
 msgid "This program is already applied to this order."
 msgstr "이 주문에 이미 적용되어 있는 프로그램입니다."
 
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid "This program is not available for public users."
 msgstr "일반 사용자들이 사용할 수 없는 프로그램입니다."
 
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid "This program requires a code to be applied."
 msgstr "적용하려면 코드가 필요한 프로그램입니다."
 
 #. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid "This promo code is already applied."
 msgstr "이미 적용된 프로모션 코드입니다."
 
@@ -489,9 +523,19 @@ msgid "Update current promotional lines and select new rewards if applicable."
 msgstr "현재 프로모션 내용을 업데이트한 후 해당되는 경우 새로운 리워드를 선택하십시오."
 
 #. module: sale_loyalty
+#: model_terms:ir.ui.view,arch_db:sale_loyalty.sale_order_portal_loyalty_content
+msgid "Used"
+msgstr "사용됨"
+
+#. module: sale_loyalty
+#. odoo-javascript
+#: code:addons/sale_loyalty/static/src/views/fields/loyalty_total/loyalty_data_field.xml:0
+msgid "Used :"
+msgstr ""
+
+#. module: sale_loyalty
 #. odoo-python
 #: code:addons/sale_loyalty/models/sale_order.py:0
-#, python-format
 msgid "You don't have the required product quantities on your sales order."
 msgstr "판매 주문에 필요한 품목 수량이 없습니다."
 

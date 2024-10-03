@@ -1,8 +1,7 @@
-/** @odoo-module **/
-
 import { makeContext } from "@web/core/context";
 import { Domain } from "@web/core/domain";
 import { evaluateExpr } from "@web/core/py_js/py";
+import { user } from "@web/core/user";
 import { sortBy, groupBy } from "@web/core/utils/arrays";
 import { deepCopy } from "@web/core/utils/objects";
 import { SearchArchParser } from "./search_arch_parser";
@@ -20,7 +19,9 @@ import { FACET_ICONS, FACET_COLORS } from "./utils/misc";
 import { EventBus, toRaw } from "@odoo/owl";
 import { domainFromTree, treeFromDomain } from "@web/core/tree_editor/condition_tree";
 import { _t } from "@web/core/l10n/translation";
-import { useGetDomainTreeDescription } from "@web/core/domain_selector/utils";
+import { useGetTreeDescription, useMakeGetFieldDef } from "@web/core/tree_editor/utils";
+import { DomainSelectorDialog } from "@web/core/domain_selector_dialog/domain_selector_dialog";
+import { getDefaultDomain } from "@web/core/domain_selector/utils";
 
 const { DateTime } = luxon;
 
@@ -169,19 +170,20 @@ export class SearchModel extends EventBus {
      */
     setup(services) {
         // services
-        const { field: fieldService, name: nameService, orm, user, view } = services;
+        const { field: fieldService, name: nameService, orm, view, dialog } = services;
         this.orm = orm;
         this.fieldService = fieldService;
-        this.userService = user;
         this.viewService = view;
+        this.dialog = dialog;
+        this.orderByCount = false;
 
-        this.getDomainTreeDescription = useGetDomainTreeDescription(fieldService, nameService);
+        this.getDomainTreeDescription = useGetTreeDescription(fieldService, nameService);
+        this.makeGetFieldDef = useMakeGetFieldDef(fieldService);
 
         // used to manage search items related to date/datetime fields
         this.referenceMoment = DateTime.local();
         this.comparisonOptions = getComparisonOptions();
         this.intervalOptions = getIntervalOptions();
-        this.optionGenerators = getPeriodOptions(this.referenceMoment);
     }
 
     /**
@@ -226,6 +228,7 @@ export class SearchModel extends EventBus {
         this.hideCustomGroupBy = hideCustomGroupBy;
 
         this.searchMenuTypes = new Set(config.searchMenuTypes || ["filter", "groupBy", "favorite"]);
+        this.canOrderByCount = config.canOrderByCount;
 
         let { irFilters, loadIrFilters, searchViewArch, searchViewFields, searchViewId } = config;
         const loadSearchView =
@@ -242,6 +245,7 @@ export class SearchModel extends EventBus {
                 },
                 {
                     actionId: this.env.config.actionId,
+                    embeddedActionId: this.env.config.currentEmbeddedActionId,
                     loadIrFilters: loadIrFilters || false,
                 }
             );
@@ -416,7 +420,7 @@ export class SearchModel extends EventBus {
     }
 
     get domainEvalContext() {
-        return Object.assign({}, this.globalContext, this.userService.context);
+        return Object.assign({}, this.globalContext, user.context);
     }
 
     /**
@@ -539,6 +543,7 @@ export class SearchModel extends EventBus {
      */
     clearQuery() {
         this.query = [];
+        this.orderByCount = false;
         this._notify();
     }
 
@@ -652,6 +657,7 @@ export class SearchModel extends EventBus {
             return searchItem.groupId !== groupId;
         });
         this._checkComparisonStatus();
+        this._checkOrderByCountStatus();
         this._notify();
     }
 
@@ -707,25 +713,20 @@ export class SearchModel extends EventBus {
             return searchItem.comparison;
         }
         const { dateFilterId, comparisonOptionId } = searchItem;
-        const {
-            fieldName,
-            fieldType,
-            description: dateFilterDescription,
-        } = this.searchItems[dateFilterId];
+        const dateFilter = this.searchItems[dateFilterId];
+        const { fieldName, description: dateFilterDescription } = dateFilter;
         const selectedGeneratorIds = this._getSelectedGeneratorIds(dateFilterId);
         // compute range and range description
         const { domain: range, description: rangeDescription } = constructDateDomain(
             this.referenceMoment,
-            fieldName,
-            fieldType,
+            dateFilter,
             selectedGeneratorIds
         );
         // compute comparisonRange and comparisonRange description
         const { domain: comparisonRange, description: comparisonRangeDescription } =
             constructDateDomain(
                 this.referenceMoment,
-                fieldName,
-                fieldType,
+                dateFilter,
                 selectedGeneratorIds,
                 comparisonOptionId
             );
@@ -758,16 +759,17 @@ export class SearchModel extends EventBus {
      */
     getSearchItems(predicate) {
         const searchItems = [];
-        Object.values(this.searchItems).forEach((searchItem) => {
-            const isInvisible =
-                "invisible" in searchItem && evaluateExpr(searchItem.invisible, this.globalContext);
-            if (!isInvisible && (!predicate || predicate(searchItem))) {
-                const enrichedSearchitem = this._enrichItem(searchItem);
-                if (enrichedSearchitem) {
+        for (const searchItem of Object.values(this.searchItems)) {
+            const enrichedSearchitem = this._enrichItem(searchItem);
+            if (enrichedSearchitem) {
+                const isInvisible =
+                    "invisible" in searchItem &&
+                    evaluateExpr(searchItem.invisible, this.globalContext);
+                if (!isInvisible && (!predicate || predicate(enrichedSearchitem))) {
                     searchItems.push(enrichedSearchitem);
                 }
             }
-        });
+        }
         if (searchItems.some((f) => f.type === "favorite")) {
             searchItems.sort((f1, f2) => f1.groupNumber - f2.groupNumber);
         }
@@ -809,7 +811,8 @@ export class SearchModel extends EventBus {
             context = makeContext(contexts);
         }
 
-        const tree = treeFromDomain(domain, { distributeNot: !this.isDebugMode });
+        const getFieldDef = await this.makeGetFieldDef(this.resModel, treeFromDomain(domain));
+        const tree = treeFromDomain(domain, { distributeNot: !this.isDebugMode, getFieldDef });
         const trees = !tree.negate && tree.value === "&" ? tree.children : [tree];
         const promises = trees.map(async (tree) => {
             const description = await this.getDomainTreeDescription(this.resModel, tree);
@@ -882,6 +885,24 @@ export class SearchModel extends EventBus {
     }
 
     /**
+     * Clears all values from the provided sections
+     * @param {array} sectionIds
+     */
+    clearSections(sectionIds) {
+        for (const sectionId of sectionIds) {
+            const section = this.sections.get(sectionId);
+            if (section.type === "category") {
+                section.activeValueId = false;
+            } else {
+                for (const [, value] of section.values) {
+                    value.checked = false;
+                }
+            }
+        }
+        this._notify();
+    }
+
+    /**
      * Activate or deactivate the simple filter with given filterId, i.e.
      * add or remove a corresponding query element.
      */
@@ -898,6 +919,7 @@ export class SearchModel extends EventBus {
         const index = this.query.findIndex((queryElem) => queryElem.searchItemId === searchItemId);
         if (index >= 0) {
             this.query.splice(index, 1);
+            this._checkOrderByCountStatus();
         } else {
             if (searchItem.type === "favorite") {
                 this.query = [];
@@ -943,13 +965,28 @@ export class SearchModel extends EventBus {
                     );
                 }
             } else {
+                if (generatorId.startsWith("custom")) {
+                    const comparisonId = this._getActiveComparison()?.id;
+                    this.query = this.query.filter(
+                        (queryElem) =>
+                            ![searchItemId, comparisonId].includes(queryElem.searchItemId)
+                    );
+                    this.query.push({ searchItemId, generatorId });
+                    continue;
+                }
+                this.query = this.query.filter(
+                    (queryElem) =>
+                        queryElem.searchItemId !== searchItemId ||
+                        !queryElem.generatorId.startsWith("custom")
+                );
                 this.query.push({ searchItemId, generatorId });
                 if (!yearSelected(this._getSelectedGeneratorIds(searchItemId))) {
-                    // Here we add 'this_year' as options if no option of type
+                    // Here we add 'year' as options if no option of type
                     // year is already selected.
-                    const { defaultYearId } = this.optionGenerators.find(
-                        (o) => o.id === generatorId
-                    );
+                    const { defaultYearId } = getPeriodOptions(
+                        this.referenceMoment,
+                        searchItem.optionsParams
+                    ).find((o) => o.id === generatorId);
                     this.query.push({ searchItemId, generatorId: defaultYearId });
                 }
             }
@@ -972,8 +1009,34 @@ export class SearchModel extends EventBus {
         );
         if (index >= 0) {
             this.query.splice(index, 1);
+            this._checkOrderByCountStatus();
         } else {
             this.query.push({ searchItemId, intervalId });
+        }
+        this._notify();
+    }
+
+    async spawnCustomFilterDialog() {
+        const domain = getDefaultDomain(this.searchViewFields);
+        this.dialog.add(DomainSelectorDialog, {
+            resModel: this.resModel,
+            defaultConnector: "|",
+            domain,
+            context: this.domainEvalContext,
+            onConfirm: (domain) => this.splitAndAddDomain(domain),
+            disableConfirmButton: (domain) => domain === `[]`,
+            title: _t("Add Custom Filter"),
+            confirmButtonText: _t("Add"),
+            discardButtonText: _t("Cancel"),
+            isDebugMode: this.isDebugMode,
+        });
+    }
+
+    switchGroupBySort() {
+        if (this.orderByCount === "Desc") {
+            this.orderByCount = "Asc";
+        } else {
+            this.orderByCount = "Desc";
         }
         this._notify();
     }
@@ -1200,6 +1263,17 @@ export class SearchModel extends EventBus {
         }
     }
 
+    _checkOrderByCountStatus() {
+        if (
+            this.orderByCount &&
+            !this.query.some((item) =>
+                ["dateGroupBy", "groupBy"].includes(this.searchItems[item.searchItemId].type)
+            )
+        ) {
+            this.orderByCount = false;
+        }
+    }
+
     /**
      * @param {string} sectionId
      * @param {Object} result
@@ -1399,7 +1473,9 @@ export class SearchModel extends EventBus {
             case "comparison": {
                 const { dateFilterId } = searchItem;
                 const dateFilterIsActive = this.query.some(
-                    (queryElem) => queryElem.searchItemId === dateFilterId
+                    (queryElem) =>
+                        queryElem.searchItemId === dateFilterId &&
+                        !queryElem.generatorId.startsWith("custom")
                 );
                 if (!dateFilterIsActive) {
                     return null;
@@ -1408,7 +1484,7 @@ export class SearchModel extends EventBus {
             }
             case "dateFilter":
                 enrichSearchItem.options = _enrichOptions(
-                    this.optionGenerators,
+                    getPeriodOptions(this.referenceMoment, searchItem.optionsParams),
                     queryElements.map((queryElem) => queryElem.generatorId)
                 );
                 break;
@@ -1579,7 +1655,7 @@ export class SearchModel extends EventBus {
      */
     _getContext() {
         const groups = this._getGroups();
-        const contexts = [this.userService.context];
+        const contexts = [user.context];
         for (const group of groups) {
             for (const activeItem of group.activeItems) {
                 const context = this._getSearchItemContext(activeItem);
@@ -1607,13 +1683,7 @@ export class SearchModel extends EventBus {
      * with a date filter starting from its corresponding query elements.
      */
     _getDateFilterDomain(dateFilter, generatorIds, key = "domain") {
-        const { fieldName, fieldType } = dateFilter;
-        const dateFilterRange = constructDateDomain(
-            this.referenceMoment,
-            fieldName,
-            fieldType,
-            generatorIds
-        );
+        const dateFilterRange = constructDateDomain(this.referenceMoment, dateFilter, generatorIds);
         return dateFilterRange[key];
     }
 
@@ -1754,7 +1824,12 @@ export class SearchModel extends EventBus {
             if (type === "field") {
                 facet.title = title;
             } else {
-                facet.icon = FACET_ICONS[type];
+                if (type === "groupBy" && this.orderByCount) {
+                    facet.icon =
+                        FACET_ICONS[this.orderByCount === "Asc" ? "groupByAsc" : "groupByDesc"];
+                } else {
+                    facet.icon = FACET_ICONS[type];
+                }
                 facet.color = FACET_COLORS[type];
             }
             if (groupActiveItemDomains.length) {
@@ -1771,10 +1846,16 @@ export class SearchModel extends EventBus {
      * of a search item of type 'field'.
      */
     _getFieldDomain(field, autocompleteValues) {
-        const domains = autocompleteValues.map(({ label, value, operator }) => {
+        const domains = autocompleteValues.map(({ label, value, operator, enforceEqual }) => {
             let domain;
             if (field.filterDomain) {
-                domain = new Domain(field.filterDomain).toList({
+                let filterDomain = field.filterDomain;
+                if (enforceEqual) {
+                    filterDomain = field.filterDomain
+                        .replaceAll("'ilike'", "'='")
+                        .replaceAll('"ilike"', '"="');
+                }
+                domain = new Domain(filterDomain).toList({
                     self: label.trim(),
                     raw_value: value,
                 });
@@ -1994,7 +2075,7 @@ export class SearchModel extends EventBus {
      * @returns {{ preFavorite: Object, irFilter: Object }}
      */
     _getIrFilterDescription(params = {}) {
-        const { description, isDefault, isShared } = params;
+        const { description, isDefault, isShared, embeddedActionId } = params;
         const fns = this.env.__getContext__.callbacks;
         const localContext = Object.assign({}, ...fns.map((fn) => fn()));
         const gs = this.env.__getOrderBy__.callbacks;
@@ -2003,7 +2084,7 @@ export class SearchModel extends EventBus {
             localOrderBy = gs.flatMap((g) => g());
         }
         const context = makeContext([this._getContext(), localContext]);
-        const userContext = this.userService.context;
+        const userContext = user.context;
         for (const key in context) {
             if (key in userContext || /^search(panel)?_default_/.test(key)) {
                 // clean search defaults and user context keys
@@ -2014,7 +2095,7 @@ export class SearchModel extends EventBus {
         const groupBys = this._getGroupBy();
         const comparison = this.getFullComparison();
         const orderBy = localOrderBy || this._getOrderBy();
-        const userId = isShared ? false : this.userService.userId;
+        const userId = isShared ? false : user.userId;
 
         const preFavorite = {
             description,
@@ -2030,6 +2111,8 @@ export class SearchModel extends EventBus {
             action_id: this.env.config.actionId,
             model_id: this.resModel,
             domain,
+            embedded_action_id: embeddedActionId,
+            embedded_parent_res_id: this.globalContext.active_id || false,
             is_default: isDefault,
             sort: JSON.stringify(orderBy.map((o) => `${o.name}${o.asc === false ? " desc" : ""}`)),
             user_id: userId,
@@ -2050,6 +2133,9 @@ export class SearchModel extends EventBus {
     _getOrderBy() {
         const groups = this._getGroups();
         const orderBy = [];
+        if (this.groupBy.length && this.orderByCount) {
+            orderBy.push({ name: "__count", asc: this.orderByCount === "Asc" });
+        }
         for (const group of groups) {
             for (const activeItem of group.activeItems) {
                 const { searchItemId } = activeItem;
@@ -2204,7 +2290,7 @@ export class SearchModel extends EventBus {
             userId = irFilter.user_id[0];
         }
         const groupNumber = userId ? FAVORITE_PRIVATE_GROUP : FAVORITE_SHARED_GROUP;
-        const context = evaluateExpr(irFilter.context, this.userService.context);
+        const context = evaluateExpr(irFilter.context, user.context);
         let groupBys = [];
         if (context.group_by) {
             groupBys = context.group_by;

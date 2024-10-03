@@ -154,7 +154,7 @@ class TestSubcontractingDropshippingFlows(TestMrpSubcontractingCommon):
 
         p_finished, p_compo = self.env['product.product'].create([{
             'name': 'Finished Product',
-            'type': 'product',
+            'is_storable': True,
             'seller_ids': [(0, 0, {'partner_id': subcontractor.id})],
         }, {
             'name': 'Component',
@@ -203,7 +203,7 @@ class TestSubcontractingDropshippingFlows(TestMrpSubcontractingCommon):
 
         p_finished, p_compo = self.env['product.product'].create([{
             'name': 'Finished Product',
-            'type': 'product',
+            'is_storable': True,
             'seller_ids': [(0, 0, {'partner_id': subcontractor.id})],
         }, {
             'name': 'Component',
@@ -251,18 +251,14 @@ class TestSubcontractingDropshippingFlows(TestMrpSubcontractingCommon):
         self.assertEqual(po.order_line.qty_received, 2)
 
         # return 1 x P_finished to the stock location
-        stock_location = self.warehouse.lot_stock_id
-        stock_location.return_location = True
         return_form = Form(self.env['stock.return.picking'].with_context(active_ids=delivery.ids, active_id=delivery.id, active_model='stock.picking'))
         with return_form.product_return_moves.edit(0) as line:
             line.quantity = 1.0
-        return_form.location_id = stock_location
         return_wizard = return_form.save()
-        return_picking_id, _pick_type_id = return_wizard._create_returns()
-
-        delivery_return01 = self.env['stock.picking'].browse(return_picking_id)
+        delivery_return01 = return_wizard._create_return()
         delivery_return01.move_line_ids.quantity = 1.0
         delivery_return01.move_ids.picked = True
+        delivery_return01.location_dest_id = self.warehouse.lot_stock_id
         delivery_return01.button_validate()
 
         self.assertEqual(delivery_return01.state, 'done')
@@ -270,15 +266,12 @@ class TestSubcontractingDropshippingFlows(TestMrpSubcontractingCommon):
         self.assertEqual(po.order_line.qty_received, 2, 'One product has been returned to the stock location, so we should still consider it as received')
 
         # return 1 x P_finished to the supplier location
-        supplier_location = dropship_picking_type.default_location_src_id
         return_form = Form(self.env['stock.return.picking'].with_context(active_ids=delivery.ids, active_id=delivery.id, active_model='stock.picking'))
         with return_form.product_return_moves.edit(0) as line:
             line.quantity = 1.0
-        return_form.location_id = supplier_location
         return_wizard = return_form.save()
-        return_picking_id, _pick_type_id = return_wizard._create_returns()
-
-        delivery_return02 = self.env['stock.picking'].browse(return_picking_id)
+        delivery_return02 = return_wizard._create_return()
+        delivery_return02.location_dest_id = dropship_picking_type.default_location_src_id
         delivery_return02.move_line_ids.quantity = 1.0
         delivery_return02.move_ids.picked = True
         delivery_return02.button_validate()
@@ -299,11 +292,11 @@ class TestSubcontractingDropshippingFlows(TestMrpSubcontractingCommon):
 
         super_product, product, component = self.env['product.product'].create([{
             'name': 'Super Product',
-            'type': 'product',
+            'is_storable': True,
             'seller_ids': [(0, 0, {'partner_id': super_subcontractor.id})],
         }, {
             'name': 'Product',
-            'type': 'product',
+            'is_storable': True,
             'seller_ids': [(0, 0, {'partner_id': subcontractor.id})],
         }, {
             'name': 'Component',
@@ -371,7 +364,7 @@ class TestSubcontractingDropshippingFlows(TestMrpSubcontractingCommon):
 
         product01, product02, component = self.env['product.product'].create([{
             'name': name,
-            'type': 'product',
+            'is_storable': True,
             'seller_ids': [(0, 0, {'partner_id': vendor.id})],
             'route_ids': [(6, 0, routes)],
         } for name, vendor, routes in [
@@ -418,7 +411,7 @@ class TestSubcontractingDropshippingFlows(TestMrpSubcontractingCommon):
 
         compo_drop, compo_rr = self.env['product.product'].create([{
             'name': name,
-            'type': 'product',
+            'is_storable': True,
             'seller_ids': [Command.create({'partner_id': self.subcontractor_partner1.parent_id.id})],
             'route_ids': [Command.set(routes)],
         } for name, routes in [
@@ -453,14 +446,14 @@ class TestSubcontractingDropshippingFlows(TestMrpSubcontractingCommon):
         # Need to add the subcontractor as Vendor to have the bom read as subcontracted.
         self.comp1.write({'seller_ids': [Command.create({'partner_id': self.subcontractor_partner1.id})]})
 
-        report = self.env['report.mrp.report_bom_structure'].with_context(warehouse=warehouse.id)._get_report_data(bom_subcontract.id)
+        report = self.env['report.mrp.report_bom_structure'].with_context(warehouse_id=warehouse.id)._get_report_data(bom_subcontract.id)
         component_lines = report.get('lines', []).get('components', [])
         self.assertEqual(component_lines[0]['product_id'], compo_drop.id)
         self.assertEqual(component_lines[0]['route_name'], 'Dropship Subcontractor on Order')
         self.assertEqual(component_lines[1]['product_id'], compo_rr.id)
         self.assertEqual(component_lines[1]['route_name'], 'Buy', 'Despite the RR linked to it, it should still display the Buy route')
 
-        report = self.env['report.mrp.report_bom_structure'].with_context(warehouse=warehouse.id)._get_report_data(bom_local.id)
+        report = self.env['report.mrp.report_bom_structure'].with_context(warehouse_id=warehouse.id)._get_report_data(bom_local.id)
         component_lines = report.get('lines', []).get('components', [])
         self.assertEqual(component_lines[0]['product_id'], compo_drop.id)
         self.assertEqual(component_lines[0]['route_name'], 'Buy', 'Outside of the subcontracted context, it should try to resupply stock.')

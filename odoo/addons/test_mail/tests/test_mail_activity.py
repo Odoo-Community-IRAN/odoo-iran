@@ -14,8 +14,8 @@ import random
 from odoo import fields, exceptions, tests
 from odoo.addons.mail.tests.common import mail_new_test_user, MailCommon
 from odoo.addons.test_mail.models.test_mail_models import MailTestActivity
+from odoo.tests import Form, HttpCase, users
 from odoo.tools import mute_logger
-from odoo.tests.common import Form, users, HttpCase, tagged
 
 
 class TestActivityCommon(MailCommon):
@@ -50,14 +50,13 @@ class TestActivityRights(TestActivityCommon):
 
     @mute_logger('odoo.addons.mail.models.mail_mail')
     def test_activity_security_user_noaccess_automated(self):
-        def _employee_crash(*args, **kwargs):
+        def _employee_crash(records, operation):
             """ If employee is test employee, consider they have no access on document """
-            recordset = args[0]
-            if recordset.env.uid == self.user_employee.id:
-                raise exceptions.AccessError('Hop hop hop Ernest, please step back.')
+            if records.env.uid == self.user_employee.id and not records.env.su:
+                return records, lambda: exceptions.AccessError('Hop hop hop Ernest, please step back.')
             return DEFAULT
 
-        with patch.object(MailTestActivity, 'check_access_rights', autospec=True, side_effect=_employee_crash):
+        with patch.object(MailTestActivity, '_check_access', autospec=True, side_effect=_employee_crash):
             activity = self.test_record.activity_schedule(
                 'test_mail.mail_act_test_todo',
                 user_id=self.user_employee.id)
@@ -66,10 +65,9 @@ class TestActivityRights(TestActivityCommon):
             activity2.write({'user_id': self.user_employee.id})
 
     def test_activity_security_user_noaccess_manual(self):
-        def _employee_crash(*args, **kwargs):
+        def _employee_crash(records, operation):
             """ If employee is test employee, consider they have no access on document """
-            recordset = args[0]
-            if recordset.env.uid == self.user_employee.id:
+            if records.env.uid == self.user_employee.id and not records.env.su:
                 raise exceptions.AccessError('Hop hop hop Ernest, please step back.')
             return DEFAULT
 
@@ -87,7 +85,7 @@ class TestActivityRights(TestActivityCommon):
             [('id', '=', test_activity.id)])
 
         # cannot _search activities if no access to the document
-        with patch.object(MailTestActivity, 'check_access_rights', autospec=True, side_effect=_employee_crash):
+        with patch.object(MailTestActivity, '_check_access', autospec=True, side_effect=_employee_crash):
             with self.assertRaises(exceptions.AccessError):
                 searched_activity = self.env['mail.activity'].with_user(self.user_employee)._search(
                     [('id', '=', test_activity.id)])
@@ -102,7 +100,7 @@ class TestActivityRights(TestActivityCommon):
         self.assertEqual('Summary', read_group_result[0]['summary'])
 
         # cannot read_group activities if no access to the document
-        with patch.object(MailTestActivity, 'check_access_rights', autospec=True, side_effect=_employee_crash):
+        with patch.object(MailTestActivity, '_check_access', autospec=True, side_effect=_employee_crash):
             with self.assertRaises(exceptions.AccessError):
                 self.env['mail.activity'].with_user(self.user_employee).read_group(
                     [('id', '=', test_activity.id)],
@@ -111,21 +109,21 @@ class TestActivityRights(TestActivityCommon):
                 )
 
         # cannot read activities if no access to the document
-        with patch.object(MailTestActivity, 'check_access_rights', autospec=True, side_effect=_employee_crash):
+        with patch.object(MailTestActivity, '_check_access', autospec=True, side_effect=_employee_crash):
             with self.assertRaises(exceptions.AccessError):
                 searched_activity = self.env['mail.activity'].with_user(self.user_employee).search(
                     [('id', '=', test_activity.id)])
                 searched_activity.read(['summary'])
 
         # cannot search_read activities if no access to the document
-        with patch.object(MailTestActivity, 'check_access_rights', autospec=True, side_effect=_employee_crash):
+        with patch.object(MailTestActivity, '_check_access', autospec=True, side_effect=_employee_crash):
             with self.assertRaises(exceptions.AccessError):
                 self.env['mail.activity'].with_user(self.user_employee).search_read(
                     [('id', '=', test_activity.id)],
                     ['summary'])
 
         # can create activities for people that cannot access record
-        with patch.object(MailTestActivity, 'check_access_rights', autospec=True, side_effect=_employee_crash):
+        with patch.object(MailTestActivity, '_check_access', autospec=True, side_effect=_employee_crash):
             self.env['mail.activity'].create({
                 'activity_type_id': self.env.ref('test_mail.mail_act_test_todo').id,
                 'res_model_id': self.env.ref('test_mail.model_mail_test_activity').id,
@@ -134,7 +132,7 @@ class TestActivityRights(TestActivityCommon):
             })
 
         # cannot create activities if no access to the document
-        with patch.object(MailTestActivity, 'check_access_rights', autospec=True, side_effect=_employee_crash):
+        with patch.object(MailTestActivity, '_check_access', autospec=True, side_effect=_employee_crash):
             with self.assertRaises(exceptions.AccessError):
                 activity = self.test_record.with_user(self.user_employee).activity_schedule(
                     'test_mail.mail_act_test_todo',
@@ -144,14 +142,14 @@ class TestActivityRights(TestActivityCommon):
         test_activity.flush_recordset()
 
         # user can read activities assigned to him even if he has no access to the document
-        with patch.object(MailTestActivity, 'check_access_rights', autospec=True, side_effect=_employee_crash):
+        with patch.object(MailTestActivity, '_check_access', autospec=True, side_effect=_employee_crash):
             found = self.env['mail.activity'].with_user(self.user_employee).search(
                 [('id', '=', test_activity.id)])
             self.assertEqual(found, test_activity)
             found.read(['summary'])
 
         # user can read_group activities assigned to him even if he has no access to the document
-        with patch.object(MailTestActivity, 'check_access_rights', autospec=True, side_effect=_employee_crash):
+        with patch.object(MailTestActivity, '_check_access', autospec=True, side_effect=_employee_crash):
             read_group_result = self.env['mail.activity'].with_user(self.user_employee).read_group(
                 [('id', '=', test_activity.id)],
                 ['summary'],
@@ -776,23 +774,26 @@ class TestActivityMixin(TestActivityCommon):
             self.assertEqual(test_record_1, record)
 
 
-@tests.tagged('mail_activity')
-class TestActivitySystray(TestActivityCommon):
+@tests.tagged("mail_activity")
+class TestActivitySystray(TestActivityCommon, HttpCase):
     """Test for systray_get_activities"""
 
+    @freeze_time("2024-01-15 14:00:00 UTC")
+    @users("employee")
     def test_systray_activities_for_archived_records(self):
         """Check that activities made on archived records are shown in the
-        systray activities. """
-        test_record = self.test_record.with_user(self.user_employee)
-        test_record.action_archive()
-        test_record.activity_schedule(
-            'test_mail.mail_act_test_todo',
-            user_id=self.env.user.id,
+        systray activities."""
+        self.test_record.action_archive()
+        self.test_record.activity_schedule(
+            "test_mail.mail_act_test_todo",
+            user_id=self.user_employee.id,
         )
-
+        self.authenticate(self.user_employee.login, self.user_employee.login)
+        data = self.make_jsonrpc_request("/mail/data", {"systray_get_activities": True})
         total_count = sum(
-            record['total_count'] for record in self.env.user.systray_get_activities()
-            if record.get('model') == test_record._name
+            record["total_count"]
+            for record in data["Store"]["activityGroups"]
+            if record.get("model") == self.test_record._name
         )
         self.assertEqual(total_count, 1)
 
@@ -964,47 +965,48 @@ class TestORM(TestActivityCommon):
         # Don't mistake fields date and date_deadline:
         # * date is just a random value
         # * date_deadline defines activity_state
-        self.env['mail.test.activity'].create({
-            'date': '2021-05-02',
-            'name': "Yesterday, all my troubles seemed so far away",
-        }).activity_schedule(
-            'test_mail.mail_act_test_todo',
-            summary="Make another test super asap (yesterday)",
-            date_deadline=fields.Date.context_today(MailTestActivityCtx) - timedelta(days=7),
-        )
-        self.env['mail.test.activity'].create({
-            'date': '2021-05-09',
-            'name': "Things we said today",
-        }).activity_schedule(
-            'test_mail.mail_act_test_todo',
-            summary="Make another test asap",
-            date_deadline=fields.Date.context_today(MailTestActivityCtx),
-        )
-        self.env['mail.test.activity'].create({
-            'date': '2021-05-16',
-            'name': "Tomorrow Never Knows",
-        }).activity_schedule(
-            'test_mail.mail_act_test_todo',
-            summary="Make a test tomorrow",
-            date_deadline=fields.Date.context_today(MailTestActivityCtx) + timedelta(days=7),
-        )
+        with freeze_time("2024-09-24 10:00:00"):
+            self.env['mail.test.activity'].create({
+                'date': '2021-05-02',
+                'name': "Yesterday, all my troubles seemed so far away",
+            }).activity_schedule(
+                'test_mail.mail_act_test_todo',
+                summary="Make another test super asap (yesterday)",
+                date_deadline=fields.Date.context_today(MailTestActivityCtx) - timedelta(days=7),
+            )
+            self.env['mail.test.activity'].create({
+                'date': '2021-05-09',
+                'name': "Things we said today",
+            }).activity_schedule(
+                'test_mail.mail_act_test_todo',
+                summary="Make another test asap",
+                date_deadline=fields.Date.context_today(MailTestActivityCtx),
+            )
+            self.env['mail.test.activity'].create({
+                'date': '2021-05-16',
+                'name': "Tomorrow Never Knows",
+            }).activity_schedule(
+                'test_mail.mail_act_test_todo',
+                summary="Make a test tomorrow",
+                date_deadline=fields.Date.context_today(MailTestActivityCtx) + timedelta(days=7),
+            )
 
-        domain = [('date', "!=", False)]
-        groupby = "date:week"
-        progress_bar = {
-            'field': 'activity_state',
-            'colors': {
-                "overdue": 'danger',
-                "today": 'warning',
-                "planned": 'success',
+            domain = [('date', "!=", False)]
+            groupby = "date:week"
+            progress_bar = {
+                'field': 'activity_state',
+                'colors': {
+                    "overdue": 'danger',
+                    "today": 'warning',
+                    "planned": 'success',
+                }
             }
-        }
 
-        # call read_group to compute group names
-        groups = MailTestActivityCtx.read_group(domain, fields=['date'], groupby=[groupby])
-        progressbars = MailTestActivityCtx.read_progress_bar(domain, group_by=groupby, progress_bar=progress_bar)
-        self.assertEqual(len(groups), 3)
-        self.assertEqual(len(progressbars), 3)
+            # call read_group to compute group names
+            groups = MailTestActivityCtx.read_group(domain, fields=['date'], groupby=[groupby])
+            progressbars = MailTestActivityCtx.read_progress_bar(domain, group_by=groupby, progress_bar=progress_bar)
+            self.assertEqual(len(groups), 3)
+            self.assertEqual(len(progressbars), 3)
 
         # format the read_progress_bar result to get a dictionary under this
         # format: {activity_state: group_name}; the original format
@@ -1019,7 +1021,7 @@ class TestORM(TestActivityCommon):
         self.assertEqual(groups[2][groupby], pg_groups["planned"])
 
 
-@tagged('post_install', '-at_install')
+@tests.tagged('post_install', '-at_install')
 class TestTours(HttpCase):
     def test_activity_view_data_with_offset(self):
         self.patch(MailTestActivity, '_order', 'date desc, id desc')
@@ -1073,8 +1075,7 @@ class TestTours(HttpCase):
             """,
         })
         self.start_tour(
-            "/web?debug=1",
+            "/odoo?debug=1",
             "mail_activity_view",
             login="admin",
-            timeout=600000
         )

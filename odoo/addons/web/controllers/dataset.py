@@ -2,6 +2,7 @@
 
 import logging
 import warnings
+from werkzeug.exceptions import NotFound
 
 from odoo import http
 from odoo.api import call_kw
@@ -15,17 +16,28 @@ _logger = logging.getLogger(__name__)
 
 class DataSet(http.Controller):
 
-    def _call_kw(self, model, method, args, kwargs):
+    def _call_kw_readonly(self):
+        params = request.get_json_data()['params']
+        try:
+            model_class = request.registry[params['model']]
+        except KeyError as e:
+            raise NotFound() from e
+        method_name = params['method']
+        for cls in model_class.mro():
+            method = getattr(cls, method_name, None)
+            if method is not None and hasattr(method, '_readonly'):
+                return method._readonly
+        return False
+
+    @http.route(['/web/dataset/call_kw', '/web/dataset/call_kw/<path:path>'], type='json', auth="user", readonly=_call_kw_readonly)
+    def call_kw(self, model, method, args, kwargs, path=None):
         check_method_name(method)
         return call_kw(request.env[model], method, args, kwargs)
 
-    @http.route(['/web/dataset/call_kw', '/web/dataset/call_kw/<path:path>'], type='json', auth="user")
-    def call_kw(self, model, method, args, kwargs, path=None):
-        return self._call_kw(model, method, args, kwargs)
-
-    @http.route('/web/dataset/call_button', type='json', auth="user")
-    def call_button(self, model, method, args, kwargs):
-        action = self._call_kw(model, method, args, kwargs)
+    @http.route(['/web/dataset/call_button', '/web/dataset/call_button/<path:path>'], type='json', auth="user", readonly=_call_kw_readonly)
+    def call_button(self, model, method, args, kwargs, path=None):
+        check_method_name(method)
+        action = call_kw(request.env[model], method, args, kwargs)
         if isinstance(action, dict) and action.get('type') != '':
             return clean_action(action, env=request.env)
         return False

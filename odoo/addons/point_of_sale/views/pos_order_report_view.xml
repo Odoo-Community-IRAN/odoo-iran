@@ -26,11 +26,11 @@
         </record>
 
         <record id="report_pos_order_view_tree" model="ir.ui.view">
-            <field name="name">report.pos.order.view.tree</field>
+            <field name="name">report.pos.order.view.list</field>
             <field name="model">report.pos.order</field>
             <field name="arch" type="xml">
-                <tree string="Point of Sale Analysis">
-                    <field name="date" widget="date"/>
+                <list string="Point of Sale Analysis">
+                    <field name="date"/>
                     <field name="order_id" optional="hide"/>
                     <field name="partner_id" optional="hide"/>
                     <field name="product_id" optional="show"/>
@@ -39,7 +39,7 @@
                     <field name="company_id" optional="show" groups="base.group_multi_company"/>
                     <field name="price_total" optional="show"/>
                     <field name="state" optional="show"/>
-                </tree>
+                </list>
             </field>
         </record>
 
@@ -63,6 +63,8 @@
                         <filter string="Point of Sale" name="pos" context="{'group_by':'config_id'}"/>
                         <filter string="Product" name="product" context="{'group_by':'product_id'}"/>
                         <filter string="Product Category" name="product_category" context="{'group_by':'product_categ_id'}"/>
+                        <filter string="Payment Method" name="payment_method" context="{'group_by':'payment_method_id'}"/>
+                        <filter string="Point of Sale Category" name="pos_categ_id" context="{'group_by':'pos_categ_id'}"/>
                         <separator/>
                         <filter string="Order Date" name="order_month" context="{'group_by':'date:month'}"/>
                     </group>
@@ -82,7 +84,7 @@
             <field name="res_model">report.pos.order</field>
             <field name="view_mode">graph,pivot</field>
             <field name="search_view_id" ref="view_report_pos_order_search"/>
-            <field name="context">{'group_by_no_leaf':1,'group_by':[]}</field>
+            <field name="context">{'group_by':[]}</field>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">
                     No data yet!

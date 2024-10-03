@@ -12,7 +12,7 @@ from dateutil.relativedelta import relativedelta
 from odoo import api, fields, models, _
 from odoo.addons.resource.models.utils import string_to_datetime, Intervals
 from odoo.osv import expression
-from odoo.tools import ormcache
+from odoo.tools import ormcache, format_list
 from odoo.exceptions import UserError
 
 
@@ -33,6 +33,12 @@ class HrContract(models.Model):
         Planning: Work entries will be generated from the employee's planning. (requires Planning app)
     '''
     )
+    work_entry_source_calendar_invalid = fields.Boolean(compute='_compute_work_entry_source_calendar_invalid')
+
+    @api.depends('work_entry_source', 'resource_calendar_id')
+    def _compute_work_entry_source_calendar_invalid(self):
+        for contract in self:
+            contract.work_entry_source_calendar_invalid = contract.work_entry_source == 'calendar' and not contract.resource_calendar_id
 
     @ormcache('self.structure_type_id')
     def _get_default_work_entry_type_id(self):
@@ -174,8 +180,8 @@ class HrContract(models.Model):
             employee = contract.employee_id
             calendar = contract.resource_calendar_id
             resource = employee.resource_id
-            tz = pytz.timezone(calendar.tz)
-
+            # if the contract is fully flexible, we refer to the employee's timezone
+            tz = pytz.timezone(resource.tz) if contract._is_fully_flexible() else pytz.timezone(calendar.tz)
             attendances = attendances_by_resource[resource.id]
 
             # Other calendars: In case the employee has declared time off in another calendar
@@ -364,8 +370,9 @@ class HrContract(models.Model):
         canceled_contracts = self.filtered(lambda c: c.state == 'cancel')
         if canceled_contracts:
             raise UserError(
-                _("Sorry, generating work entries from cancelled contracts is not allowed.") + '\n%s' % (
-                    ', '.join(canceled_contracts.mapped('name'))))
+                _("Sorry, generating work entries from cancelled contracts is not allowed.")
+                + "\n%s" % (format_list(self.env, canceled_contracts.mapped("name"))),
+            )
         vals_list = []
         self.write({'last_generation_date': fields.Date.today()})
 

@@ -1,12 +1,10 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import json
+from ast import literal_eval
 from collections import defaultdict
 
-from odoo import models, _lt
-from odoo.tools import SQL
-from odoo.tools.misc import OrderedSet
+from odoo import models
 
 
 class Project(models.Model):
@@ -14,7 +12,10 @@ class Project(models.Model):
 
     def _add_purchase_items(self, profitability_items, with_action=True):
         domain = self._get_add_purchase_items_domain()
-        with_action = with_action and self.user_has_groups('account.group_account_invoice, account.group_account_readonly')
+        with_action = with_action and (
+            self.env.user.has_group('account.group_account_invoice')
+            or self.env.user.has_group('account.group_account_readonly')
+        )
         self._get_costs_items_from_purchase(domain, profitability_items, with_action=with_action)
 
     def _get_add_purchase_items_domain(self):
@@ -29,44 +30,31 @@ class Project(models.Model):
     def _get_costs_items_from_purchase(self, domain, profitability_items, with_action=True):
         """ This method is used in sale_project and project_purchase. Since project_account is the only common module (except project), we create the method here. """
         # calculate the cost of bills without a purchase order
-        query = self.env['account.move.line'].sudo()._search(domain)
-        query.add_where(
-            SQL(
-                "%s && %s",
-                [str(self.analytic_account_id.id)],
-                self.env['account.move.line'].sudo()._query_analytic_accounts(),
-            )
+        account_move_lines = self.env['account.move.line'].sudo().search_fetch(
+            domain + [('analytic_distribution', 'in', self.account_id.ids)],
+            ['price_subtotal', 'parent_state', 'currency_id', 'analytic_distribution', 'move_type', 'move_id'],
         )
-        # account_move_line__move_id is the alias of the joined table account_move in the query
-        # we can use it, because of the "move_id.move_type" clause in the domain of the query, which generates the join
-        # this is faster than a search_read followed by a browse on the move_id to retrieve the move_type of each account.move.line
-        query_string, query_param = query.select('price_subtotal', 'parent_state', 'account_move_line.currency_id', 'account_move_line.analytic_distribution', 'account_move_line__move_id.move_type', 'move_id')
-        self._cr.execute(query_string, query_param)
-        bills_move_line_read = self._cr.dictfetchall()
-        if bills_move_line_read:
+        if account_move_lines:
             # Get conversion rate from currencies to currency of the current company
-            currency_ids = OrderedSet(bml['currency_id'] for bml in bills_move_line_read)
             amount_invoiced = amount_to_invoice = 0.0
-            move_ids = set()
-            for moves_read in bills_move_line_read:
-                price_subtotal = self.env['res.currency'].browse(moves_read['currency_id']).with_prefetch(currency_ids)._convert(
-                    from_amount=moves_read['price_subtotal'], to_currency=self.currency_id,
+            for move_line in account_move_lines:
+                price_subtotal = move_line.currency_id._convert(
+                    from_amount=move_line.price_subtotal, to_currency=self.currency_id,
                 )
                 # an analytic account can appear several time in an analytic distribution with different repartition percentage
                 analytic_contribution = sum(
-                    percentage for ids, percentage in moves_read['analytic_distribution'].items()
-                    if str(self.analytic_account_id.id) in ids.split(',')
+                    percentage for ids, percentage in move_line.analytic_distribution.items()
+                    if str(self.account_id.id) in ids.split(',')
                 ) / 100.
-                move_ids.add(moves_read['move_id'])
-                if moves_read['parent_state'] == 'draft':
-                    if moves_read['move_type'] == 'in_invoice':
+                if move_line.parent_state == 'draft':
+                    if move_line.move_type == 'in_invoice':
                         amount_to_invoice -= price_subtotal * analytic_contribution
-                    else:  # moves_read['move_type'] == 'in_refund'
+                    else:  # move_line.move_type == 'in_refund'
                         amount_to_invoice += price_subtotal * analytic_contribution
-                else:  # moves_read['parent_state'] == 'posted'
-                    if moves_read['move_type'] == 'in_invoice':
+                else:  # move_line.parent_state == 'posted'
+                    if move_line.move_type == 'in_invoice':
                         amount_invoiced -= price_subtotal * analytic_contribution
-                    else:  # moves_read['move_type'] == 'in_refund'
+                    else:  # move_line.move_type == 'in_refund'
                         amount_invoiced += price_subtotal * analytic_contribution
             # don't display the section if the final values are both 0 (bill -> vendor credit)
             if amount_invoiced != 0 or amount_to_invoice != 0:
@@ -79,7 +67,7 @@ class Project(models.Model):
                     'to_bill': amount_to_invoice,
                 }
                 if with_action:
-                    bills_costs['action'] = self._get_action_for_profitability_section(list(move_ids), section_id)
+                    bills_costs['action'] = self._get_action_for_profitability_section(account_move_lines.move_id.ids, section_id)
                 costs['data'].append(bills_costs)
                 costs['total']['billed'] += amount_invoiced
                 costs['total']['to_bill'] += amount_to_invoice
@@ -94,9 +82,9 @@ class Project(models.Model):
     def _get_profitability_labels(self):
         return {
             **super()._get_profitability_labels(),
-            'other_purchase_costs': _lt('Vendor Bills'),
-            'other_revenues_aal': _lt('Other Revenues'),
-            'other_costs_aal': _lt('Other Costs'),
+            'other_purchase_costs': self.env._('Vendor Bills'),
+            'other_revenues_aal': self.env._('Other Revenues'),
+            'other_costs_aal': self.env._('Other Costs'),
         }
 
     def _get_profitability_sequence_per_invoice_type(self):
@@ -139,7 +127,7 @@ class Project(models.Model):
     def _get_domain_aal_with_no_move_line(self):
         """ this method is used in order to overwrite the domain in sale_timesheet module. Since the field 'project_id' is added to the "analytic line" model
         in the hr_timesheet module, we can't add the condition ('project_id', '=', False) here. """
-        return [('account_id', '=', self.analytic_account_id.id), ('move_line_id', '=', False), ('category', '!=', 'manufacturing_order')]
+        return [('account_id', '=', self.account_id.id), ('move_line_id', '=', False), ('category', '!=', 'manufacturing_order')]
 
     def _get_items_from_aal(self, with_action=True):
         domain = self._get_domain_aal_with_no_move_line()
@@ -176,7 +164,7 @@ class Project(models.Model):
         revenues = {'id': 'other_revenues_aal', 'sequence': profitability_sequence_per_invoice_type['other_revenues_aal'], 'invoiced': total_revenues, 'to_invoice': 0.0}
         costs = {'id': 'other_costs_aal', 'sequence': profitability_sequence_per_invoice_type['other_costs_aal'], 'billed': total_costs, 'to_bill': 0.0}
 
-        if with_action and self.user_has_groups('account.group_account_readonly'):
+        if with_action and self.env.user.has_group('account.group_account_readonly'):
             costs['action'] = self._get_action_for_profitability_section(cost_ids, 'other_costs_aal')
             revenues['action'] = self._get_action_for_profitability_section(revenue_ids, 'other_revenues_aal')
 
@@ -184,3 +172,14 @@ class Project(models.Model):
             'revenues': {'data': [revenues], 'total': {'invoiced': total_revenues, 'to_invoice': 0.0}},
             'costs': {'data': [costs], 'total': {'billed': total_costs, 'to_bill': 0.0}},
         }
+
+    def action_open_analytic_items(self):
+        action = self.env['ir.actions.act_window']._for_xml_id('analytic.account_analytic_line_action_entries')
+        action['domain'] = [('account_id', '=', self.account_id.id)]
+        context = literal_eval(action['context'])
+        action['context'] = {
+            **context,
+            'create': self.env.context.get('from_embedded_action', False),
+            'default_account_id': self.account_id.id,
+        }
+        return action

@@ -8,6 +8,7 @@ from odoo.addons.mail.tools.parser import parse_res_ids
 from odoo.exceptions import ValidationError
 from odoo.tools import html2plaintext
 from odoo.tools.misc import clean_context, format_date
+from odoo.osv import expression
 
 
 class MailActivitySchedule(models.TransientModel):
@@ -19,7 +20,7 @@ class MailActivitySchedule(models.TransientModel):
     def default_get(self, fields_list):
         res = super().default_get(fields_list)
         context = self.env.context
-        active_res_ids = parse_res_ids(context.get('active_ids'))
+        active_res_ids = parse_res_ids(context.get('active_ids'), self.env)
         if 'res_ids' in fields_list:
             if active_res_ids and len(active_res_ids) <= self._batch_size:
                 res['res_ids'] = f"{context['active_ids']}"
@@ -50,13 +51,13 @@ class MailActivitySchedule(models.TransientModel):
     plan_id = fields.Many2one('mail.activity.plan', domain="[('id', 'in', plan_available_ids)]",
                               compute='_compute_plan_id', store=True, readonly=False)
     plan_has_user_on_demand = fields.Boolean(related="plan_id.has_user_on_demand")
-    plan_assignation_summary = fields.Html(related='plan_id.assignation_summary')
+    plan_summary = fields.Html(compute='_compute_plan_summary')
     plan_on_demand_user_id = fields.Many2one(
         'res.users', 'Assigned To',
         help='Choose assignation for activities with on demand assignation.',
         default=lambda self: self.env.user)
-    plan_date_deadline = fields.Date(
-        'Plan Date', compute='_compute_plan_date_deadline',
+    plan_date = fields.Date(
+        'Plan Date', compute='_compute_plan_date',
         store=True, readonly=False)
     # activity-based
     activity_type_id = fields.Many2one(
@@ -87,7 +88,7 @@ class MailActivitySchedule(models.TransientModel):
     def _compute_res_ids(self):
         context = self.env.context
         for scheduler in self.filtered(lambda scheduler: not scheduler.res_ids):
-            active_res_ids = parse_res_ids(context.get('active_ids'))
+            active_res_ids = parse_res_ids(context.get('active_ids'), self.env)
             if active_res_ids and len(active_res_ids) <= self._batch_size:
                 scheduler.res_ids = f"{context['active_ids']}"
             elif not active_res_ids and context.get('active_id'):
@@ -147,8 +148,16 @@ class MailActivitySchedule(models.TransientModel):
                 scheduler.plan_id = False
 
     @api.depends('res_model_id', 'res_ids')
-    def _compute_plan_date_deadline(self):
-        self.plan_date_deadline = False
+    def _compute_plan_date(self):
+        self.plan_date = False
+
+    @api.depends('plan_date', 'plan_id')
+    def _compute_plan_summary(self):
+        self.plan_summary = False
+        for scheduler in self:
+            if not scheduler.plan_id.template_ids:
+                continue
+            scheduler.plan_summary = scheduler._get_summary_lines(scheduler.plan_id.template_ids)
 
     @api.depends('res_model')
     def _compute_activity_type_id(self):
@@ -160,7 +169,7 @@ class MailActivitySchedule(models.TransientModel):
     def _compute_date_deadline(self):
         for scheduler in self:
             if scheduler.activity_type_id:
-                scheduler.date_deadline = scheduler.env['mail.activity']._calculate_date_deadline(scheduler.activity_type_id)
+                scheduler.date_deadline = scheduler.activity_type_id._get_date_deadline()
             elif not scheduler.date_deadline:
                 scheduler.date_deadline = fields.Date.context_today(scheduler)
 
@@ -212,8 +221,7 @@ class MailActivitySchedule(models.TransientModel):
                     responsible = self.plan_on_demand_user_id
                 else:
                     responsible = template._determine_responsible(self.plan_on_demand_user_id, record)['responsible']
-                date_deadline = self.env['mail.activity']._calculate_date_deadline(
-                    template.activity_type_id, force_base_date=self.plan_date_deadline)
+                date_deadline = template._get_date_deadline(self.plan_date)
                 record.activity_schedule(
                     activity_type_id=template.activity_type_id.id,
                     automated=False,
@@ -247,7 +255,7 @@ class MailActivitySchedule(models.TransientModel):
             'type': 'ir.actions.act_window',
             'res_model': self.res_model,
             'name': _('Launch Plans'),
-            'view_mode': 'tree,form',
+            'view_mode': 'list,form',
             'target': 'current',
             'domain': [('id', 'in', applied_on.ids)],
         }
@@ -314,17 +322,31 @@ class MailActivitySchedule(models.TransientModel):
 
         :return: a list of IDs (empty list in case of falsy strings)"""
         self.ensure_one()
-        return parse_res_ids(self.res_ids) or []
+        return parse_res_ids(self.res_ids, self.env) or []
 
     def _get_applied_on_records(self):
         return self.env[self.res_model].browse(self._evaluate_res_ids())
 
     def _get_plan_available_base_domain(self):
         self.ensure_one()
-        return [
-            '&', '|', ('company_id', '=', False), ('company_id', '=', self.company_id.id),
-            '|', ('res_model', '=', False), ('res_model', '=', self.res_model)
-        ]
+        return expression.AND([
+            ['|', ('company_id', '=', False), ('company_id', '=', self.company_id.id)],
+            ['|', ('res_model', '=', False), ('res_model', '=', self.res_model)],
+            [('template_ids', '!=', False)],  # exclude plan without activities
+        ])
 
     def _plan_filter_activity_templates_to_schedule(self):
         return self.plan_id.template_ids
+
+    def _get_summary_lines(self, templates):
+        self.ensure_one()
+        summaries = []
+        for template in templates:
+            summary_line = template.activity_type_id.name
+            if template.summary:
+                summary_line += f": {template.summary}"
+            # We don't display deadlines when the user doesn't specify a plan_date
+            if self.plan_date:
+                summary_line += f" ({format_date(self.env, template._get_date_deadline(self.plan_date))})"
+            summaries.append(Markup('<li>%s</li>') % summary_line)
+        return Markup('<ul>%s</ul>') % Markup().join(summaries) if summaries else ''

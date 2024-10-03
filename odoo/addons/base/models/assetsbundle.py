@@ -1,22 +1,16 @@
 # -*- coding: utf-8 -*-
 from contextlib import closing
 from collections import OrderedDict
-from datetime import datetime
 from lxml import etree
 from subprocess import Popen, PIPE
-import base64
-import copy
 import hashlib
 import io
-import itertools
-import json
 import logging
 import os
 import re
 import textwrap
 import uuid
 
-import psycopg2
 try:
     import sass as libsass
 except ImportError:
@@ -29,11 +23,10 @@ from rjsmin import jsmin as rjsmin
 from odoo import release, SUPERUSER_ID, _
 from odoo.http import request
 from odoo.tools import (func, misc, transpile_javascript,
-    is_odoo_module, SourceMapGenerator, profiler,
-    apply_inheritance_specs)
+    is_odoo_module, SourceMapGenerator, profiler, OrderedSet)
+from odoo.tools.json import scriptsafe as json
 from odoo.tools.constants import SCRIPT_EXTENSIONS, STYLE_EXTENSIONS
 from odoo.tools.misc import file_open, file_path
-from odoo.tools.pycompat import to_text
 
 _logger = logging.getLogger(__name__)
 
@@ -49,6 +42,8 @@ class AssetError(Exception):
 class AssetNotFound(AssetError):
     pass
 
+class XMLAssetError(Exception):
+    pass
 
 class AssetsBundle(object):
     rx_css_import = re.compile("(@import[^;{]+;?)", re.M)
@@ -326,22 +321,20 @@ class AssetsBundle(object):
         if not js_attachment:
             template_bundle = ''
             if self.templates:
-                content = ['<?xml version="1.0" encoding="UTF-8"?>']
-                content.append('<templates xml:space="preserve">')
-                content.append(self.xml(show_inherit_info=not is_minified))
-                content.append('</templates>')
-                templates = '\n'.join(content).replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
+                templates = self.generate_xml_bundle()
                 template_bundle = textwrap.dedent(f"""
 
                     /*******************************************
                     *  Templates                               *
                     *******************************************/
 
-                    odoo.define('{self.name}.bundle.xml', ['@web/core/registry'], function(require){{
-                        'use strict';
-                        const {{ registry }} = require('@web/core/registry');
-                        registry.category(`xml_templates`).add(`{self.name}`, `{templates}`);
-                    }});""")
+                    odoo.define("{self.name}.bundle.xml", ["@web/core/templates"], function(require) {{
+                        "use strict";
+                        const {{ checkPrimaryTemplateParents, registerTemplate, registerTemplateExtension }} = require("@web/core/templates");
+                        /* {self.name} */
+                        {templates}
+                    }});
+                """)
 
             if is_minified:
                 content_bundle = ';\n'.join(asset.minify() for asset in self.javascripts)
@@ -394,29 +387,64 @@ class AssetsBundle(object):
 
         return js_attachment
 
-    def xml(self, show_inherit_info=False):
+    def generate_xml_bundle(self):
+        content = []
+        blocks = []
+        try:
+            blocks = self.xml()
+        except XMLAssetError as e:
+            content.append(f'throw new Error({json.dumps(str(e))});')
+
+        def get_template(element):
+            element.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
+            string = etree.tostring(element, encoding='unicode')
+            return string.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
+
+        names = OrderedSet()
+        primary_parents = OrderedSet()
+        extension_parents = OrderedSet()
+        for block in blocks:
+            if block["type"] == "templates":
+                for (element, url, inherit_from) in block["templates"]:
+                    if inherit_from:
+                        primary_parents.add(inherit_from)
+                    name = element.get("t-name")
+                    names.add(name)
+                    template = get_template(element)
+                    content.append(f'registerTemplate("{name}", `{url}`, `{template}`);')
+            else:
+                for inherit_from, elements in block["extensions"].items():
+                    extension_parents.add(inherit_from)
+                    for (element, url) in elements:
+                        template = get_template(element)
+                        content.append(f'registerTemplateExtension("{inherit_from}", `{url}`, `{template}`);')
+
+        missing_names_for_primary = primary_parents - names
+        if missing_names_for_primary:
+            content.append(f'checkPrimaryTemplateParents({json.dumps(list(missing_names_for_primary))});')
+        missing_names_for_extension = extension_parents - names
+        if missing_names_for_extension:
+            content.append(f'console.error("Missing (extension) parent templates: {", ".join(missing_names_for_extension)}");')
+
+        return '\n'.join(content)
+
+    def xml(self):
         """
-        Create the ir.attachment representing the content of the bundle XML.
-        The xml contents are loaded and parsed with etree. Inheritances are
-        applied in the order of files and templates.
+        Create a list of blocks. A block can have one of the two types "templates" or "extensions".
+        A template with no parent or template with t-inherit-mode="primary" goes in a block of type "templates".
+        A template with t-inherit-mode="extension" goes in a block of type "extensions".
 
         Used parsed attributes:
         * `t-name`: template name
-        * `t-inherit`: inherited template name. The template use the
-            `apply_inheritance_specs` method from `ir.ui.view` to apply
-            inheritance (with xpath and position).
-        * 't-inherit-mode':  'primary' to create a new template with the
-            update, or 'extension' to apply the update on the inherited
-            template.
-        * `t-extend` deprecated attribute, used by the JavaScript Qweb.
+        * `t-inherit`: inherited template name.
+        * 't-inherit-mode':  'primary' or 'extension'.
 
-        :param show_inherit_info: if true add the file url and inherit
-            information in the template.
-        :return ir.attachment representing the content of the bundle XML
+        :return a list of blocks
         """
-        template_dict = OrderedDict()
         parser = etree.XMLParser(ns_clean=True, recover=True, remove_comments=True)
 
+        blocks = []
+        block = None
         for asset in self.templates:
             # Load content.
             try:
@@ -425,106 +453,36 @@ class AssetsBundle(object):
                 io_content = io.BytesIO(template.encode('utf-8'))
                 content_templates_tree = etree.parse(io_content, parser=parser).getroot()
             except etree.ParseError as e:
-                _logger.error("Could not parse file %s: %s", asset.url, e.msg)
-                raise
-            addon = asset.url.split('/')[1]
-            template_dict.setdefault(addon, OrderedDict())
+                return asset.generate_error(f'Could not parse file: {e.msg}')
             # Process every templates.
             for template_tree in list(content_templates_tree):
-                template_name = None
-                if 't-name' in template_tree.attrib:
-                    template_name = template_tree.attrib['t-name']
-                    dotted_names = template_name.split('.', 1)
-                    if len(dotted_names) > 1 and dotted_names[0] == addon:
-                        template_name = dotted_names[1]
-
-                if 't-inherit' in template_tree.attrib:
-                    inherit_mode = template_tree.attrib.get('t-inherit-mode', 'primary')
+                template_name = template_tree.get("t-name")
+                inherit_from = template_tree.get("t-inherit")
+                inherit_mode = None
+                if inherit_from:
+                    inherit_mode = template_tree.get('t-inherit-mode', 'primary')
                     if inherit_mode not in ['primary', 'extension']:
-                        raise ValueError(_("Invalid inherit mode. Module %r and template name %r", addon, template_name))
-
-                    # Get inherited template, the identifier can be "addon.name", just "name" or (silly) "just.name.with.dots"
-                    parent_dotted_name = template_tree.attrib['t-inherit']
-                    split_name_attempt = parent_dotted_name.split('.', 1)
-                    parent_addon, parent_name = split_name_attempt if len(split_name_attempt) == 2 else (addon, parent_dotted_name)
-                    if parent_addon not in template_dict:
-                        if parent_dotted_name in template_dict[addon]:
-                            parent_addon = addon
-                            parent_name = parent_dotted_name
-                        else:
-                            raise ValueError(_("Module %r not loaded or inexistent (try to inherit %r), or templates of addon being loaded %r are misordered (template %r)", parent_addon, parent_name, addon, template_name))
-                    if parent_name not in template_dict[parent_addon]:
-                        raise ValueError(_("Cannot create %r because the template to inherit %r is not found.", '%s.%s' % (addon, template_name), '%s.%s' % (parent_addon, parent_name)))
-
-                    # After several performance tests, we found out that deepcopy is the most efficient
-                    # solution in this case (compared with copy, xpath with '.' and stringifying).
-                    parent_tree, parent_urls = template_dict[parent_addon][parent_name]
-                    parent_tree = copy.deepcopy(parent_tree)
-
-                    if show_inherit_info:
-                        # Add inheritance information as xml comment for debugging.
-                        xpaths = []
-                        for item in template_tree:
-                            position = item.get('position')
-                            attrib = dict(**item.attrib)
-                            attrib.pop('position', None)
-                            comment = etree.Comment(f""" Filepath: {asset.url} ; position="{position}" ; {attrib} """)
-                            if position == "attributes":
-                                if item.get('expr'):
-                                    comment_node = etree.Element('xpath', {'expr': item.get('expr'), 'position': 'before'})
-                                else:
-                                    comment_node = etree.Element(item.tag, item.attrib)
-                                    comment_node.attrib['position'] = 'before'
-                                comment_node.append(comment)
-                                xpaths.append(comment_node)
-                            else:
-                                if len(item) > 0:
-                                    item[0].addprevious(comment)
-                                else:
-                                    item.append(comment)
-                            xpaths.append(item)
-                    else:
-                        xpaths = list(template_tree)
-
-                    # Apply inheritance.
-                    if inherit_mode == 'primary':
-                        parent_tree.tag = template_tree.tag
-                    inherited_template = apply_inheritance_specs(parent_tree, xpaths)
-                    if inherit_mode == 'primary':  # New template_tree: A' = B(A)
-                        for attr_name, attr_val in template_tree.attrib.items():
-                            if attr_name not in ('t-inherit', 't-inherit-mode'):
-                                inherited_template.set(attr_name, attr_val)
-                        if not template_name:
-                            raise ValueError(_("Template name is missing in file %r.", asset.url))
-                        template_dict[addon][template_name] = (inherited_template, parent_urls + [asset.url])
-                    else:  # Modifies original: A = B(A)
-                        template_dict[parent_addon][parent_name] = (inherited_template, parent_urls + [asset.url])
+                        addon = asset.url.split('/')[1]
+                        return asset.generate_error(_(
+                            'Invalid inherit mode. Module "%(module)s" and template name "%(template_name)s"',
+                            module=addon,
+                            template_name=template_name,
+                        ))
+                if inherit_mode == "extension":
+                    if block is None or block["type"] != "extensions":
+                        block = {"type": "extensions", "extensions": OrderedDict()}
+                        blocks.append(block)
+                    block["extensions"].setdefault(inherit_from, [])
+                    block["extensions"][inherit_from].append((template_tree, asset.url))
                 elif template_name:
-                    if template_name in template_dict[addon]:
-                        raise ValueError(_("Template %r already exists in module %r", template_name, addon))
-                    template_dict[addon][template_name] = (template_tree, [asset.url])
-                elif template_tree.attrib.get('t-extend'):
-                    template_name = '%s__extend_%s' % (template_tree.attrib.get('t-extend'), len(template_dict[addon]))
-                    template_dict[addon][template_name] = (template_tree, [asset.url])
+                    if block is None or block["type"] != "templates":
+                        block = {"type": "templates", "templates": []}
+                        blocks.append(block)
+                    block["templates"].append((template_tree, asset.url, inherit_from))
                 else:
-                    raise ValueError(_("Template name is missing in file %r.", asset.url))
+                    return asset.generate_error(_("Template name is missing."))
+        return blocks
 
-        # Concat and render inherited templates
-        root = etree.Element('root')
-        for addon in template_dict.values():
-            for template, urls in addon.values():
-                if show_inherit_info:
-                    tail = "\n"
-                    if len(root) > 0:
-                        tail = root[-1].tail
-                        root[-1].tail = "\n\n"
-                    comment = etree.Comment(f""" Filepath: {' => '.join(urls)} """)
-                    comment.tail = tail
-                    root.append(comment)
-                root.append(template)
-
-        # Returns the string by removing the <root> tag.
-        return etree.tostring(root, encoding='unicode')[6:-7]
 
     def css(self):
         is_minified = not self.is_debug_assets
@@ -652,7 +610,7 @@ css_error_message {
         """Sanitizes @import rules, remove duplicates @import rules, then compile"""
         imports = []
         def handle_compile_error(e, source):
-            error = self.get_preprocessor_error(e, source=source)
+            error = self.get_preprocessor_error(str(e), source=source)
             _logger.warning(error)
             self.css_errors.append(error)
             return ''
@@ -668,7 +626,6 @@ css_error_message {
             return ''
         source = re.sub(self.rx_preprocess_imports, sanitize, source)
 
-        compiled = ''
         try:
             compiled = compiler(source)
         except CompileError as e:
@@ -700,7 +657,7 @@ css_error_message {
         cmd = [rtlcss, '-c', file_path("base/data/rtlcss.json"), '-']
 
         try:
-            rtlcss = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+            rtlcss = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, encoding='utf-8')
         except Exception:
 
             # Check the presence of rtlcss, if rtlcss not available then we should return normal less file
@@ -717,23 +674,20 @@ css_error_message {
             self.css_errors.append(msg)
             return ''
 
-        stdout, stderr = rtlcss.communicate(input=source.encode('utf-8'))
-        if rtlcss.returncode or (source and not stdout):
-            cmd_output = ''.join(misc.ustr(stderr))
-            if not cmd_output and rtlcss.returncode:
-                cmd_output = "Process exited with return code %d\n" % rtlcss.returncode
-            elif not cmd_output:
-                cmd_output = "rtlcss: error processing payload\n"
-            error = self.get_rtlcss_error(cmd_output, source=source)
-            _logger.warning(error)
+        out, err = rtlcss.communicate(input=source)
+        if rtlcss.returncode or (source and not out):
+            if rtlcss.returncode:
+                error = self.get_rtlcss_error(err or f"Process exited with return code {rtlcss.returncode}", source=source)
+            else:
+                error = "rtlcss: error processing payload\n"
+            _logger.warning("%s", error)
             self.css_errors.append(error)
             return ''
-        rtlcss_result = stdout.strip().decode('utf8')
-        return rtlcss_result
+        return out.strip()
 
     def get_preprocessor_error(self, stderr, source=None):
         """Improve and remove sensitive information from sass/less compilator error messages"""
-        error = misc.ustr(stderr).split('Load paths')[0].replace('  Use --trace for backtrace.', '')
+        error = stderr.split('Load paths')[0].replace('  Use --trace for backtrace.', '')
         if 'Cannot load compass' in error:
             error += "Maybe you should install the compass gem using this extra argument:\n\n" \
                      "    $ sudo gem install compass --pre\n"
@@ -745,8 +699,8 @@ css_error_message {
 
     def get_rtlcss_error(self, stderr, source=None):
         """Improve and remove sensitive information from sass/less compilator error messages"""
-        error = misc.ustr(stderr).split('Load paths')[0].replace('  Use --trace for backtrace.', '')
-        error += "This error occurred while compiling the bundle '%s' containing:" % self.name
+        error = stderr.split('Load paths')[0].replace('  Use --trace for backtrace.', '')
+        error = f"{error}This error occurred while compiling the bundle {self.name!r} containing:"
         return error
 
 
@@ -764,6 +718,11 @@ class WebAsset(object):
         self._last_modified = last_modified
         if not inline and not url:
             raise Exception("An asset should either be inlined or url linked, defined in bundle '%s'" % bundle.name)
+
+    def generate_error(self, msg):
+        msg = f'{msg!r} in file {self.url!r}'
+        _logger.error(msg)  # log it in the python console in all cases.
+        return msg
 
     @func.lazy_property
     def id(self):
@@ -840,6 +799,10 @@ class JavascriptAsset(WebAsset):
         self._is_transpiled = None
         self._converted_content = None
 
+    def generate_error(self, msg):
+        msg = super().generate_error(msg)
+        return f'console.error({json.dumps(msg)});'
+
     @property
     def bundle_version(self):
         return self.bundle.get_version('js')
@@ -847,7 +810,7 @@ class JavascriptAsset(WebAsset):
     @property
     def is_transpiled(self):
         if self._is_transpiled is None:
-            self._is_transpiled = bool(is_odoo_module(super().content))
+            self._is_transpiled = bool(is_odoo_module(self.url, super().content))
         return self._is_transpiled
 
     @property
@@ -866,7 +829,7 @@ class JavascriptAsset(WebAsset):
         try:
             return super()._fetch_content()
         except AssetError as e:
-            return u"console.error(%s);" % json.dumps(to_text(e))
+            return self.generate_error(str(e))
 
 
     def with_header(self, content=None, minimal=True):
@@ -898,16 +861,20 @@ class XMLAsset(WebAsset):
         try:
             content = super()._fetch_content()
         except AssetError as e:
-            return u"console.error(%s);" % json.dumps(to_text(e))
+            return self.generate_error(str(e))
 
         parser = etree.XMLParser(ns_clean=True, remove_comments=True, resolve_entities=False)
         try:
             root = etree.fromstring(content.encode('utf-8'), parser=parser)
         except etree.XMLSyntaxError as e:
-            return f'<t t-name="parsing_error{self.url.replace("/","_")}"><parsererror>Invalid XML template: {self.url} \n {e.msg} </parsererror></t>'
+            return self.generate_error(f'Invalid XML template: {e.msg}')
         if root.tag in ('templates', 'template'):
             return ''.join(etree.tostring(el, encoding='unicode') for el in root)
         return etree.tostring(root, encoding='unicode')
+
+    def generate_error(self, msg):
+        msg = super().generate_error(msg)
+        raise XMLAssetError(msg)
 
     @property
     def bundle_version(self):
@@ -1008,17 +975,17 @@ class PreprocessedCSS(StylesheetAsset):
         command = self.get_command()
         try:
             compiler = Popen(command, stdin=PIPE, stdout=PIPE,
-                             stderr=PIPE)
+                             stderr=PIPE, encoding='utf-8')
         except Exception:
             raise CompileError("Could not execute command %r" % command[0])
 
-        (out, err) = compiler.communicate(input=source.encode('utf-8'))
+        out, err = compiler.communicate(input=source)
         if compiler.returncode:
-            cmd_output = misc.ustr(out) + misc.ustr(err)
+            cmd_output = out + err
             if not cmd_output:
                 cmd_output = u"Process exited with return code %d\n" % compiler.returncode
             raise CompileError(cmd_output)
-        return out.decode('utf8')
+        return out
 
 class SassStylesheetAsset(PreprocessedCSS):
     rx_indent = re.compile(r'^( +|\t+)', re.M)

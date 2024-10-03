@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
+import threading
 
 from odoo import _, api, fields, models
 
@@ -74,12 +75,7 @@ class Company(models.Model):
                 'location_id': parent_location.id,
                 'company_id': company.id,
             })
-            self.env['ir.property']._set_default(
-                "property_stock_inventory",
-                "product.template",
-                inventory_loss_location,
-                company.id,
-            )
+            self.env['ir.default'].set('product.template', 'property_stock_inventory', inventory_loss_location.id, company_id=company.id)
 
     def _create_production_location(self):
         parent_location = self.env.ref('stock.stock_location_locations_virtual', raise_if_not_found=False)
@@ -90,12 +86,7 @@ class Company(models.Model):
                 'location_id': parent_location.id,
                 'company_id': company.id,
             })
-            self.env['ir.property']._set_default(
-                "property_stock_production",
-                "product.template",
-                production_location,
-                company.id,
-            )
+            self.env['ir.default'].set('product.template', 'property_stock_production', production_location.id, company_id=company.id)
 
     def _create_scrap_location(self):
         parent_location = self.env.ref('stock.stock_location_locations_virtual', raise_if_not_found=False)
@@ -125,18 +116,16 @@ class Company(models.Model):
 
     @api.model
     def create_missing_warehouse(self):
-        """ This hook is used to add a warehouse on existing companies
-        when module stock is installed.
+        """ This hook is used to add a warehouse on the first company of the database
         """
-        company_ids  = self.env['res.company'].search([])
-        company_with_warehouse = self.env['stock.warehouse'].with_context(active_test=False).search([]).mapped('company_id')
-        company_without_warehouse = company_ids - company_with_warehouse
-        for company in company_without_warehouse:
+        existing_warehouses = self.env['stock.warehouse'].search([])
+        if len(existing_warehouses) == 0:
+            first_company = self.env['res.company'].search([], limit=1)
             self.env['stock.warehouse'].create({
-                'name': company.name,
-                'code': company.name[:5],
-                'company_id': company.id,
-                'partner_id': company.partner_id.id,
+                'name': first_company.name,
+                'code': first_company.name[:5],
+                'company_id': first_company.id,
+                'partner_id': first_company.partner_id.id,
             })
 
     @api.model
@@ -148,7 +137,7 @@ class Company(models.Model):
     def create_missing_inventory_loss_location(self):
         company_ids  = self.env['res.company'].search([])
         inventory_loss_product_template_field = self.env['ir.model.fields']._get('product.template', 'property_stock_inventory')
-        companies_having_property = self.env['ir.property'].sudo().search([('fields_id', '=', inventory_loss_product_template_field.id), ('res_id', '=', False)]).mapped('company_id')
+        companies_having_property = self.env['ir.default'].sudo().search([('field_id', '=', inventory_loss_product_template_field.id)]).mapped('company_id')
         company_without_property = company_ids - companies_having_property
         company_without_property._create_inventory_loss_location()
 
@@ -156,7 +145,7 @@ class Company(models.Model):
     def create_missing_production_location(self):
         company_ids  = self.env['res.company'].search([])
         production_product_template_field = self.env['ir.model.fields']._get('product.template', 'property_stock_production')
-        companies_having_property = self.env['ir.property'].sudo().search([('fields_id', '=', production_product_template_field.id), ('res_id', '=', False)]).mapped('company_id')
+        companies_having_property = self.env['ir.default'].sudo().search([('field_id', '=', production_product_template_field.id)]).mapped('company_id')
         company_without_property = company_ids - companies_having_property
         company_without_property._create_production_location()
 
@@ -194,15 +183,33 @@ class Company(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         companies = super().create(vals_list)
+        # Unarchive inter-company location when multi-company is enabled.
+        inter_company_location = self.env.ref('stock.stock_location_inter_company')
+        if not inter_company_location.active:
+            inter_company_location.sudo().write({'active': True})
         for company in companies:
             company.sudo()._create_per_company_locations()
             company.sudo()._create_per_company_sequences()
             company.sudo()._create_per_company_picking_types()
             company.sudo()._create_per_company_rules()
-        self.env['stock.warehouse'].sudo().create([{
-            'name': company.name,
-            'code': self.env.context.get('default_code') or company.name[:5],
-            'company_id': company.id,
-            'partner_id': company.partner_id.id
-        } for company in companies])
+            company.sudo()._set_per_company_inter_company_locations(inter_company_location)
+        test_mode = getattr(threading.current_thread(), 'testing', False)
+        if test_mode:
+            self.env['stock.warehouse'].sudo().create([{'company_id': company.id} for company in companies])
         return companies
+
+    def _set_per_company_inter_company_locations(self, inter_company_location):
+        self.ensure_one()
+        if not self.env.user.has_group('base.group_multi_company'):
+            return
+        other_companies = self.env['res.company'].search([('id', '!=', self.id)])
+        other_companies.partner_id.with_company(self).write({
+            'property_stock_customer': inter_company_location.id,
+            'property_stock_supplier': inter_company_location.id,
+        })
+        for company in other_companies:
+            # Still need to insert those one by one, as the env company must be different every time
+            self.partner_id.with_company(company).write({
+                'property_stock_customer': inter_company_location.id,
+                'property_stock_supplier': inter_company_location.id,
+            })

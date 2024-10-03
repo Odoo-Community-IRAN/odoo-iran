@@ -1,20 +1,20 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo import api, fields, models
+from odoo import _, api, fields, models
 
 
 class ProductTemplate(models.Model):
     _inherit = 'product.template'
 
-    detailed_type = fields.Selection(selection_add=[
-        ('course', 'Course'),
-    ], ondelete={'course': 'set service'})
+    service_tracking = fields.Selection(selection_add=[
+        ('course', 'Course Access'),
+    ], ondelete={'course': 'set default'})
 
-    def _detailed_type_mapping(self):
-        type_mapping = super(ProductTemplate, self)._detailed_type_mapping()
-        type_mapping['course'] = 'service'
-        return type_mapping
+    def _prepare_service_tracking_tooltip(self):
+        if self.service_tracking == 'course':
+            return _("Grant access to the eLearning course linked to this product.")
+        return super()._prepare_service_tracking_tooltip()
 
     @api.model
     def _get_product_types_allow_zero_price(self):

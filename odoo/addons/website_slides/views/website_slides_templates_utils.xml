@@ -14,7 +14,7 @@
                 <i class="fa fa-facebook-square fa-fw"/>
             </a>
             <a t-attf-href="https://twitter.com/intent/tweet?text=#{record.name}&amp;url=#{website_share_url}" class="btn border bg-white o_wslides_js_social_share"
-                social-key="twitter" aria-label="Share on Twitter" title="Share on Twitter" target="_blank">
+                social-key="twitter" aria-label="Share on X" title="Share on X" target="_blank">
                 <i class="fa fa-twitter fa-fw"/>
             </a>
             <a t-attf-href="http://www.linkedin.com/sharing/share-offsite/?url=#{website_share_url}" class="btn border bg-white o_wslides_js_social_share"
@@ -57,7 +57,7 @@
         </div>
     </div>
     <div t-if="is_public_user" class="alert alert-info d-inline-block">
-        <p class="mb-0">Please <a t-attf-href="/web?redirect=#{request.httprequest.url}" class="fw-bold"> login </a> to share this
+        <p class="mb-0">Please <a t-attf-href="/odoo?redirect=#{request.httprequest.url}" class="fw-bold"> login </a> to share this
         <span t-field="record.slide_category" t-if="record._name == 'slide.slide'"/>
         <span t-field="record.name" t-if="record._name == 'slide.channel'"/> by email.</p>
     </div>
@@ -152,7 +152,7 @@
             <i t-if="slide_completed" class="o_wslides_slide_completed fa fa-check-circle fa-fw text-success fa-lg" t-att-data-slide-id="slide.id" title="Mark as not done"/>
             <i t-else="" t-attf-class="fa #{uncompleted_icon} fa-fw fa-lg" t-att-data-slide-id="slide.id" title="Mark as done"/>
         </button>
-        <button class="o_wslides_button_complete o_wslides_button_uncompleted btn btn-sm" t-else="" disabled="1">
+        <button class="o_wslides_button_complete o_wslides_button_uncompleted btn btn-sm border-0" t-else="" disabled="1">
             <i t-if="slide_completed" class="o_wslides_slide_completed fa fa-check fa-fw text-success fa-lg" t-att-data-slide-id="slide.id" title="Can not be marked as not done"/>
             <i t-else="" t-attf-class="fa #{uncompleted_icon} fa-fw fa-lg" t-att-data-slide-id="slide.id" title="Can not be marked as done"/>
         </button>

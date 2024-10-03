@@ -2,25 +2,34 @@
 <odoo>
 <data noupdate="0">
     <!--
-        There are 4 groups
-        The way the groups work is different when `account_accountant` is installed or not.
+        There are 5 groups
+        The way the groups work is different depending on whether `account`, `account_accountant` or `accountant` are installed.
 
-        Invoicing only:
+        Invoicing only (account):
         ```
          group_account_invoice ⇨ group_account_manager   (only those two should be used)
                                ⬂
-        group_account_readonly ⇨ group_account_user      (those two are only visible through a server action)
+                                 group_account_basic ⬂   (those are only visible through a server action)
+                              group_account_readonly ⇨ group_account_user
         ```
 
-        Invoicing + Accounting:
+        Invoicing Enterprise (account_accountant):
         ```
-         group_account_invoice ⬂
-        group_account_readonly ⇨ group_account_user ⇨ group_account_manager
+        group_account_invoice ⇨ group_account_basic ⇨ group_account_manager (basic accounting group activated)
+                                                    ⬂
+                             group_account_readonly ⇨ group_account_user    (these are still not visible)
+        ```
+
+        Invoicing + Accounting (accountant):
+        ```
+           group_account_invoice ⇨ group_account_basic ⬂
+                                group_account_readonly ⇨ group_account_user ⇨ group_account_manager
         ```
         `group_account_user` is almost (a bit more than) the sum of `group_account_invoice` and `group_account_readonly`
         `group_account_manager` is the king (except when Consolidation is installed, then there is a super-king)
 
         `group_account_invoice` can create/edit invoices, refunds, payments, etc but cannot see accounting related stuff (journal entries, reports, reconciliation,...)
+        `group_account_basic` can do additional accounting features (eg. basic bank recon) but not journal entries
         `group_account_readonly` can see (and only see) everything, including the journal entries, advanced configuration, reports
         `group_account_user`  is the accountant: he can do everything except advanced config (accounting periods for instance)
         `group_account_manager` can edit some config that `group_account_user` cannot do
@@ -29,7 +38,11 @@
     -->
 
     <record model="ir.module.category" id="base.module_category_accounting_accounting">
-        <field name="description">Helps you handle your accounting needs, if you are not an accountant, we suggest you to install only the Invoicing.</field>
+        <field name="description">Helps you handle your invoices and accounting actions.
+
+        Invoicing: Invoices, payments and basic invoice reporting.
+        Administrator: full access including configuration rights.
+        </field>
         <field name="sequence">7</field>
     </record>
 
@@ -45,22 +58,33 @@
     </record>
 
     <record id="group_account_invoice" model="res.groups">
-        <field name="name">Billing</field>
+        <field name="name">Invoicing</field>
         <field name="category_id" ref="base.module_category_accounting_accounting"/>
         <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="group_account_basic" model="res.groups">
+        <field name="name">Basic</field>
+        <field name="category_id" ref="base.module_category_hidden"/>
+        <field name="implied_ids" eval="[(4, ref('group_account_invoice'))]"/>
     </record>
 
     <record id="group_account_user" model="res.groups">
         <field name="name">Show Full Accounting Features</field>
         <field name="category_id" ref="base.module_category_hidden"/>
-        <field name="implied_ids" eval="[(4, ref('group_account_invoice')), (4, ref('group_account_readonly'))]"/>
+        <field name="implied_ids" eval="[(4, ref('group_account_basic')), (4, ref('group_account_readonly'))]"/>
     </record>
 
     <record id="group_account_manager" model="res.groups">
-        <field name="name">Billing Administrator</field>
+        <field name="name">Administrator</field>
         <field name="category_id" ref="base.module_category_accounting_accounting"/>
         <field name="implied_ids" eval="[(4, ref('group_account_invoice'))]"/>
         <field name="users" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+    </record>
+
+    <record id="group_account_secured" model="res.groups">
+        <field name="name">Show Inalterability Features</field>
+        <field name="category_id" ref="base.module_category_usability"/>
     </record>
 
     <record id="group_warning_account" model="res.groups">
@@ -123,9 +147,9 @@
     </record>
 
     <record id="journal_group_comp_rule" model="ir.rule">
-        <field name="name">Journal Group multi-company</field>
+        <field name="name">Multi-ledger multi-company</field>
         <field name="model_id" ref="model_account_journal_group"/>
-        <field name="domain_force">[('company_id', 'parent_of', company_ids)]</field>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'parent_of', company_ids)]</field>
     </record>
 
     <record id="journal_comp_rule" model="ir.rule">
@@ -137,19 +161,13 @@
     <record id="account_comp_rule" model="ir.rule">
         <field name="name">Account multi-company</field>
         <field name="model_id" ref="model_account_account"/>
-        <field name="domain_force">[('company_id', 'parent_of', company_ids)]</field>
+        <field name="domain_force">[('company_ids', 'parent_of', company_ids)]</field>
     </record>
 
     <record id="account_group_comp_rule" model="ir.rule">
         <field name="name">Account Group multi-company</field>
         <field name="model_id" ref="model_account_group"/>
         <field name="domain_force">[('company_id', 'parent_of', company_ids)]</field>
-    </record>
-
-    <record id="account_root_comp_rule" model="ir.rule">
-        <field name="name">Account Root multi-company</field>
-        <field name="model_id" ref="model_account_root"/>
-        <field name="domain_force">['|',('company_id','=',False), ('company_id', 'parent_of', company_ids)]</field>
     </record>
 
     <record id="tax_group_comp_rule" model="ir.rule">
@@ -287,9 +305,16 @@
         <field name="groups" eval="[(4, ref('account.group_account_invoice'))]"/>
     </record>
 
-    <record id="account_move_send_rule_group_invoice" model="ir.rule">
-        <field name="name">Readonly Invoice Send and Print</field>
-        <field name="model_id" ref="model_account_move_send"/>
+    <record id="account_move_send_single_rule_group_invoice" model="ir.rule">
+        <field name="name">Readonly Invoice Send and Print (single)</field>
+        <field name="model_id" ref="model_account_move_send_wizard"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('account.group_account_invoice'))]"/>
+    </record>
+
+    <record id="account_move_send_batch_rule_group_invoice" model="ir.rule">
+        <field name="name">Readonly Invoice Send and Print (batch)</field>
+        <field name="model_id" ref="model_account_move_send_batch_wizard"/>
         <field name="domain_force">[(1, '=', 1)]</field>
         <field name="groups" eval="[(4, ref('account.group_account_invoice'))]"/>
     </record>

@@ -6,6 +6,8 @@
 #
 
 from odoo import fields, models, api
+from odoo.tools.query import Query
+from odoo.tools.sql import SQL
 
 
 class PurchaseReport(models.Model):
@@ -30,11 +32,11 @@ class PurchaseReport(models.Model):
     company_id = fields.Many2one('res.company', 'Company', readonly=True)
     currency_id = fields.Many2one('res.currency', 'Currency', readonly=True)
     user_id = fields.Many2one('res.users', 'Purchase Representative', readonly=True)
-    delay = fields.Float('Days to Confirm', digits=(16, 2), readonly=True, group_operator='avg', help="Amount of time between purchase approval and order by date.")
-    delay_pass = fields.Float('Days to Receive', digits=(16, 2), readonly=True, group_operator='avg',
+    delay = fields.Float('Days to Confirm', digits=(16, 2), readonly=True, aggregator='avg', help="Amount of time between purchase approval and order by date.")
+    delay_pass = fields.Float('Days to Receive', digits=(16, 2), readonly=True, aggregator='avg',
                               help="Amount of time between date planned and order by date for each purchase order line.")
-    price_total = fields.Float('Total', readonly=True)
-    price_average = fields.Float('Average Cost', readonly=True, group_operator="avg", digits='Product Price')
+    price_total = fields.Monetary('Total', readonly=True)
+    price_average = fields.Monetary('Average Cost', readonly=True, aggregator="avg")
     nbr_lines = fields.Integer('# of Lines', readonly=True)
     category_id = fields.Many2one('product.category', 'Product Category', readonly=True)
     product_tmpl_id = fields.Many2one('product.template', 'Product Template', readonly=True)
@@ -44,19 +46,20 @@ class PurchaseReport(models.Model):
     weight = fields.Float('Gross Weight', readonly=True)
     volume = fields.Float('Volume', readonly=True)
     order_id = fields.Many2one('purchase.order', 'Order', readonly=True)
-    untaxed_total = fields.Float('Untaxed Total', readonly=True)
+    untaxed_total = fields.Monetary('Untaxed Total', readonly=True)
     qty_ordered = fields.Float('Qty Ordered', readonly=True)
     qty_received = fields.Float('Qty Received', readonly=True)
     qty_billed = fields.Float('Qty Billed', readonly=True)
     qty_to_be_billed = fields.Float('Qty to be Billed', readonly=True)
 
     @property
-    def _table_query(self):
+    def _table_query(self) -> SQL:
         ''' Report needs to be dynamic to take into account multi-company selected + multi-currency rates '''
-        return '%s %s %s %s' % (self._select(), self._from(), self._where(), self._group_by())
+        return SQL("%s %s %s %s", self._select(), self._from(), self._where(), self._group_by())
 
-    def _select(self):
-        select_str = """
+    def _select(self) -> SQL:
+        return SQL(
+            """
                 SELECT
                     po.id as order_id,
                     min(l.id) as id,
@@ -76,25 +79,26 @@ class PurchaseReport(models.Model):
                     extract(epoch from age(po.date_approve,po.date_order))/(24*60*60)::decimal(16,2) as delay,
                     extract(epoch from age(l.date_planned,po.date_order))/(24*60*60)::decimal(16,2) as delay_pass,
                     count(*) as nbr_lines,
-                    sum(l.price_total / COALESCE(po.currency_rate, 1.0))::decimal(16,2) * currency_table.rate as price_total,
-                    (sum(l.product_qty * l.price_unit / COALESCE(po.currency_rate, 1.0))/NULLIF(sum(l.product_qty/line_uom.factor*product_uom.factor),0.0))::decimal(16,2) * currency_table.rate as price_average,
+                    sum(l.price_total / COALESCE(po.currency_rate, 1.0))::decimal(16,2) * account_currency_table.rate as price_total,
+                    (sum(l.product_qty * l.price_unit / COALESCE(po.currency_rate, 1.0))/NULLIF(sum(l.product_qty/line_uom.factor*product_uom.factor),0.0))::decimal(16,2) * account_currency_table.rate as price_average,
                     partner.country_id as country_id,
                     partner.commercial_partner_id as commercial_partner_id,
                     sum(p.weight * l.product_qty/line_uom.factor*product_uom.factor) as weight,
                     sum(p.volume * l.product_qty/line_uom.factor*product_uom.factor) as volume,
-                    sum(l.price_subtotal / COALESCE(po.currency_rate, 1.0))::decimal(16,2) * currency_table.rate as untaxed_total,
+                    sum(l.price_subtotal / COALESCE(po.currency_rate, 1.0))::decimal(16,2) * account_currency_table.rate as untaxed_total,
                     sum(l.product_qty / line_uom.factor * product_uom.factor) as qty_ordered,
                     sum(l.qty_received / line_uom.factor * product_uom.factor) as qty_received,
                     sum(l.qty_invoiced / line_uom.factor * product_uom.factor) as qty_billed,
-                    case when t.purchase_method = 'purchase' 
+                    case when t.purchase_method = 'purchase'
                          then sum(l.product_qty / line_uom.factor * product_uom.factor) - sum(l.qty_invoiced / line_uom.factor * product_uom.factor)
                          else sum(l.qty_received / line_uom.factor * product_uom.factor) - sum(l.qty_invoiced / line_uom.factor * product_uom.factor)
                     end as qty_to_be_billed
-        """
-        return select_str
+            """,
+        )
 
-    def _from(self):
-        from_str = """
+    def _from(self) -> SQL:
+        return SQL(
+            """
             FROM
             purchase_order_line l
                 join purchase_order po on (l.order_id=po.id)
@@ -104,20 +108,22 @@ class PurchaseReport(models.Model):
                 left join res_company C ON C.id = po.company_id
                 left join uom_uom line_uom on (line_uom.id=l.product_uom)
                 left join uom_uom product_uom on (product_uom.id=t.uom_id)
-                left join {currency_table} ON currency_table.company_id = po.company_id
-        """.format(
-            currency_table=self.env['res.currency']._get_query_currency_table(self.env.companies.ids, fields.Date.today())
+                left join %(currency_table)s ON account_currency_table.company_id = po.company_id
+            """,
+            currency_table=self.env['res.currency']._get_simple_currency_table(self.env.companies),
         )
-        return from_str
 
-    def _where(self):
-        return """
+    def _where(self) -> SQL:
+        return SQL(
+            """
             WHERE
                 l.display_type IS NULL
-        """
+            """,
+        )
 
-    def _group_by(self):
-        group_by_str = """
+    def _group_by(self) -> SQL:
+        return SQL(
+            """
             GROUP BY
                 po.company_id,
                 po.user_id,
@@ -144,32 +150,16 @@ class PurchaseReport(models.Model):
                 partner.country_id,
                 partner.commercial_partner_id,
                 po.id,
-                currency_table.rate
-        """
-        return group_by_str
+                account_currency_table.rate
+            """,
+        )
 
-    @api.model
-    def read_group(self, domain, fields, groupby, offset=0, limit=None, orderby=False, lazy=True):
-        """
-        This is a hack to allow us to correctly calculate the average price of product.
-        """
-        if 'price_average:avg' in fields:
-            fields.extend(['aggregated_qty_ordered:array_agg(qty_ordered)'])
-            fields.extend(['aggregated_price_average:array_agg(price_average)'])
-
-        res = []
-        if fields:
-            res = super(PurchaseReport, self).read_group(domain, fields, groupby, offset=offset, limit=limit, orderby=orderby, lazy=lazy)
-
-        if 'price_average:avg' in fields:
-            qties = 'aggregated_qty_ordered'
-            special_field = 'aggregated_price_average'
-            for data in res:
-                if data[special_field] and data[qties]:
-                    total_unit_cost = sum(float(value) * float(qty) for value, qty in zip(data[special_field], data[qties]) if qty and value)
-                    total_qty_ordered = sum(float(qty) for qty in data[qties] if qty)
-                    data['price_average'] = (total_unit_cost / total_qty_ordered) if total_qty_ordered else 0
-                del data[special_field]
-                del data[qties]
-
-        return res
+    def _read_group_select(self, aggregate_spec: str, query: Query) -> SQL:
+        """ This override allows us to correctly calculate the average price of products. """
+        if aggregate_spec != 'price_average:avg':
+            return super()._read_group_select(aggregate_spec, query)
+        return SQL(
+            'SUM(%(f_price)s * %(f_qty)s) / SUM(%(f_qty)s)',
+            f_qty=self._field_to_sql(self._table, 'qty_ordered', query),
+            f_price=self._field_to_sql(self._table, 'price_average', query),
+        )

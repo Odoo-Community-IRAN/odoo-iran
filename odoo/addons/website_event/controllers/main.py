@@ -6,7 +6,6 @@ import werkzeug
 
 from ast import literal_eval
 from collections import Counter
-from werkzeug.datastructures import OrderedMultiDict
 from werkzeug.exceptions import NotFound
 
 from odoo import fields, http, _
@@ -43,6 +42,16 @@ class WebsiteEventController(http.Controller):
 
     @http.route(['/event', '/event/page/<int:page>', '/events', '/events/page/<int:page>'], type='http', auth="public", website=True, sitemap=sitemap_event)
     def events(self, page=1, **searches):
+        if searches.get('tags', '[]').count(',') > 0 and request.httprequest.method == 'GET' and not searches.get('prevent_redirect'):
+            # Previously, the tags were searched using GET, which caused issues with crawlers (too many hits)
+            # We replaced those with POST to avoid that, but it's not sufficient as bots "remember" crawled pages for a while
+            # This permanent redirect is placed to instruct the bots that this page is no longer valid
+            # Note: We allow a single tag to be GET, to keep crawlers & indexes on those pages
+            # What we really want to avoid is combinatorial explosions
+            # (Tags are formed as a JSON array, so we count ',' to keep it simple)
+            # TODO: remove in a few stable versions (v19?), including the "prevent_redirect" param in templates
+            return request.redirect('/event', code=301)
+
         Event = request.env['event.event']
         SudoEventType = request.env['event.type'].sudo()
 
@@ -130,10 +139,6 @@ class WebsiteEventController(http.Controller):
             'original_search': fuzzy_search_term and search,
             'website': website
         }
-
-        if searches['date'] == 'old':
-            # the only way to display this content is to set date=old so it must be canonical
-            values['canonical_params'] = OrderedMultiDict([('date', 'old')])
 
         return request.render("website_event.index", values)
 

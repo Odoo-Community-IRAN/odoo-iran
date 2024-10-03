@@ -7,6 +7,31 @@
         groups="base.group_user"
         sequence="5"
     />
+    <menuitem
+        id="mail.menu_configuration"
+        name="Configuration"
+        parent="mail.menu_root_discuss"
+        sequence="1"
+    />
+    <menuitem name="Notification"
+        id="mail.menu_notification_settings"
+        parent="mail.menu_configuration"
+        action="mail.discuss_notification_settings_action"
+        sequence="1"
+    />
+    <menuitem
+        id="mail.menu_call_settings"
+        name="Voice &amp; Video"
+        parent="mail.menu_configuration"
+        action="mail.discuss_call_settings_action"
+        sequence="5"
+    />
+    <menuitem name="Canned Responses"
+        id="mail.menu_canned_responses"
+        parent="mail.menu_configuration"
+        action="mail.mail_canned_response_action"
+        sequence="15"
+    />
 
     <record id="base.menu_email" model="ir.ui.menu">
         <field name="sequence">3</field>
@@ -83,24 +108,6 @@
         action="action_view_mail_tracking_value"
         sequence="5"/>
 
-    <menuitem
-      id="menu_mail_activity_type"
-      action="mail_activity_type_action"
-      parent="mail.mail_menu_technical"
-      sequence="10"
-    />
-    <menuitem
-      id="menu_mail_activities"
-      action="mail_activity_action"
-      parent="mail.mail_menu_technical"
-      sequence="11"
-    />
-    <menuitem
-        id="menu_mail_activity_plan"
-        action="mail_activity_plan_action"
-        parent="mail.mail_menu_technical"
-        sequence="12"/>
-
     <menuitem name="Notifications"
         id="mail_notification_menu"
         parent="mail.mail_menu_technical"
@@ -154,6 +161,26 @@
         action="discuss_gif_favorite_action"
         parent="mail.mail_menu_technical"
         sequence="56"/>
+
+    <menuitem name="Activities"
+        id="menu_mail_activities_section"
+        parent="base.menu_custom"
+        sequence="2" />
+    <menuitem
+      id="menu_mail_activities"
+      action="mail_activity_action"
+      parent="mail.menu_mail_activities_section"
+      sequence="10"/>
+    <menuitem
+      id="menu_mail_activity_type"
+      action="mail_activity_type_action"
+      parent="mail.menu_mail_activities_section"
+      sequence="20"/>
+    <menuitem
+        id="menu_mail_activity_plan"
+        action="mail_activity_plan_action"
+        parent="mail.menu_mail_activities_section"
+        sequence="30"/>
 
     <!--
         This menuitem will be activated by integrations modules (like github, twitter, ...). It

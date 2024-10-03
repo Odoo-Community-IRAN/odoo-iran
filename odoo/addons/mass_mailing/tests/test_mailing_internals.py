@@ -15,7 +15,7 @@ from odoo.addons.base.tests.test_ir_cron import CronMixinCase
 from odoo.addons.mass_mailing.tests.common import MassMailCommon
 from odoo.exceptions import ValidationError
 from odoo.sql_db import Cursor
-from odoo.tests.common import users, Form, HttpCase, tagged
+from odoo.tests import Form, HttpCase, users, tagged
 from odoo.tools import mute_logger
 
 BASE_64_STRING = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
@@ -818,3 +818,27 @@ class TestMailingScheduleDateWizard(MassMailCommon):
         self.assertEqual(mailing.schedule_date, datetime(2021, 4, 30, 9, 0))
         self.assertEqual(mailing.schedule_type, 'scheduled')
         self.assertEqual(mailing.state, 'in_queue')
+
+
+class TestMassMailingActions(MassMailCommon):
+    def test_mailing_action_open(self):
+        mass_mailings = self.env['mailing.mailing'].create([
+            {'subject': 'First subject'},
+            {'subject': 'Second subject'}
+        ])
+        # Create two traces: one linked to the created mass.mailing and one not (action should open only the first)
+        self.env["mailing.trace"].create([{
+                "trace_status": "open",
+                "mass_mailing_id": mass_mailings[0].id,
+                "model": "res.partner",
+                "res_id": self.partner_admin.id,
+            }, {
+                "trace_status": "open",
+                "mass_mailing_id": mass_mailings[1].id,
+                "model": "res.partner",
+                "res_id": self.partner_employee.id,
+            }
+        ])
+        results = mass_mailings[0].action_view_opened()
+        results_partner = self.env["res.partner"].search(results['domain'])
+        self.assertEqual(results_partner, self.partner_admin, "Trace leaked from mass_mailing_2 to mass_mailing_1")

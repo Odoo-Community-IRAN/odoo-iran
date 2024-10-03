@@ -20,7 +20,7 @@ class PaymentPortal(payment_portal.PaymentPortal):
                 _("The provided order or access token is invalid."))
 
         if order_sudo.state == "cancel":
-            raise ValidationError(_("The order has been canceled."))
+            raise ValidationError(_("The order has been cancelled."))
         return order_sudo
 
     @staticmethod
@@ -279,7 +279,7 @@ class PaymentPortal(payment_portal.PaymentPortal):
             amount=tx_sudo.amount,
             currency=tx_sudo.currency_id,
             provider_name=tx_sudo.provider_id.name,
-            tx=tx_sudo, # for the payment.transaction_status template
+            tx=tx_sudo, # for the payment.state_header template
         )
 
         if tx_sudo.state not in ('authorized', 'done'):

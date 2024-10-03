@@ -1,9 +1,6 @@
-/* @odoo-module */
-
 import {
     onMounted,
     onPatched,
-    onWillPatch,
     onWillUnmount,
     useComponent,
     useEffect,
@@ -12,6 +9,8 @@ import {
 } from "@odoo/owl";
 
 import { browser } from "@web/core/browser/browser";
+import { Deferred } from "@web/core/utils/concurrency";
+import { makeDraggableHook } from "@web/core/utils/draggable_hook_builder_owl";
 import { useService } from "@web/core/utils/hooks";
 
 export function useLazyExternalListener(target, eventName, handler, eventParams) {
@@ -48,7 +47,7 @@ export function onExternalClick(refName, cb) {
     let downTarget, upTarget;
     const ref = useRef(refName);
     function onClick(ev) {
-        if (ref.el && !ref.el.contains(ev.target)) {
+        if (ref.el && !ref.el.contains(ev.composedPath()[0])) {
             cb(ev, { downTarget, upTarget });
             upTarget = downTarget = null;
         }
@@ -71,35 +70,113 @@ export function onExternalClick(refName, cb) {
     });
 }
 
-export function useHover(refName, callback = () => {}) {
-    const ref = useRef(refName);
-    const state = useState({ isHover: false });
-    function onHover(hovered) {
-        state.isHover = hovered;
-        callback(hovered);
+/**
+ * @param {string | string[]} refNames name of refs that determine whether this is in state "hovering".
+ *   ref name that end with "*" means it takes parented HTML node into account too. Useful for floating
+ *   menu where dropdown menu container is not accessible.
+ * @param {Object} param1
+ * @param {() => void} [param1.onHover] callback when hovering the ref names.
+ * @param {() => void} [param1.onAway] callback when stop hovering the ref names.
+ * @param {number, () => void} [param1.onHovering] array where 1st param is duration until start hovering
+ *   and function to be executed at this delay duration after hovering is kept true.
+ * @returns {({ isHover: boolean })}
+ */
+export function useHover(refNames, { onHover, onAway, onHovering } = {}) {
+    refNames = Array.isArray(refNames) ? refNames : [refNames];
+    const targets = [];
+    let wasHovering = false;
+    let hoveringTimeout;
+    let awayTimeout;
+    for (const refName of refNames) {
+        targets.push({
+            ref: refName.endsWith("*")
+                ? useRef(refName.substring(0, refName.length - 1))
+                : useRef(refName),
+        });
     }
-    useLazyExternalListener(
-        () => ref.el,
-        "mouseenter",
-        (ev) => {
-            if (ref.el.contains(ev.relatedTarget)) {
+    const state = useState({
+        set isHover(newIsHover) {
+            if (this._isHover !== newIsHover) {
+                this._isHover = newIsHover;
+                this._count++;
+            }
+        },
+        get isHover() {
+            void this._count;
+            return this._isHover;
+        },
+        _count: 0,
+        _isHover: false,
+    });
+    function setHover(hovering) {
+        if (hovering && !wasHovering) {
+            state.isHover = true;
+            clearTimeout(awayTimeout);
+            clearTimeout(hoveringTimeout);
+            if (typeof onHover === "function") {
+                onHover();
+            }
+            if (Array.isArray(onHovering)) {
+                const [delay, cb] = onHovering;
+                hoveringTimeout = setTimeout(() => {
+                    cb();
+                }, delay);
+            }
+        } else if (!hovering) {
+            state.isHover = false;
+            clearTimeout(awayTimeout);
+            if (typeof onAway === "function") {
+                awayTimeout = setTimeout(() => {
+                    clearTimeout(hoveringTimeout);
+                    onAway();
+                }, 200);
+            }
+        }
+        wasHovering = hovering;
+    }
+    function onmouseenter(ev) {
+        if (state.isHover) {
+            return;
+        }
+        for (const target of targets) {
+            if (!target.ref.el) {
+                continue;
+            }
+            if (target.ref.el.contains(ev.target)) {
+                setHover(true);
                 return;
             }
-            onHover(true);
-        },
-        true
-    );
-    useLazyExternalListener(
-        () => ref.el,
-        "mouseleave",
-        (ev) => {
-            if (ref.el.contains(ev.relatedTarget)) {
+        }
+    }
+    function onmouseleave(ev) {
+        if (!state.isHover) {
+            return;
+        }
+        for (const target of targets) {
+            if (!target.ref.el) {
+                continue;
+            }
+            if (target.ref.el.contains(ev.relatedTarget)) {
                 return;
             }
-            onHover(false);
-        },
-        true
-    );
+        }
+        setHover(false);
+    }
+
+    for (const target of targets) {
+        useLazyExternalListener(
+            () => target.ref.el,
+            "mouseenter",
+            (ev) => onmouseenter(ev),
+            true
+        );
+        useLazyExternalListener(
+            () => target.ref.el,
+            "mouseleave",
+            (ev) => onmouseleave(ev),
+            true
+        );
+    }
     return state;
 }
 
@@ -126,54 +203,19 @@ export function useOnBottomScrolled(refName, callback, threshold = 1) {
     });
 }
 
-/** @deprecated */
-export function useAutoScroll(refName, shouldScrollPredicate = () => true) {
-    const ref = useRef(refName);
-    let el = null;
-    let isScrolled = true;
-    let lastSetValue;
-    const observer = new ResizeObserver(applyScroll);
-
-    function onScroll() {
-        isScrolled = Math.abs(el.scrollTop + el.clientHeight - el.scrollHeight) < 1;
-    }
-    async function applyScroll() {
-        if (isScrolled && shouldScrollPredicate() && lastSetValue !== ref.el.scrollHeight) {
-            /**
-             * Avoid setting the same value 2 times in a row. This is not supposed to have an
-             * effect, unless the value was changed from outside in the meantime, in which case
-             * resetting the value would incorrectly override the other change.
-             */
-            lastSetValue = ref.el.scrollHeight;
-            ref.el.scrollTop = ref.el.scrollHeight;
-        }
-    }
-    onMounted(() => {
-        el = ref.el;
-        applyScroll();
-        observer.observe(el);
-        el.addEventListener("scroll", onScroll);
-    });
-    onWillUnmount(() => {
-        observer.unobserve(el);
-        el.removeEventListener("scroll", onScroll);
-    });
-    onPatched(applyScroll);
-}
-
 /**
  * @param {string} refName
  * @param {function} cb
  */
-export function useVisible(refName, cb, { init = false, ready = true } = {}) {
+export function useVisible(refName, cb, { ready = true } = {}) {
     const ref = useRef(refName);
     const state = useState({
-        isVisible: init,
+        isVisible: undefined,
         ready,
     });
     function setValue(value) {
         state.isVisible = value;
-        cb();
+        cb(state.isVisible);
     }
     const observer = new IntersectionObserver((entries) => {
         setValue(entries.at(-1).isIntersecting);
@@ -183,7 +225,7 @@ export function useVisible(refName, cb, { init = false, ready = true } = {}) {
             if (el && ready) {
                 observer.observe(el);
                 return () => {
-                    setValue(false);
+                    setValue(undefined);
                     observer.unobserve(el);
                 };
             }
@@ -191,49 +233,6 @@ export function useVisible(refName, cb, { init = false, ready = true } = {}) {
         () => [ref.el, state.ready]
     );
     return state;
-}
-
-/**
- * This hook eases adjusting scroll position by snapshotting scroll
- * properties of scrollable in onWillPatch / onPatched hooks.
- *
- * @deprecated
- * @param {import("@web/core/utils/hooks").Ref} ref
- * @param {function} param1.onWillPatch
- * @param {function} param1.onPatched
- */
-export function useScrollSnapshot(ref, { onWillPatch: p_onWillPatch, onPatched: p_onPatched }) {
-    const snapshot = {
-        scrollHeight: null,
-        scrollTop: null,
-        clientHeight: null,
-    };
-    onMounted(() => {
-        const el = ref.el;
-        Object.assign(snapshot, {
-            scrollHeight: el.scrollHeight,
-            scrollTop: el.scrollTop,
-            clientHeight: el.clientHeight,
-        });
-    });
-    onWillPatch(() => {
-        const el = ref.el;
-        Object.assign(snapshot, {
-            scrollHeight: el.scrollHeight,
-            scrollTop: el.scrollTop,
-            clientHeight: el.clientHeight,
-            ...p_onWillPatch(),
-        });
-    });
-    onPatched(() => {
-        const el = ref.el;
-        Object.assign(snapshot, {
-            scrollHeight: el.scrollHeight,
-            scrollTop: el.scrollTop,
-            clientHeight: el.clientHeight,
-            ...p_onPatched(snapshot),
-        });
-    });
 }
 
 /**
@@ -245,7 +244,6 @@ export function useScrollSnapshot(ref, { onWillPatch: p_onWillPatch, onPatched: 
  */
 export function useMessageHighlight(duration = 2000) {
     let timeout;
-    const threadService = useService("mail.thread");
     const state = useState({
         clearHighlight() {
             if (this.highlightedMessageId) {
@@ -259,10 +257,10 @@ export function useMessageHighlight(duration = 2000) {
          * @param {import("models").Thread} thread
          */
         async highlightMessage(message, thread) {
-            if (thread.notEq(message.originThread)) {
+            if (thread.notEq(message.thread)) {
                 return;
             }
-            await threadService.loadAround(thread, message.id);
+            await thread.loadAround(message.id);
             const lastHighlightedMessageId = state.highlightedMessageId;
             this.clearHighlight();
             if (lastHighlightedMessageId === message.id) {
@@ -273,6 +271,29 @@ export function useMessageHighlight(duration = 2000) {
             state.highlightedMessageId = message.id;
             timeout = browser.setTimeout(() => this.clearHighlight(), duration);
         },
+        scrollPromise: null,
+        /**
+         * Scroll the element into view and expose a promise that will resolved
+         * once the scroll is done.
+         *
+         * @param {Element} el
+         */
+        scrollTo(el) {
+            state.scrollPromise?.resolve();
+            const scrollPromise = new Deferred();
+            state.scrollPromise = scrollPromise;
+            if ("onscrollend" in window) {
+                document.addEventListener("scrollend", scrollPromise.resolve, {
+                    capture: true,
+                    once: true,
+                });
+            } else {
+                // To remove when safari will support the "scrollend" event.
+                setTimeout(scrollPromise.resolve, 250);
+            }
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            return scrollPromise;
+        },
         highlightedMessageId: null,
     });
     return state;
@@ -282,7 +303,8 @@ export function useSelection({ refName, model, preserveOnClickAwayPredicate = ()
     const ui = useState(useService("ui"));
     const ref = useRef(refName);
     function onSelectionChange() {
-        if (document.activeElement && document.activeElement === ref.el) {
+        const activeElement = ref.el?.getRootNode().activeElement;
+        if (activeElement && activeElement === ref.el) {
             Object.assign(model, {
                 start: ref.el.selectionStart,
                 end: ref.el.selectionEnd,
@@ -324,72 +346,6 @@ export function useSelection({ refName, model, preserveOnClickAwayPredicate = ()
             }
         },
     };
-}
-
-/**
- * @deprecated
- * @param {string} refName
- * @param {ScrollPosition} [model] Model to store saved position.
- * @param {'bottom' | 'top'} [clearOn] Whether scroll
- * position should be cleared when reaching bottom or top.
- */
-export function useScrollPosition(refName, model, clearOn) {
-    const ref = useRef(refName);
-    let observeScroll = false;
-    const self = {
-        ref,
-        model,
-        restore() {
-            if (!self.model) {
-                return;
-            }
-            ref.el?.scrollTo({
-                left: self.model.left,
-                top: self.model.top,
-            });
-        },
-    };
-    function isScrolledToBottom() {
-        if (!ref.el) {
-            return false;
-        }
-        return Math.abs(ref.el.scrollTop + ref.el.clientHeight - ref.el.scrollHeight) < 1;
-    }
-
-    function onScrolled() {
-        if (!self.model) {
-            return;
-        }
-        if (
-            (clearOn === "bottom" && isScrolledToBottom()) ||
-            (clearOn === "top" && ref.el.scrollTop === 0)
-        ) {
-            return self.model.clear();
-        }
-        Object.assign(self.model, {
-            top: ref.el.scrollTop,
-            left: ref.el.scrollLeft,
-        });
-    }
-
-    onMounted(() => {
-        if (ref.el) {
-            observeScroll = true;
-        }
-        ref.el?.addEventListener("scroll", onScrolled);
-    });
-
-    onPatched(() => {
-        if (!observeScroll && ref.el) {
-            observeScroll = true;
-            ref.el.addEventListener("scroll", onScrolled);
-        }
-    });
-
-    onWillUnmount(() => {
-        ref.el?.removeEventListener("scroll", onScrolled);
-    });
-    return self;
 }
 
 export function useMessageEdition() {
@@ -500,7 +456,7 @@ export function useDiscussSystray() {
     return {
         class: "o-mail-DiscussSystray-class",
         get contentClass() {
-            return `d-flex flex-column flex-grow-1 bg-view ${
+            return `d-flex flex-column flex-grow-1 ${
                 ui.isSmall ? "overflow-auto w-100 mh-100" : ""
             }`;
         },
@@ -513,3 +469,24 @@ export function useDiscussSystray() {
         },
     };
 }
+
+export const useMovable = makeDraggableHook({
+    name: "useMovable",
+    onWillStartDrag({ ctx, addCleanup, addStyle, getRect }) {
+        const { height } = getRect(ctx.current.element);
+        ctx.current.container = document.createElement("div");
+        addStyle(ctx.current.container, {
+            position: "fixed",
+            top: 0,
+            bottom: `${height}px`,
+            left: 0,
+            right: 0,
+        });
+        ctx.current.element.after(ctx.current.container);
+        addCleanup(() => ctx.current.container.remove());
+    },
+    onDrop({ ctx, getRect }) {
+        const { top, left } = getRect(ctx.current.element);
+        return { top, left };
+    },
+});

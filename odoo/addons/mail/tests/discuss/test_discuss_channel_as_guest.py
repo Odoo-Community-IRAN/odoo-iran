@@ -67,6 +67,10 @@ class TestMailPublicPage(HttpCaseWithUserPortal, HttpCaseWithUserDemo):
         self.assertTrue(self.channel.message_ids[0].author_guest_id)
         self.start_tour(self.channel.invitation_url, self.tour, cookies={guest._cookie_name: guest._format_auth_cookie()})
 
+    def test_discuss_channel_public_page_call_public(self):
+        self.channel.default_display_mode = 'video_full_screen'
+        self.start_tour(self.channel.invitation_url, "discuss_channel_call_public_tour.js")
+
     def test_mail_group_public_page_as_guest(self):
         self.start_tour(self.group.invitation_url, "discuss_channel_as_guest_tour.js")
         guest = self.env['mail.guest'].search([('channel_ids', 'in', self.channel.id)], limit=1, order='id desc')
@@ -99,3 +103,11 @@ class TestMailPublicPage(HttpCaseWithUserPortal, HttpCaseWithUserDemo):
 
         internal_response = self.url_open(internal_channel.invitation_url)
         self.assertEqual(internal_response.status_code, 404)
+
+    def test_sidebar_in_public_page(self):
+        guest = self.env['mail.guest'].create({'name': 'Guest'})
+        channel_1 = self.env["discuss.channel"].channel_create(name="Channel 1", group_id=None)
+        channel_2 = self.env["discuss.channel"].channel_create(name="Channel 2", group_id=None)
+        channel_1.add_members(guest_ids=[guest.id])
+        channel_2.add_members(guest_ids=[guest.id])
+        self.start_tour(f"/discuss/channel/{channel_1.id}", "sidebar_in_public_page_tour", cookies={guest._cookie_name: guest._format_auth_cookie()})

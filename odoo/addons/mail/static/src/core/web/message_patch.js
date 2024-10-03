@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { Message } from "@mail/core/common/message";
 import { markEventHandled } from "@web/core/utils/misc";
 
@@ -26,7 +24,6 @@ patch(Message.prototype, {
     setup() {
         super.setup(...arguments);
         this.action = useService("action");
-        this.userService = useService("user");
         this.avatarCard = usePopover(AvatarCardPopover);
     },
     get authorAvatarAttClass() {
@@ -35,11 +32,23 @@ patch(Message.prototype, {
             "o_redirect cursor-pointer": this.hasAuthorClickable(),
         };
     },
+    getAuthorAttClass() {
+        return {
+            ...super.getAuthorAttClass(),
+            "cursor-pointer o-hover-text-underline": this.hasAuthorClickable(),
+        };
+    },
     getAuthorText() {
         return this.hasAuthorClickable() ? _t("Open card") : undefined;
     },
+    getAvatarContainerAttClass() {
+        return {
+            ...super.getAvatarContainerAttClass(),
+            "cursor-pointer": this.hasAuthorClickable(),
+        };
+    },
     hasAuthorClickable() {
-        return this.message.author?.user;
+        return this.message.author?.userId;
     },
     onClickAuthor(ev) {
         if (this.hasAuthorClickable()) {
@@ -47,13 +56,13 @@ patch(Message.prototype, {
             const target = ev.currentTarget;
             if (!this.avatarCard.isOpen) {
                 this.avatarCard.open(target, {
-                    id: this.message.author.user.id,
+                    id: this.message.author.userId,
                 });
             }
         }
     },
     openRecord() {
-        this.threadService.open(this.message.originThread);
+        this.message.thread.open();
     },
 
     /**

@@ -1,45 +1,52 @@
 /** @odoo-module **/
 
-import wTourUtils from "@website/js/tours/tour_utils";
+import * as wTourUtils from "@website/js/tours/tour_utils";
 
 const snippets = [
     {
         id: 's_cover',
         name: 'Cover',
+        groupName: "Intro",
     },
     {
-        id: 's_text_image',
-        name: 'Text - Image',
+        id: 's_title',
+        name: 'Title',
+        groupName: "Text",
     },
     {
-        id: 's_image_text',
-        name: 'Image - Text',
+        id: 's_three_columns',
+        name: 'Columns',
+        groupName: "Columns",
     },
     {
         id: 's_picture',
-        name: 'Picture',
+        name: 'Title - Image',
+        groupName: "Images",
     },
     {
-        id: 's_masonry_block',
-        name: 'Masonry',
+        id: 's_key_images',
+        name: 'Key Images',
+        groupName: "Columns",
     },
     {
-        id: 's_call_to_action',
-        name: 'Call to Action',
+        id: 's_numbers_charts',
+        name: 'Numbers Charts',
+        groupName: "Content",
+    },
+    {
+        id: 's_media_list',
+        name: 'Media List',
+        groupName: "Content",
     },
 ];
 
 wTourUtils.registerThemeHomepageTour("vehicle_tour", () => [
     wTourUtils.assertCssVariable('--color-palettes-name', '"vehicle-1"'),
-    wTourUtils.dragNDrop(snippets[0], 'top'),
-    wTourUtils.clickOnText(snippets[0], 'h1', 'top'),
-    wTourUtils.goBackToBlocks(),
-    wTourUtils.dragNDrop(snippets[1], 'top'),
-    wTourUtils.dragNDrop(snippets[2], 'top'),
-    wTourUtils.dragNDrop(snippets[3], 'top'),
-    wTourUtils.dragNDrop(snippets[4], 'top'),
-    wTourUtils.dragNDrop(snippets[5], 'top'),
-    wTourUtils.clickOnSnippet(snippets[5]),
-    wTourUtils.changeBackgroundColor(),
-    wTourUtils.selectColorPalette(),
+    ...wTourUtils.insertSnippet(snippets[0]),
+    ...wTourUtils.insertSnippet(snippets[1]),
+    ...wTourUtils.insertSnippet(snippets[2]),
+    ...wTourUtils.insertSnippet(snippets[3]),
+    ...wTourUtils.insertSnippet(snippets[4]),
+    ...wTourUtils.insertSnippet(snippets[5]),
+    ...wTourUtils.insertSnippet(snippets[6]),
 ]);

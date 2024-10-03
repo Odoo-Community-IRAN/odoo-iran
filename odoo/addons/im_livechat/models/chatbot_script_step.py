@@ -6,6 +6,7 @@ from odoo.exceptions import ValidationError
 from odoo.fields import Command
 from odoo.osv import expression
 from odoo.tools import html2plaintext, is_html_empty, email_normalize, plaintext2html
+from odoo.addons.mail.tools.discuss import Store
 
 from collections import defaultdict
 from markupsafe import Markup
@@ -259,8 +260,10 @@ class ChatbotScriptStep(models.Model):
         discuss_channel = discuss_channel or self.env['discuss.channel']
 
         # if it's not a question and if there is no next step, then we end the script
-        if self.step_type != 'question_selection' and not self._fetch_next_step(
-           discuss_channel.chatbot_message_ids.user_script_answer_id):
+        # sudo: chatbot.script.answser - visitor can access their own answers
+        if self.step_type != "question_selection" and not self._fetch_next_step(
+            discuss_channel.sudo().chatbot_message_ids.user_script_answer_id
+        ):
             return True
 
         return False
@@ -296,7 +299,8 @@ class ChatbotScriptStep(models.Model):
                 chatbot_message.write({'user_raw_answer': message_body})
                 self.env.flush_all()
 
-        return self._fetch_next_step(discuss_channel.chatbot_message_ids.user_script_answer_id)
+        # sudo: chatbot.script.answer - visitor can access their own answer
+        return self._fetch_next_step(discuss_channel.sudo().chatbot_message_ids.user_script_answer_id)
 
     def _process_step(self, discuss_channel):
         """ When we reach a chatbot.step in the script we need to do some processing on behalf of
@@ -309,12 +313,11 @@ class ChatbotScriptStep(models.Model):
         Returns the mail.message posted by the chatbot's operator_partner_id. """
 
         self.ensure_one()
-        # We change the current step to the new step
-        discuss_channel.chatbot_current_step_id = self.id
+        # sudo: discuss.channel - updating current step on the channel is allowed
+        discuss_channel.sudo().chatbot_current_step_id = self.id
 
         if self.step_type == 'forward_operator':
             return self._process_step_forward_operator(discuss_channel)
-
         return discuss_channel._chatbot_post_message(self.chatbot_script_id, plaintext2html(self.message))
 
     def _process_step_forward_operator(self, discuss_channel):
@@ -326,11 +329,13 @@ class ChatbotScriptStep(models.Model):
         (e.g: ask for the visitor's email and create a lead). """
 
         human_operator = False
-        posted_message = False
+        posted_message = self.env["mail.message"]
 
         if discuss_channel.livechat_channel_id:
-            human_operator = discuss_channel.livechat_channel_id._get_operator(
-                lang=discuss_channel.livechat_visitor_id.lang_id.code if hasattr(discuss_channel, "livechat_visitor_id") else None,
+            # sudo: res.users - visitor can access operator of their channel
+            # sudo: res.lang - visitor can access their own lang
+            human_operator = discuss_channel.livechat_channel_id.sudo()._get_operator(
+                lang=discuss_channel.livechat_visitor_id.sudo().lang_id.code if hasattr(discuss_channel, "livechat_visitor_id") else None,
                 country_id=discuss_channel.country_id.id
             )
 
@@ -363,6 +368,21 @@ class ChatbotScriptStep(models.Model):
 
         return posted_message
 
+    def _to_store(self, store: Store, /, *, fields=None):
+        if fields is None:
+            fields = ["answer_ids", "message", "type"]
+        for step in self:
+            data = self._read_format(
+                [f for f in fields if f not in {"answer_ids", "message", "type"}], load=False
+            )[0]
+            if "answer_ids" in fields:
+                data["answers"] = Store.many(step.answer_ids)
+            if "message" in fields:
+                data["message"] = plaintext2html(step.message) if step.message else False
+            if "type" in fields:
+                data["type"] = step.step_type
+            store.add("chatbot.script.step", data)
+
     # --------------------------
     # Tooling / Misc
     # --------------------------
@@ -375,8 +395,8 @@ class ChatbotScriptStep(models.Model):
             'id': self.id,
             'answers': [{
                 'id': answer.id,
-                'label': answer.name,
-                'redirectLink': answer.redirect_link,
+                "name": answer.name,
+                "redirect_link": answer.redirect_link,
             } for answer in self.answer_ids],
             'message': plaintext2html(self.message) if not is_html_empty(self.message) else False,
             'isLast': self._is_last_step(),

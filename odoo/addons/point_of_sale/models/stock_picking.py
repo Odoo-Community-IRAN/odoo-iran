@@ -31,7 +31,7 @@ class StockPicking(models.Model):
         """We'll create some picking based on order_lines"""
 
         pickings = self.env['stock.picking']
-        stockable_lines = lines.filtered(lambda l: l.product_id.type in ['product', 'consu'] and not float_is_zero(l.qty, precision_rounding=l.product_id.uom_id.rounding))
+        stockable_lines = lines.filtered(lambda l: l.product_id.type == 'consu' and not float_is_zero(l.qty, precision_rounding=l.product_id.uom_id.rounding))
         if not stockable_lines:
             return pickings
         positive_lines = stockable_lines.filtered(lambda l: l.qty > 0)
@@ -84,6 +84,7 @@ class StockPicking(models.Model):
             'location_id': self.location_id.id,
             'location_dest_id': self.location_dest_id.id,
             'company_id': self.company_id.id,
+            'never_product_template_attribute_value_ids': first_line.attribute_value_ids.filtered(lambda a: a.attribute_id.create_variant == 'no_variant'),
         }
 
     def _create_move_from_pos_order_lines(self, lines):
@@ -101,8 +102,8 @@ class StockPicking(models.Model):
 
     def _link_owner_on_return_picking(self, lines):
         """This method tries to retrieve the owner of the returned product"""
-        if lines[0].order_id.refunded_order_ids.picking_ids:
-            returned_lines_picking = lines[0].order_id.refunded_order_ids.picking_ids
+        if lines[0].order_id.refunded_order_id.picking_ids:
+            returned_lines_picking = lines[0].order_id.refunded_order_id.picking_ids
             returnable_qty_by_product = {}
             for move_line in returned_lines_picking.move_line_ids:
                 returnable_qty_by_product[(move_line.product_id.id, move_line.owner_id.id or 0)] = move_line.quantity
@@ -126,7 +127,7 @@ class StockPicking(models.Model):
             if rec.pos_order_id.shipping_date and not rec.pos_order_id.to_invoice:
                 cost_per_account = defaultdict(lambda: 0.0)
                 for line in rec.pos_order_id.lines:
-                    if line.product_id.type != 'product' or line.product_id.valuation != 'real_time':
+                    if not line.product_id.is_storable or line.product_id.valuation != 'real_time':
                         continue
                     out = line.product_id.categ_id.property_stock_account_output_categ_id
                     exp = line.product_id._get_product_accounts()['expense']
@@ -157,7 +158,8 @@ class StockPicking(models.Model):
         return res
 
 class StockPickingType(models.Model):
-    _inherit = 'stock.picking.type'
+    _name = 'stock.picking.type'
+    _inherit = ['stock.picking.type', 'pos.load.mixin']
 
     @api.depends('warehouse_id')
     def _compute_hide_reservation_method(self):
@@ -171,7 +173,15 @@ class StockPickingType(models.Model):
         for picking_type in self:
             pos_config = self.env['pos.config'].sudo().search([('picking_type_id', '=', picking_type.id)], limit=1)
             if pos_config:
-                raise ValidationError(_("You cannot archive '%s' as it is used by a POS configuration '%s'.", picking_type.name, pos_config.name))
+                raise ValidationError(_("You cannot archive '%(picking_type)s' as it is used by POS configuration '%(config)s'.", picking_type=picking_type.name, config=pos_config.name))
+
+    @api.model
+    def _load_pos_data_domain(self, data):
+        return [('id', '=', data['pos.config']['data'][0]['picking_type_id'])]
+
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        return ['id', 'use_create_lots', 'use_existing_lots']
 
 class ProcurementGroup(models.Model):
     _inherit = 'procurement.group'
@@ -215,7 +225,7 @@ class StockMove(models.Model):
             lots = lines.pack_lot_ids.filtered(lambda l: l.lot_name and l.product_id.id in moves_product_ids)
             lots_data = set(lots.mapped(lambda l: (l.product_id.id, l.lot_name)))
             existing_lots = self.env['stock.lot'].search([
-                ('company_id', '=', moves[0].picking_type_id.company_id.id),
+                '|', ('company_id', '=', False), ('company_id', '=', moves[0].picking_type_id.company_id.id),
                 ('product_id', 'in', lines.product_id.ids),
                 ('name', 'in', lots.mapped('lot_name')),
             ])
@@ -257,7 +267,7 @@ class StockMove(models.Model):
                 _("Conversion Error: The following unit of measure conversions result in a zero quantity due to rounding:")
             ]
             for uom_from, uom_to in uoms_with_issues:
-                error_message_lines.append(_(' - From "%s" to "%s"', uom_from, uom_to))
+                error_message_lines.append(_(' - From "%(uom_from)s" to "%(uom_to)s"', uom_from=uom_from, uom_to=uom_to))
 
             error_message_lines.append(
                 _("\nThis issue occurs because the quantity becomes zero after rounding during the conversion. "

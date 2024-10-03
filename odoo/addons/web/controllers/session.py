@@ -20,7 +20,7 @@ _logger = logging.getLogger(__name__)
 
 class Session(http.Controller):
 
-    @http.route('/web/session/get_session_info', type='json', auth="user")
+    @http.route('/web/session/get_session_info', type='json', auth='user', readonly=True)
     def get_session_info(self):
         # Crapy workaround for unupdatable Odoo Mobile App iOS (Thanks Apple :@)
         request.session.touch()
@@ -28,10 +28,15 @@ class Session(http.Controller):
 
     @http.route('/web/session/authenticate', type='json', auth="none")
     def authenticate(self, db, login, password, base_location=None):
+        if request.db and request.db != db:
+            request.env.cr.close()
+        elif request.db:
+            request.env.cr.rollback()
         if not http.db_filter([db]):
             raise AccessError("Database not found.")
-        pre_uid = request.session.authenticate(db, login, password)
-        if pre_uid != request.session.uid:
+        credential = {'login': login, 'password': password, 'type': 'password'}
+        auth_info = request.session.authenticate(db, credential)
+        if auth_info['uid'] != request.session.uid:
             # Crapy workaround for unupdatable Odoo Mobile App iOS (Thanks Apple :@) and Android
             # Correct behavior should be to raise AccessError("Renewing an expired session for user that has multi-factor-authentication is not supported. Please use /web/login instead.")
             return {'uid': None}
@@ -46,7 +51,7 @@ class Session(http.Controller):
                 http.root.session_store.rotate(request.session, env)
                 request.future_response.set_cookie(
                     'session_id', request.session.sid,
-                    max_age=http.SESSION_LIFETIME, httponly=True
+                    max_age=http.get_session_max_inactivity(env), httponly=True
                 )
             return env['ir.http'].session_info()
 
@@ -57,16 +62,16 @@ class Session(http.Controller):
         except Exception as e:
             return {"error": e, "title": _("Languages")}
 
-    @http.route('/web/session/modules', type='json', auth="user")
+    @http.route('/web/session/modules', type='json', auth='user', readonly=True)
     def modules(self):
         # return all installed modules. Web client is smart enough to not load a module twice
-        return list(request.env.registry._init_modules.union([module.current_test] if module.current_test else []))
+        return list(request.env.registry._init_modules)
 
-    @http.route('/web/session/check', type='json', auth="user")
+    @http.route('/web/session/check', type='json', auth='user', readonly=True)
     def check(self):
         return  # ir.http@_authenticate does the job
 
-    @http.route('/web/session/account', type='json', auth="user")
+    @http.route('/web/session/account', type='json', auth='user', readonly=True)
     def account(self):
         ICP = request.env['ir.config_parameter'].sudo()
         params = {
@@ -77,11 +82,11 @@ class Session(http.Controller):
         }
         return 'https://accounts.odoo.com/oauth2/auth?' + url_encode(params)
 
-    @http.route('/web/session/destroy', type='json', auth="user")
+    @http.route('/web/session/destroy', type='json', auth='user', readonly=True)
     def destroy(self):
         request.session.logout()
 
-    @http.route('/web/session/logout', type='http', auth="none")
-    def logout(self, redirect='/web'):
+    @http.route('/web/session/logout', type='http', auth='none', readonly=True)
+    def logout(self, redirect='/odoo'):
         request.session.logout(keep_db=True)
         return request.redirect(redirect, 303)

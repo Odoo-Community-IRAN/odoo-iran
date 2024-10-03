@@ -10,7 +10,7 @@ from PIL import Image
 import odoo
 from odoo.exceptions import AccessError
 from odoo.addons.base.tests.common import TransactionCaseWithUserDemo
-from odoo.tools import image_to_base64
+from odoo.tools.image import image_to_base64
 
 HASH_SPLIT = 2      # FIXME: testing implementations detail is not a good idea
 
@@ -246,20 +246,15 @@ class TestIrAttachment(TransactionCaseWithUserDemo):
         self.assertFalse(os.path.isfile(store_path), 'file removed')
 
     def test_13_rollback(self):
-        self.registry.enter_test_mode(self.cr)
-        self.addCleanup(self.registry.leave_test_mode)
-        self.cr = self.registry.cursor()
-        self.addCleanup(self.cr.close)
-        self.env = odoo.api.Environment(self.cr, odoo.SUPERUSER_ID, {})
-
+        savepoint = self.cr.savepoint()
         # the data needs to be unique so that no other attachment link
         # the file so that the gc removes it
         unique_blob = os.urandom(16)
-        a1 = self.Attachment.create({'name': 'a1', 'raw': unique_blob})
+        a1 = self.env['ir.attachment'].create({'name': 'a1', 'raw': unique_blob})
         store_path = os.path.join(self.filestore, a1.store_fname)
         self.assertTrue(os.path.isfile(store_path), 'file exists')
-        self.env.cr.rollback()
-        self.Attachment._gc_file_store_unsafe()
+        savepoint.rollback()
+        self.env['ir.attachment']._gc_file_store_unsafe()
         self.assertFalse(os.path.isfile(store_path), 'file removed')
 
     def test_14_invalid_mimetype_with_correct_file_extension_no_post_processing(self):

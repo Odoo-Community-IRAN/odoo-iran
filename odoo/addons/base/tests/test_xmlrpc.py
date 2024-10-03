@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 import collections
+import datetime
 import time
-from xmlrpc.client import Binary
 
 from odoo.exceptions import AccessDenied, AccessError
 from odoo.http import _request_stack
@@ -41,6 +41,28 @@ class TestXMLRPC(common.HttpCase):
         self.assertIsInstance(ids, list)
         ids = o.execute(db_name, self.admin_uid, 'admin', 'ir.model', 'search', [], {})
         self.assertIsInstance(ids, list)
+
+    def test_xmlrpc_datetime(self):
+        """ Test that native datetime can be sent over xmlrpc
+        """
+        m = self.env.ref('base.model_res_device_log')
+        self.env['ir.model.access'].create({
+            'name': "w/e",
+            'model_id': m.id,
+            'perm_read': True,
+            'perm_create': True,
+        })
+
+        now = datetime.datetime.now()
+        ids = self.xmlrpc(
+            'res.device.log', 'create',
+            {'session_identifier': "abc", 'first_activity': now}
+        )
+        [r] = self.xmlrpc(
+            'res.device.log', 'read',
+            ids, ['first_activity'],
+        )
+        self.assertEqual(r['first_activity'], now.isoformat(" ", "seconds"))
 
     def test_xmlrpc_read_group(self):
         groups = self.xmlrpc_object.execute(
@@ -108,7 +130,7 @@ class TestXMLRPC(common.HttpCase):
         )
 
     def _json_call(self, *args):
-        self.opener.post("http://%s:%s/jsonrpc" % (common.HOST, odoo.tools.config['http_port']), json={
+        self.opener.post(f"{self.base_url()}/jsonrpc", json={
             'jsonrpc': '2.0',
             'id': None,
             'method': 'call',
@@ -149,6 +171,7 @@ class TestAPIKeys(common.HttpCase):
                 'environ': {'REMOTE_ADDR': 'localhost'},
                 'cookies': {},
             }),
+            'cookies': {},
             # bypass check_identity flow
             'session': {'identity-check-last': time.time()},
             'geoip': {},

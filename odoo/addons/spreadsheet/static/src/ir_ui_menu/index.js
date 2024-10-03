@@ -15,17 +15,21 @@ import {
 } from "./odoo_menu_link_cell";
 import { _t } from "@web/core/l10n/translation";
 import { sprintf } from "@web/core/utils/strings";
+import { navigateTo } from "../actions/helpers";
 
-const { urlRegistry, corePluginRegistry } = spreadsheet.registries;
+const { urlRegistry, corePluginRegistry, errorTypes } = spreadsheet.registries;
 const { EvaluationError } = spreadsheet;
 
 corePluginRegistry.add("ir_ui_menu_plugin", IrMenuPlugin);
 
+const LINK_ERROR = "#LINK";
+errorTypes.add(LINK_ERROR);
+
 class BadOdooLinkError extends EvaluationError {
     constructor(menuId) {
         super(
-            _t("#LINK"),
-            sprintf(_t("Menu %s not found. You may not have the required access rights."), menuId)
+            sprintf(_t("Menu %s not found. You may not have the required access rights."), menuId),
+            LINK_ERROR
         );
     }
 }
@@ -67,12 +71,6 @@ export const spreadsheetLinkMenuCellService = {
                     const menu = env.services.menu.getMenu(menuId);
                     env.services.action.doAction(menu.actionID);
                 },
-                // createCell: (id, content, properties, sheetId, getters) => {
-                //     const { url } = parseMarkdownLink(content);
-                //     const menuId = parseIrMenuIdLink(url);
-                //     const menuName = env.services.menu.getMenu(menuId).name;
-                //     return new OdooMenuLinkCell(id, content, menuId, menuName, properties);
-                // },
             })
             .add("OdooMenuXmlLink", {
                 sequence: 66,
@@ -114,9 +112,9 @@ export const spreadsheetLinkMenuCellService = {
                     const actionDescription = parseViewLink(url);
                     return actionDescription.name;
                 },
-                open(url) {
+                async open(url, env) {
                     const { viewType, action, name } = parseViewLink(url);
-                    env.services.action.doAction(
+                    await navigateTo(env, action.xmlId,
                         {
                             type: "ir.actions.act_window",
                             name: name,

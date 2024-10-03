@@ -10,7 +10,7 @@ from werkzeug.urls import url_encode
 
 from odoo import api, Command, fields, models, _
 from odoo.osv import expression
-from odoo.tools import format_amount, format_date, formatLang, groupby
+from odoo.tools import format_amount, format_date, format_list, formatLang, groupby
 from odoo.tools.float_utils import float_is_zero
 from odoo.exceptions import UserError, ValidationError
 
@@ -22,26 +22,23 @@ class PurchaseOrder(models.Model):
     _rec_names_search = ['name', 'partner_ref']
     _order = 'priority desc, id desc'
 
-    @api.depends('order_line.price_total')
+    @api.depends('order_line.price_subtotal', 'company_id')
     def _amount_all(self):
+        AccountTax = self.env['account.tax']
         for order in self:
             order_lines = order.order_line.filtered(lambda x: not x.display_type)
-
-            if order.company_id.tax_calculation_rounding_method == 'round_globally':
-                tax_results = self.env['account.tax']._compute_taxes([
-                    line._convert_to_tax_base_line_dict()
-                    for line in order_lines
-                ])
-                totals = tax_results['totals']
-                amount_untaxed = totals.get(order.currency_id, {}).get('amount_untaxed', 0.0)
-                amount_tax = totals.get(order.currency_id, {}).get('amount_tax', 0.0)
-            else:
-                amount_untaxed = sum(order_lines.mapped('price_subtotal'))
-                amount_tax = sum(order_lines.mapped('price_tax'))
-
-            order.amount_untaxed = amount_untaxed
-            order.amount_tax = amount_tax
-            order.amount_total = order.amount_untaxed + order.amount_tax
+            base_lines = [line._prepare_base_line_for_taxes_computation() for line in order_lines]
+            AccountTax._add_tax_details_in_base_lines(base_lines, order.company_id)
+            AccountTax._round_base_lines_tax_details(base_lines, order.company_id)
+            tax_totals = AccountTax._get_tax_totals_summary(
+                base_lines=base_lines,
+                currency=order.currency_id or order.company_id.currency_id,
+                company=order.company_id,
+            )
+            order.amount_untaxed = tax_totals['base_amount_currency']
+            order.amount_tax = tax_totals['tax_amount_currency']
+            order.amount_total = tax_totals['total_amount_currency']
+            order.amount_total_cc = tax_totals['total_amount']
 
     @api.depends('state', 'order_line.qty_to_invoice')
     def _get_invoiced(self):
@@ -105,6 +102,7 @@ class PurchaseOrder(models.Model):
     order_line = fields.One2many('purchase.order.line', 'order_id', string='Order Lines', copy=True)
     notes = fields.Html('Terms and Conditions')
 
+    partner_bill_count = fields.Integer(related='partner_id.supplier_invoice_count')
     invoice_count = fields.Integer(compute="_compute_invoice", string='Bill Count', copy=False, default=0, store=True)
     invoice_ids = fields.Many2many('account.move', compute="_compute_invoice", string='Bills', copy=False, store=True)
     invoice_status = fields.Selection([
@@ -121,6 +119,7 @@ class PurchaseOrder(models.Model):
     tax_totals = fields.Binary(compute='_compute_tax_totals', exportable=False)
     amount_tax = fields.Monetary(string='Taxes', store=True, readonly=True, compute='_amount_all')
     amount_total = fields.Monetary(string='Total', store=True, readonly=True, compute='_amount_all')
+    amount_total_cc = fields.Monetary(string="Company Total", store=True, readonly=True, compute="_amount_all", currency_field="company_currency_id")
 
     fiscal_position_id = fields.Many2one('account.fiscal.position', string='Fiscal Position', domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]")
     tax_country_id = fields.Many2one(
@@ -140,11 +139,20 @@ class PurchaseOrder(models.Model):
         'res.users', string='Buyer', index=True, tracking=True,
         default=lambda self: self.env.user, check_company=True)
     company_id = fields.Many2one('res.company', 'Company', required=True, index=True, default=lambda self: self.env.company.id)
+    company_currency_id = fields.Many2one(related="company_id.currency_id", string="Company Currency")
     country_code = fields.Char(related='company_id.account_fiscal_country_id.code', string="Country code")
-    currency_rate = fields.Float("Currency Rate", compute='_compute_currency_rate', compute_sudo=True, store=True, readonly=True, help='Ratio between the purchase order currency and the company currency')
+    company_price_include = fields.Selection(related='company_id.account_price_include')
+    currency_rate = fields.Float(
+        string="Currency Rate",
+        compute='_compute_currency_rate',
+        digits=0,
+        store=True,
+        precompute=True,
+    )
 
     mail_reminder_confirmed = fields.Boolean("Reminder Confirmed", default=False, readonly=True, copy=False, help="True if the reminder email is confirmed by the vendor.")
     mail_reception_confirmed = fields.Boolean("Reception Confirmed", default=False, readonly=True, copy=False, help="True if PO reception is confirmed by the vendor.")
+    mail_reception_declined = fields.Boolean("Reception Declined", readonly=True, copy=False, help="True if PO reception is declined by the vendor.")
 
     receipt_reminder_email = fields.Boolean('Receipt Reminder Email', compute='_compute_receipt_reminder_email')
     reminder_date_before_receipt = fields.Integer('Days Before Receipt', compute='_compute_receipt_reminder_email')
@@ -176,10 +184,20 @@ class PurchaseOrder(models.Model):
         for order in self:
             order.date_calendar_start = order.date_approve if (order.state in ['purchase', 'done']) else order.date_order
 
-    @api.depends('date_order', 'currency_id', 'company_id', 'company_id.currency_id')
+    @api.depends('currency_id', 'date_order', 'company_id')
     def _compute_currency_rate(self):
         for order in self:
-            order.currency_rate = self.env['res.currency']._get_conversion_rate(order.company_id.currency_id, order.currency_id, order.company_id, order.date_order)
+            order.currency_rate = self.env['res.currency']._get_conversion_rate(
+                from_currency=order.company_id.currency_id,
+                to_currency=order.currency_id,
+                company=order.company_id,
+                date=(order.date_order or fields.Datetime.now()).date(),
+            )
+
+    @api.depends('amount_total', 'currency_rate')
+    def _compute_amount_total_cc(self):
+        for order in self:
+            order.amount_total_cc = order.amount_total / order.currency_rate
 
     @api.depends('order_line.date_planned')
     def _compute_date_planned(self):
@@ -209,13 +227,18 @@ class PurchaseOrder(models.Model):
             order.reminder_date_before_receipt = order.partner_id.with_company(order.company_id).reminder_date_before_receipt
 
     @api.depends_context('lang')
-    @api.depends('order_line.taxes_id', 'order_line.price_subtotal', 'amount_total', 'amount_untaxed')
+    @api.depends('order_line.price_subtotal', 'currency_id', 'company_id')
     def _compute_tax_totals(self):
+        AccountTax = self.env['account.tax']
         for order in self:
             order_lines = order.order_line.filtered(lambda x: not x.display_type)
-            order.tax_totals = self.env['account.tax']._prepare_tax_totals(
-                [x._convert_to_tax_base_line_dict() for x in order_lines],
-                order.currency_id or order.company_id.currency_id,
+            base_lines = [line._prepare_base_line_for_taxes_computation() for line in order_lines]
+            AccountTax._add_tax_details_in_base_lines(base_lines, order.company_id)
+            AccountTax._round_base_lines_tax_details(base_lines, order.company_id)
+            order.tax_totals = AccountTax._get_tax_totals_summary(
+                base_lines=base_lines,
+                currency=order.currency_id or order.company_id.currency_id,
+                company=order.company_id,
             )
 
     @api.depends('company_id.account_fiscal_country_id', 'fiscal_position_id.country_id', 'fiscal_position_id.foreign_vat')
@@ -269,14 +292,14 @@ class PurchaseOrder(models.Model):
         ctx = dict(self.env.context)
         ctx.pop('default_product_id', None)
         self = self.with_context(ctx)
-        new_po = super(PurchaseOrder, self).copy(default=default)
-        for line in new_po.order_line:
+        new_pos = super().copy(default=default)
+        for line in new_pos.order_line:
             if line.product_id:
                 seller = line.product_id._select_seller(
                     partner_id=line.partner_id, quantity=line.product_qty,
                     date=line.order_id.date_order and line.order_id.date_order.date(), uom_id=line.product_uom)
                 line.date_planned = line._get_date_planned(seller)
-        return new_po
+        return new_pos
 
     def _must_delete_date_planned(self, field_name):
         # To be overridden
@@ -386,8 +409,8 @@ class PurchaseOrder(models.Model):
                     {'url': self.get_update_url(), 'title': _('Update Dates')},
                 ])
             else:
-                access_opt['title'] = _('Confirm')
-                access_opt['url'] = self.get_confirm_url(confirm_type='reception')
+                access_opt['title'] = _('View Quotation') if self.state in ('draft', 'sent') else _('View Order')
+                access_opt['url'] = self.get_confirm_url()
 
         return groups
 
@@ -399,14 +422,12 @@ class PurchaseOrder(models.Model):
         )
         subtitles = [render_context['record'].name]
         # don't show price on RFQ mail
-        if self.state not in ['draft', 'sent']:
-            if self.date_order:
-                subtitles.append(_('%(amount)s due\N{NO-BREAK SPACE}%(date)s',
-                                   amount=format_amount(self.env, self.amount_total, self.currency_id, lang_code=render_context.get('lang')),
-                                   date=format_date(self.env, self.date_order, date_format='short', lang_code=render_context.get('lang'))
-                                   ))
-            else:
-                subtitles.append(format_amount(self.env, self.amount_total, self.currency_id, lang_code=render_context.get('lang')))
+        if self.state in ['draft', 'sent']:
+            subtitles.append(_('Order\N{NO-BREAK SPACE}due\N{NO-BREAK SPACE}%(date)s',
+                date=format_date(self.env, self.date_order, lang_code=render_context.get('lang'))
+            ))
+        else:
+            subtitles.append(format_amount(self.env, self.amount_total, self.currency_id, lang_code=render_context.get('lang')))
         render_context['subtitles'] = subtitles
         return render_context
 
@@ -512,11 +533,9 @@ class PurchaseOrder(models.Model):
         return True
 
     def button_cancel(self):
-        for order in self:
-            for inv in order.invoice_ids:
-                if inv and inv.state not in ('cancel', 'draft'):
-                    raise UserError(_("Unable to cancel this purchase order. You must first cancel the related vendor bills."))
-
+        purchase_orders_with_invoices = self.filtered(lambda po: any(i.state not in ('cancel', 'draft') for i in po.invoice_ids))
+        if purchase_orders_with_invoices:
+            raise UserError(_("Unable to cancel purchase order(s): %s. You must first cancel their related vendor bills.", format_list(self.env, purchase_orders_with_invoices.mapped('display_name'))))
         self.write({'state': 'cancel', 'mail_reminder_confirmed': False})
 
     def button_unlock(self):
@@ -546,15 +565,13 @@ class PurchaseOrder(models.Model):
             partner = self.partner_id if not self.partner_id.parent_id else self.partner_id.parent_id
             already_seller = (partner | self.partner_id) & line.product_id.seller_ids.mapped('partner_id')
             if line.product_id and not already_seller and len(line.product_id.seller_ids) <= 10:
-                # Convert the price in the right currency.
-                currency = partner.property_purchase_currency_id or self.env.company.currency_id
-                price = self.currency_id._convert(line.price_unit, currency, line.company_id, line.date_order or fields.Date.today(), round=False)
+                price = line.price_unit
                 # Compute the price for the template's UoM, because the supplier's UoM is related to that UoM.
                 if line.product_id.product_tmpl_id.uom_po_id != line.product_uom:
                     default_uom = line.product_id.product_tmpl_id.uom_po_id
                     price = line.product_uom._compute_price(price, default_uom)
 
-                supplierinfo = self._prepare_supplier_info(partner, line, price, currency)
+                supplierinfo = self._prepare_supplier_info(partner, line, price, line.currency_id)
                 # In case the order partner is a contact address, a new supplierinfo is created on
                 # the parent company. In this case, we keep the product name and code.
                 seller = line.product_id._select_seller(
@@ -570,6 +587,53 @@ class PurchaseOrder(models.Model):
                 }
                 # supplier info should be added regardless of the user access rights
                 line.product_id.product_tmpl_id.sudo().write(vals)
+
+    def action_bill_matching(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _("Bill Matching"),
+            'res_model': 'purchase.bill.line.match',
+            'domain': [
+                ('partner_id', '=', self.partner_id.id),
+                ('company_id', 'in', self.env.company.ids),
+                ('purchase_order_id', 'in', [self.id, False]),
+            ],
+            'views': [(self.env.ref('purchase.purchase_bill_line_match_tree').id, 'list')],
+        }
+
+    def _prepare_down_payment_section_values(self):
+        self.ensure_one()
+        context = {'lang': self.partner_id.lang}
+        res = {
+            'product_qty': 0.0,
+            'order_id': self.id,
+            'display_type': 'line_section',
+            'is_downpayment': True,
+            'sequence': (self.order_line[-1:].sequence or 9) + 1,
+            'name': _("Down Payments"),
+        }
+        del context
+        return res
+
+    def _create_downpayments(self, line_vals):
+        self.ensure_one()
+
+        # create section
+        if not any(line.display_type and line.is_downpayment for line in self.order_line):
+            section_line = self.order_line.create(self._prepare_down_payment_section_values())
+        else:
+            section_line = self.order_line.filtered(lambda line: line.display_type and line.is_downpayment)
+        vals = [
+            {
+                **line_val,
+                'sequence': section_line.sequence + i,
+            }
+            for i, line_val in enumerate(line_vals, start=1)
+        ]
+        downpayment_lines = self.env['purchase.order.line'].create(vals)
+        self.order_line += downpayment_lines
+        return downpayment_lines
 
     def action_create_invoice(self):
         """Create the invoice associated to the PO.
@@ -644,6 +708,86 @@ class PurchaseOrder(models.Model):
 
         return self.action_view_invoice(moves)
 
+    def action_merge(self):
+        all_origin = []
+        all_vendor_references = []
+        rfq_to_merge = self.filtered(lambda r: r.state in ['draft', 'sent'])
+
+        # Group RFQs by vendor
+        if len(rfq_to_merge) < 2:
+            raise UserError(_("Please select at least two purchase orders with state RFQ and RFQ sent to merge."))
+
+        rfqs_grouped = defaultdict(lambda: self.env['purchase.order'])
+        for rfq in rfq_to_merge:
+            key = self._prepare_grouped_data(rfq)
+            rfqs_grouped[key] += rfq
+
+        bunches_of_rfq_to_be_merge = list(rfqs_grouped.values())
+        if all(len(rfq_bunch) == 1 for rfq_bunch in list(bunches_of_rfq_to_be_merge)):
+            raise UserError(_("In selected purchase order to merge these details must be same\nVendor, currency, destination, dropship address and agreement"))
+        bunches_of_rfq_to_be_merge = [rfqs for rfqs in bunches_of_rfq_to_be_merge if len(rfqs) > 1]
+
+        for rfqs in bunches_of_rfq_to_be_merge:
+            if len(rfqs) <= 1:
+                continue
+            oldest_rfq = min(rfqs, key=lambda r: r.date_order)
+            if oldest_rfq:
+                # Merge RFQs into the oldest purchase order
+                rfqs -= oldest_rfq
+                for rfq_line in rfqs.order_line:
+                    existing_line = oldest_rfq.order_line.filtered(lambda l: l.product_id == rfq_line.product_id and
+                                                                                l.product_uom == rfq_line.product_uom and
+                                                                                l.product_packaging_id == rfq_line.product_packaging_id and
+                                                                                l.product_packaging_qty == rfq_line.product_packaging_qty and
+                                                                                l.analytic_distribution == rfq_line.analytic_distribution and
+                                                                                l.discount == rfq_line.discount and
+                                                                                abs(l.date_planned - rfq_line.date_planned).total_seconds() <= 86400  # 24 hours in seconds
+                                                                        )
+                    if len(existing_line) > 1:
+                        existing_line[0].product_qty += sum(existing_line[1:].mapped('product_qty'))
+                        existing_line[1:].unlink()
+                        existing_line = existing_line[0]
+
+                    if existing_line:
+                        existing_line._merge_po_line(rfq_line)
+                    else:
+                        rfq_line.order_id = oldest_rfq
+
+                # Merge source documents and vendor references
+                all_origin = rfqs.mapped('origin')
+                all_vendor_references = rfqs.mapped('partner_ref')
+
+                oldest_rfq.origin = ', '.join(filter(None, [oldest_rfq.origin, *all_origin]))
+                oldest_rfq.partner_ref = ', '.join(filter(None, [oldest_rfq.partner_ref, *all_vendor_references]))
+
+                rfq_names = rfqs.mapped('name')
+                merged_names = ", ".join(rfq_names)
+                oldest_rfq_message = _("RFQ merged with %(oldest_rfq_name)s and %(cancelled_rfq)s", oldest_rfq_name=oldest_rfq.name, cancelled_rfq=merged_names)
+
+                for rfq in rfqs:
+                    cancelled_rfq_message = _("RFQ merged with %s", oldest_rfq._get_html_link())
+                    rfq.message_post(body=cancelled_rfq_message)
+                oldest_rfq.message_post(body=oldest_rfq_message)
+
+                rfqs.filtered(lambda r: r.state != 'cancel').button_cancel()
+                oldest_rfq._merge_alternative_po(rfqs)
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'type': 'success',
+                'message': _('purchase orders merged'),
+                'next': {'type': 'ir.actions.act_window_close'},
+            }
+        }
+
+    def _merge_alternative_po(self, rfqs):
+        pass
+
+    def _prepare_grouped_data(self, rfq):
+        return (rfq.partner_id.id, rfq.currency_id.id, rfq.dest_address_id.id)
+
     def _prepare_invoice(self):
         """Prepare the dict of values to create the new invoice for a purchase order.
         """
@@ -700,7 +844,7 @@ class PurchaseOrder(models.Model):
         """ This function returns the values to populate the custom dashboard in
             the purchase order views.
         """
-        self.check_access_rights('read')
+        self.browse().check_access('read')
 
         result = {
             'all_to_send': 0,
@@ -761,7 +905,7 @@ class PurchaseOrder(models.Model):
         return result
 
     def _send_reminder_mail(self, send_single=False):
-        if not self.user_has_groups('purchase.group_send_reminder'):
+        if not self.env.user.has_group('purchase.group_send_reminder'):
             return
 
         template = self.env.ref('purchase.email_template_edi_purchase_reminder', raise_if_not_found=False)
@@ -781,7 +925,7 @@ class PurchaseOrder(models.Model):
 
     def send_reminder_preview(self):
         self.ensure_one()
-        if not self.user_has_groups('purchase.group_send_reminder'):
+        if not self.env.user.has_group('purchase.group_send_reminder'):
             return
 
         template = self.env.ref('purchase.email_template_edi_purchase_reminder', raise_if_not_found=False)
@@ -840,10 +984,16 @@ class PurchaseOrder(models.Model):
         ]).filtered(lambda p: p.partner_id.with_company(p.company_id).receipt_reminder_email and\
             p.mapped('order_line.product_id.product_tmpl_id.type') != ['service'])
 
-    def _default_order_line_values(self):
-        default_data = super()._default_order_line_values()
+    def _default_order_line_values(self, child_field=False):
+        default_data = super()._default_order_line_values(child_field)
         new_default_data = self.env['purchase.order.line']._get_product_catalog_lines_data()
         return {**default_data, **new_default_data}
+
+    def action_add_from_catalog(self):
+        res = super().action_add_from_catalog()
+        if res['context'].get('product_catalog_order_model') == 'purchase.order':
+            res['search_view_id'] = [self.env.ref('purchase.product_view_search_catalog').id, 'search']
+        return res
 
     def _get_action_add_from_catalog_extra_context(self):
         return {
@@ -864,7 +1014,7 @@ class PurchaseOrder(models.Model):
             res[product.id] |= self._get_product_price_and_data(product)
         return res
 
-    def _get_product_catalog_record_lines(self, product_ids):
+    def _get_product_catalog_record_lines(self, product_ids, child_field=False):
         grouped_lines = defaultdict(lambda: self.env['purchase.order.line'])
         for line in self.order_line:
             if line.display_type or line.product_id.id not in product_ids:
@@ -929,7 +1079,7 @@ class PurchaseOrder(models.Model):
     def get_confirm_url(self, confirm_type=None):
         """Create url for confirm reminder or purchase reception email for sending
         in mail."""
-        if confirm_type in ['reminder', 'reception']:
+        if confirm_type in ['reminder', 'reception', 'decline']:
             param = url_encode({
                 'confirm': confirm_type,
                 'confirmed_date': self.date_planned and self.date_planned.date(),
@@ -948,7 +1098,7 @@ class PurchaseOrder(models.Model):
             if order.state in ['purchase', 'done'] and not order.mail_reminder_confirmed:
                 order.mail_reminder_confirmed = True
                 date_planned = order.get_localized_date_planned(confirmed_date).date()
-                order.message_post(body=_("%s confirmed the receipt will take place on %s.", order.partner_id.name, date_planned))
+                order.message_post(body=_("%(vendor)s confirmed the receipt will take place on %(date)s.", vendor=order.partner_id.name, date=date_planned))
 
     def _approval_allowed(self):
         """Returns whether the order qualifies to be approved by the current user"""
@@ -959,13 +1109,28 @@ class PurchaseOrder(models.Model):
                 and self.amount_total < self.env.company.currency_id._convert(
                     self.company_id.po_double_validation_amount, self.currency_id, self.company_id,
                     self.date_order or fields.Date.today()))
-            or self.user_has_groups('purchase.group_purchase_manager'))
+            or self.env.user.has_group('purchase.group_purchase_manager'))
 
     def _confirm_reception_mail(self):
         for order in self:
             if order.state in ['purchase', 'done'] and not order.mail_reception_confirmed:
                 order.mail_reception_confirmed = True
                 order.message_post(body=_("The order receipt has been acknowledged by %s.", order.partner_id.name))
+            elif order.state == 'sent' and not order.mail_reception_confirmed:
+                order.mail_reception_confirmed = True
+                order.message_post(body=_("The RFQ has been acknowledged by %s.", order.partner_id.name))
+
+    def _decline_reception_mail(self):
+        for order in self:
+            if order.state in ['purchase', 'done'] and not order.mail_reception_declined:
+                order.mail_reception_declined = True
+                order.activity_schedule(
+                    'mail.mail_activity_data_todo',
+                    note=_('The vendor asked to decline this confirmed RfQ, if you agree on that, cancel this PO'))
+                order.message_post(body=_("The order receipt has been declined by %s.", order.partner_id.name))
+            elif order.state  == 'sent' and not order.mail_reception_declined:
+                order.mail_reception_declined = True
+                order.message_post(body=_("The RFQ has been declined by %s.", order.partner_id.name))
 
     def get_localized_date_planned(self, date_planned=False):
         """Returns the localized date planned in the timezone of the order's user or the
@@ -1088,3 +1253,6 @@ class PurchaseOrder(models.Model):
         """
         self.ensure_one()
         return self.state == 'cancel'
+
+    def _get_edi_builders(self):
+        return []

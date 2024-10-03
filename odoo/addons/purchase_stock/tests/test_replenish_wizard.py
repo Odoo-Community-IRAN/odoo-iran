@@ -24,7 +24,7 @@ class TestReplenishWizard(TestStockCommon):
         # the 'supplierinfo' prevously created
         cls.product1 = cls.env['product.product'].create({
             'name': 'product a',
-            'type': 'product',
+            'is_storable': True,
             'categ_id': cls.env.ref('product.product_category_all').id,
             'seller_ids': [(4, cls.supplierinfo.id, 0)],
             'route_ids': [(4, cls.env.ref('purchase_stock.route_warehouse0_buy').id, 0)],
@@ -54,7 +54,7 @@ class TestReplenishWizard(TestStockCommon):
 
         last_po_id = False
         if purchase_order_id and model_name:
-            last_po_id = self.env[model_name[0]].browse(int(purchase_order_id[0]))
+            last_po_id = self.env[model_name].browse(int(purchase_order_id))
         self.assertTrue(last_po_id, 'Purchase Order not found')
         order_line = last_po_id.order_line.search([('product_id', '=', self.product1.id)])
         self.assertTrue(order_line, 'The product is not in the Purchase Order')
@@ -72,7 +72,7 @@ class TestReplenishWizard(TestStockCommon):
         """
         product_to_buy = self.env['product.product'].create({
             'name': "Furniture Service",
-            'type': 'product',
+            'is_storable': True,
             'categ_id': self.env.ref('product.product_category_all').id,
             'route_ids': [(4, self.env.ref('purchase_stock.route_warehouse0_buy').id, 0)],
         })
@@ -107,7 +107,7 @@ class TestReplenishWizard(TestStockCommon):
 
         last_po_id = False
         if purchase_order_id and model_name:
-            last_po_id = self.env[model_name[0]].browse(int(purchase_order_id[0]))
+            last_po_id = self.env[model_name].browse(int(purchase_order_id))
         self.assertEqual(last_po_id.partner_id, vendor1)
         self.assertEqual(last_po_id.order_line.price_unit, 100)
 
@@ -123,7 +123,7 @@ class TestReplenishWizard(TestStockCommon):
         """
         product_to_buy = self.env['product.product'].create({
             'name': "Furniture Service",
-            'type': 'product',
+            'is_storable': True,
             'categ_id': self.env.ref('product.product_category_all').id,
             'route_ids': [(4, self.env.ref('purchase_stock.route_warehouse0_buy').id, 0)],
         })
@@ -166,7 +166,7 @@ class TestReplenishWizard(TestStockCommon):
 
         last_po_id = False
         if purchase_order_id and model_name:
-            last_po_id = self.env[model_name[0]].browse(int(purchase_order_id[0]))
+            last_po_id = self.env[model_name].browse(int(purchase_order_id))
         self.assertEqual(last_po_id.partner_id, vendor1)
         self.assertEqual(last_po_id.order_line.price_unit, 100)
 
@@ -181,7 +181,7 @@ class TestReplenishWizard(TestStockCommon):
         """
         product_to_buy = self.env['product.product'].create({
             'name': "Furniture Service",
-            'type': 'product',
+            'is_storable': True,
             'categ_id': self.env.ref('product.product_category_all').id,
             'route_ids': [(4, self.env.ref('purchase_stock.route_warehouse0_buy').id, 0)],
         })
@@ -215,7 +215,7 @@ class TestReplenishWizard(TestStockCommon):
 
         last_po_id = False
         if purchase_order_id and model_name:
-            last_po_id = self.env[model_name[0]].browse(int(purchase_order_id[0]))
+            last_po_id = self.env[model_name].browse(int(purchase_order_id))
 
         self.assertEqual(last_po_id.partner_id, vendor2)
 
@@ -231,7 +231,7 @@ class TestReplenishWizard(TestStockCommon):
         """
         product_to_buy = self.env['product.product'].create({
             'name': "Furniture Service",
-            'type': 'product',
+            'is_storable': True,
             'categ_id': self.env.ref('product.product_category_all').id,
             'route_ids': [(4, self.env.ref('purchase_stock.route_warehouse0_buy').id, 0)],
         })
@@ -268,7 +268,7 @@ class TestReplenishWizard(TestStockCommon):
 
         last_po_id = False
         if purchase_order_id and model_name:
-            last_po_id = self.env[model_name[0]].browse(int(purchase_order_id[0]))
+            last_po_id = self.env[model_name].browse(int(purchase_order_id))
 
         self.assertEqual(last_po_id.partner_id, vendor1)
         self.assertEqual(last_po_id.order_line.price_unit, 60)
@@ -306,7 +306,7 @@ class TestReplenishWizard(TestStockCommon):
 
         last_po_id = False
         if purchase_order_id and model_name:
-            last_po_id = self.env[model_name[0]].browse(int(purchase_order_id[0]))
+            last_po_id = self.env[model_name].browse(int(purchase_order_id))
         self.assertEqual(last_po_id.partner_id, self.vendor)
         self.assertEqual(last_po_id.order_line.price_unit, 110)
         self.assertEqual(last_po_id.order_line.discount, 20.0)
@@ -314,7 +314,7 @@ class TestReplenishWizard(TestStockCommon):
     def test_supplier_delay(self):
         product_to_buy = self.env['product.product'].create({
             'name': "Furniture Service",
-            'type': 'product',
+            'is_storable': True,
             'categ_id': self.env.ref('product.product_category_all').id,
             'route_ids': [(4, self.env.ref('purchase_stock.route_warehouse0_buy').id, 0)],
         })
@@ -350,7 +350,7 @@ class TestReplenishWizard(TestStockCommon):
     def test_purchase_delay(self):
         product_to_buy = self.env['product.product'].create({
             'name': "Furniture Service",
-            'type': 'product',
+            'is_storable': True,
             'categ_id': self.env.ref('product.product_category_all').id,
             'route_ids': [(4, self.env.ref('purchase_stock.route_warehouse0_buy').id, 0)],
         })
@@ -391,7 +391,7 @@ class TestReplenishWizard(TestStockCommon):
     def test_purchase_supplier_route_delay(self):
         product_to_buy = self.env['product.product'].create({
             'name': "Furniture Service",
-            'type': 'product',
+            'is_storable': True,
             'categ_id': self.env.ref('product.product_category_all').id,
             'route_ids': [(4, self.env.ref('purchase_stock.route_warehouse0_buy').id, 0)],
         })

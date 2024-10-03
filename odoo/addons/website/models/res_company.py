@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo import api, fields, models, _
@@ -26,7 +25,7 @@ class Company(models.Model):
         for company in self:
             if not company.active and company.website_id:
                 raise ValidationError(_(
-                    'The company %(company_name)r cannot be archived because it has a linked website %(website_name)r.'
+                    'The company “%(company_name)s” cannot be archived because it has a linked website “%(website_name)s”.'
                     '\nChange that website\'s company first.',
                     company_name=company.name,
                     website_name=company.website_id.name

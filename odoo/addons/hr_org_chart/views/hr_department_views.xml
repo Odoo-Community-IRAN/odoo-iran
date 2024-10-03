@@ -15,9 +15,9 @@
                             <field name="name" />
                         </div>
                         <div class="o_hierarchy_node_body d-flex flex-column">
-                            <field name="manager_id" class="pt-1 ps-1" widget="many2one_avatar" />
+                            <field name="manager_id" class="pt-1 ps-1" widget="many2one_avatar_employee" />
                             <div>
-                                <button class="btn btn-link" name="%(hr.act_employee_from_department)d" type="action">
+                                <button class="btn btn-link" name="action_employee_from_department" type="object">
                                     <t t-out="record.total_employee.raw_value"/> Employees
                                 </button>
                             </div>
@@ -28,12 +28,16 @@
         </field>
     </record>
 
-    <record id="hr.hr_department_kanban_action" model="ir.actions.act_window">
-        <field name="view_mode">kanban,tree,hierarchy,form</field>
+    <record id="act_hr_department_hierarchy_view_kanban_action" model="ir.actions.act_window.view">
+        <field name="sequence" eval="25"/>
+        <field name="view_mode">hierarchy</field>
+        <field name="act_window_id" ref="hr.hr_department_kanban_action"/>
     </record>
 
-    <record id="hr.hr_department_tree_action" model="ir.actions.act_window">
-        <field name="view_mode">tree,kanban,hierarchy,form</field>
+    <record id="act_hr_department_hierarchy_view_tree_action" model="ir.actions.act_window.view">
+        <field name="sequence" eval="25"/>
+        <field name="view_mode">hierarchy</field>
+        <field name="act_window_id" ref="hr.hr_department_tree_action"/>
     </record>
 
 </odoo>

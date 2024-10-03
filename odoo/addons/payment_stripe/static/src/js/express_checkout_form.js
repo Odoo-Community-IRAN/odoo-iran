@@ -2,15 +2,11 @@
 /* global Stripe */
 
 import { _t } from '@web/core/l10n/translation';
+import { rpc } from "@web/core/network/rpc";
 import { paymentExpressCheckoutForm } from '@payment/js/express_checkout_form';
 import { StripeOptions } from '@payment_stripe/js/stripe_options';
 
 paymentExpressCheckoutForm.include({
-    init() {
-        this._super(...arguments);
-        this.rpc = this.bindService("rpc");
-    },
-
     /**
      * Get the order details to display on the payment form.
      *
@@ -21,7 +17,12 @@ paymentExpressCheckoutForm.include({
      */
     _getOrderDetails(deliveryAmount, amountFreeShipping) {
         const pending = this.paymentContext['shippingInfoRequired'] && deliveryAmount === undefined;
-        const minorAmount = parseInt(this.paymentContext['minorAmount'])
+        const orderDeliveryAmount = parseInt(this.paymentContext['deliveryAmount'])
+        let minorAmount = parseInt(this.paymentContext['minorAmount'])
+        if (orderDeliveryAmount) { // The delivery method is set on the order.
+            // Subtract the delivery amount from the total amount to display the right total.
+            minorAmount -= orderDeliveryAmount;
+        }
         const displayItems = [
             {
                 label: _t("Your order"),
@@ -133,12 +134,12 @@ paymentExpressCheckoutForm.include({
                 addresses.shipping_option = ev.shippingOption;
             }
             // Update the customer addresses on the related document.
-            this.paymentContext.partnerId = parseInt(await this.rpc(
+            this.paymentContext.partnerId = parseInt(await rpc(
                 this.paymentContext['expressCheckoutRoute'],
                 addresses,
             ));
             // Call the transaction route to create the transaction and retrieve the client secret.
-            const { client_secret } = await this.rpc(
+            const { client_secret } = await rpc(
                 this.paymentContext['transactionRoute'],
                 this._prepareTransactionRouteParams(providerData.providerId),
             );
@@ -168,10 +169,10 @@ paymentExpressCheckoutForm.include({
             // shipping address, the shipping options need to be fetched again.
             paymentRequest.on('shippingaddresschange', async (ev) => {
                 // Call the shipping address update route to fetch the shipping options.
-                const availableCarriers = await this.rpc(
+                const availableCarriers = await rpc(
                     this.paymentContext['shippingAddressUpdateRoute'],
                     {
-                        partial_shipping_address: {
+                        partial_delivery_address: {
                             zip: ev.shippingAddress.postalCode,
                             city: ev.shippingAddress.city,
                             country: ev.shippingAddress.country,
@@ -197,8 +198,8 @@ paymentExpressCheckoutForm.include({
 
             // When the customer selects a different shipping option, update the displayed total.
             paymentRequest.on('shippingoptionchange', async (ev) => {
-                const result = await this.rpc('/shop/update_carrier', {
-                    carrier_id: parseInt(ev.shippingOption.id),
+                const result = await rpc('/shop/set_delivery_method', {
+                    dm_id: parseInt(ev.shippingOption.id),
                 });
                 ev.updateWith({
                     status: 'success',

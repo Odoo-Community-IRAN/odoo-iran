@@ -1,21 +1,22 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
+
 import logging
 
 from odoo import api, fields, models
-from odoo.addons.http_routing.models.ir_http import slug, unslug
-from odoo.addons.website.models import ir_http
+from odoo.osv import expression
 from odoo.tools import float_is_zero, is_html_empty
 from odoo.tools.translate import html_translate
-from odoo.osv import expression
+
+from odoo.addons.website.models import ir_http
 
 _logger = logging.getLogger(__name__)
+
 
 class ProductTemplate(models.Model):
     _inherit = [
         'rating.mixin',
-        "product.template",
-        "website.seo.metadata",
+        'product.template',
+        'website.seo.metadata',
         'website.published.multi.mixin',
         'website.searchable.mixin',
     ]
@@ -27,14 +28,14 @@ class ProductTemplate(models.Model):
 
     @api.model
     def _default_website_sequence(self):
-        ''' We want new product to be the last (highest seq).
+        """ We want new product to be the last (highest seq).
         Every product should ideally have an unique sequence.
         Default sequence (10000) should only be used for DB first product.
         As we don't resequence the whole tree (as `sequence` does), this field
         might have negative value.
-        '''
-        self._cr.execute("SELECT MAX(website_sequence) FROM %s" % self._table)
-        max_sequence = self._cr.fetchone()[0]
+        """
+        self.env.cr.execute('SELECT MAX(website_sequence) FROM %s' % self._table)
+        max_sequence = self.env.cr.fetchone()[0]
         if max_sequence is None:
             return 10000
         return max_sequence + 5
@@ -62,7 +63,8 @@ class ProductTemplate(models.Model):
         relation='product_alternative_rel',
         column1='src_id', column2='dest_id',
         check_company=True,
-        help="Suggest alternatives to your customer (upsell strategy). Those products show up on the product page.",
+        help="Suggest alternatives to your customer (upsell strategy)."
+            " Those products show up on the product page.",
     )
     accessory_product_ids = fields.Many2many(
         string="Accessory Products",
@@ -70,7 +72,8 @@ class ProductTemplate(models.Model):
         relation='product_accessory_rel',
         column1='src_id', column2='dest_id',
         check_company=True,
-        help="Accessories show up when the customer reviews the cart before payment (cross-sell strategy).",
+        help="Accessories show up when the customer reviews the cart before payment"
+            " (cross-sell strategy).",
     )
 
     website_size_x = fields.Integer(string="Size X", default=1)
@@ -78,17 +81,17 @@ class ProductTemplate(models.Model):
     website_ribbon_id = fields.Many2one(string="Ribbon", comodel_name='product.ribbon')
     website_sequence = fields.Integer(
         string="Website Sequence",
+        help="Determine the display order in the Website E-commerce",
         default=_default_website_sequence,
         copy=False,
         index=True,
-        help="Determine the display order in the Website E-commerce",
     )
     public_categ_ids = fields.Many2many(
         string="Website Product Category",
+        help="The product will be available in each mentioned eCommerce category. Go to Shop > Edit"
+             " Click on the page and enable 'Categories' to view all eCommerce categories.",
         comodel_name='product.public.category',
         relation='product_public_category_product_template_rel',
-        help="The product will be available in each mentioned eCommerce category. Go to Shop > Edit "
-             "Click on the page and enable 'Categories' to view all eCommerce categories.",
     )
 
     product_template_image_ids = fields.One2many(
@@ -100,27 +103,33 @@ class ProductTemplate(models.Model):
 
     base_unit_count = fields.Float(
         string="Base Unit Count",
+        help="Display base unit price on your eCommerce pages. Set to 0 to hide it for this product.",
         compute='_compute_base_unit_count',
         inverse='_set_base_unit_count',
         store=True,
         required=True,
         default=0,
-        help="Display base unit price on your eCommerce pages. Set to 0 to hide it for this product.")
+    )
     base_unit_id = fields.Many2one(
         string="Custom Unit of Measure",
+        help="Define a custom unit to display in the price per unit of measure field.",
         comodel_name='website.base.unit',
         compute='_compute_base_unit_id',
         inverse='_set_base_unit_id',
         store=True,
-        help="Define a custom unit to display in the price per unit of measure field.")
+    )
     base_unit_price = fields.Monetary(string="Price Per Unit", compute="_compute_base_unit_price")
     base_unit_name = fields.Char(
         compute='_compute_base_unit_name',
-        help="Displays the custom unit for the products if defined or the selected unit of measure otherwise.")
+        help="Displays the custom unit for the products if defined or the selected unit of measure"
+            " otherwise.",
+    )
 
     compare_list_price = fields.Monetary(
         string="Compare to Price",
-        help="The amount will be displayed strikethroughed on the eCommerce product page")
+        help="Add a strikethrough price to your /shop and product pages for comparison purposes."
+             "It will not be displayed if pricelists apply.",
+    )
 
     #=== COMPUTE METHODS ===#
 
@@ -164,7 +173,7 @@ class ProductTemplate(models.Model):
         super()._compute_website_url()
         for product in self:
             if product.id:
-                product.website_url = "/shop/%s" % slug(product)
+                product.website_url = "/shop/%s" % self.env['ir.http']._slug(product)
 
     #=== CRUD METHODS ===#
 
@@ -249,63 +258,55 @@ class ProductTemplate(models.Model):
 
         return self._get_possible_variants(parent_combination).sorted(_sort_key_variant)
 
-    def _get_sales_prices(self, pricelist, fiscal_position):
+    def _get_sales_prices(self, website):
         if not self:
             return {}
 
-        pricelist and pricelist.ensure_one()
-        pricelist = pricelist or self.env['product.pricelist']
-        currency = pricelist.currency_id or self.env.company.currency_id
+        pricelist = website.pricelist_id
+        currency = website.currency_id
+        fiscal_position = website.fiscal_position_id.sudo()
         date = fields.Date.context_today(self)
 
-        sales_prices = pricelist._get_products_price(self, 1.0)
-        show_discount = pricelist and pricelist.discount_policy == 'without_discount'
-        show_strike_price = self.env.user.has_group('website_sale.group_product_price_comparison')
-
-        base_sales_prices = self._price_compute('list_price', currency=currency)
+        pricelist_prices = pricelist._compute_price_rule(self, 1.0)
+        comparison_prices_enabled = self.env.user.has_group('website_sale.group_product_price_comparison')
 
         res = {}
         for template in self:
-            price_reduce = sales_prices[template.id]
+            pricelist_price, pricelist_rule_id = pricelist_prices[template.id]
 
             product_taxes = template.sudo().taxes_id._filter_taxes_by_company(self.env.company)
             taxes = fiscal_position.map_tax(product_taxes)
 
             base_price = None
-            price_list_contains_template = currency.compare_amounts(price_reduce, base_sales_prices[template.id]) != 0
-
-            if template.compare_list_price and show_strike_price:
-                # The base_price becomes the compare list price and the price_reduce becomes the price
-                base_price = template.compare_list_price
-                if not price_list_contains_template:
-                    price_reduce = base_sales_prices[template.id]
-
-                if template.currency_id != currency:
-                    base_price = template.currency_id._convert(
-                        base_price,
-                        currency,
-                        self.env.company,
-                        date,
-                        round=False
+            template_price_vals = {
+                'price_reduce': self._apply_taxes_to_price(
+                    pricelist_price, currency, product_taxes, taxes, self, website=website,
+                ),
+            }
+            if pricelist_rule_id:  # If a rule was applied, there might be a discount
+                # For ecommerce flows, the base price is always the product sales price
+                # which can be computed by calling `_compute_base_price` without a pricelist rule
+                pricelist_base_price = template.env['product.pricelist.item']._compute_base_price(
+                    product=template,
+                    quantity=1.0,
+                    date=date,
+                    uom=template.uom_id,
+                    currency=currency,
+                )
+                if pricelist_base_price != pricelist_price:
+                    base_price = pricelist_base_price
+                    template_price_vals['base_price'] = self._apply_taxes_to_price(
+                        base_price, currency, product_taxes, taxes, self, website=website,
                     )
 
-            elif show_discount and price_list_contains_template:
-                base_price = base_sales_prices[template.id]
-
-                # Compare_list_price are never tax included
-                base_price = self._apply_taxes_to_price(
-                    base_price, currency, product_taxes, taxes, template,
+            if not base_price and comparison_prices_enabled and template.compare_list_price:
+                template_price_vals['base_price'] = template.currency_id._convert(
+                    template.compare_list_price,
+                    currency,
+                    self.env.company,
+                    date,
+                    round=False,
                 )
-
-            price_reduce = self._apply_taxes_to_price(
-                price_reduce, currency, product_taxes, taxes, template,
-            )
-
-            template_price_vals = {
-                'price_reduce': price_reduce,
-            }
-            if base_price:
-                template_price_vals['base_price'] = base_price
 
             res[template.id] = template_price_vals
 
@@ -408,7 +409,7 @@ class ProductTemplate(models.Model):
         product_or_template = product or self
         combination = combination or product.product_template_attribute_value_ids
 
-        display_name = product_or_template.display_name
+        display_name = product_or_template.with_context(display_default_code=False).display_name
         if not product:
             combination_name = combination._get_combination_name()
             if combination_name:
@@ -418,6 +419,7 @@ class ProductTemplate(models.Model):
         product_or_template = product_or_template.with_context(**price_context)
 
         combination_info = {
+            'combination': combination,
             'product_id': product.id,
             'product_template_id': self.id,
             'display_name': display_name,
@@ -457,50 +459,53 @@ class ProductTemplate(models.Model):
         pricelist = website.pricelist_id
         currency = website.currency_id
 
-        compare_list_price = product_or_template.compare_list_price if self.env.user.has_group(
-            'website_sale.group_product_price_comparison'
-        ) else None
-        list_price = product_or_template._price_compute('list_price')[product_or_template.id]
-        price_extra = product_or_template._get_attributes_extra_price()
-        if product_or_template.currency_id != currency:
-            price_extra = product_or_template.currency_id._convert(
-                from_amount=price_extra,
-                to_currency=currency,
-                company=self.env.company,
-                date=date,
-            )
-            list_price = product_or_template.currency_id._convert(
-                from_amount=list_price,
-                to_currency=currency,
-                company=self.env.company,
-                date=date,
-            )
-            compare_list_price = product_or_template.currency_id._convert(
-                from_amount=compare_list_price,
-                to_currency=currency,
-                company=self.env.company,
-                date=date,
-                round=False)
-
         # Pricelist price doesn't have to be converted
-        pricelist_price = pricelist._get_product_price(
+        pricelist_price, pricelist_rule_id = pricelist._get_product_price_rule(
             product=product_or_template,
             quantity=quantity,
             target_currency=currency,
         )
 
-        if pricelist.discount_policy == 'without_discount':
-            has_discounted_price = currency.compare_amounts(list_price, pricelist_price) == 1
-        else:
-            has_discounted_price = False
+        price_before_discount = pricelist_price
+        if pricelist_rule_id:  # If a rule was applied, there might be a discount
+            # For ecommerce flows, the base price is always the product sales price
+            # which can be computed by calling `_compute_base_price` without a pricelist rule
+            price_before_discount = self.env['product.pricelist.item']._compute_base_price(
+                product=product_or_template,
+                quantity=quantity or 1.0,
+                date=date,
+                uom=product_or_template.uom_id,
+                currency=currency,
+            )
 
+        has_discounted_price = price_before_discount > pricelist_price
         combination_info = {
-            'price_extra': price_extra,
+            'list_price': max(pricelist_price, price_before_discount),
             'price': pricelist_price,
-            'list_price': list_price,
             'has_discounted_price': has_discounted_price,
-            'compare_list_price': compare_list_price,
         }
+
+        comparison_price = None
+        if (
+            not has_discounted_price
+            and product_or_template.compare_list_price
+            and self.env.user.has_group('website_sale.group_product_price_comparison')
+        ):
+            comparison_price = product_or_template.currency_id._convert(
+                from_amount=product_or_template.compare_list_price,
+                to_currency=currency,
+                company=self.env.company,
+                date=date,
+                round=False)
+        combination_info['compare_list_price'] = comparison_price
+
+        combination_info['price_extra'] = product_or_template.currency_id._convert(
+            from_amount=product_or_template._get_attributes_extra_price(),
+            to_currency=currency,
+            company=self.env.company,
+            date=date,
+            round=False,
+        )
 
         # Apply taxes
         fiscal_position = website.fiscal_position_id.sudo()
@@ -518,6 +523,7 @@ class ProductTemplate(models.Model):
                     product_taxes,
                     taxes,
                     product_or_template,
+                    website=website,
                 )
 
         combination_info.update({
@@ -536,28 +542,16 @@ class ProductTemplate(models.Model):
             'taxes': taxes,  # taxes after fpos mapping
         })
 
-        if pricelist.discount_policy != 'without_discount':
-            # Leftover from before cleanup, different behavior between ecommerce & backend configurator
-            # probably to keep product sales price hidden from customers ?
-            combination_info['list_price'] = combination_info['price']
-
-        if website.is_view_active('website_sale.product_tags') and product_or_template.is_product_variant:
-            combination_info['product_tags'] = self.env['ir.ui.view']._render_template(
-                'website_sale.product_tags', values={
-                    'all_product_tags': product_or_template.all_product_tag_ids.filtered('visible_on_ecommerce')
-                }
-            )
-
         return combination_info
 
     @api.model
     def _apply_taxes_to_price(
         self, price, currency, product_taxes, taxes, product_or_template,
+        website=None,
     ):
-        website = self.env['website'].get_current_website()
+        website = website or self.env['website'].get_current_website()
         price = self.env['product.product']._get_tax_included_unit_price_from_price(
             price,
-            currency,
             product_taxes,
             product_taxes_after_fp=taxes,
         )
@@ -642,7 +636,7 @@ class ProductTemplate(models.Model):
             values_args = [(prod_tmpl['id'], max_seq + i * 5) for i, prod_tmpl in enumerate(prod_tmpl_ids)]
             self.env.cr.execute_values(query, values_args)
         else:
-            super(ProductTemplate, self)._init_column(column_name)
+            super()._init_column(column_name)
 
     def set_sequence_top(self):
         min_sequence = self.sudo().search([], order='website_sequence ASC', limit=1)
@@ -687,7 +681,7 @@ class ProductTemplate(models.Model):
     @api.model
     def _get_product_types_allow_zero_price(self):
         """
-        Returns a list of detailed types (`product.template.detailed_type`) that can ignore the
+        Returns a list of service_tracking (`product.template.service_tracking`) that can ignore the
         `prevent_zero_price_sale` rule when buying products on a website.
         """
         return []
@@ -714,6 +708,24 @@ class ProductTemplate(models.Model):
         self.ensure_one()
         return [self] + list(self.product_template_image_ids)
 
+    def _get_attrib_values_domain(self, attribute_values):
+        attribute_id = None
+        attribute_value_ids = []
+        domains = []
+        for value in attribute_values:
+            if not attribute_id:
+                attribute_id = value[0]
+                attribute_value_ids.append(value[1])
+            elif value[0] == attribute_id:
+                attribute_value_ids.append(value[1])
+            else:
+                domains.append([('attribute_line_ids.value_ids', 'in', attribute_value_ids)])
+                attribute_id = value[0]
+                attribute_value_ids = [value[1]]
+        if attribute_id:
+            domains.append([('attribute_line_ids.value_ids', 'in', attribute_value_ids)])
+        return domains
+
     @api.model
     def _search_get_detail(self, website, order, options):
         with_image = options['displayImage']
@@ -727,7 +739,7 @@ class ProductTemplate(models.Model):
         max_price = options.get('max_price')
         attrib_values = options.get('attrib_values')
         if category:
-            domains.append([('public_categ_ids', 'child_of', unslug(category)[1])])
+            domains.append([('public_categ_ids', 'child_of', self.env['ir.http']._unslug(category)[1])])
         if tags:
             if isinstance(tags, str):
                 tags = tags.split(',')
@@ -737,20 +749,7 @@ class ProductTemplate(models.Model):
         if max_price:
             domains.append([('list_price', '<=', max_price)])
         if attrib_values:
-            attrib = None
-            ids = []
-            for value in attrib_values:
-                if not attrib:
-                    attrib = value[0]
-                    ids.append(value[1])
-                elif value[0] == attrib:
-                    ids.append(value[1])
-                else:
-                    domains.append([('attribute_line_ids.value_ids', 'in', ids)])
-                    attrib = value[0]
-                    ids = [value[1]]
-            if attrib:
-                domains.append([('attribute_line_ids.value_ids', 'in', ids)])
+            domains.extend(self._get_attrib_values_domain(attrib_values))
         search_fields = ['name', 'default_code', 'product_variant_ids.default_code']
         fetch_fields = ['id', 'name', 'website_url']
         mapping = {
@@ -803,7 +802,7 @@ class ProductTemplate(models.Model):
             if with_category and categ_ids:
                 data['category'] = self.env['ir.ui.view'].sudo()._render_template(
                     "website_sale.product_category_extra_link",
-                    {'categories': categ_ids, 'slug': slug}
+                    {'categories': categ_ids, 'slug': self.env['ir.http']._slug}
                 )
         return results_data
 
@@ -848,5 +847,7 @@ class ProductTemplate(models.Model):
         return pricelist
 
     def _website_show_quick_add(self):
+        self.ensure_one()
+        # TODO VFE pass website as param and avoid existence check
         website = self.env['website'].get_current_website()
         return self.sale_ok and (not website.prevent_zero_price_sale or self._get_contextual_price())

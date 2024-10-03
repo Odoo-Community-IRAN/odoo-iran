@@ -13,7 +13,7 @@ class RecruitmentSource(models.Model):
     has_domain = fields.Char(compute='_compute_has_domain')
     job_id = fields.Many2one('hr.job', "Job", ondelete='cascade')
     alias_id = fields.Many2one('mail.alias', "Alias ID", ondelete='restrict')
-    medium_id = fields.Many2one('utm.medium', default=lambda self: self.env.ref('utm.utm_medium_website'))
+    medium_id = fields.Many2one('utm.medium', default=lambda self: self.env['utm.medium']._fetch_or_create_utm_medium('website'))
 
     def _compute_has_domain(self):
         for source in self:
@@ -25,7 +25,7 @@ class RecruitmentSource(models.Model):
 
     def create_alias(self):
         campaign = self.env.ref('hr_recruitment.utm_campaign_job')
-        medium = self.env.ref('utm.utm_medium_email')
+        medium = self.env['utm.medium']._fetch_or_create_utm_medium('email')
         for source in self.filtered(lambda s: not s.alias_id):
             vals = {
                 'alias_defaults': {
@@ -42,8 +42,7 @@ class RecruitmentSource(models.Model):
             }
 
             # check that you can create source before to call mail.alias in sudo with known/controlled vals
-            source.check_access_rights('create')
-            source.check_access_rule('create')
+            source.check_access('create')
             source.alias_id = self.env['mail.alias'].sudo().create(vals)
 
     def unlink(self):

@@ -1,30 +1,36 @@
 /** @odoo-module */
 
-import wTourUtils from "@website/js/tours/tour_utils";
+import {
+    clickOnEditAndWaitEditMode,
+    clickOnElement,
+    clickOnSave,
+    changeOption,
+    insertSnippet,
+    registerWebsitePreviewTour,
+} from '@website/js/tours/tour_utils';
 import { browser } from "@web/core/browser/browser";
 
-wTourUtils.registerWebsitePreviewTour("snippet_popup_display_on_click", {
+registerWebsitePreviewTour("snippet_popup_display_on_click", {
     test: true,
     url: "/",
     edition: true,
 }, () => [
-    wTourUtils.dragNDrop({id: "s_text_image", name: "Image - Text"}),
-    wTourUtils.dragNDrop({id: "s_popup", name: "Popup"}),
+    ...insertSnippet({id: "s_text_image", name: "Image - Text", groupName: "Content"}),
+    ...insertSnippet({id: "s_popup", name: "Popup", groupName: "Content"}),
     {
         content: "Click inside the popup to access its options menu.",
-        in_modal: false,
-        trigger: "iframe .s_popup .s_banner",
+        trigger: ":iframe .s_popup .s_banner",
+        run: "click",
     },
-    wTourUtils.changeOption("SnippetPopup", 'we-select[data-attribute-name="display"] we-toggler'),
+    changeOption("SnippetPopup", 'we-select[data-attribute-name="display"] we-toggler'),
     {
         content: "Click on the display 'On Click' option",
         trigger: "#oe_snippets we-button[data-name='onclick_opt']",
-        in_modal: false,
-        run() {
+        async run(helpers) {
             // Patch and ignore write on clipboard in tour as we don't have permissions
             const oldWriteText = browser.navigator.clipboard.writeText;
             browser.navigator.clipboard.writeText = () => { console.info('Copy in clipboard ignored!') };
-            this.$anchor[0].click();
+            await helpers.click();
             browser.navigator.clipboard.writeText = oldWriteText;
         }
     },
@@ -32,7 +38,7 @@ wTourUtils.registerWebsitePreviewTour("snippet_popup_display_on_click", {
         content: "Check the copied anchor from the notification toast",
         trigger: ".o_notification_manager .o_notification_content",
         run() {
-            const notificationContent = this.$anchor[0].innerText;
+            const notificationContent = this.anchor.innerText;
             const anchor = notificationContent.substring(notificationContent.indexOf("#"));
 
             if (anchor !== "#Win-%2420") {
@@ -40,53 +46,55 @@ wTourUtils.registerWebsitePreviewTour("snippet_popup_display_on_click", {
             }
         },
     },
-    wTourUtils.clickOnElement("button to close the popup", "iframe .s_popup_close"),
-    wTourUtils.clickOnElement("text image snippet button", "iframe .s_text_image .btn-secondary"),
+    clickOnElement("button to close the popup", ":iframe .s_popup_close"),
+    clickOnElement("text image snippet button", ":iframe .s_text_image .btn-secondary"),
     {
         content: "Paste the popup anchor in the URL input",
         trigger: "#o_link_dialog_url_input",
-        run: "text #Win-%2420"
+        run: "edit #Win-%2420",
     },
-    ...wTourUtils.clickOnSave(),
-    wTourUtils.clickOnElement("text image snippet button", "iframe .s_text_image .btn-secondary"),
+    ...clickOnSave(),
+    clickOnElement("text image snippet button", ":iframe .s_text_image .btn-secondary"),
     {
         content: "Verify that the popup opens after clicked the button.",
-        in_modal: false,
-        trigger: "iframe .s_popup .modal[id='Win-%2420'].show",
+        trigger: ":iframe .s_popup .modal[id='Win-%2420'].show",
+        run: "click",
     },
-    wTourUtils.clickOnElement("button to close the popup", "iframe .s_popup_close"),
+    clickOnElement("button to close the popup", ":iframe .s_popup_close"),
     {
         content: "Go to the 'contactus' page.",
-        trigger: "iframe a[href='/contactus']",
+        trigger: ":iframe a[href='/contactus']",
+        run: "click",
     },
     {
         content: "wait for the page to be loaded",
         trigger: ".o_website_preview[data-view-xmlid='website.contactus']",
-        run: () => null, // it"s a check
     },
-    ...wTourUtils.clickOnEditAndWaitEditMode(),
-    wTourUtils.dragNDrop({id: "s_text_image", name: "Image - Text"}),
-    wTourUtils.clickOnElement("text image snippet button", "iframe .s_text_image .btn-secondary"),
+    ...clickOnEditAndWaitEditMode(),
+    ...insertSnippet({id: "s_text_image", name: "Image - Text", groupName: "Content"}),
+    clickOnElement("text image snippet button", ":iframe .s_text_image .btn-secondary"),
     {
         content: "Add a link to the homepage in the URL input",
         trigger: "#o_link_dialog_url_input",
-        run: "text /"
+        run: "edit /",
     },
     {
         content: "Open the page anchor selector",
         trigger: ".o_link_dialog_page_anchor .dropdown-toggle",
+        run: "click",
     },
     {
         content: "Click on the popup anchor to add it after the homepage link in the URL input",
         trigger: ".o_link_dialog_page_anchor we-button:contains('#Win-%2420')",
+        run: "click",
     },
-    ...wTourUtils.clickOnSave(),
-    wTourUtils.clickOnElement("text image snippet button", "iframe .s_text_image .btn-secondary"),
+    ...clickOnSave(),
+    clickOnElement("text image snippet button", ":iframe .s_text_image .btn-secondary"),
+    {
+        trigger: ".o_website_preview[data-view-xmlid='website.homepage']",
+    },
     {
         content: "Verify that the popup opens when the homepage page loads.",
-        in_modal: false,
-        extra_trigger: ".o_website_preview[data-view-xmlid='website.homepage']",
-        trigger: "iframe .s_popup .modal[id='Win-%2420'].show",
-        isCheck: true,
+        trigger: ":iframe .s_popup .modal[id='Win-%2420'].show",
     },
 ]);

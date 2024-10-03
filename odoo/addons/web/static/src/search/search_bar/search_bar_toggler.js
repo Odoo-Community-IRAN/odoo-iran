@@ -1,17 +1,16 @@
-/** @odoo-module **/
-
 import { Component, useEffect, useState } from "@odoo/owl";
 import { browser } from "@web/core/browser/browser";
 import { useService } from "@web/core/utils/hooks";
 import { useDebounced } from "@web/core/utils/timing";
 
-export class SearchBarToggler extends Component {}
-SearchBarToggler.template = "web.SearchBar.Toggler";
-SearchBarToggler.props = {
-    isSmall: Boolean,
-    showSearchBar: Boolean,
-    toggleSearchBar: Function,
-};
+export class SearchBarToggler extends Component {
+    static template = "web.SearchBar.Toggler";
+    static props = {
+        isSmall: Boolean,
+        showSearchBar: Boolean,
+        toggleSearchBar: Function,
+    };
+}
 
 export function useSearchBarToggler() {
     const ui = useService("ui");

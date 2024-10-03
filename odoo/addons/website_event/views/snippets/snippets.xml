@@ -6,8 +6,12 @@
 </template>
 
 <template id="snippets" inherit_id="website.snippets">
+    <xpath expr="//t[@id='installed_snippets_hook']" position="after">
+        <t snippet-group="events" t-snippet="website.s_snippet_group" string="Events"
+            t-thumbnail="/website/static/src/img/snippets_thumbs/s_event_upcoming_snippet.svg"/>
+    </xpath>
     <xpath expr="//t[@id='event_upcoming_snippet_hook']" position="replace">
-        <t t-snippet="website_event.s_events" string="Events" t-thumbnail="/website/static/src/img/snippets_thumbs/s_event_upcoming_snippet.svg"/>
+        <t t-snippet="website_event.s_events" string="Events" group="events"/>
     </xpath>
 </template>
 
@@ -73,6 +77,13 @@
                          data-display-submenu="true"
                          data-no-preview="true"
                          data-reload="/"/>
+        </div>
+        <div data-selector="main:has(#o_wevent_event_main)" groups="website.group_website_designer" data-no-check="true" string="Event Cover Position">
+            <we-select string="Cover Position" data-no-preview="true" data-reload="/">
+                <we-button data-customize-website-views="">Inside content</we-button>
+                <we-button data-customize-website-views="website_event.opt_event_description_cover_top">Top</we-button>
+                <we-button data-customize-website-views="website_event.opt_event_description_cover_hidden">Hidden (visitor only)</we-button>
+            </we-select>
         </div>
     </xpath>
 </template>

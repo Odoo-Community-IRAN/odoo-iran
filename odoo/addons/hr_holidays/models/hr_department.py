@@ -1,7 +1,6 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-import datetime
+from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
 
 from odoo import api, fields, models
@@ -23,7 +22,7 @@ class Department(models.Model):
     def _compute_leave_count(self):
         Requests = self.env['hr.leave']
         Allocations = self.env['hr.leave.allocation']
-        today_date = datetime.datetime.utcnow().date()
+        today_date = datetime.now(timezone.utc).date()
         today_start = fields.Datetime.to_string(today_date)  # get the midnight of the current utc day
         today_end = fields.Datetime.to_string(today_date + relativedelta(hours=23, minutes=59, seconds=59))
 
@@ -36,7 +35,7 @@ class Department(models.Model):
              ('state', '=', 'confirm')],
             ['department_id'], ['__count'])
         absence_data = Requests._read_group(
-            [('department_id', 'in', self.ids), ('state', 'not in', ['cancel', 'refuse']),
+            [('department_id', 'in', self.ids), ('state', '=', 'validate'),
              ('date_from', '<=', today_end), ('date_to', '>=', today_start)],
             ['department_id'], ['__count'])
 

@@ -4,22 +4,11 @@ import re
 
 from odoo import models
 from odoo.addons.mail.models.discuss.mail_guest import add_guest_to_context
+from odoo.addons.mail.tools.discuss import Store
 
 
 class IrWebsocket(models.AbstractModel):
     _inherit = "ir.websocket"
-
-    def _get_im_status(self, data):
-        im_status = super()._get_im_status(data)
-        if "mail.guest" in data:
-            # sudo: mail.guest - necessary to read im_status from other guests, information is not considered sensitive
-            im_status["Persona"] += [{**g, 'type': "guest"} for g in (
-                self.env["mail.guest"]
-                .sudo()
-                .with_context(active_test=False)
-                .search_read([("id", "in", data["mail.guest"])], ["im_status"])
-            )]
-        return im_status
 
     def _get_missed_presences_identity_domains(self, presence_channels):
         identity_domain = super()._get_missed_presences_identity_domains(presence_channels)

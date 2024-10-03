@@ -3,16 +3,16 @@
 # 	* website_customer
 # 
 # Translators:
-# Wil Odoo, 2023
-# 山西清水欧度(QQ:54773801) <54773801@qq.com>, 2023
+# Wil Odoo, 2024
+# Chloe Wang, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:56+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: 山西清水欧度(QQ:54773801) <54773801@qq.com>, 2023\n"
+"POT-Creation-Date: 2024-09-26 08:56+0000\n"
+"PO-Revision-Date: 2024-09-25 09:42+0000\n"
+"Last-Translator: Chloe Wang, 2024\n"
 "Language-Team: Chinese (China) (https://app.transifex.com/odoo/teams/41243/zh_CN/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -24,6 +24,15 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:website_customer.details
 msgid "<i class=\"fa fa-chevron-left me-2\"/>Back to references"
 msgstr "<i class=\"fa fa-chevron-left me-2\"/>返回成功案例"
+
+#. module: website_customer
+#: model_terms:ir.ui.view,arch_db:website_customer.index
+msgid ""
+"<i class=\"fa fa-info-circle me-2\"/>\n"
+"                        There are no matching customers found for the selected country. Displaying results across all countries instead."
+msgstr ""
+"<i class=\"fa fa-info-circle me-2\"/>\n"
+"                        所选国家/地区没有匹配的客户。显示所有国家/地区的结果。"
 
 #. module: website_customer
 #: model_terms:ir.ui.view,arch_db:website_customer.opt_country
@@ -53,14 +62,12 @@ msgstr "已启用"
 #. module: website_customer
 #. odoo-python
 #: code:addons/website_customer/controllers/main.py:0
-#, python-format
 msgid "All Countries"
 msgstr "所有国家"
 
 #. module: website_customer
 #. odoo-python
 #: code:addons/website_customer/controllers/main.py:0
-#, python-format
 msgid "All Industries"
 msgstr "所有行业"
 
@@ -126,6 +133,11 @@ msgid "Created on"
 msgstr "创建日期"
 
 #. module: website_customer
+#: model_terms:ir.ui.view,arch_db:website_customer.details
+msgid "DROP BUILDING BLOCKS HERE TO MAKE THEM AVAILABLE ACROSS ALL CUSTOMERS"
+msgstr "将内容方块拖放至此处，使其适用于所有客户"
+
+#. module: website_customer
 #: model:ir.model.fields,field_description:website_customer.field_res_partner_tag__display_name
 msgid "Display Name"
 msgstr "显示名称"
@@ -149,6 +161,12 @@ msgstr "按行业筛选"
 #: model_terms:ir.ui.view,arch_db:website_customer.index
 msgid "Filter by Tags"
 msgstr "按标签筛选"
+
+#. module: website_customer
+#: model:ir.model.fields,help:website_customer.field_res_partner__website_tag_ids
+#: model:ir.model.fields,help:website_customer.field_res_users__website_tag_ids
+msgid "Filter published customers on the .../customers website page"
+msgstr "在.../客户网站页面上筛选已发布的客户"
 
 #. module: website_customer
 #: model_terms:ir.ui.view,arch_db:website_customer.index
@@ -233,7 +251,6 @@ msgstr "合作伙伴"
 #. odoo-python
 #: code:addons/website_customer/models/website.py:0
 #: model_terms:ir.ui.view,arch_db:website_customer.references_block
-#, python-format
 msgid "References"
 msgstr "参考"
 

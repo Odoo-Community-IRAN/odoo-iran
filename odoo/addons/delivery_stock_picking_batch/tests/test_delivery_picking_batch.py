@@ -22,13 +22,13 @@ class TestDeliveryPickingBatch(common.TransactionCase):
 
         cls.product_a = cls.env['product.product'].create({
             'name': 'product_a',
-            'type': 'product',
+            'is_storable': True,
             'weight': 1.0,
         })
 
     def test_batch_picking_pack_shipping_weight_compute(self):
         """ Having a batch transfer with 2+ of the same product across multiple pickings and adding
-        the products to the same pack should result in an accurate computed shipping weight.
+        the products to the same pack should result in an accurate computed shipping weight.gau
         """
         picking_create_vals = {
             'picking_type_id': self.picking_type_out.id,

@@ -8,9 +8,6 @@
                 <div t-if="_loyaltyStat.program.portal_visible and (_loyaltyStat.points.won || _loyaltyStat.points.spent)" class='loyalty'>
                     <span class="pos-receipt-center-align">
                         <div>--------------------------------</div>
-                        <br/>
-                        <div t-esc='_loyaltyStat.program.name' class="pos-receipt-title" />
-                        <br />
                     </span>
                     <t t-if='_loyaltyStat.points.won'>
                         <div><t t-esc="_loyaltyStat.points.name"/> Won: <span t-esc='_loyaltyStat.points.won' class="pos-receipt-right-align"/></div>
@@ -23,7 +20,6 @@
                     <t t-if='_loyaltyStat.points.balance'>
                         <div>Balance <t t-esc="_loyaltyStat.points.name"/>: <span t-esc='_loyaltyStat.points.balance' class="pos-receipt-right-align"/></div>
                     </t>
-                    <br />
                 </div>
             </t>
             <t t-if="props.data.partner">

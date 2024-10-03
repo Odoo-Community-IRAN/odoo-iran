@@ -1,4 +1,4 @@
-/** @odoo-module */
+/** @ts-check */
 
 import { serializeDate, serializeDateTime } from "@web/core/l10n/dates";
 import { Domain } from "@web/core/domain";
@@ -9,7 +9,7 @@ import { monthsOptions } from "@spreadsheet/assets_backend/constants";
 import { QUARTER_OPTIONS } from "@web/search/utils/dates";
 
 /**
- * @typedef {import("@spreadsheet/global_filters/plugins/global_filters_core_plugin").FieldMatching} FieldMatching
+ * @typedef {import("@spreadsheet").FieldMatching} FieldMatching
  */
 
 const monthsOptionsIds = monthsOptions.map((option) => option.id);
@@ -102,7 +102,7 @@ export function checkFilterFieldMatching(fieldMatchings) {
  *
  * @param {Object} now current time, as luxon time
  * @param {number} offset offset to add to the date
- * @param {"last_month" | "last_week" | "last_year" | "last_three_years"} rangeType
+ * @param {import("@spreadsheet").RelativePeriod} rangeType
  * @param {string} fieldName
  * @param {"date" | "datetime"} fieldType
  *

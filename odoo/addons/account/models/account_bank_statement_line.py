@@ -1,13 +1,9 @@
 from odoo import api, Command, fields, models, _
 from odoo.exceptions import UserError, ValidationError
-from odoo.osv.expression import get_unaccent_wrapper
-from odoo.tools.misc import str2bool
-
-from odoo.addons.base.models.res_bank import sanitize_account_number
 
 from xmlrpc.client import MAXINT
 
-from odoo.tools import create_index
+from odoo.tools import create_index, SQL
 
 
 class AccountBankStatementLine(models.Model):
@@ -24,31 +20,26 @@ class AccountBankStatementLine(models.Model):
     # - there should be a better way for syncing account_moves with bank transactions, payments, invoices, etc.
 
     # == Business fields ==
-    def default_get(self, fields_list):
-        defaults = super().default_get(fields_list)
-        # copy the date and statement from the latest transaction of the same journal to help the user
-        # to enter the next transaction, they do not have to enter the date and the statement every time until the
-        # statement is completed. It is only possible if we know the journal that is used, so it can only be done
-        # in a view in which the journal is already set and so is single journal view.
-        if 'journal_id' in defaults and 'date' in fields_list:
-            last_line = self.search([
-                ('journal_id', '=', defaults.get('journal_id')),
-                ('state', '=', 'posted'),
-            ], limit=1)
-            statement = last_line.statement_id
-            if statement:
-                defaults.setdefault('date', statement.date)
-            elif last_line:
-                defaults.setdefault('date', last_line.date)
-
-        return defaults
-
     move_id = fields.Many2one(
         comodel_name='account.move',
         auto_join=True,
         string='Journal Entry', required=True, readonly=True, ondelete='cascade',
         index=True,
         check_company=True)
+    journal_id = fields.Many2one(
+        comodel_name='account.journal',
+        inherited=True,
+        related='move_id.journal_id', store=True, readonly=False, precompute=True,
+        index=False,  # covered by account_bank_statement_line_main_idx
+        required=True,
+    )
+    company_id = fields.Many2one(
+        comodel_name='res.company',
+        inherited=True,
+        related='move_id.company_id', store=True, readonly=False, precompute=True,
+        index=False,  # covered by account_bank_statement_line_main_idx
+        required=True,
+    )
     statement_id = fields.Many2one(
         comodel_name='account.bank.statement',
         string='Statement',
@@ -130,7 +121,6 @@ class AccountBankStatementLine(models.Model):
     internal_index = fields.Char(
         string='Internal Reference',
         compute='_compute_internal_index', store=True,
-        index=True,
     )
 
     # Technical field indicating if the statement line is already reconciled.
@@ -157,11 +147,26 @@ class AccountBankStatementLine(models.Model):
 
     def init(self):
         super().init()
-        create_index(self.env.cr,
-                     indexname='account_bank_statement_line_internal_index_move_id_amount_idx',
-                     tablename='account_bank_statement_line',
-                     expressions=['internal_index', 'move_id', 'amount'],
-                     where='statement_id IS NULL')
+        create_index(  # used for default filters
+            self.env.cr,
+            indexname='account_bank_statement_line_unreconciled_idx',
+            tablename='account_bank_statement_line',
+            expressions=['journal_id', 'company_id', 'internal_index'],
+            where='NOT is_reconciled OR is_reconciled IS NULL',
+        )
+        create_index(  # used for the dashboard
+            self.env.cr,
+            indexname='account_bank_statement_line_orphan_idx',
+            tablename='account_bank_statement_line',
+            expressions=['journal_id', 'company_id', 'internal_index'],
+            where='statement_id IS NULL',
+        )
+        create_index(  # used in other cases
+            self.env.cr,
+            indexname='account_bank_statement_line_main_idx',
+            tablename='account_bank_statement_line',
+            expressions=['journal_id', 'company_id', 'internal_index'],
+        )
 
     # -------------------------------------------------------------------------
     # COMPUTE METHODS
@@ -195,10 +200,11 @@ class AccountBankStatementLine(models.Model):
         # the user can split on that lines, but their balance should be the same as previous posted line
         # we do the same for the canceled lines, in order to keep using them as anchor points
 
-        self.statement_id.flush_model(['balance_start', 'first_line_index'])
-        self.flush_model(['internal_index', 'date', 'journal_id', 'statement_id', 'amount', 'state'])
         record_by_id = {x.id: x for x in self}
-
+        company2children = {
+            company: self.env['res.company'].search([('id', 'child_of', company.id)])
+            for company in self.journal_id.company_id
+        }
         for journal in self.journal_id:
             journal_lines_indexes = self.filtered(lambda line: line.journal_id == journal)\
                 .sorted('internal_index')\
@@ -206,6 +212,7 @@ class AccountBankStatementLine(models.Model):
             min_index, max_index = journal_lines_indexes[0], journal_lines_indexes[-1]
 
             # Find the oldest index for each journal.
+            self.env['account.bank.statement'].flush_model(['first_line_index', 'journal_id', 'balance_start'])
             self._cr.execute(
                 """
                     SELECT first_line_index, COALESCE(balance_start, 0.0)
@@ -219,16 +226,17 @@ class AccountBankStatementLine(models.Model):
                 [min_index, journal.id],
             )
             current_running_balance = 0.0
-            extra_clause = ''
-            extra_params = []
+            extra_clause = SQL()
             row = self._cr.fetchone()
             if row:
                 starting_index, current_running_balance = row
-                extra_clause = "AND st_line.internal_index >= %s"
-                extra_params.append(starting_index)
+                extra_clause = SQL("AND st_line.internal_index >= %s", starting_index)
 
-            self._cr.execute(
-                f"""
+            self.flush_model(['amount', 'move_id', 'statement_id', 'journal_id', 'internal_index'])
+            self.env['account.bank.statement'].flush_model(['first_line_index', 'balance_start'])
+            self.env['account.move'].flush_model(['state'])
+            self._cr.execute(SQL(
+                """
                     SELECT
                         st_line.id,
                         st_line.amount,
@@ -240,12 +248,16 @@ class AccountBankStatementLine(models.Model):
                     LEFT JOIN account_bank_statement st ON st.id = st_line.statement_id
                     WHERE
                         st_line.internal_index <= %s
-                        AND move.journal_id = %s
-                        {extra_clause}
+                        AND st_line.journal_id = %s
+                        AND st_line.company_id = ANY(%s)
+                        %s
                     ORDER BY st_line.internal_index
                 """,
-                [max_index, journal.id] + extra_params,
-            )
+                max_index,
+                journal.id,
+                company2children[journal.company_id].ids,
+                extra_clause,
+            ))
             for st_line_id, amount, is_anchor, balance_start, state in self._cr.fetchall():
                 if is_anchor:
                     current_running_balance = balance_start
@@ -279,7 +291,7 @@ class AccountBankStatementLine(models.Model):
                                       f'{st_line._origin.id:0>10}'
 
     @api.depends('journal_id', 'currency_id', 'amount', 'foreign_currency_id', 'amount_currency',
-                 'move_id.to_check',
+                 'move_id.checked',
                  'move_id.line_ids.account_id', 'move_id.line_ids.amount_currency',
                  'move_id.line_ids.amount_residual_currency', 'move_id.line_ids.currency_id',
                  'move_id.line_ids.matched_debit_ids', 'move_id.line_ids.matched_credit_ids')
@@ -292,7 +304,7 @@ class AccountBankStatementLine(models.Model):
             _liquidity_lines, suspense_lines, _other_lines = st_line._seek_for_lines()
 
             # Compute residual amount
-            if st_line.to_check:
+            if not st_line.checked:
                 st_line.amount_residual = -st_line.amount_currency if st_line.foreign_currency_id else -st_line.amount
             elif suspense_lines.account_id.reconcile:
                 st_line.amount_residual = sum(suspense_lines.mapped('amount_residual_currency'))
@@ -311,7 +323,6 @@ class AccountBankStatementLine(models.Model):
             else:
                 # The journal entry seems reconciled.
                 st_line.is_reconciled = True
-
 
     # -------------------------------------------------------------------------
     # CONSTRAINT METHODS
@@ -336,11 +347,30 @@ class AccountBankStatementLine(models.Model):
     # LOW-LEVEL METHODS
     # -------------------------------------------------------------------------
 
+    def default_get(self, fields_list):
+        self_ctx = self.with_context(is_statement_line=True)
+        defaults = super(AccountBankStatementLine, self_ctx).default_get(fields_list)
+        if 'journal_id' in fields_list and not defaults.get('journal_id'):
+            defaults['journal_id'] = self_ctx.env['account.move']._search_default_journal().id
+
+        if 'date' in fields_list and not defaults.get('date') and 'journal_id' in defaults:
+            # copy the date and statement from the latest transaction of the same journal to help the user
+            # to enter the next transaction, they do not have to enter the date and the statement every time until the
+            # statement is completed. It is only possible if we know the journal that is used, so it can only be done
+            # in a view in which the journal is already set and so is single journal view.
+            last_line = self.search([
+                ('journal_id', '=', defaults['journal_id']),
+                ('state', '=', 'posted'),
+            ], limit=1)
+            statement = last_line.statement_id
+            if statement:
+                defaults.setdefault('date', statement.date)
+            elif last_line:
+                defaults.setdefault('date', last_line.date)
+        return defaults
+
     def new(self, values=None, origin=None, ref=None):
-        st_line = super().new(values, origin, ref)
-        if not st_line.journal_id:  # might not be computed because declared by inheritance
-            st_line.move_id._compute_journal_id()
-        return st_line
+        return super(AccountBankStatementLine, self.with_context(is_statement_line=True)).new(values, origin, ref)
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -375,37 +405,43 @@ class AccountBankStatementLine(models.Model):
             if 'amount' not in vals:
                 vals['amount'] = 0
 
-        st_lines = super().create(vals_list)
+        st_lines = super(AccountBankStatementLine, self.with_context(is_statement_line=True)).create([{
+            'name': False,
+            **vals,
+        } for vals in vals_list])
 
-        for i, st_line in enumerate(st_lines):
+        for i, (st_line, vals) in enumerate(zip(st_lines, vals_list)):
             counterpart_account_id = counterpart_account_ids[i]
 
-            to_write = {'statement_line_id': st_line.id, 'narration': st_line.narration}
+            to_write = {'statement_line_id': st_line.id, 'narration': st_line.narration, 'name': False}
             if 'line_ids' not in vals_list[i]:
                 to_write['line_ids'] = [(0, 0, line_vals) for line_vals in st_line._prepare_move_line_default_vals(
                     counterpart_account_id=counterpart_account_id)]
-
-            st_line.move_id.write(to_write)
+            with self.env.protecting(self.env['account.move']._get_protected_vals(vals, st_line)):
+                st_line.move_id.write(to_write)
+            self.env.add_to_compute(self.env['account.move']._fields['name'], st_line.move_id)
 
             # Otherwise field narration will be recomputed silently (at next flush) when writing on partner_id
             self.env.remove_to_compute(st_line.move_id._fields['narration'], st_line.move_id)
 
         # No need for the user to manage their status (from 'Draft' to 'Posted')
         st_lines.move_id.action_post()
-        return st_lines
+        return st_lines.with_env(self.env)  # clear the context
 
     def write(self, vals):
         # OVERRIDE
 
-        res = super().write(vals)
+        res = super(AccountBankStatementLine, self.with_context(skip_readonly_check=True)).write(vals)
         self._synchronize_to_moves(set(vals.keys()))
         return res
 
     def unlink(self):
         # OVERRIDE to unlink the inherited account.move (move_id field) as well.
-        moves = self.with_context(force_delete=True).mapped('move_id')
+        tracked_lines = self.filtered(lambda stl: stl.company_id.check_account_audit_trail)
+        tracked_lines.move_id.button_cancel()
+        moves_to_delete = (self - tracked_lines).move_id
         res = super().unlink()
-        moves.unlink()
+        moves_to_delete.with_context(force_delete=True).unlink()
         return res
 
     @api.model
@@ -417,7 +453,7 @@ class AccountBankStatementLine(models.Model):
         show_running_balance = False
         # We loop over the content of groupby because the groupby date is in the form of "date:granularity"
         for el in groupby:
-            if (el == 'statement_id' or el == 'journal_id' or el.startswith('date')) and 'running_balance' in fields:
+            if (el == 'statement_id' or el == 'journal_id' or el.startswith('date')) and self.env.context.get('show_running_balance_latest'):
                 show_running_balance = True
                 break
         if show_running_balance:
@@ -437,8 +473,8 @@ class AccountBankStatementLine(models.Model):
         self.payment_ids.unlink()
 
         for st_line in self:
-            st_line.with_context(force_delete=True).write({
-                'to_check': False,
+            st_line.with_context(force_delete=True, skip_readonly_check=True).write({
+                'checked': True,
                 'line_ids': [Command.clear()] + [
                     Command.create(line_vals) for line_vals in st_line._prepare_move_line_default_vals()],
             })
@@ -449,9 +485,6 @@ class AccountBankStatementLine(models.Model):
 
     def _find_or_create_bank_account(self):
         self.ensure_one()
-        if str2bool(self.env['ir.config_parameter'].sudo().get_param("account.skip_create_bank_account_on_reconcile")):
-            return self.env['res.partner.bank']
-
         # There is a sql constraint on res.partner.bank ensuring an unique pair <partner, account number>.
         # Since it's not dependent of the company, we need to search on others company too to avoid the creation
         # of an extra res.partner.bank raising an error coming from this constraint.
@@ -472,7 +505,7 @@ class AccountBankStatementLine(models.Model):
     def _get_default_amls_matching_domain(self):
         self.ensure_one()
         all_reconcilable_account_ids = self.env['account.account'].search([
-            ("company_id", "child_of", self.company_id.root_id.id),
+            ("company_ids", "child_of", self.company_id.root_id.id),
             ('reconcile', '=', True),
         ]).ids
         return [
@@ -716,8 +749,9 @@ class AccountBankStatementLine(models.Model):
 
                 if len(suspense_lines) > 1:
                     raise UserError(_(
-                        "%s reached an invalid state regarding its related statement line.\n"
-                        "To be consistent, the journal entry must always have exactly one suspense line.", st_line.move_id.display_name
+                        "%(move)s reached an invalid state regarding its related statement line.\n"
+                        "To be consistent, the journal entry must always have exactly one suspense line.",
+                        move=st_line.move_id.display_name,
                     ))
                 elif len(suspense_lines) == 1:
                     if journal_currency and suspense_lines.currency_id == journal_currency:
@@ -794,7 +828,7 @@ class AccountBankStatementLine(models.Model):
                 st_line_vals['journal_id'] = journal.id
             if st_line.move_id.partner_id != st_line.partner_id:
                 st_line_vals['partner_id'] = st_line.partner_id.id
-            st_line.move_id.write(st_line_vals)
+            st_line.move_id.with_context(skip_readonly_check=True).write(st_line_vals)
 
 
 # For optimization purpose, creating the reverse relation of m2o in _inherits saves

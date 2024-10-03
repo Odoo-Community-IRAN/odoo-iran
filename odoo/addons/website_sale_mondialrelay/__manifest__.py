@@ -11,13 +11,13 @@ This module allow your customer to choose a Point Relais® and use it as shippin
     'depends': ['website_sale', 'delivery_mondialrelay'],
     'data': [
         'views/delivery_carrier_views.xml',
+        'views/delivery_form_templates.xml',
         'views/res_config_settings_views.xml',
         'views/templates.xml',
     ],
     'assets': {
         'web.assets_frontend': [
-            'website_sale_mondialrelay/static/src/js/website_sale_mondialrelay.js',
-            'website_sale_mondialrelay/static/src/xml/website_sale_mondialrelay.xml',
+            'website_sale_mondialrelay/static/src/**/*',
         ],
     },
     'license': 'LGPL-3',

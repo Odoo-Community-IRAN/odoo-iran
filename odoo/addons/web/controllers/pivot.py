@@ -7,17 +7,13 @@ import json
 
 from odoo import http, _
 from odoo.http import content_disposition, request
-from odoo.tools import ustr, osutil
+from odoo.tools import osutil
 from odoo.tools.misc import xlsxwriter
 
 
 class TableExporter(http.Controller):
 
-    @http.route('/web/pivot/check_xlsxwriter', type='json', auth='none')
-    def check_xlsxwriter(self):
-        return xlsxwriter is not None
-
-    @http.route('/web/pivot/export_xlsx', type='http', auth="user")
+    @http.route('/web/pivot/export_xlsx', type='http', auth="user", readonly=True)
     def export_xlsx(self, data, **kw):
         jdata = json.loads(data)
         output = io.BytesIO()
@@ -91,7 +87,7 @@ class TableExporter(http.Controller):
         # Step 4: writing data
         x = 0
         for row in jdata['rows']:
-            worksheet.write(y, x, row['indent'] * '     ' + ustr(row['title']), header_plain)
+            worksheet.write(y, x, row['indent'] * '     ' + row['title'], header_plain)
             for cell in row['values']:
                 x = x + 1
                 if cell.get('is_bold', False):

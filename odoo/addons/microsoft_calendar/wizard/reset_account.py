@@ -35,7 +35,7 @@ class ResetMicrosoftAccount(models.TransientModel):
 
         if self.delete_policy in ('delete_microsoft', 'delete_both'):
             for event in non_recurring_events:
-                event._microsoft_delete(event._get_organizer(), event.ms_organizer_event_id, timeout=3)
+                event._microsoft_delete(event._get_organizer(), event.microsoft_id, timeout=3)
 
         if self.sync_policy == 'all':
             events.with_context(dont_notify=True).update({
@@ -50,7 +50,7 @@ class ResetMicrosoftAccount(models.TransientModel):
         # We commit to make sure the _microsoft_delete are called when we still have a token on the user.
         self.env.cr.commit()
         self.user_id._set_microsoft_auth_tokens(False, False, 0)
-        self.user_id.microsoft_calendar_account_id.write({
-            'calendar_sync_token': False,
-            'last_sync_date': False
+        self.user_id.res_users_settings_id.write({
+            'microsoft_calendar_sync_token': False,
+            'microsoft_last_sync_date': False
         })

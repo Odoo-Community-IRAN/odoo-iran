@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from collections import defaultdict
@@ -14,6 +13,17 @@ class LoyaltyProgram(models.Model):
     _order = 'sequence'
     _rec_name = 'name'
 
+    @api.model
+    def default_get(self, fields_list):
+        defaults = super().default_get(fields_list)
+        program_type = defaults.get('program_type')
+        if program_type:
+            program_default_values = self._program_type_default_values()
+            if program_type in program_default_values:
+                default_values = program_default_values[program_type]
+                defaults.update({k: v for k, v in default_values.items() if k in fields_list})
+        return defaults
+
     name = fields.Char('Program Name', required=True, translate=True)
     active = fields.Boolean(default=True)
     sequence = fields.Integer(copy=False)
@@ -22,7 +32,10 @@ class LoyaltyProgram(models.Model):
         readonly=False, required=True, store=True, precompute=True)
     currency_symbol = fields.Char(related='currency_id.symbol')
     pricelist_ids = fields.Many2many(
-        'product.pricelist', string="Pricelist", domain="[('currency_id', '=', currency_id)]"
+        string="Pricelist",
+        help="This program is specific to this pricelist set.",
+        comodel_name='product.pricelist',
+        domain="[('currency_id', '=', currency_id)]",
     )
 
     total_order_count = fields.Integer("Total Order Count", compute="_compute_total_order_count")
@@ -184,7 +197,7 @@ class LoyaltyProgram(models.Model):
     def _compute_is_nominative(self):
         for program in self:
             program.is_nominative = program.applies_on == 'both' or\
-                (program.program_type == 'ewallet' and program.applies_on == 'future')
+                (program.program_type in ('ewallet', 'loyalty') and program.applies_on == 'future')
 
     @api.depends('program_type')
     def _compute_is_payment_program(self):

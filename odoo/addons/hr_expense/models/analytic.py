@@ -36,7 +36,7 @@ class AccountAnalyticAccount(models.Model):
                     WHERE %s && %s
                 LIMIT 1
                 """,
-                [str(id) for id in self.ids],
+                [str(account_id) for account_id in self.ids],
                 self.env['hr.expense']._query_analytic_accounts(),
             )
         )

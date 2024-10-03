@@ -4,6 +4,7 @@ import { registry } from "@web/core/registry";
 import { session } from "@web/session";
 import { companyService } from "@web/webclient/company_service";
 
+import { patchUserContextWithCleanup } from "@web/../tests/helpers/mock_services";
 import { patchWithCleanup } from "@web/../tests/helpers/utils";
 import { setupViewRegistries } from "@web/../tests/views/helpers";
 
@@ -38,9 +39,9 @@ export const getServerData = () => JSON.parse(JSON.stringify({
                 progress: { string: "progress", type: "float" },
             },
             records: [
-                { id: 1, name: "Task 1\u00A0AdditionalInfo", project_id: 1, progress: 50 },
-                { id: 2, name: "Task 2\u00A0AdditionalInfo", project_id: 1, progress: 80 },
-                { id: 3, name: "Task 3\u00A0AdditionalInfo", project_id: 1, progress: 104 },
+                { id: 1, name: "Task 1\u00A0AdditionalInfo", project_id: 1, progress: 0.5 },
+                { id: 2, name: "Task 2\u00A0AdditionalInfo", project_id: 1, progress: 0.8 },
+                { id: 3, name: "Task 3\u00A0AdditionalInfo", project_id: 1, progress: 1.04 },
             ],
         },
     },
@@ -53,11 +54,11 @@ export const getServerData = () => JSON.parse(JSON.stringify({
             </form>
         `,
         "account.analytic.line,false,list": `
-            <tree editable="bottom">
+            <list editable="bottom">
                 <field name="project_id"/>
                 <field name="task_id"/>
                 <field name="unit_amount"/>
-            </tree>
+            </list>
         `,
     },
 }));
@@ -108,9 +109,6 @@ export function setupTestEnv() {
                 },
             },
         },
-        user_context: {
-            allowed_company_ids: [1],
-        },
         uom_ids: {
             1: {
                 id: 1,
@@ -132,7 +130,9 @@ export function setupTestEnv() {
             },
         },
     });
-
+    patchUserContextWithCleanup({
+        allowed_company_ids: [1],
+    });
     const serviceRegistry = registry.category("services");
     serviceRegistry.add("company", companyService, { force: true });
     serviceRegistry.add("timesheet_uom", timesheetUOMService, { force: true });

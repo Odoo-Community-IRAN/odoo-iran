@@ -1,6 +1,7 @@
 /** @odoo-module **/
 
 import publicWidget from "@web/legacy/js/public/public_widget";
+import { rpc } from "@web/core/network/rpc";
 
 publicWidget.registry.portalDetails = publicWidget.Widget.extend({
     selector: '.o_portal_details',
@@ -52,11 +53,6 @@ publicWidget.registry.portalDetails = publicWidget.Widget.extend({
 export const PortalHomeCounters = publicWidget.Widget.extend({
     selector: '.o_portal_my_home',
 
-    init() {
-        this._super(...arguments);
-        this.rpc = this.bindService("rpc");
-    },
-
     /**
      * @override
      */
@@ -84,14 +80,14 @@ export const PortalHomeCounters = publicWidget.Widget.extend({
      * @private
      */
     async _updateCounters(elem) {
-        const numberRpc = 3;
         const needed = Object.values(this.el.querySelectorAll('[data-placeholder_count]'))
                                 .map(documentsCounterEl => documentsCounterEl.dataset['placeholder_count']);
-        const counterByRpc = Math.ceil(needed.length / numberRpc);  // max counter, last can be less
+        const numberRpc = Math.min(Math.ceil(needed.length / 5), 3); // max 3 rpc, up to 5 counters by rpc ideally
+        const counterByRpc = Math.ceil(needed.length / numberRpc);
         const countersAlwaysDisplayed = this._getCountersAlwaysDisplayed();
 
         const proms = [...Array(Math.min(numberRpc, needed.length)).keys()].map(async i => {
-            const documentsCountersData = await this.rpc("/my/counters", {
+            const documentsCountersData = await rpc("/my/counters", {
                 counters: needed.slice(i * counterByRpc, (i + 1) * counterByRpc)
             });
             Object.keys(documentsCountersData).forEach(counterName => {

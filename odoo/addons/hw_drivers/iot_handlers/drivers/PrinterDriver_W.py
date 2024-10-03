@@ -14,6 +14,7 @@ from odoo.addons.hw_drivers.event_manager import event_manager
 from odoo.addons.hw_drivers.main import iot_devices
 from odoo.addons.hw_drivers.tools import helpers
 from odoo.tools.mimetypes import guess_mimetype
+from odoo.addons.hw_drivers.websocket_client import send_to_controller
 
 _logger = logging.getLogger(__name__)
 
@@ -55,6 +56,12 @@ class PrinterDriver(Driver):
         })
 
         self.receipt_protocol = 'escpos'
+        if any(cmd in device['identifier'] for cmd in ['STAR', 'Receipt']):
+            self.device_subtype = "receipt_printer"
+        elif "ZPL" in device['identifier']:
+            self.device_subtype = "label_printer"
+        else:
+            self.device_subtype = "office_printer"
 
     @classmethod
     def supported(cls, device):
@@ -162,5 +169,6 @@ class PrinterDriver(Driver):
             self.print_report(document)
         else:
             self.print_raw(document)
+        send_to_controller(self.connection_type, {'print_id': data['print_id'], 'device_identifier': self.device_identifier})
 
 proxy_drivers['printer'] = PrinterDriver

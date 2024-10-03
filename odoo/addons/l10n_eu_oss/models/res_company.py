@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
-import re
+
 from itertools import product
 
 from odoo import Command, api, models
+from .eu_account_map import EU_ACCOUNT_MAP
 from .eu_tag_map import EU_TAG_MAP
 from .eu_tax_map import EU_TAX_MAP
 
@@ -24,19 +25,16 @@ class Company(models.Model):
         '''
         eu_countries = self.env.ref('base.europe').country_ids
         oss_tax_groups = self.env['ir.model.data'].search([
-            ('name', 'ilike', 'oss_tax_group'),
-            ('module', '=', 'account'),
+            ('module', '=', 'l10n_eu_oss'),
             ('model', '=', 'account.tax.group')])
-        for company in self:
-            # instantiate OSS taxes on the first branch with a TAX ID, default on root company
-            company = company.parent_ids.filtered(lambda c: c.vat)[-1:] or self.root_id
+        for company in self.root_id:  # instantiate OSS taxes on the root company only
             invoice_repartition_lines, refund_repartition_lines = company._get_repartition_lines_oss()
             taxes = self.env['account.tax'].search([
                 *self.env['account.tax']._check_company_domain(company),
                 ('type_tax_use', '=', 'sale'),
                 ('amount_type', '=', 'percent'),
-                ('tax_group_id', 'not in', oss_tax_groups.mapped('res_id'))
-            ])
+                ('country_id', '=', company.account_fiscal_country_id.id),
+                ('tax_group_id', 'not in', oss_tax_groups.mapped('res_id'))])
 
             multi_tax_reports_countries_fpos = self.env['account.fiscal.position'].search([
                 ('foreign_vat', '!=', False),
@@ -45,7 +43,7 @@ class Company(models.Model):
             for destination_country in oss_countries:
                 mapping = []
                 fpos = self.env['account.fiscal.position'].search([
-                            ('company_id', '=', company.id),
+                            *self.env['account.fiscal.position']._check_company_domain(company),
                             ('country_id', '=', destination_country.id),
                             ('auto_apply', '=', True),
                             ('vat_required', '=', False),
@@ -61,7 +59,7 @@ class Company(models.Model):
                 foreign_taxes = {tax.amount: tax for tax in fpos.tax_ids.tax_dest_id if tax.amount_type == 'percent'}
 
                 for domestic_tax in taxes:
-                    tax_amount = EU_TAX_MAP.get((domestic_tax.country_id.code, domestic_tax.amount, destination_country.code), False)
+                    tax_amount = EU_TAX_MAP.get((company.account_fiscal_country_id.code, domestic_tax.amount, destination_country.code), False)
                     if tax_amount and domestic_tax not in fpos.tax_ids.tax_src_id:
                         if not foreign_taxes.get(tax_amount, False):
                             oss_tax_group_local_xml_id = f"{company.id}_oss_tax_group_{str(tax_amount).replace('.', '_')}_{company.account_fiscal_country_id.code}"
@@ -113,44 +111,48 @@ class Company(models.Model):
 
     def _get_oss_account(self):
         self.ensure_one()
-        if not self.env.ref(f'l10n_eu_oss.oss_tax_account_company_{self.id}', raise_if_not_found=False):
+        if not (oss_account := self.env.ref(f'l10n_eu_oss.oss_tax_account_company_{self.id}', raise_if_not_found=False)):
+            oss_account = self._create_oss_account()
+        return oss_account
+
+    def _create_oss_account(self):
+        if (
+            self.chart_template in EU_ACCOUNT_MAP
+            and (oss_account_if_exists :=
+                self.env['account.account'].with_company(self).search([
+                    ('company_ids', '=', self.id),
+                    ('code', '=', EU_ACCOUNT_MAP[self.chart_template])
+                ])
+            )
+        ):
+            oss_account = oss_account_if_exists
+        else:
             sales_tax_accounts = self.env['account.tax'].search([
                     *self.env['account.tax']._check_company_domain(self),
                     ('type_tax_use', '=', 'sale'),
                 ]).invoice_repartition_line_ids.mapped('account_id')
             if not sales_tax_accounts:
                 return False
-            new_code = self.env['account.account']._search_new_account_code(self, len(sales_tax_accounts[0].code), sales_tax_accounts[0].code[:-2])
+            new_code = self.env['account.account'].with_company(self)._search_new_account_code(sales_tax_accounts[0].with_company(self).code)
             oss_account = self.env['account.account'].create({
                 'name': f'{sales_tax_accounts[0].name} OSS',
                 'code': new_code,
                 'account_type': sales_tax_accounts[0].account_type,
-                'company_id': self.id,
+                'company_ids': [Command.link(self.id)],
                 'tag_ids': [(4, tag.id, 0) for tag in sales_tax_accounts[0].tag_ids],
-                })
-            self.env['ir.model.data'].create({
-                'name': f'oss_tax_account_company_{self.id}',
-                'module': 'l10n_eu_oss',
-                'model': 'account.account',
-                'res_id': oss_account.id,
-                'noupdate': True,
-                })
-        return self.env.ref(f'l10n_eu_oss.oss_tax_account_company_{self.id}')
+            })
+        self.env['ir.model.data'].create({
+            'name': f'oss_tax_account_company_{self.id}',
+            'module': 'l10n_eu_oss',
+            'model': 'account.account',
+            'res_id': oss_account.id,
+            'noupdate': True,
+        })
+        return oss_account
 
     def _get_oss_tags(self):
         oss_tag = self.env.ref('l10n_eu_oss.tag_oss')
-        country = None
-        # Try to use the VAT country if vat is set and easily guessable
-        if self.vat:
-            country_prefix = re.match('^[a-zA-Z]{2}|^', self.vat).group()
-            if country_prefix:
-                country = self.env['res.country'].search([('code', '=', country_prefix)], limit=1)
-        # otherwise fallback on the fiscal country
-        if not country:
-            country = self.account_fiscal_country_id
-        chart_template = self.env['account.chart.template']._guess_chart_template(country)
-
-        tag_for_country = EU_TAG_MAP.get(chart_template, {
+        tag_for_country = EU_TAG_MAP.get(self.chart_template, {
             'invoice_base_tag': None,
             'invoice_tax_tag': None,
             'refund_base_tag': None,

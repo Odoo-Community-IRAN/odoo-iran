@@ -3,16 +3,15 @@
 # 	* pos_adyen
 # 
 # Translators:
-# Wil Odoo, 2023
-# Rasareeyar Lappiam, 2024
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-01-05 12:31+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Rasareeyar Lappiam, 2024\n"
+"POT-Creation-Date: 2024-09-25 08:39+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Thai (https://app.transifex.com/odoo/teams/41243/th/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -33,14 +32,8 @@ msgstr "Adyen API คีย์"
 #. module: pos_adyen
 #. odoo-javascript
 #: code:addons/pos_adyen/static/src/app/payment_adyen.js:0
-#, python-format
 msgid "Adyen Error"
 msgstr "ข้อผิดพลาด Adyen"
-
-#. module: pos_adyen
-#: model:ir.model.fields,field_description:pos_adyen.field_pos_payment_method__adyen_latest_diagnosis
-msgid "Adyen Latest Diagnosis"
-msgstr "การวินิจฉัย Adyen ล่าสุด"
 
 #. module: pos_adyen
 #: model:ir.model.fields,field_description:pos_adyen.field_pos_payment_method__adyen_latest_response
@@ -60,7 +53,6 @@ msgstr "โหมดทดลอง Adyen"
 #. module: pos_adyen
 #. odoo-javascript
 #: code:addons/pos_adyen/static/src/app/payment_adyen.js:0
-#, python-format
 msgid "An unexpected error occurred. Message from Adyen: %s"
 msgstr "เกิดข้อผิดพลาดทีคาดไม่ถึง ข้อความจาก Adyen: %s"
 
@@ -72,14 +64,12 @@ msgstr "ขอทิปจากลูกค้า"
 #. module: pos_adyen
 #. odoo-javascript
 #: code:addons/pos_adyen/static/src/app/payment_adyen.js:0
-#, python-format
 msgid "Authentication failed. Please check your Adyen credentials."
 msgstr "การตรวจสอบสิทธิ์ล้มเหลว โปรดตรวจสอบข้อมูลรับรอง Adyen ของคุณ"
 
 #. module: pos_adyen
 #. odoo-javascript
 #: code:addons/pos_adyen/static/src/app/payment_adyen.js:0
-#, python-format
 msgid ""
 "Cancelling the payment failed. Please cancel it manually on the payment "
 "terminal."
@@ -88,7 +78,6 @@ msgstr "การยกเลิกการชำระเงินล้มเ
 #. module: pos_adyen
 #. odoo-javascript
 #: code:addons/pos_adyen/static/src/app/payment_adyen.js:0
-#, python-format
 msgid "Cannot process transactions with negative amount."
 msgstr "ไม่สามารถประมวลผลธุรกรรมที่มียอดติดลบได้"
 
@@ -100,7 +89,6 @@ msgstr "ตั้งค่าการกำหนดค่า"
 #. module: pos_adyen
 #. odoo-javascript
 #: code:addons/pos_adyen/static/src/app/payment_adyen.js:0
-#, python-format
 msgid ""
 "Could not connect to the Odoo server, please check your internet connection "
 "and try again."
@@ -109,24 +97,25 @@ msgstr ""
 "โปรดตรวจสอบการเชื่อมต่ออินเตอร์เน็ตของคุณและลองอีกครั้ง"
 
 #. module: pos_adyen
+#: model:ir.model.fields,field_description:pos_adyen.field_pos_payment_method__adyen_event_url
+msgid "Event URL"
+msgstr ""
+
+#. module: pos_adyen
 #. odoo-python
 #: code:addons/pos_adyen/models/pos_payment_method.py:0
-#: code:addons/pos_adyen/models/pos_payment_method.py:0
-#, python-format
 msgid "Invalid Adyen request"
 msgstr "คำขอ Adyen ไม่ถูกต้อง"
 
 #. module: pos_adyen
 #. odoo-javascript
 #: code:addons/pos_adyen/static/src/app/payment_adyen.js:0
-#, python-format
 msgid "Message from Adyen: %s"
 msgstr "ข้อความจาก Adyen: %s"
 
 #. module: pos_adyen
 #. odoo-python
 #: code:addons/pos_adyen/models/pos_config.py:0
-#, python-format
 msgid ""
 "Please configure a tip product for POS %s to support tipping with Adyen."
 msgstr "โปรดกำหนดค่าสินค้าทิปสำหรับ POS %sเพื่อรองรับการให้ทิปกับเอเดียน"
@@ -142,11 +131,6 @@ msgid "Point of Sale Payment Methods"
 msgstr "วิธีการชำระเงินการขายหน้าร้าน"
 
 #. module: pos_adyen
-#: model:ir.model,name:pos_adyen.model_pos_session
-msgid "Point of Sale Session"
-msgstr "เซสชั่นการขายหน้าร้าน"
-
-#. module: pos_adyen
 #: model:ir.model.fields,field_description:pos_adyen.field_res_config_settings__pos_adyen_ask_customer_for_tip
 msgid "Pos Adyen Ask Customer For Tip"
 msgstr "Pos Adyen ขอทิปจากลูกค้า"
@@ -159,16 +143,24 @@ msgstr "ดำเนินการธุรกรรมในสภาพแว
 #. module: pos_adyen
 #. odoo-python
 #: code:addons/pos_adyen/models/pos_payment_method.py:0
-#, python-format
-msgid "Terminal %s is already used in company %s on payment method %s."
-msgstr "เทอร์มินัล %s ถูกใช้แล้วในบริษัท %s เกี่ยวกับวิธีการชำระเงิน %s"
+msgid ""
+"Terminal %(terminal)s is already used in company %(company)s on payment "
+"method %(payment_method)s."
+msgstr ""
+"เทอร์มินัล %(terminal)s ถูกใช้แล้วในบริษัท %(company)s "
+"เกี่ยวกับวิธีการชำระเงิน %(pay_method)s"
 
 #. module: pos_adyen
 #. odoo-python
 #: code:addons/pos_adyen/models/pos_payment_method.py:0
-#, python-format
-msgid "Terminal %s is already used on payment method %s."
-msgstr "สถานี %s ได้ใช้วิธีการชำระเงินแล้ว %s"
+msgid ""
+"Terminal %(terminal)s is already used on payment method %(payment_method)s."
+msgstr "เทอร์มินัล %(terminal)s ถูกใช้แล้วกับวิธีการชำระเงิน %(pay_method)s"
+
+#. module: pos_adyen
+#: model:ir.model.fields,help:pos_adyen.field_pos_payment_method__adyen_event_url
+msgid "This URL needs to be pasted on Adyen's portal terminal settings."
+msgstr ""
 
 #. module: pos_adyen
 #: model:ir.model.fields,help:pos_adyen.field_pos_payment_method__adyen_api_key

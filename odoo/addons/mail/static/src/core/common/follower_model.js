@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { Record } from "@mail/core/common/record";
 
 export class Follower extends Record {
@@ -15,7 +13,7 @@ export class Follower extends Record {
         return super.insert(...arguments);
     }
 
-    followedThread = Record.one("Thread");
+    thread = Record.one("Thread");
     /** @type {number} */
     id;
     /** @type {boolean} */
@@ -24,10 +22,20 @@ export class Follower extends Record {
 
     /** @returns {boolean} */
     get isEditable() {
-        const hasWriteAccess = this.followedThread ? this.followedThread.hasWriteAccess : false;
-        return this.partner.eq(this._store.user)
-            ? this.followedThread.hasReadAccess
-            : hasWriteAccess;
+        const hasWriteAccess = this.thread ? this.thread.hasWriteAccess : false;
+        return this.partner.eq(this.store.self) ? this.thread.hasReadAccess : hasWriteAccess;
+    }
+
+    async remove() {
+        await this.store.env.services.orm.call(this.thread.model, "message_unsubscribe", [
+            [this.thread.id],
+            [this.partner.id],
+        ]);
+        this.delete();
+    }
+
+    removeRecipient() {
+        this.thread.recipients.delete(this);
     }
 }
 

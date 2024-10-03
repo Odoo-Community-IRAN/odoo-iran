@@ -3,7 +3,7 @@
 
 <template id="s_website_form" name="Form">
     <section class="s_website_form pt16 pb16" data-vcss="001" data-snippet="s_website_form">
-        <div class="container">
+        <div class="container-fluid">
             <form action="/website/form/" method="post" enctype="multipart/form-data" class="o_mark_required" data-mark="*" data-pre-fill="true" data-model_name="mail.mail" data-success-mode="redirect" data-success-page="/contactus-thank-you">
                 <div class="s_website_form_rows row s_col_no_bgcolor">
                     <div data-name="Field" class="s_website_form_field mb-3 col-12 s_website_form_dnone">
@@ -80,10 +80,10 @@
                             </div>
                         </div>
                     </div>
-                    <div class="mb-0 py-2 col-12 s_website_form_submit" data-name="Submit Button">
+                    <div class="mb-0 py-2 col-12 s_website_form_submit text-end s_website_form_no_submit_label" data-name="Submit Button">
                         <div style="width: 200px;" class="s_website_form_label"/>
+                        <span id="s_website_form_result"/>
                         <a href="#" role="button" class="btn btn-primary s_website_form_send">Submit</a>
-                        <span id="s_website_form_result"></span>
                     </div>
                 </div>
             </form>
@@ -151,7 +151,7 @@
              data-exclude=".s_website_form_dnone" data-drop-near=".s_website_form_field"
              data-drop-lock-within="form">
             <we-select data-name="type_opt" string="Type" data-no-preview="true">
-                <we-title>Custom field</we-title>
+                <we-title>Custom Field</we-title>
                 <we-button data-custom-field="char">Text</we-button>
                 <we-button data-custom-field="text">Long Text</we-button>
                 <we-button data-custom-field="email">Email</we-button>
@@ -172,6 +172,10 @@
                 <we-button data-select-type="email">Email</we-button>
                 <we-button data-select-type="tel">Telephone</we-button>
                 <we-button data-select-type="url">Url</we-button>
+            </we-select>
+            <we-select string="Selection type" data-name="existing_field_select_type_opt" data-no-preview="true">
+                <we-button data-existing-field-select-type="many2one">Dropdown List</we-button>
+                <we-button data-existing-field-select-type="selection">Radio</we-button>
             </we-select>
             <we-select string="Display" class="o_we_sublevel_1" data-name="multi_check_display_opt" data-no-preview="true">
                 <we-button data-multi-checkbox-display="horizontal">Horizontal</we-button>
@@ -220,14 +224,14 @@
                 data-toggle-required="s_website_form_required"/>
 
             <we-input data-name="max_files_number_opt"
-                string="Max # of files"
+                string="Max # of Files"
                 title="The maximum number of files that can be uploaded."
                 data-attribute-name="maxFilesNumber"
                 data-select-data-attribute="1"
                 data-apply-to="input[type='file']"
                 data-step="1"/>
 
-            <we-input string="Max file size"
+            <we-input string="Max File Size"
                 title="The maximum size (in MB) an uploaded file can have."
                 data-attribute-name="maxFileSize"
                 data-select-data-attribute="1MB"
@@ -287,8 +291,15 @@
                     <we-button data-select-data-attribute="fileSet">Is set</we-button>
                     <we-button data-select-data-attribute="!fileSet">Is not set</we-button>
                 </we-select>
+                <we-select data-name="hidden_condition_record_opt" data-attribute-name="visibilityComparator" data-no-preview="true">
+                    <we-button data-select-data-attribute="selected">Is equal to</we-button>
+                    <we-button data-select-data-attribute="!selected">Is not equal to</we-button>
+                </we-select>
             </we-row>
             <we-select class="o_we_large" data-name="hidden_condition_no_text_opt" data-attribute-name="visibilityCondition" data-no-preview="true">
+                <!-- checkbox, select, radio possible values -->
+            </we-select>
+            <we-select class="o_we_large" data-name="hidden_condition_record_opt" data-attribute-name="visibilityCondition" data-no-preview="true">
                 <!-- checkbox, select, radio possible values -->
             </we-select>
             <we-input class="o_we_large" data-name="hidden_condition_additional_text" data-attribute-name="visibilityCondition" data-select-data-attribute=""/>

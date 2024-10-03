@@ -31,6 +31,8 @@ $variable-prefix: '' !default;
 // Restore negative margins disabled in BS5 by default
 $enable-negative-margins: true !default;
 
+// Enable CSS grid
+$enable-cssgrid: true !default;
 
 
 // Customize the light and dark text colors for use in our color contrast function.
@@ -260,10 +262,6 @@ $form-check-input-border: ($input-border-width or 1px) solid $input-border-color
 //   (a disabled range should have its *active* part with a different color).
 $form-range-track-bg: $input-disabled-bg !default;
 
-// Badge
-$badge-padding-y: 0.25em !default;
-$badge-padding-x: 0.4em !default;
-
 // Breadcrumbs
 $breadcrumb-padding-y: .75rem !default;
 $breadcrumb-padding-x: 1rem !default;
@@ -271,7 +269,6 @@ $breadcrumb-padding-x: 1rem !default;
 // Navbar
 
 // Increase default navbar padding for some navbar styles
-$navbar-padding-x: $spacer !default;
 $navbar-padding-y: if(index(('fill', 'pills', 'outline'), o-website-value('header-links-style')), ($spacer / 2) * 1.25, null) !default;
 $navbar-nav-link-padding-x: if(index(('outline', 'block'), o-website-value('header-links-style')), .5rem * 3, null) !default;
 $navbar-nav-link-padding-x: if(o-website-value('header-links-style') == 'border-bottom', .5rem * 2, null) !default;
@@ -328,6 +325,9 @@ $popover-border-color: $border-color !default;
 $popover-arrow-color: $body-bg !default;
 $popover-arrow-outer-color: $border-color !default;
 
+// Badge
+$badge-border-radius: $border-radius-pill !default;
+
 // Shadows
 $box-shadow: 0px 4px 16px rgba($black, 0.12) !default;
 $box-shadow-sm: 0px 1px 3px rgba($black, .1) !default;
@@ -341,7 +341,7 @@ $modal-header-border-width: 0 !default;
 $modal-footer-border-width: 0 !default;
 
 // HR Separator
-$hr-color: $border-color !default;
+$hr-border-color: $border-color !default;
 $hr-opacity: 1 !default;
 
 // Pagination
@@ -376,3 +376,6 @@ $pagination-padding-x-lg: $pagination-padding-x !default;
 
 $pagination-border-radius-lg: $pagination-border-radius !default;
 $pagination-border-radius-sm: $pagination-border-radius !default;
+
+// Carousel
+$carousel-control-width: 10% !default;

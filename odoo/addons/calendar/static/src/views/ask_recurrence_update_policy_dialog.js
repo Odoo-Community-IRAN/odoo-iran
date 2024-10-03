@@ -5,6 +5,15 @@ import { Dialog } from "@web/core/dialog/dialog";
 import { Component } from "@odoo/owl";
 
 export class AskRecurrenceUpdatePolicyDialog extends Component {
+    static template = "calendar.AskRecurrenceUpdatePolicyDialog";
+    static components = {
+        Dialog,
+    };
+    static props = {
+        confirm: Function,
+        close: Function,
+    };
+
     setup() {
         this.possibleValues = {
             self_only: {
@@ -36,7 +45,3 @@ export class AskRecurrenceUpdatePolicyDialog extends Component {
         this.props.close();
     }
 }
-AskRecurrenceUpdatePolicyDialog.template = "calendar.AskRecurrenceUpdatePolicyDialog";
-AskRecurrenceUpdatePolicyDialog.components = {
-    Dialog,
-};

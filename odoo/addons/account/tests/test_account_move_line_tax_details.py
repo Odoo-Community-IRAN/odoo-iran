@@ -8,6 +8,12 @@ from odoo import Command
 @tagged('post_install', '-at_install')
 class TestAccountTaxDetailsReport(AccountTestInvoicingCommon):
 
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+
+        cls.other_currency = cls.setup_other_currency('EUR', rounding=0.001)
+
     def _dispatch_move_lines(self, moves):
         base_lines = moves.line_ids\
             .filtered(lambda x: x.tax_ids and not x.tax_line_id)\
@@ -19,9 +25,9 @@ class TestAccountTaxDetailsReport(AccountTestInvoicingCommon):
 
     def _get_tax_details(self, fallback=False, extra_domain=None):
         domain = [('company_id', '=', self.env.company.id)] + (extra_domain or [])
-        tax_details_query, tax_details_params = self.env['account.move.line']._get_query_tax_details_from_domain(domain, fallback=fallback)
+        tax_details_query = self.env['account.move.line']._get_query_tax_details_from_domain(domain, fallback=fallback)
         self.env['account.move.line'].flush_model()
-        self.cr.execute(tax_details_query, tax_details_params)
+        self.cr.execute(tax_details_query)
         tax_details_res = self.cr.dictfetchall()
         return sorted(tax_details_res, key=lambda x: (x['base_line_id'], abs(x['base_amount']), abs(x['tax_amount'])))
 
@@ -293,7 +299,7 @@ class TestAccountTaxDetailsReport(AccountTestInvoicingCommon):
                 },
                 {
                     'base_line_id': base_lines[0].id,
-                    'tax_line_id': tax_lines[0].id,
+                    'tax_line_id': tax_lines[1].id,
                     'base_amount': -1000.0,
                     'tax_amount': -100.0,
                 },
@@ -323,7 +329,7 @@ class TestAccountTaxDetailsReport(AccountTestInvoicingCommon):
                 },
                 {
                     'base_line_id': base_lines[1].id,
-                    'tax_line_id': tax_lines[1].id,
+                    'tax_line_id': tax_lines[0].id,
                     'base_amount': -1000.0,
                     'tax_amount': -100.0,
                 },
@@ -901,7 +907,8 @@ class TestAccountTaxDetailsReport(AccountTestInvoicingCommon):
                 Command.create({
                     'name': 'line3',
                     'account_id': self.company_data['default_account_revenue'].id,
-                    'price_unit': -400.0,
+                    'price_unit': 400.0,
+                    'quantity': -1,
                     'tax_ids': [Command.set(fixed_tax.ids)],
                 }),
             ]
@@ -1037,7 +1044,7 @@ class TestAccountTaxDetailsReport(AccountTestInvoicingCommon):
                     'credit': 0.0,
                     'amount_currency': 2400.0,
                     'account_id': self.company_data['default_account_revenue'].id,
-                    'currency_id': self.currency_data['currency'].id,
+                    'currency_id': self.other_currency.id,
                     'tax_ids': [Command.set(percent_tax.ids)],
                 }),
                 Command.create({
@@ -1046,7 +1053,7 @@ class TestAccountTaxDetailsReport(AccountTestInvoicingCommon):
                     'credit': 0.0,
                     'amount_currency': 6000.0,
                     'account_id': self.company_data['default_account_revenue'].id,
-                    'currency_id': self.currency_data['currency'].id,
+                    'currency_id': self.other_currency.id,
                     'tax_ids': [Command.set(percent_tax.ids)],
                 }),
                 # Tax lines
@@ -1056,7 +1063,7 @@ class TestAccountTaxDetailsReport(AccountTestInvoicingCommon):
                     'credit': 0.0,
                     'amount_currency': 360.0,
                     'account_id': self.company_data['default_account_revenue'].id,
-                    'currency_id': self.currency_data['currency'].id,
+                    'currency_id': self.other_currency.id,
                     'tax_repartition_line_id': tax_rep.id,
                 }),
                 Command.create({
@@ -1065,7 +1072,7 @@ class TestAccountTaxDetailsReport(AccountTestInvoicingCommon):
                     'credit': 0.0,
                     'amount_currency': 200.0,
                     'account_id': self.company_data['default_account_revenue'].id,
-                    'currency_id': self.currency_data['currency'].id,
+                    'currency_id': self.other_currency.id,
                     'tax_repartition_line_id': tax_rep.id,
                 }),
                 # Balance

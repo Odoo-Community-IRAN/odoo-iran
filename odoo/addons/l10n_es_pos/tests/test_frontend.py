@@ -33,20 +33,26 @@ class TestUi(TestPointOfSaleHttpCommon):
         initial_number_of_regular_invoices = get_number_of_regular_invoices()
         self.main_pos_config.l10n_es_simplified_invoice_journal_id = simp
         # this `limit` value is linked to the `SIMPLIFIED_INVOICE_LIMIT` const in the tour
-        self.main_pos_config.l10n_es_simplified_invoice_limit = 1000
+        self._get_main_company().l10n_es_simplified_invoice_limit = 1000
         self.main_pos_config.with_user(self.pos_user).open_ui()
-        self.start_tour(f"/pos/ui?config_id={self.main_pos_config.id}", "spanish_pos_tour", login="pos_user")
+        self.start_pos_tour("spanish_pos_tour")
         num_of_simp_invoices = self.env['account.move'].search_count([('journal_id', '=', simp.id), ('l10n_es_is_simplified', '=', True)])
         num_of_regular_invoices = get_number_of_regular_invoices() - initial_number_of_regular_invoices
         self.assertEqual(num_of_simp_invoices, 3)
         self.assertEqual(num_of_regular_invoices, 1)
 
     def test_spanish_pos_invoice_no_certificate(self):
-        """This test make sure that the invoice generated in spanish PoS are not proforma invoices"""
+        """This test make sure that the invoice generated in spanish PoS are not proforma invoices when no certificate exists"""
+
+        # Make sure there is no certificate
+        self.assertEqual(self.env['certificate.certificate'].search_count([]), 0)
         self.partner_a.write({
             'vat': "ESA12345674",
             'country_id': self.env.ref("base.es").id,
-            'email': "email@gmail.com"
+            'email': "email@gmail.com",
+        })
+        self._get_main_company().partner_id.write({
+            'bank_ids': [Command.create({'acc_number': 'FOO42'})]
         })
         self.main_pos_config.open_ui()
         self.pos_order_pos0 = self.env['pos.order'].create({
@@ -58,12 +64,13 @@ class TestUi(TestPointOfSaleHttpCommon):
                 'product_id': self.product_a.id,
                 'price_unit': 100,
                 'qty': 1.0,
-                'price_subtotal': 100,
+                'tax_ids': self.product_a.taxes_id,
+                'price_subtotal': 85,
                 'price_subtotal_incl': 100,
                 'discount': 0,
             })],
             'amount_total': 100,
-            'amount_tax': 0,
+            'amount_tax': 15,
             'amount_paid': 0,
             'amount_return': 0,
             'to_invoice': True,
@@ -80,6 +87,6 @@ class TestUi(TestPointOfSaleHttpCommon):
         self.pos_order_pos0.action_pos_order_invoice()
         attachment_proforma = self.pos_order_pos0.account_move.attachment_ids.filtered(lambda att: "proforma" in att.name)
         self.assertFalse(attachment_proforma)
-        invoice_str = str(self.pos_order_pos0.account_move.get_invoice_pdf_report_attachment()[0])
+        invoice_str = str(self.pos_order_pos0.account_move._get_invoice_legal_documents('pdf', allow_fallback=True).get('content'))
         self.assertTrue("invoice" in invoice_str)
         self.assertTrue("proforma" not in invoice_str)

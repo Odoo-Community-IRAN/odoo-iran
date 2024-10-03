@@ -1,15 +1,11 @@
-from odoo import models, _
-from odoo.exceptions import RedirectWarning
+from odoo import models, api, _
+from odoo.exceptions import UserError
 
 
 class StockQuant(models.Model):
     _inherit = 'stock.quant'
 
-    def action_apply_inventory(self):
+    @api.constrains('product_id')
+    def _check_kits(self):
         if self.sudo().product_id.filtered("is_kits"):
-            raise RedirectWarning(
-                _('You should update the components quantity instead of directly updating the quantity of the kit product.'),
-                self.env.ref('stock.action_view_inventory_tree').id,
-                _("Return to Inventory"),
-            )
-        return super().action_apply_inventory()
+            raise UserError(_('You should update the components quantity instead of directly updating the quantity of the kit product.'))

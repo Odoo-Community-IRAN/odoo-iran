@@ -3,10 +3,9 @@
 
 import collections
 from datetime import timedelta
-from itertools import groupby
 import operator as py_operator
 from odoo import api, fields, models, _
-from odoo.tools import groupby
+from odoo.exceptions import UserError
 from odoo.tools.float_utils import float_round, float_is_zero
 
 
@@ -52,7 +51,7 @@ class ProductTemplate(models.Model):
         neg = ''
         if (operator == '=' and not value) or (operator == '!=' and value):
             neg = 'not '
-        return [('id', neg + 'inselect', bom_tmpl_query.subselect('product_tmpl_id'))]
+        return [('id', neg + 'in', bom_tmpl_query.subselect('product_tmpl_id'))]
 
     def _compute_show_qty_status_button(self):
         super()._compute_show_qty_status_button()
@@ -108,6 +107,10 @@ class ProductTemplate(models.Model):
             }
         return res
 
+    def _get_backend_root_menu_ids(self):
+        return super()._get_backend_root_menu_ids() + [self.env.ref('mrp.menu_mrp_root').id]
+
+
 class ProductProduct(models.Model):
     _inherit = "product.product"
 
@@ -120,6 +123,17 @@ class ProductProduct(models.Model):
     mrp_product_qty = fields.Float('Manufactured', digits='Product Unit of Measure',
         compute='_compute_mrp_product_qty', compute_sudo=False)
     is_kits = fields.Boolean(compute="_compute_is_kits", search='_search_is_kits')
+
+    # Catalog related fields
+    product_catalog_product_is_in_bom = fields.Boolean(
+        compute='_compute_product_is_in_bom_and_mo',
+        search='_search_product_is_in_bom',
+    )
+
+    product_catalog_product_is_in_mo = fields.Boolean(
+        compute='_compute_product_is_in_bom_and_mo',
+        search='_search_product_is_in_mo',
+    )
 
     def _compute_bom_count(self):
         for product in self:
@@ -158,8 +172,8 @@ class ProductProduct(models.Model):
         if (operator == '=' and not value) or (operator == '!=' and value):
             neg = 'not '
             op = '&'
-        return [op, ('product_tmpl_id', neg + 'inselect', bom_tmpl_query.subselect('product_tmpl_id')),
-                ('id', neg + 'inselect', bom_product_query.subselect('product_id'))]
+        return [op, ('product_tmpl_id', neg + 'in', bom_tmpl_query.subselect('product_tmpl_id')),
+                ('id', neg + 'in', bom_product_query.subselect('product_id'))]
 
     def _compute_show_qty_status_button(self):
         super()._compute_show_qty_status_button()
@@ -171,6 +185,36 @@ class ProductProduct(models.Model):
     def _compute_used_in_bom_count(self):
         for product in self:
             product.used_in_bom_count = self.env['mrp.bom'].search_count([('bom_line_ids.product_id', '=', product.id)])
+
+    @api.depends_context('order_id')
+    def _compute_product_is_in_bom_and_mo(self):
+        # Just to enable the _search method
+        self.product_catalog_product_is_in_bom = False
+        self.product_catalog_product_is_in_mo = False
+
+    def _search_product_is_in_bom(self, operator, value):
+        if operator not in ['=', '!='] or not isinstance(value, bool):
+            raise UserError(_("Operation not supported"))
+        product_ids = self.env['mrp.bom.line'].search([
+            ('bom_id', '=', self.env.context.get('order_id', '')),
+        ]).product_id.ids
+        if (operator == '!=' and value is True) or (operator == '=' and value is False):
+            domain_operator = 'not in'
+        else:
+            domain_operator = 'in'
+        return [('id', domain_operator, product_ids)]
+
+    def _search_product_is_in_mo(self, operator, value):
+        if operator not in ['=', '!='] or not isinstance(value, bool):
+            raise UserError(_("Operation not supported"))
+        product_ids = self.env['mrp.production'].search([
+            ('id', 'in', [self.env.context.get('order_id', '')]),
+        ]).move_raw_ids.product_id.ids
+        if (operator == '!=' and value is True) or (operator == '=' and value is False):
+            domain_operator = 'not in'
+        else:
+            domain_operator = 'in'
+        return [('id', domain_operator, product_ids)]
 
     def write(self, values):
         if 'active' in values:
@@ -186,7 +230,7 @@ class ProductProduct(models.Model):
         bom_kit = self.env['mrp.bom']._bom_find(self, bom_type='phantom')[self]
         if bom_kit:
             boms, bom_sub_lines = bom_kit.explode(self, 1)
-            return [bom_line.product_id.id for bom_line, data in bom_sub_lines if bom_line.product_id.type == 'product']
+            return [bom_line.product_id.id for bom_line, data in bom_sub_lines if bom_line.product_id.is_storable]
         else:
             return super(ProductProduct, self).get_components()
 
@@ -255,7 +299,7 @@ class ProductProduct(models.Model):
                 component = component.with_context(mrp_compute_quantities=qties).with_prefetch(prefetch_component_ids)
                 qty_per_kit = 0
                 for bom_line, bom_line_data in bom_sub_lines:
-                    if component.type != 'product' or float_is_zero(bom_line_data['qty'], precision_rounding=bom_line.product_uom_id.rounding):
+                    if not component.is_storable or float_is_zero(bom_line_data['qty'], precision_rounding=bom_line.product_uom_id.rounding):
                         # As BoMs allow components with 0 qty, a.k.a. optionnal components, we simply skip those
                         # to avoid a division by zero. The same logic is applied to non-storable products as those
                         # products have 0 qty available.
@@ -342,16 +386,13 @@ class ProductProduct(models.Model):
         # * the attributes are a subset of the attributes of the line.
         return len(self.product_template_attribute_value_ids & product_template_attribute_value_ids) == len(product_template_attribute_value_ids.attribute_id)
 
-    def _count_returned_sn_products(self, sn_lot):
-        res = self.env['stock.move.line'].search_count([
-            ('lot_id', '=', sn_lot.id),
-            ('quantity', '=', 1),
-            ('state', '=', 'done'),
+    def _count_returned_sn_products_domain(self, sn_lot, or_domains):
+        or_domains.append([
             ('production_id', '=', False),
             ('location_id.usage', '=', 'production'),
             ('move_id.unbuild_id', '!=', False),
         ])
-        return super()._count_returned_sn_products(sn_lot) + res
+        return super()._count_returned_sn_products_domain(sn_lot, or_domains)
 
     def _search_qty_available_new(self, operator, value, lot_id=False, owner_id=False, package_id=False):
         '''extending the method in stock.product to take into account kits'''
@@ -384,3 +425,6 @@ class ProductProduct(models.Model):
                 },
             }
         return res
+
+    def _get_backend_root_menu_ids(self):
+        return super()._get_backend_root_menu_ids() + [self.env.ref('mrp.menu_mrp_root').id]

@@ -1,5 +1,3 @@
-/** @odoo-module */
-
 import { Component, useState } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { useSelfOrder } from "@pos_self_order/app/self_order_service";
@@ -10,6 +8,7 @@ import { OrderWidget } from "@pos_self_order/app/components/order_widget/order_w
 export class CartPage extends Component {
     static template = "pos_self_order.CartPage";
     static components = { PopupTable, OrderWidget };
+    static props = {};
 
     setup() {
         this.selfOrder = useSelfOrder();
@@ -29,8 +28,11 @@ export class CartPage extends Component {
         const selfOrder = this.selfOrder;
         const order = selfOrder.currentOrder;
 
-        if (selfOrder.config.self_ordering_pay_after === "meal" && !order.isSavedOnServer) {
-            return order.hasNotAllLinesSent();
+        if (
+            selfOrder.config.self_ordering_pay_after === "meal" &&
+            Object.keys(order.changes).length > 0
+        ) {
+            return order.unsentLines;
         } else {
             return this.lines;
         }
@@ -38,26 +40,31 @@ export class CartPage extends Component {
 
     getLineChangeQty(line) {
         const currentQty = line.qty;
-        const lastChange = this.selfOrder.currentOrder.lastChangesSent[line.uuid];
+        const lastChange = this.selfOrder.currentOrder.uiState.lineChanges[line.uuid];
         return !lastChange ? currentQty : currentQty - lastChange.qty;
-    }
-
-    backToMenu() {
-        this.router.navigate("product_list");
     }
 
     async pay() {
         const orderingMode = this.selfOrder.config.self_ordering_service_mode;
         const type = this.selfOrder.config.self_ordering_mode;
-        const takeAway = this.selfOrder.currentOrder.take_away;
+        const takeAway = this.selfOrder.currentOrder.takeaway;
 
         if (this.selfOrder.rpcLoading || !this.selfOrder.verifyCart()) {
             return;
         }
 
-        if (type === "mobile" && orderingMode === "table" && !takeAway && !this.selfOrder.table) {
+        if (
+            type === "mobile" &&
+            orderingMode === "table" &&
+            !takeAway &&
+            !this.selfOrder.currentTable
+        ) {
             this.state.selectTable = true;
             return;
+        } else {
+            this.selfOrder.currentOrder.update({
+                table_id: this.selfOrder.currentTable,
+            });
         }
 
         this.selfOrder.rpcLoading = true;
@@ -67,7 +74,10 @@ export class CartPage extends Component {
 
     selectTable(table) {
         if (table) {
-            this.selfOrder.table = table;
+            this.selfOrder.currentOrder.update({
+                table_id: table,
+            });
+            this.selfOrder.currentTable = table;
             this.router.addTableIdentifier(table);
             this.pay();
         }
@@ -75,18 +85,14 @@ export class CartPage extends Component {
         this.state.selectTable = false;
     }
 
-    getChildLines(line) {
-        return this.lines.filter((l) => l.combo_parent_uuid === line.uuid);
-    }
-
     getPrice(line) {
-        const childLines = this.getChildLines(line);
+        const childLines = line.combo_line_ids;
         if (childLines.length == 0) {
-            return line.price_subtotal_incl;
+            return line.get_display_price();
         } else {
             let price = 0;
             for (const child of childLines) {
-                price += child.price_subtotal_incl;
+                price += child.get_display_price();
             }
             return price;
         }
@@ -94,7 +100,7 @@ export class CartPage extends Component {
 
     canChangeQuantity(line) {
         const order = this.selfOrder.currentOrder;
-        const lastChange = order.lastChangesSent[line.uuid];
+        const lastChange = order.uiState.lineChanges[line.uuid];
 
         if (!lastChange) {
             return true;
@@ -104,12 +110,12 @@ export class CartPage extends Component {
     }
 
     canDeleteLine(line) {
-        const lastChange = this.selfOrder.currentOrder.lastChangesSent[line.uuid];
+        const lastChange = this.selfOrder.currentOrder.uiState.lineChanges[line.uuid];
         return !lastChange ? true : lastChange.qty !== line.qty;
     }
 
     async removeLine(line) {
-        const lastChange = this.selfOrder.currentOrder.lastChangesSent[line.uuid];
+        const lastChange = this.selfOrder.currentOrder.uiState.lineChanges[line.uuid];
 
         if (!this.canDeleteLine(line)) {
             return;
@@ -117,11 +123,10 @@ export class CartPage extends Component {
 
         if (lastChange) {
             line.qty = lastChange.qty;
+            line.setDirty();
         } else {
-            this.selfOrder.currentOrder.removeLine(line.uuid);
+            this.selfOrder.removeLine(line);
         }
-
-        await this.selfOrder.getPricesFromServer();
     }
 
     async _changeQuantity(line, increase) {
@@ -137,13 +142,15 @@ export class CartPage extends Component {
         for (const cline of this.selfOrder.currentOrder.lines) {
             if (cline.combo_parent_uuid === line.uuid) {
                 this._changeQuantity(cline, increase);
+                cline.setDirty();
             }
         }
+
+        line.setDirty();
     }
 
     async changeQuantity(line, increase) {
         await this._changeQuantity(line, increase);
-        await this.selfOrder.getPricesFromServer();
     }
 
     clickOnLine(line) {
@@ -151,9 +158,9 @@ export class CartPage extends Component {
         this.selfOrder.editedLine = line;
 
         if (order.state === "draft" && !order.lastChangesSent[line.uuid]) {
-            this.selfOrder.editedOrder = order;
+            this.selfOrder.selectedOrderUuid = order.uuid;
 
-            if (line.child_lines.length > 0) {
+            if (line.combo_line_ids.length > 0) {
                 this.router.navigate("combo_selection", { id: line.product_id });
             } else {
                 this.router.navigate("product", { id: line.product_id });

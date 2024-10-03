@@ -55,11 +55,11 @@
     </record>
 
     <record id="view_invoice_tree_inherit_l10n_vn_edi" model="ir.ui.view">
-        <field name="name">account.invoice.tree.inherit.l10n_vn_edi</field>
+        <field name="name">account.invoice.list.inherit.l10n_vn_edi</field>
         <field name="model">account.move</field>
         <field name="inherit_id" ref="account.view_invoice_tree"/>
         <field name="arch" type="xml">
-            <field name="state" position="after">
+            <field name="status_in_payment" position="after">
                 <field name="l10n_vn_edi_invoice_state"
                        widget="badge"
                        decoration-success="l10n_vn_edi_invoice_state == 'sent'"

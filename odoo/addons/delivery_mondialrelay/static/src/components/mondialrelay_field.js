@@ -4,19 +4,22 @@ import { registry } from "@web/core/registry";
 import { loadJS } from "@web/core/assets";
 
 // temporary for OnNoResultReturned bug
-import { UncaughtCorsError } from "@web/core/errors/error_service";
+import { ThirdPartyScriptError } from "@web/core/errors/error_service";
 const errorHandlerRegistry = registry.category("error_handlers");
 import { Component, onWillRender, useEffect, useRef, useState, xml } from "@odoo/owl";
+import { standardFieldProps } from "@web/views/fields/standard_field_props";
 
 const MONDIALRELAY_SCRIPT_URL = "https://widget.mondialrelay.com/parcelshop-picker/jquery.plugin.mondialrelay.parcelshoppicker.min.js"
 
 function corsIgnoredErrorHandler(env, error) {
-    if (error instanceof UncaughtCorsError) {
+    if (error instanceof ThirdPartyScriptError) {
         return true;
     }
 }
 
 export class MondialRelayField extends Component {
+    static template = xml`<div t-if="enabled" t-ref="root"/>`;
+    static props = {...standardFieldProps};
     setup() {
         this.root = useRef("root");
         this.state = useState({
@@ -85,7 +88,6 @@ export class MondialRelayField extends Component {
         $el.trigger("MR_RebindMap");
     }
 }
-MondialRelayField.template = xml`<div t-if="enabled" t-ref="root"/>`;
 
 export const mondialRelayField = {
     component: MondialRelayField,

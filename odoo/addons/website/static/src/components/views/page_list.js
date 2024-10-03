@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 import { _t } from "@web/core/l10n/translation";
-import {PageControllerMixin, PageRendererMixin} from "./page_views_mixin";
+import {PageControllerMixin} from "./page_views_mixin";
 import {PageSearchModel} from "./page_search_model";
 import {registry} from '@web/core/registry';
 import {listView} from '@web/views/list/list_view';
@@ -11,6 +11,12 @@ import {CheckboxItem} from "@web/core/dropdown/checkbox_item";
 
 
 export class PageListController extends PageControllerMixin(listView.Controller) {
+    static template = `website.PageListView`;
+    static components = {
+        ...listView.Controller.components,
+        CheckboxItem,
+    };
+
     /**
      * @override
      */
@@ -59,8 +65,6 @@ export class PageListController extends PageControllerMixin(listView.Controller)
             menuItems.duplicate.callback = async (records = []) => {
                 const resIds = this.model.root.selection.map((record) => record.resId);
                 this.dialog.add(DuplicatePageDialog, {
-                    // TODO Remove pageId in master
-                    pageId: 0, // Ignored but mandatory
                     pageIds: resIds,
                     onDuplicate: () => {
                         this.model.load();
@@ -71,13 +75,16 @@ export class PageListController extends PageControllerMixin(listView.Controller)
         return menuItems;
     }
 
-    onDeleteSelectedRecords() {
+    async onDeleteSelectedRecords() {
+        const pageIds = this.model.root.selection.map((record) => record.resId);
+        const newPageTemplateRecords = await this.orm.read("website.page", pageIds, ["is_new_page_template"]);
         this.dialogService.add(DeletePageDialog, {
-            resIds: this.model.root.selection.map((record) => record.resId),
+            resIds: pageIds,
             resModel: this.props.resModel,
             onDelete: () => {
                 this.model.root.deleteRecords();
             },
+            hasNewPageTemplate: newPageTemplateRecords.some(record => record.is_new_page_template),
         });
     }
 
@@ -87,19 +94,10 @@ export class PageListController extends PageControllerMixin(listView.Controller)
         this.actionService.switchView('list');
     }
 }
-PageListController.template = `website.PageListView`;
-PageListController.components = {
-    ...listView.Controller.components,
-    CheckboxItem,
-};
 
-// TODO master: remove `PageRendererMixin` extend and props override
-export class PageListRenderer extends PageRendererMixin(listView.Renderer) {}
-PageListRenderer.props = [
-    ...listView.Renderer.props,
-    "activeWebsite",
-];
-PageListRenderer.recordRowTemplate = "website.PageListRenderer.RecordRow";
+export class PageListRenderer extends listView.Renderer {
+    static recordRowTemplate = "website.PageListRenderer.RecordRow";
+}
 
 export const PageListView = {
     ...listView,

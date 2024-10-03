@@ -35,20 +35,17 @@ export class SMLX2ManyField extends X2ManyField {
         context = {
             ...context,
             single_product: true,
-            tree_view_ref: "stock.view_stock_quant_tree_simple",
+            list_view_ref: "stock.view_stock_quant_tree_simple",
             search_default_on_hand: true,
             search_default_in_stock: true,
         };
         const productName = this.props.record.data.product_id[1];
         const title = _t("Add line: %s", productName);
         const alreadySelected = this.props.record.data.move_line_ids.records.filter((line) => line.data.quant_id?.[0]);
-        let domain = [
+        const domain = [
             ["product_id", "=", this.props.record.data.product_id[0]],
             ["location_id", "child_of", this.props.context.default_location_id],
         ];
-        if (this.props.domain) {
-            domain = [...domain, ...this.props.domain()];
-        }
         if (alreadySelected.length) {
             domain.push(["id", "not in", alreadySelected.map((line) => line.data.quant_id[0])]);
         }

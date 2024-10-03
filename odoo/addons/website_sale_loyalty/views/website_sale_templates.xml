@@ -42,7 +42,7 @@
                                                 <div class="flex-grow-1 text-break">
                                                     <t t-set="program" t-value="reward.program_id"/>
                                                     <t t-set="points" t-value="coupon._format_points(website_sale_order._get_real_points_for_coupon(coupon))"/>
-                                                    <t t-if="program.program_type not in ['ewallet', 'promo_code'] and (program.trigger == 'with_code' or (program.trigger == 'auto' and program.applies_on == 'future'))">
+                                                    <t t-if="program.program_type not in ['ewallet', 'promo_code', 'loyalty'] and (program.trigger == 'with_code' or (program.trigger == 'auto' and program.applies_on == 'future'))">
                                                         <t t-if="program.program_type == 'gift_card'">
                                                             <strong t-esc="reward.description"/>
                                                             <strong> - </strong>
@@ -131,7 +131,7 @@
     </template>
 
     <template id="layout" inherit_id="website.layout">
-        <body position="inside">
+        <xpath expr="//*[@id='wrapwrap']" position="inside">
             <t t-set="coupon_error" t-value="request.params.get('coupon_error')"/>
             <t t-set="pending_coupon_code" t-value="request.session.get('pending_coupon_code')"/>
             <t t-if="coupon_error and pending_coupon_code">
@@ -144,7 +144,7 @@
             <div t-if="notify_coupon" class="d-none coupon-message coupon-info-message">
                 <span class="coupon-message-content">The following promo code was applied on your order: <t t-out="notify_coupon"/></span>
             </div>
-        </body>
+        </xpath>
     </template>
 
     <template id="cart_discount" name="Show Discount in Subtotal" active="False" inherit_id="website_sale.total">
@@ -169,8 +169,8 @@
         </xpath>
     </template>
 
-    <template id="cart_summary" name="Payment" inherit_id="website_sale.checkout_layout">
-        <xpath expr="//td[@name='website_sale_cart_summary_line_price']/child::*" position="attributes">
+    <template id="cart_summary" name="Payment" inherit_id="website_sale.cart_product_price">
+        <xpath expr="//span" position="attributes">
             <attribute name="t-att-data-reward-type">line.reward_id.reward_type</attribute>
         </xpath>
     </template>

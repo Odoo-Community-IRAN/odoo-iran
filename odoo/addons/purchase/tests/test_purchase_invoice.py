@@ -3,8 +3,8 @@
 from datetime import timedelta
 
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
-from odoo.tests import tagged
-from odoo.tests.common import Form
+from odoo.exceptions import UserError
+from odoo.tests import Form, tagged
 from odoo import Command, fields
 
 
@@ -13,6 +13,7 @@ class TestPurchaseToInvoiceCommon(AccountTestInvoicingCommon):
     @classmethod
     def setUpClass(cls):
         super(TestPurchaseToInvoiceCommon, cls).setUpClass()
+        cls.other_currency = cls.setup_other_currency('EUR')
         uom_unit = cls.env.ref('uom.product_uom_unit')
         uom_hour = cls.env.ref('uom.product_uom_hour')
         cls.product_order = cls.env['product.product'].create({
@@ -328,12 +329,12 @@ class TestPurchaseToInvoice(TestPurchaseToInvoiceCommon):
         self.assertInvoiceValues(move, [
             {
                 'display_type': 'product',
-                'amount_currency': 1000,
-                'balance': 1000,
-            }, {
-                'display_type': 'product',
                 'amount_currency': 500,
                 'balance': 500,
+            }, {
+                'display_type': 'product',
+                'amount_currency': 1000,
+                'balance': 1000,
             }, {
                 'display_type': 'payment_term',
                 'amount_currency': -1500,
@@ -705,6 +706,63 @@ class TestPurchaseToInvoice(TestPurchaseToInvoiceCommon):
         self.assertEqual(840.0, po_line.price_unit_discounted, "1680.0 * 0.5 = 840.0")
         self.assertEqual(2520.0, po_line.price_subtotal, "840.0 * 3 = 2520.0")
 
+    def test_invoice_line_name_has_product_name(self):
+        """ Testing that when invoicing a sales order, the invoice line name ALWAYS contains the product name. """
+        # Create a purchase order with different descriptions
+        po = self.env['purchase.order'].with_context(tracking_disable=True).create({
+            'partner_id': self.partner_a.id,
+        })
+        PurchaseOrderLine = self.env['purchase.order.line'].with_context(tracking_disable=True)
+        pol_prod_no_redundancy = PurchaseOrderLine.create({
+            'name': "just a description",
+            'product_id': self.product_deliver.id,
+            'product_qty': 1,
+            'product_uom': self.product_deliver.uom_id.id,
+            'price_unit': self.product_deliver.list_price,
+            'order_id': po.id,
+            'taxes_id': False,
+        })
+        pol_prod_same = PurchaseOrderLine.create({
+            'name': self.product_deliver.display_name,
+            'product_id': self.product_deliver.id,
+            'product_qty': 1,
+            'product_uom': self.product_deliver.uom_id.id,
+            'price_unit': self.product_deliver.list_price,
+            'order_id': po.id,
+            'taxes_id': False,
+        })
+        pol_prod_product_in_name = PurchaseOrderLine.create({
+            'name': f"{self.product_deliver.display_name} with more description",
+            'product_id': self.product_deliver.id,
+            'product_qty': 1,
+            'product_uom': self.product_deliver.uom_id.id,
+            'price_unit': self.product_deliver.list_price,
+            'order_id': po.id,
+            'taxes_id': False,
+        })
+        pol_prod_name_in_product = PurchaseOrderLine.create({
+            'name': "Switch",
+            'product_id': self.product_deliver.id,
+            'product_qty': 1,
+            'product_uom': self.product_deliver.uom_id.id,
+            'price_unit': self.product_deliver.list_price,
+            'order_id': po.id,
+            'taxes_id': False,
+        })
+
+        # Invoice the purchase order
+        po.button_confirm()
+        po.order_line.qty_received = 4
+        po.action_create_invoice()
+        inv = po.invoice_ids
+
+        # Check the invoice line names
+        self.assertEqual(inv.invoice_line_ids[0].name, f"{pol_prod_no_redundancy.product_id.display_name} {pol_prod_no_redundancy.name}", "When the description doesn't contain the product name, it should be added to the invoice line name")
+        self.assertEqual(inv.invoice_line_ids[1].name, f"{pol_prod_same.name}", "When the description is the product name, the invoice line name should only be the description")
+        self.assertEqual(inv.invoice_line_ids[2].name, f"{pol_prod_product_in_name.name}", "When description contains the product name, the invoice line name should only be the description")
+        self.assertEqual(inv.invoice_line_ids[3].name, f"{pol_prod_name_in_product.product_id.display_name} {pol_prod_name_in_product.name}", "When the product name contains the description, the invoice line name should be the product name and the description")
+
+
 @tagged('post_install', '-at_install')
 class TestInvoicePurchaseMatch(TestPurchaseToInvoiceCommon):
 
@@ -847,6 +905,115 @@ class TestInvoicePurchaseMatch(TestPurchaseToInvoiceCommon):
 
         self.assertTrue(invoice.id not in po.invoice_ids.ids)
 
+    def test_manual_matching(self):
+        po = self.init_purchase(confirm=True, products=[self.product_order])
+        bill = self.init_invoice('in_invoice', partner=self.partner_a, products=[self.product_order])
+
+        self.env['account.move.line'].flush_model()  # necessary to get the bill lines
+        match_lines = self.env['purchase.bill.line.match'].search([('partner_id', '=', self.partner_a.id)])
+
+        expected_ids = po.order_line.ids + [-lid for lid in bill.invoice_line_ids.ids]
+        self.assertListEqual(match_lines.ids, expected_ids)
+
+        match_lines.action_match_lines()
+        self.assertEqual(bill.invoice_line_ids.purchase_line_id, po.order_line)
+        self.assertEqual(po.order_line.qty_invoiced, bill.invoice_line_ids.quantity)
+
+    def test_manual_matching_restrict_no_pol(self):
+        """ raises when there's no POL found """
+        with self.assertRaisesRegex(UserError, "must select at least one Purchase Order line"):
+            match_lines = self.env['purchase.bill.line.match'].search([('partner_id', '=', self.partner_a.id)])
+            match_lines.action_match_lines()
+
+    def test_manual_matching_restrict_multi_bill(self):
+        """ raises when multiple bill selected """
+        with self.assertRaisesRegex(UserError, "can't select lines from multiple Vendor Bill"):
+            self.init_purchase(confirm=True, products=[self.product_order])
+            self.init_invoice('in_invoice', partner=self.partner_a, products=[self.product_order])
+            self.init_invoice('in_invoice', partner=self.partner_a, products=[self.product_order])
+            match_lines = self.env['purchase.bill.line.match'].search([('partner_id', '=', self.partner_a.id)])
+            match_lines.action_match_lines()
+
+    def test_manual_matching_create_bill(self):
+        """ Selecting POL without AML will create bill with the selected POL as the lines """
+        prev_moves = self.env['account.move'].search([])
+        self.init_purchase(confirm=True, products=[self.product_order, self.product_order_var_name])
+        self.env['purchase.order.line'].flush_model()
+
+        match_lines = self.env['purchase.bill.line.match'].search([('partner_id', '=', self.partner_a.id)])
+        match_lines.action_match_lines()
+
+        new_move = self.env['account.move'].search([]) - prev_moves
+        self.assertEqual(new_move.partner_id, self.partner_a)
+        self.assertRecordValues(new_move.invoice_line_ids, [
+            {'product_id': self.product_order.id},
+            {'product_id': self.product_order_var_name.id},
+        ])
+
+    def test_manual_matching_multi_po(self):
+        """ All POL are matched/added into the bill, and all unmatched AML are discarded """
+        po_1 = self.init_purchase(confirm=True, products=[self.product_order, self.product_order_var_name])
+        po_2 = self.init_purchase(confirm=True, products=[self.service_deliver])
+        po_3 = self.init_purchase(confirm=True, products=[self.service_order])
+        bill = self.init_invoice(move_type='in_invoice', partner=self.partner_a,
+                                 products=[self.product_order, self.product_order_other_price])
+
+        self.env['account.move.line'].flush_model()
+        match_lines = self.env['purchase.bill.line.match'].search([('partner_id', '=', self.partner_a.id)])
+        match_lines.action_match_lines()
+
+        self.env.flush_all()
+        self.assertEqual(bill.invoice_line_ids.purchase_line_id, (po_1 + po_2 + po_3).order_line)
+        self.assertRecordValues(bill.invoice_line_ids, [
+            {'product_id': self.product_order.id},
+            {'product_id': self.service_order.id},
+            {'product_id': self.product_order_var_name.id},
+            {'product_id': self.service_deliver.id},
+        ])
+
+    def test_add_bill_to_po(self):
+        bill = self.init_invoice('in_invoice', partner=self.partner_a, products=[self.product_order_var_name, self.service_deliver], post=True)
+        self.env['account.move.line'].flush_model()
+
+        match_lines = self.env['purchase.bill.line.match'].search([('partner_id', '=', self.partner_a.id)])
+
+        # Use wizard to create a new PO
+        action = match_lines.action_add_to_po()
+        wizard = self.env['bill.to.po.wizard'].with_context({**action['context'], 'active_ids': match_lines.ids}).create({})
+        self.assertEqual(wizard.partner_id, self.partner_a)
+        self.assertFalse(wizard.purchase_order_id)
+
+        action = wizard.action_add_to_po()
+        po = self.env['purchase.order'].browse(action['res_id'])
+        self.assertEqual(po.partner_id, self.partner_a)
+        self.assertTrue(po.order_line.taxes_id)
+        self.assertEqual(po.order_line.taxes_id, bill.invoice_line_ids.tax_ids)
+        self.assertEqual(po.order_line.product_id, bill.invoice_line_ids.product_id)
+        self.assertEqual(po.order_line.product_id, self.product_order_var_name + self.service_deliver)
+
+        bill_2 = self.init_invoice('in_invoice', partner=self.partner_a, products=[self.product_order_other_price], post=False)
+        bill_2.invoice_line_ids.write({
+            'discount': 2.0,
+            'product_uom_id': self.env.ref('uom.product_uom_dozen').id,
+        })
+        bill_2.action_post()
+        self.env['account.move.line'].flush_model()
+
+        match_lines = self.env['purchase.bill.line.match'].search([('partner_id', '=', self.partner_a.id)])
+
+        # Use wizard to add lines to existing PO
+        match_lines.action_add_to_po()
+        wizard = self.env['bill.to.po.wizard'].with_context({
+            'default_purchase_order_id': po.id,
+            'active_ids': match_lines.ids
+        }).create({})
+
+        action = wizard.action_add_to_po()
+        self.assertEqual(action['res_id'], po.id)
+        self.assertEqual(len(po.order_line), 3)
+        self.assertEqual(po.order_line[-1:].product_id, self.product_order_other_price)
+        self.assertListEqual(po.order_line.mapped('price_total'), (bill + bill_2).invoice_line_ids.mapped('price_total'))
+
     def test_onchange_partner_currency(self):
         """
         Test that the currency of the Bill is correctly set when the partner is changed
@@ -919,7 +1086,7 @@ class TestInvoicePurchaseMatch(TestPurchaseToInvoiceCommon):
         self.assertEqual(bill.currency_id, self.env.ref('base.EUR'), "The currency of the Bill should be the one set on the Bill")
         self.assertEqual(bill.invoice_line_ids.currency_id, self.env.ref('base.EUR'), "The currency of the Bill lines should be the same as the currency of the Bill")
 
-        ctx['default_currency_id'] = self.currency_data['currency'].id
+        ctx['default_currency_id'] = self.other_currency.id
         move_form_currency_in_context = Form(self.env['account.move'].with_context(ctx))
         move_form_currency_in_context.currency_id = self.env.ref('base.EUR')
         with move_form_currency_in_context.invoice_line_ids.new() as line_form:
@@ -930,8 +1097,8 @@ class TestInvoicePurchaseMatch(TestPurchaseToInvoiceCommon):
         move_form_currency_in_context.partner_id = vendor_a
         bill = move_form_currency_in_context.save()
 
-        self.assertEqual(bill.currency_id, self.currency_data['currency'], "The currency of the Bill should be the one of the context")
-        self.assertEqual(bill.invoice_line_ids.currency_id, self.currency_data['currency'], "The currency of the Bill lines should be the same as the currency of the Bill")
+        self.assertEqual(bill.currency_id, self.other_currency, "The currency of the Bill should be the one of the context")
+        self.assertEqual(bill.invoice_line_ids.currency_id, self.other_currency, "The currency of the Bill lines should be the same as the currency of the Bill")
 
     def test_payment_reference_autocomplete_invoice(self):
         """

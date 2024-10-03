@@ -1,13 +1,9 @@
 # -*- coding: utf-8 -*-
-import time
-
-from datetime import datetime, timedelta
-from psycopg2 import OperationalError
+from datetime import timedelta
 
 from odoo import api, fields, models
 from odoo import tools
-from odoo.service.model import PG_CONCURRENCY_ERRORS_TO_RETRY
-from odoo.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT
+from odoo.service.model import PG_CONCURRENCY_EXCEPTIONS_TO_RETRY
 
 UPDATE_PRESENCE_DELAY = 60
 DISCONNECTION_TIMER = UPDATE_PRESENCE_DELAY + 5
@@ -66,11 +62,9 @@ class BusPresence(models.Model):
                 self._update_presence(inactivity_period=inactivity_period, identity_field=identity_field, identity_value=identity_value)
                 # commit on success
                 self.env.cr.commit()
-        except OperationalError as e:
-            if e.pgcode in PG_CONCURRENCY_ERRORS_TO_RETRY:
-                # ignore concurrency error
-                return self.env.cr.rollback()
-            raise
+        except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:
+            # ignore concurrency error
+            return self.env.cr.rollback()
 
     def _get_bus_target(self):
         self.ensure_one()
@@ -88,8 +82,8 @@ class BusPresence(models.Model):
     def _update_presence(self, inactivity_period, identity_field, identity_value):
         presence = self.search([(identity_field, "=", identity_value)])
         values = {
-            "last_poll": time.strftime(DEFAULT_SERVER_DATETIME_FORMAT),
-            "last_presence": datetime.now() - timedelta(milliseconds=inactivity_period),
+            "last_poll": fields.Datetime.now(),
+            "last_presence": fields.Datetime.now() - timedelta(milliseconds=inactivity_period),
             "status": "away" if inactivity_period > AWAY_TIMER * 1000 else "online",
         }
         if not presence:
@@ -107,23 +101,19 @@ class BusPresence(models.Model):
 
         :param im_status: 'online', 'away' or 'offline'
         """
-        notifications = []
         for presence in self:
             identity_data = presence._get_identity_data()
             target = presence._get_bus_target()
             target = bus_target or (target and (target, "presence"))
             if identity_data and target:
-                notifications.append(
-                    (
-                        target,
-                        "bus.bus/im_status_updated",
-                        {"im_status": im_status or presence.status, **identity_data},
-                    )
+                self.env["bus.bus"]._sendone(
+                    target,
+                    "bus.bus/im_status_updated",
+                    {"im_status": im_status or presence.status, **identity_data},
                 )
-        self.env["bus.bus"]._sendmany(notifications)
 
     @api.autovacuum
     def _gc_bus_presence(self):
         self.search(
-            [("last_poll", "<", datetime.now() - timedelta(seconds=PRESENCE_OUTDATED_TIMER))]
+            [("last_poll", "<", fields.Datetime.now() - timedelta(seconds=PRESENCE_OUTDATED_TIMER))]
         ).unlink()

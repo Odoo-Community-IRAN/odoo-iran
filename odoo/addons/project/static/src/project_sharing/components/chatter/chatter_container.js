@@ -1,6 +1,5 @@
-/** @odoo-module */
-
 import { useService } from "@web/core/utils/hooks";
+import { rpc } from "@web/core/network/rpc";
 import { ChatterComposer } from "./chatter_composer";
 import { ChatterMessageCounter } from "./chatter_message_counter";
 import { ChatterMessages } from "./chatter_messages";
@@ -8,13 +7,39 @@ import { ChatterPager } from "./chatter_pager";
 import { Component, markup, onWillStart, useState, onWillUpdateProps } from "@odoo/owl";
 
 export class ChatterContainer extends Component {
+    static template = "project.ChatterContainer";
+    static components = {
+        ChatterComposer,
+        ChatterMessageCounter,
+        ChatterMessages,
+        ChatterPager,
+    };
+    static props = {
+        token: { type: String, optional: true },
+        resModel: String,
+        resId: { type: Number, optional: true },
+        pid: { type: String, optional: true },
+        hash: { type: String, optional: true },
+        pagerStart: { type: Number, optional: true },
+        twoColumns: { type: Boolean, optional: true },
+        projectSharingId: Number,
+        isFollower: Boolean,
+        displayFollowButton: Boolean,
+    };
+    static defaultProps = {
+        token: "",
+        pid: "",
+        hash: "",
+        pagerStart: 1,
+    };
+
     setup() {
-        this.rpc = useService('rpc');
         this.state = useState({
             currentPage: this.props.pagerStart,
             messages: [],
             options: this.defaultOptions,
         });
+        this.ormService = useService("orm");
 
         onWillStart(this.onWillStart);
         onWillUpdateProps(this.onWillUpdateProps);
@@ -30,6 +55,7 @@ export class ChatterContainer extends Component {
             partner_id: null,
             pager_scope: 4,
             pager_step: 10,
+            is_follower: this.props.isFollower,
         };
     }
 
@@ -57,7 +83,9 @@ export class ChatterContainer extends Component {
             projectSharingId: this.props.projectSharingId,
             postProcessMessageSent: async () => {
                 this.state.currentPage = 1;
-                await this.fetchMessages();
+                const prom = [this.fetchMessages()];
+                this.state.options.is_follower = true;
+                await Promise.all(prom);
             },
             attachments: this.state.options.default_attachment_ids,
         };
@@ -78,7 +106,7 @@ export class ChatterContainer extends Component {
 
     async initChatter(params) {
         if (params.res_id && params.res_model) {
-            const chatterData = await this.rpc(
+            const chatterData = await rpc(
                 '/mail/chatter_init',
                 params,
             );
@@ -91,13 +119,22 @@ export class ChatterContainer extends Component {
     }
 
     async fetchMessages() {
-        const result = await this.rpc(
+        const result = await rpc(
             '/mail/chatter_fetch',
             this.messagesParams(this.props),
         );
         this.state.messages = this.preprocessMessages(result.messages);
         this.state.options.message_count = result.message_count;
         return result;
+    }
+
+    async toggleIsFollower() {
+        const isFollower = await this.ormService.call(
+            this.props.resModel,
+            "project_sharing_toggle_is_follower",
+            [this.props.resId]
+        );
+        this.state.options.is_follower = isFollower;
     }
 
     messagesParams(props) {
@@ -111,9 +148,6 @@ export class ChatterContainer extends Component {
         };
         if (props.token) {
             params.token = props.token;
-        }
-        if (props.domain) {
-            params.domain = props.domain;
         }
         return params;
     }
@@ -132,28 +166,3 @@ export class ChatterContainer extends Component {
         );
     }
 }
-
-ChatterContainer.components = {
-    ChatterComposer,
-    ChatterMessageCounter,
-    ChatterMessages,
-    ChatterPager,
-};
-
-ChatterContainer.props = {
-    token: { type: String, optional: true },
-    resModel: String,
-    resId: { type: Number, optional: true },
-    pid: { type: String, optional: true },
-    hash: { type: String, optional: true },
-    pagerStart: { type: Number, optional: true },
-    twoColumns: { type: Boolean, optional: true },
-    projectSharingId: Number,
-};
-ChatterContainer.defaultProps = {
-    token: '',
-    pid: '',
-    hash: '',
-    pagerStart: 1,
-};
-ChatterContainer.template = 'project.ChatterContainer';

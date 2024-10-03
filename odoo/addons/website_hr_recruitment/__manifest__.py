@@ -30,6 +30,11 @@
             'website_hr_recruitment/static/src/scss/**/*',
             'website_hr_recruitment/static/src/js/website_hr_applicant_form.js',
         ],
+        'web.assets_backend': [
+            'website_hr_recruitment/static/src/js/widgets/copy_link_menuitem.js',
+            'website_hr_recruitment/static/src/js/widgets/copy_link_menuitem.xml',
+            'website_hr_recruitment/static/src/fields/**/*',
+        ],
         'website.assets_wysiwyg': [
             'website_hr_recruitment/static/src/js/website_hr_recruitment_editor.js',
         ],

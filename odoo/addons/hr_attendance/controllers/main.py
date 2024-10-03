@@ -1,9 +1,9 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+from odoo.service.common import exp_version
 from odoo import http, _
 from odoo.http import request
-from odoo.tools import float_round
+from odoo.tools import float_round, py_to_js_locale, SQL
 from odoo.tools.image import image_data_uri
 
 import datetime
@@ -36,7 +36,7 @@ class HrAttendance(http.Controller):
             response = {
                 **HrAttendance._get_user_attendance_data(employee),
                 'employee_name': employee.name,
-                'employee_avatar': employee.image_256,
+                'employee_avatar': employee.image_256 and image_data_uri(employee.image_256),
                 'total_overtime': float_round(employee.total_overtime, precision_digits=2),
                 'kiosk_delay': employee.company_id.attendance_kiosk_delay * 1000,
                 'attendance': {'check_in': employee.last_attendance_id.check_in,
@@ -61,22 +61,17 @@ class HrAttendance(http.Controller):
             'mode': mode
         }
 
-    @http.route('/hr_attendance/kiosk_mode_menu', auth='user', type='http')
-    def kiosk_menu_item_action(self):
-        # better use route with company_id suffix
-        if request.env.user.user_has_groups("hr_attendance.group_hr_attendance_manager"):
+    @http.route('/hr_attendance/kiosk_mode_menu/<int:company_id>', auth='user', type='http')
+    def kiosk_menu_item_action(self, company_id):
+        if request.env.user.has_group("hr_attendance.group_hr_attendance_manager"):
             # Auto log out will prevent users from forgetting to log out of their session
             # before leaving the kiosk mode open to the public. This is a prevention security
             # measure.
-            request.session.logout(keep_db=True)
-            return request.redirect(request.env.company.attendance_kiosk_url)
+            if self.has_password():
+                request.session.logout(keep_db=True)
+            return request.redirect(request.env['res.company'].browse(company_id).attendance_kiosk_url)
         else:
             return request.not_found()
-
-    @http.route('/hr_attendance/kiosk_mode_menu/<int:company_id>', auth='user', type='http')
-    def kiosk_menu_item_action2(self, company_id):
-        request.update_context(allowed_company_ids=[company_id])
-        return self.kiosk_menu_item_action()
 
     @http.route('/hr_attendance/kiosk_keepalive', auth='user', type='json')
     def kiosk_keepalive(self):
@@ -84,32 +79,26 @@ class HrAttendance(http.Controller):
         return {}
 
     @http.route(["/hr_attendance/<token>"], type='http', auth='public', website=True, sitemap=True)
-    def open_kiosk_mode(self, token):
+    def open_kiosk_mode(self, token, from_trial_mode=False):
         company = self._get_company(token)
         if not company:
             return request.not_found()
         else:
-            employee_list = [{"id": e["id"],
-                              "name": e["name"],
-                              "avatar": image_data_uri(e["avatar_256"]),
-                              "job": e["job_id"][1] if e["job_id"] else False,
-                              "department": {"id": e["department_id"][0] if e["department_id"] else False,
-                                             "name": e["department_id"][1] if e["department_id"] else False
-                                             }
-                              } for e in request.env['hr.employee'].sudo().search_read(domain=[('company_id', '=', company.id)],
-                                                                                       fields=["id",
-                                                                                               "name",
-                                                                                               "avatar_256",
-                                                                                               "job_id",
-                                                                                               "department_id"])]
-            departement_list = [{'id': dep["id"],
+            department_list = [{'id': dep["id"],
                                  'name': dep["name"],
                                  'count': dep["total_employee"]
                                  } for dep in request.env['hr.department'].sudo().search_read(domain=[('company_id', '=', company.id)],
                                                                                               fields=["id",
                                                                                                       "name",
                                                                                                       "total_employee"])]
-            request.session.logout(keep_db=True)
+            has_password = self.has_password()
+            if not from_trial_mode and has_password:
+                request.session.logout(keep_db=True)
+            if (from_trial_mode or not has_password):
+                kiosk_mode = "settings"
+            else:
+                kiosk_mode = company.attendance_kiosk_mode
+            version_info = exp_version()
             return request.render(
                 'hr_attendance.public_kiosk_mode',
                 {
@@ -117,11 +106,12 @@ class HrAttendance(http.Controller):
                         'token': token,
                         'company_id': company.id,
                         'company_name': company.name,
-                        'employees': employee_list,
-                        'departments': departement_list,
-                        'kiosk_mode': company.attendance_kiosk_mode,
+                        'departments': department_list,
+                        'kiosk_mode': kiosk_mode,
+                        'from_trial_mode': from_trial_mode,
                         'barcode_source': company.attendance_barcode_source,
-                        'lang': company.partner_id.lang,
+                        'lang': py_to_js_locale(company.partner_id.lang),
+                        'server_version_info': version_info.get('server_version_info'),
                     },
                 }
             )
@@ -155,6 +145,21 @@ class HrAttendance(http.Controller):
                 return self._get_employee_info_response(employee)
         return {}
 
+    @http.route('/hr_attendance/employees_infos', type="json", auth="public")
+    def employees_infos(self, token, limit, offset, domain):
+        company = self._get_company(token)
+        if company:
+            employees = request.env['hr.employee'].sudo().search_fetch(domain, ['id', 'display_name', 'job_id'],
+                limit=limit, offset=offset, order="name, id")
+            employees_data = [{
+                'id': employee.id,
+                'display_name': employee.display_name,
+                'job_id': employee.job_id.name,
+                'avatar': image_data_uri(employee.avatar_128)
+            } for employee in employees]
+            return {'records': employees_data, 'length': request.env['hr.employee'].sudo().search_count(domain)}
+        return []
+
     @http.route('/hr_attendance/systray_check_in_out', type="json", auth="user")
     def systray_attendance(self, latitude=False, longitude=False):
         employee = request.env.user.employee_id
@@ -168,3 +173,38 @@ class HrAttendance(http.Controller):
     def user_attendance_data(self):
         employee = request.env.user.employee_id
         return self._get_user_attendance_data(employee)
+
+    def has_password(self):
+        # With this method we try to know whether it's the user is on trial mode or not.
+        # We assume that in trial, people have not configured their password yet and their password should be empty.
+        request.env.cr.execute(
+            SQL('''
+                SELECT COUNT(password)
+                  FROM res_users
+                 WHERE id=%(user_id)s
+                   AND password IS NOT NULL
+                 LIMIT 1
+                ''', user_id=request.env.user.id))
+        return bool(request.env.cr.fetchone()[0])
+
+    @http.route('/hr_attendance/is_fresh_db', type="json", auth="public")
+    def is_fresh_db(self, token):
+        company = self._get_company(token)
+        if company:
+            users = request.env['res.users'].sudo().search([])
+            return len(users) == 1 and not users[0].employee_id.barcode
+        return False
+
+    @http.route('/hr_attendance/set_user_barcode', type="json", auth="public")
+    def set_user_barcode(self, token, barcode):
+        company = self._get_company(token)
+        if company and self.is_fresh_db(token):
+            request.env.user.employee_id.barcode = barcode
+            return True
+        return False
+
+    @http.route('/hr_attendance/set_settings', type="json", auth="public")
+    def set_attendance_settings(self, token, mode):
+        company = self._get_company(token)
+        if company:
+            request.env.user.company_id.attendance_kiosk_mode = mode

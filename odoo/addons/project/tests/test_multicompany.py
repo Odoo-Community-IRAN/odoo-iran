@@ -4,7 +4,7 @@
 from contextlib import contextmanager
 from lxml import etree
 
-from odoo.tests.common import TransactionCase, Form
+from odoo.tests import Form, TransactionCase
 from odoo.exceptions import AccessError, UserError
 
 class TestMultiCompanyCommon(TransactionCase):
@@ -221,17 +221,17 @@ class TestMultiCompanyProject(TestMultiCompanyCommon):
             with self.allow_companies([self.company_a.id, self.company_b.id]):
                 self.project_company_a._create_analytic_account()
 
-                self.assertEqual(self.project_company_a.company_id, self.project_company_a.analytic_account_id.company_id, "The analytic account created from a project should be in the same company.")
+                self.assertEqual(self.project_company_a.company_id, self.project_company_a.account_id.company_id, "The analytic account created from a project should be in the same company.")
 
         project_no_company = self.Project.create({'name': 'Project no company'})
         #ensures that all the existing plan have a company_id
         project_no_company._create_analytic_account()
-        self.assertFalse(project_no_company.analytic_account_id.company_id, "The analytic account created from a project without company_id should have its company_id field set to False.")
+        self.assertFalse(project_no_company.account_id.company_id, "The analytic account created from a project without company_id should have its company_id field set to False.")
 
         project_no_company_2 = self.Project.create({'name': 'Project no company 2'})
         project_no_company_2._create_analytic_account()
-        self.assertNotEqual(project_no_company_2.analytic_account_id, project_no_company.analytic_account_id, "The analytic account created should be different from the account created for the 1st project.")
-        self.assertEqual(project_no_company_2.analytic_account_id.plan_id, project_no_company.analytic_account_id.plan_id, "No new analytic should have been created.")
+        self.assertNotEqual(project_no_company_2.account_id, project_no_company.account_id, "The analytic account created should be different from the account created for the 1st project.")
+        self.assertEqual(project_no_company_2.account_id.plan_id, project_no_company.account_id.plan_id, "No new analytic should have been created.")
 
     def test_analytic_account_company_consistency(self):
         """
@@ -241,21 +241,21 @@ class TestMultiCompanyProject(TestMultiCompanyCommon):
         """
         project_no_company = self.Project.create({'name': 'Project no company'})
         project_no_company._create_analytic_account()
-        account_no_company = project_no_company.analytic_account_id
+        account_no_company = project_no_company.account_id
         self.project_company_a._create_analytic_account()
-        account_a = self.project_company_a.analytic_account_id
+        account_a = self.project_company_a.account_id
 
         # Set the account of the project to a new account without company_id
-        self.project_company_a.analytic_account_id = account_no_company
-        self.assertEqual(self.project_company_a.analytic_account_id, account_no_company, "The new account should be set on the project.")
+        self.project_company_a.account_id = account_no_company
+        self.assertEqual(self.project_company_a.account_id, account_no_company, "The new account should be set on the project.")
         self.assertFalse(account_no_company.company_id, "The company of the account should not have been updated.")
-        self.project_company_a.analytic_account_id = account_a
+        self.project_company_a.account_id = account_a
 
         # Set the account of the project to a new account with a company_id
-        project_no_company.analytic_account_id = account_a
+        project_no_company.account_id = account_a
         self.assertEqual(project_no_company.company_id, self.company_a, "The company of the project should have been updated to the company of its new account.")
-        self.assertEqual(project_no_company.analytic_account_id, account_a, "The account of the project should have been updated.")
-        project_no_company.analytic_account_id = account_no_company
+        self.assertEqual(project_no_company.account_id, account_a, "The account of the project should have been updated.")
+        project_no_company.account_id = account_no_company
         project_no_company.company_id = False
 
         # Neither the project nor its account have a company_id
@@ -322,7 +322,7 @@ class TestMultiCompanyProject(TestMultiCompanyCommon):
         self.assertEqual(self.project_company_a.company_id, self.company_b, "The account of the project contains AAL, its company can not be updated.")
         aal.unlink()
 
-        project_no_company.analytic_account_id = account_a
+        project_no_company.account_id = account_a
         self.assertEqual(project_no_company.company_id, account_a.company_id)
         with self.assertRaises(UserError):
             self.project_company_a.company_id = self.company_a
@@ -412,31 +412,56 @@ class TestMultiCompanyProject(TestMultiCompanyCommon):
                 self.assertEqual(task.company_id, self.company_a, "Moving a task should change its company.")
 
     def test_create_subtask(self):
-        with self.sudo('employee-a'):
-            with self.allow_companies([self.company_a.id, self.company_b.id]):
-                # create subtask, set parent; the onchange will set the correct company and subtask project
-                with Form(self.env['project.task'].with_context({'tracking_disable': True, 'default_parent_id': self.task_1.id, 'default_project_id': self.project_company_b.id})) as task_form:
-                    task_form.name = 'Test Subtask in company B'
-                task = task_form.save()
-                self.assertEqual(task.company_id, self.project_company_b.company_id, "The company of the subtask should be the one from its project, and not from its parent.")
+        # 1) Create a subtask and check that every field is correctly set on the subtask
+        with (
+            Form(self.task_1) as task_1_form,
+            task_1_form.child_ids.new() as subtask_line,
+        ):
+            self.assertEqual(subtask_line.project_id, self.task_1.project_id, "The task's project should already be set on the subtask.")
+            subtask_line.name = 'Test Subtask'
+        subtask = self.task_1.child_ids[0]
+        self.assertTrue(subtask.show_display_in_project, "The subtask's field 'display in project' should be visible.")
+        self.assertFalse(subtask.display_in_project, "The subtask's field 'display in project' should be unchecked.")
+        self.assertEqual(subtask.company_id, self.task_1.company_id, "The company of the subtask should be the one from its project.")
 
-                # For `parent_id` to  be visible in the view, you need
-                # 1. The debug mode
-                # <field name="parent_id" groups="base.group_no_one"/>
-                view = self.env.ref('project.view_task_form2').sudo()
-                tree = etree.fromstring(view.arch)
-                for node in tree.xpath('//field[@name="parent_id"][@invisible]'):
-                    node.attrib.pop('invisible')
-                view.arch = etree.tostring(tree)
-                with self.debug_mode():
-                    with Form(self.task_2) as task_form:
-                        task_form.name = 'Test Task 2 becomes child of Task 1 (other company)'
-                        task_form.parent_id = self.task_1
-                        task_form.project_id = self.env['project.project']
-                    task = task_form.save()
+        # 2) Change the project of the parent task and check that the subtask follows it
+        with Form(self.task_1) as task_1_form:
+            task_1_form.project_id = self.project_company_b
+        self.assertEqual(subtask.project_id, self.task_1.project_id, "The task's project should already be set on the subtask.")
+        self.assertTrue(subtask.show_display_in_project, "The subtask's field 'display in project' should be visible.")
+        self.assertFalse(subtask.display_in_project, "The subtask's field 'display in project' should be unchecked.")
+        self.assertEqual(subtask.company_id, self.project_company_b.company_id, "The company of the subtask should be the one from its project.")
+        task_1_form.project_id = self.project_company_a
 
-                self.assertEqual(task.project_id, task.parent_id.project_id, "The subtask should have the same project as its parents")
-                self.assertEqual(task.company_id, task.parent_id.company_id, "The company of the subtask should be the one from its parent when no project is set.")
+        # 3) Change the parent of the subtask and check that every field is correctly set on it
+        # For `parent_id` to  be visible in the view, you need
+        # 1. The debug mode
+        # <field name="parent_id" groups="base.group_no_one"/>
+        view = self.env.ref('project.view_task_form2').sudo()
+        tree = etree.fromstring(view.arch)
+        for node in tree.xpath('//field[@name="parent_id"][@invisible]'):
+            node.attrib.pop('invisible')
+        view.arch = etree.tostring(tree)
+        with (
+            self.debug_mode(),
+            Form(subtask) as subtask_form
+        ):
+            subtask_form.parent_id = self.task_2
+            self.assertEqual(subtask_form.project_id, self.task_2.project_id, "The task's project should already be set on the subtask.")
+            self.assertTrue(subtask.show_display_in_project, "The subtask's field 'display in project' should be visible.")
+            self.assertFalse(subtask.display_in_project, "The subtask's field 'display in project' should be unchecked.")
+        self.assertEqual(subtask.company_id, self.task_2.company_id, "The company of the subtask should be the one from its new project, set from its parent.")
+
+        # 4) Change the project of the subtask and check some fields
+        with (
+            self.debug_mode(),
+            Form(subtask) as subtask_form
+        ):
+            subtask.project_id = self.project_company_a
+            self.assertFalse(subtask.show_display_in_project, "The subtask's field 'display in project' shouldn't be visible.")
+            self.assertTrue(subtask.display_in_project, "The subtask's field 'display in project' should be checked.")
+        self.assertEqual(subtask.company_id, self.project_company_a.company_id, "The company of the subtask should be the one from its project, and not from its parent.")
+
 
     def test_cross_subtask_project(self):
 
@@ -454,12 +479,10 @@ class TestMultiCompanyProject(TestMultiCompanyCommon):
                 with self.debug_mode():
                     with Form(self.env['project.task'].with_context({'tracking_disable': True})) as task_form:
                         task_form.name = 'Test Subtask in company B'
+                        task_form.project_id = self.task_1.project_id
                         task_form.parent_id = self.task_1
-
                     task = task_form.save()
 
-                self.assertEqual(task.project_id, task.parent_id.project_id, "The subtask should have the same project as its parents")
-                self.assertEqual(task.company_id, task.parent_id.company_id, "The company of the subtask should be the one from its parent.")
                 self.assertEqual(self.task_1.child_ids.ids, [task.id])
 
         with self.sudo('employee-a'):

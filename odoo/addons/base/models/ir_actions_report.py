@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
+from ast import literal_eval
+from contextlib import ExitStack
 from markupsafe import Markup
 from urllib.parse import urlparse
 
 from odoo import api, fields, models, tools, SUPERUSER_ID, _
 from odoo.exceptions import UserError, AccessError, RedirectWarning
 from odoo.tools.safe_eval import safe_eval, time
-from odoo.tools.misc import find_in_path, ustr
+from odoo.tools.misc import find_in_path
 from odoo.tools import check_barcode_encoding, config, is_html_empty, parse_version, split_every
 from odoo.http import request
 from odoo.osv.expression import NEGATIVE_TERM_OPERATORS, FALSE_DOMAIN
@@ -63,6 +65,11 @@ except Exception:
 def _get_wkhtmltopdf_bin():
     return find_in_path('wkhtmltopdf')
 
+
+def _get_wkhtmltoimage_bin():
+    return find_in_path('wkhtmltoimage')
+
+
 def _split_table(tree, max_rows):
     """
     Walks through the etree and splits tables with more than max_rows rows into
@@ -113,6 +120,23 @@ else:
         _logger.info('Wkhtmltopdf seems to be broken.')
         wkhtmltopdf_state = 'broken'
 
+wkhtmltoimage_version = None
+try:
+    process = subprocess.Popen(
+        [_get_wkhtmltoimage_bin(), '--version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+except OSError:
+    _logger.info('You need Wkhtmltoimage to generate images from html.')
+else:
+    _logger.info('Will use the Wkhtmltoimage binary at %s', _get_wkhtmltoimage_bin())
+    out, err = process.communicate()
+    match = re.search(b'([0-9.]+)', out)
+    if match:
+        wkhtmltoimage_version = parse_version(match.group(0).decode('ascii'))
+        if config['workers'] == 1:
+            _logger.info('You need to start Odoo with at least two workers to convert images to html.')
+    else:
+        _logger.info('Wkhtmltoimage seems to be broken.')
 
 class IrActionsReport(models.Model):
     _name = 'ir.actions.report'
@@ -149,6 +173,7 @@ class IrActionsReport(models.Model):
                                     help='If enabled, then the second time the user prints with same attachment name, it returns the previous report.')
     attachment = fields.Char(string='Save as Attachment Prefix',
                              help='This is the filename of the attachment used to store the printing result. Keep empty to not save the printed reports. You can use a python expression with the object and time variables.')
+    domain = fields.Char(string='Filter domain', help='If set, the action will only appear on records that matches the domain.')
 
     @api.depends('model')
     def _compute_model_id(self):
@@ -188,6 +213,7 @@ class IrActionsReport(models.Model):
             "context", "data",
             # and this one is used by the frontend later on.
             "close_on_report_download",
+            "domain",
         }
 
     def associated_view(self):
@@ -211,7 +237,7 @@ class IrActionsReport(models.Model):
 
     def unlink_action(self):
         """ Remove the contextual actions created for the reports. """
-        self.check_access_rights('write', raise_exception=True)
+        self.check_access('write')
         self.filtered('binding_model_id').write({'binding_model_id': False})
         return True
 
@@ -249,6 +275,9 @@ class IrActionsReport(models.Model):
 
     def get_paperformat(self):
         return self.paperformat_id or self.env.company.paperformat_id
+
+    def get_paperformat_by_xmlid(self, xml_id):
+        return self.env.ref(xml_id).get_paperformat() if xml_id else self.env.company.paperformat_id
 
     def _get_layout(self):
         return self.env.ref('web.minimal_layout', raise_if_not_found=False)
@@ -391,7 +420,7 @@ class IrActionsReport(models.Model):
                     'subst': False,
                     'body': Markup(lxml.html.tostring(node, encoding='unicode')),
                     'base_url': base_url,
-                    'report_xml_id' : self.xml_id
+                    'report_xml_id': self.xml_id
                 }, raise_if_not_found=False)
             bodies.append(body)
             if node.get('data-oe-model') == report_model:
@@ -413,15 +442,61 @@ class IrActionsReport(models.Model):
         header = self.env['ir.qweb']._render(layout.id, {
             'subst': True,
             'body': Markup(lxml.html.tostring(header_node, encoding='unicode')),
-            'base_url': base_url
+            'base_url': base_url,
+            'report_xml_id': self.xml_id
         })
         footer = self.env['ir.qweb']._render(layout.id, {
             'subst': True,
             'body': Markup(lxml.html.tostring(footer_node, encoding='unicode')),
-            'base_url': base_url
+            'base_url': base_url,
+            'report_xml_id': self.xml_id
         })
 
         return bodies, res_ids, header, footer, specific_paperformat_args
+
+    def _run_wkhtmltoimage(self, bodies, width, height, image_format="jpg"):
+        """
+        :bodies str: valid html documents as strings
+        :param width int: width in pixels
+        :param height int: height in pixels
+        :param image_format union['jpg', 'png']: format of the image
+        :return list[bytes|None]:
+        """
+        if (tools.config['test_enable'] or tools.config['test_file']) and not self.env.context.get('force_image_rendering'):
+            return [None] * len(bodies)
+        if not wkhtmltoimage_version or wkhtmltoimage_version < parse_version('0.12.0'):
+            raise UserError(_('wkhtmltoimage 0.12.0^ is required in order to render images from html'))
+        command_args = [
+            '--disable-local-file-access', '--disable-javascript',
+            '--quiet',
+            '--width', str(width), '--height', str(height),
+            '--format', image_format,
+        ]
+        with ExitStack() as stack:
+            files = []
+            for body in bodies:
+                input_file = stack.enter_context(tempfile.NamedTemporaryFile(suffix='.html', prefix='report_image_html_input.tmp.'))
+                output_file = stack.enter_context(tempfile.NamedTemporaryFile(suffix=f'.{image_format}', prefix='report_image_output.tmp.'))
+                input_file.write(body.encode())
+                files.append((input_file, output_file))
+            output_images = []
+            for input_file, output_file in files:
+                # smaller bodies may be held in a python buffer until close, force flush
+                input_file.flush()
+                wkhtmltoimage = [_get_wkhtmltoimage_bin()] + command_args + [input_file.name, output_file.name]
+                # start and block, no need for parallelism for now
+                completed_process = subprocess.run(wkhtmltoimage, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False)
+                if completed_process.returncode:
+                    message = _(
+                        'Wkhtmltoimage failed (error code: %(error_code)s). Message: %(error_message_end)s',
+                        error_code=completed_process.returncode,
+                        error_message_end=completed_process.stderr[-1000:],
+                    )
+                    _logger.warning(message)
+                    output_images.append(None)
+                else:
+                    output_images.append(output_file.read())
+        return output_images
 
     @api.model
     def _run_wkhtmltopdf(
@@ -509,22 +584,21 @@ class IrActionsReport(models.Model):
 
         try:
             wkhtmltopdf = [_get_wkhtmltopdf_bin()] + command_args + files_command_args + paths + [pdf_report_path]
-            process = subprocess.Popen(wkhtmltopdf, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            out, err = process.communicate()
-            err = ustr(err)
+            process = subprocess.Popen(wkhtmltopdf, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
+            _out, err = process.communicate()
 
             if process.returncode not in [0, 1]:
                 if process.returncode == -11:
                     message = _(
-                        'Wkhtmltopdf failed (error code: %s). Memory limit too low or maximum file number of subprocess reached. Message : %s',
-                        process.returncode,
-                        err[-1000:],
+                        'Wkhtmltopdf failed (error code: %(error_code)s). Memory limit too low or maximum file number of subprocess reached. Message : %(message)s',
+                        error_code=process.returncode,
+                        message=err[-1000:],
                     )
                 else:
                     message = _(
-                        'Wkhtmltopdf failed (error code: %s). Message: %s',
-                        process.returncode,
-                        err[-1000:],
+                        'Wkhtmltopdf failed (error code: %(error_code)s). Message: %(message)s',
+                        error_code=process.returncode,
+                        message=err[-1000:],
                     )
                 _logger.warning(message)
                 raise UserError(message)
@@ -680,20 +754,18 @@ class IrActionsReport(models.Model):
         )
         return view_obj._render_template(template, values).encode()
 
+    def _handle_merge_pdfs_error(self, error=None, error_stream=None):
+        raise UserError(_("Odoo is unable to merge the generated PDFs."))
+
     @api.model
-    def _merge_pdfs(self, streams):
+    def _merge_pdfs(self, streams, handle_error=_handle_merge_pdfs_error):
         writer = PdfFileWriter()
         for stream in streams:
             try:
                 reader = PdfFileReader(stream)
                 writer.appendPagesFromReader(reader)
-            except (PdfReadError, TypeError, NotImplementedError, ValueError):
-                # TODO : make custom_error_handler a parameter in master
-                custom_error_handler = self.env.context.get('custom_error_handler')
-                if custom_error_handler:
-                    custom_error_handler(stream)
-                    continue
-                raise UserError(_("Odoo is unable to merge the generated PDFs."))
+            except (PdfReadError, TypeError, NotImplementedError, ValueError) as e:
+                handle_error(error=e, error_stream=stream)
         result_stream = io.BytesIO()
         streams.append(result_stream)
         writer.write(result_stream)
@@ -765,13 +837,13 @@ class IrActionsReport(models.Model):
 
             html = self.with_context(**additional_context)._render_qweb_html(report_ref, all_res_ids_wo_stream, data=data)[0]
 
-            bodies, html_ids, header, footer, specific_paperformat_args = self.with_context(**additional_context)._prepare_html(html, report_model=report_sudo.model)
+            bodies, html_ids, header, footer, specific_paperformat_args = report_sudo.with_context(**additional_context)._prepare_html(html, report_model=report_sudo.model)
 
             if not has_duplicated_ids and report_sudo.attachment and set(res_ids_wo_stream) != set(html_ids):
                 raise UserError(_(
-                    "The report's template %r is wrong, please contact your administrator. \n\n"
-                    "Can not separate file to save as attachment because the report's template does not contains the"
-                    " attributes 'data-oe-model' and 'data-oe-id' on the div with 'article' classname.",
+                    "Report template “%s” has an issue, please contact your administrator. \n\n"
+                    "Cannot separate file to save as attachment because the report's template does not contain the"
+                    " attributes 'data-oe-model' and 'data-oe-id' as part of the div with 'article' classname.",
                     report_sudo.name,
                 ))
 
@@ -901,7 +973,7 @@ class IrActionsReport(models.Model):
             })
         return attachment_vals_list
 
-    def _render_qweb_pdf(self, report_ref, res_ids=None, data=None):
+    def _pre_render_qweb_pdf(self, report_ref, res_ids=None, data=None):
         if not data:
             data = {}
         if isinstance(res_ids, int):
@@ -913,7 +985,19 @@ class IrActionsReport(models.Model):
             return self._render_qweb_html(report_ref, res_ids, data=data)
 
         self = self.with_context(webp_as_jpg=True)
-        collected_streams = self._render_qweb_pdf_prepare_streams(report_ref, data, res_ids=res_ids)
+        return self._render_qweb_pdf_prepare_streams(report_ref, data, res_ids=res_ids), 'pdf'
+
+    def _render_qweb_pdf(self, report_ref, res_ids=None, data=None):
+        if not data:
+            data = {}
+        if isinstance(res_ids, int):
+            res_ids = [res_ids]
+        data.setdefault('report_type', 'pdf')
+
+        collected_streams, report_type = self._pre_render_qweb_pdf(report_ref, res_ids=res_ids, data=data)
+        if report_type != 'pdf':
+            return collected_streams, report_type
+
         has_duplicated_ids = res_ids and len(res_ids) != len(set(res_ids))
 
         # access the report details with sudo() but keep evaluation context as current user
@@ -931,6 +1015,9 @@ class IrActionsReport(models.Model):
                 else:
                     _logger.info("The PDF documents %r are now saved in the database", attachment_names)
 
+        def custom_handle_merge_pdfs_error(error, error_stream):
+            error_record_ids.append(stream_to_ids[error_stream])
+
         stream_to_ids = {v['stream']: k for k, v in collected_streams.items() if v['stream']}
         # Merge all streams together for a single record.
         streams_to_merge = list(stream_to_ids.keys())
@@ -939,9 +1026,7 @@ class IrActionsReport(models.Model):
         if len(streams_to_merge) == 1:
             pdf_content = streams_to_merge[0].getvalue()
         else:
-            with self.with_context(
-                    custom_error_handler=lambda error_stream: error_record_ids.append(stream_to_ids[error_stream])
-            )._merge_pdfs(streams_to_merge) as pdf_merged_stream:
+            with self._merge_pdfs(streams_to_merge, custom_handle_merge_pdfs_error) as pdf_merged_stream:
                 pdf_content = pdf_merged_stream.getvalue()
 
         if error_record_ids:
@@ -950,7 +1035,7 @@ class IrActionsReport(models.Model):
                 'name': _('Problematic record(s)'),
                 'res_model': report_sudo.model,
                 'domain': [('id', 'in', error_record_ids)],
-                'views': [(False, 'tree'), (False, 'form')],
+                'views': [(False, 'list'), (False, 'form')],
             }
             num_errors = len(error_record_ids)
             if num_errors == 1:
@@ -1056,11 +1141,24 @@ class IrActionsReport(models.Model):
 
         return report_action
 
-    def _action_configure_external_report_layout(self, report_action):
-        action = self.env["ir.actions.actions"]._for_xml_id("web.action_base_document_layout_configurator")
+    def _action_configure_external_report_layout(self, report_action, xml_id="web.action_base_document_layout_configurator"):
+        action = self.env["ir.actions.actions"]._for_xml_id(xml_id)
         py_ctx = json.loads(action.get('context', {}))
         report_action['close_on_report_download'] = True
         py_ctx['report_action'] = report_action
-        py_ctx['dialog_size'] = 'large'
         action['context'] = py_ctx
         return action
+
+    def get_valid_action_reports(self, model, record_ids):
+        """ Return the list of ids of actions for which the domain is
+        satisfied by at least one record in record_ids.
+        :param model: the model of the records to validate
+        :param record_ids: list of ids of records to validate
+        """
+        records = self.env[model].browse(record_ids)
+        actions_with_domain = self.filtered('domain')
+        valid_action_report_ids = (self - actions_with_domain).ids  # actions without domain are always valid
+        for action in actions_with_domain:
+            if records.filtered_domain(literal_eval(action.domain)):
+                valid_action_report_ids.append(action.id)
+        return valid_action_report_ids

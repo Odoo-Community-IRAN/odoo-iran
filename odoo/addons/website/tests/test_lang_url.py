@@ -1,11 +1,9 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import json
 import lxml.html
 from urllib.parse import urlparse
 
-from odoo.addons.http_routing.models.ir_http import url_lang
 from odoo.addons.website.tools import MockRequest
 from odoo.tests import HttpCase, tagged
 
@@ -24,18 +22,18 @@ class TestLangUrl(HttpCase):
 
     def test_01_url_lang(self):
         with MockRequest(self.env, website=self.website):
-            self.assertEqual(url_lang('', '[lang]'), '/[lang]/mockrequest', "`[lang]` is used to be replaced in the url_return after installing a language, it should not be replaced or removed.")
+            self.assertEqual(self.env['ir.http']._url_for('', '[lang]'), '/[lang]/mockrequest', "`[lang]` is used to be replaced in the url_return after installing a language, it should not be replaced or removed.")
 
     def test_02_url_redirect(self):
         url = '/fr_WHATEVER/contactus'
         r = self.url_open(url)
         self.assertEqual(r.status_code, 200)
-        self.assertTrue(r.url.endswith('/fr/contactus'), f"fr_WHATEVER should be forwarded to 'fr_FR' lang as closest match, url: {r.url}")
+        self.assertURLEqual(r.url, '/fr/contactus', f"fr_WHATEVER should be forwarded to 'fr_FR' lang as closest match, url: {r.url}")
 
         url = '/fr_FR/contactus'
         r = self.url_open(url)
         self.assertEqual(r.status_code, 200)
-        self.assertTrue(r.url.endswith('/fr/contactus'), f"lang in url should use url_code ('fr' in this case), url: {r.url}")
+        self.assertURLEqual(r.url, '/fr/contactus', f"lang in url should use url_code ('fr' in this case), url: {r.url}")
 
     def test_03_url_cook_lang_not_available(self):
         """ An activated res.lang should not be displayed in the frontend if not a website lang. """
@@ -55,7 +53,7 @@ class TestLangUrl(HttpCase):
         """
         # 1. Load backend
         self.authenticate('admin', 'admin')
-        r = self.url_open('/web')
+        r = self.url_open('/odoo')
         self.assertEqual(r.status_code, 200)
 
         for line in r.text.splitlines():

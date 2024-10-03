@@ -19,6 +19,7 @@ import requests
 import secrets
 import socket
 import subprocess
+from urllib.parse import parse_qs
 import urllib3
 from threading import Thread, Lock
 import time
@@ -36,9 +37,13 @@ try:
 except ImportError:
     _logger.warning('Could not import library crypt')
 
-#----------------------------------------------------------
-# Helper
-#----------------------------------------------------------
+
+class Orientation(Enum):
+    """xrandr screen orientation for kiosk mode"""
+    NORMAL = 'normal'
+    INVERTED = 'inverted'
+    LEFT = 'left'
+    RIGHT = 'right'
 
 
 class CertificateStatus(Enum):
@@ -126,7 +131,7 @@ def check_certificate():
         _logger.info(message)
         return {"status": CertificateStatus.NEED_REFRESH}
     else:
-        message = _('Your certificate %s is valid until %s', cn, cert_end_date)
+        message = _('Your certificate %(certificate)s is valid until %(end_date)s', certificate=cn, end_date=cert_end_date)
         _logger.info(message)
         return {"status": CertificateStatus.OK, "message": message}
 
@@ -592,47 +597,62 @@ def disconnect_from_server():
         'remote_server': '',
         'token': '',
         'db_uuid': '',
+        'enterprise_code': '',
     })
 
 
-def migrate_old_config_files_to_new_config_file():
-    """Migrate old config files to the new odoo.conf"""
-    if not get_conf().has_section('iot.box'):
-        _logger.info('Migrating old config files to the new odoo.conf')
-        iotbox_version = read_file_first_line('/var/odoo/iotbox_version')
-        db_uuid = read_file_first_line('odoo-db-uuid.conf')
-        enterprise_code = read_file_first_line('odoo-enterprise-code.conf')
-        remote_server = read_file_first_line('odoo-remote-server.conf')
-        token = read_file_first_line('token')
-        subject = read_file_first_line('odoo-subject.conf')
+def save_browser_state(url=None, orientation=None):
+    """
+    Save the browser state to the file
+    :param url: The URL the browser is on (if None, the URL is not saved)
+    :param orientation: The orientation of the screen (if None, the orientation is not saved)
+    """
+    update_conf({
+        'browser-url': url,
+        'screen-orientation': orientation.value if orientation else None,
+    })
 
-        update_conf({
-            'iotbox_version': iotbox_version,
-            'remote_server': remote_server,
-            'token': token,
-            'db_uuid': db_uuid,
-            'enterprise_code': enterprise_code,
-            'subject': subject,
-        })
 
-        if platform.system() == 'Linux':
-            wifi_network_path = path_file('wifi_network.txt')
-            if wifi_network_path.exists():
-                with open(wifi_network_path, encoding="utf-8") as f:
-                    wifi_ssid = f.readline().strip('\n')
-                    wifi_password = f.readline().strip('\n')
-                update_conf({
-                    'wifi_ssid': wifi_ssid,
-                    'wifi_password': wifi_password,
-                })
+def load_browser_state():
+    """
+    Load the browser state from the file
+    :return: The URL the browser is on and the orientation of the screen (default to NORMAL)
+    """
+    url = get_conf('browser-url')
+    orientation = get_conf('screen-orientation') or Orientation.NORMAL
+    return url, Orientation(orientation)
 
-        get_conf.cache_clear()
 
-        _logger.info('Removing old config files')
-        unlink_file('iotbox_version')
-        unlink_file('wifi_network.txt')
-        unlink_file('odoo-db-uuid.conf')
-        unlink_file('odoo-enterprise-code.conf')
-        unlink_file('odoo-remote-server.conf')
-        unlink_file('token')
-        unlink_file('odoo-subject.conf')
+def url_is_valid(url):
+    """
+    Checks whether the provided url is a valid one or not
+    :param url: the URL to check
+    :return: boolean indicating if the URL is valid.
+    """
+    try:
+        result = urllib3.util.parse_url(url.strip())
+        return all([result.scheme in ["http", "https"], result.netloc, result.host != 'localhost'])
+    except urllib3.exceptions.LocationParseError:
+        return False
+
+
+def parse_url(url):
+    """
+    Parses URL params and returns them as a dictionary starting by the url.
+
+    Does not allow multiple params with the same name (e.g. <url>?a=1&a=2 will return the same as <url>?a=1)
+    :param url: the URL to parse
+    :return: the dictionary containing the URL and params
+    """
+    if not url_is_valid(url):
+        raise ValueError("Invalid URL provided.")
+
+    url = urllib3.util.parse_url(url.strip())
+    search_params = {
+        key: value[0]
+        for key, value in parse_qs(url.query, keep_blank_values=True).items()
+    }
+    return {
+        "url": f"{url.scheme}://{url.netloc}",
+        **search_params,
+    }

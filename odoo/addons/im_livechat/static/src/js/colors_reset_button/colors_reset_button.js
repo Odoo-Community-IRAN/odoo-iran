@@ -1,19 +1,18 @@
-/* @odoo-module */
-
 import { registry } from "@web/core/registry";
 import { standardWidgetProps } from "@web/views/widgets/standard_widget_props";
 import { Component } from "@odoo/owl";
 
 export class ColorsResetButton extends Component {
+    static template = `im_livechat.ColorsResetButton`;
+    static props = {
+        ...standardWidgetProps,
+        default_colors: { type: Object },
+    };
+
     onColorsResetButtonClick() {
         this.props.record.update(this.props.default_colors);
     }
 }
-ColorsResetButton.template = `im_livechat.ColorsResetButton`;
-ColorsResetButton.props = {
-    ...standardWidgetProps,
-    default_colors: { type: Object },
-};
 
 export const colorsResetButton = {
     component: ColorsResetButton,

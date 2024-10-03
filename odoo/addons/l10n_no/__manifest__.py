@@ -1,7 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 {
     'name': 'Norway - Accounting',
-    'website': 'https://www.odoo.com/documentation/17.0/applications/finance/fiscal_localizations.html',
+    'website': 'https://www.odoo.com/documentation/master/applications/finance/fiscal_localizations.html',
     'icon': '/account/static/description/l10n.png',
     'countries': ['no'],
     'version': '2.1',
@@ -16,6 +16,7 @@ Updated for Odoo 9 by Bringsvor Consulting AS <www.bringsvor.com>
         'base_vat',
         'account',
     ],
+    'auto_install': ['account'],
     'data': [
         'data/account_tax_report_data.xml',
         'views/res_partner_views.xml',

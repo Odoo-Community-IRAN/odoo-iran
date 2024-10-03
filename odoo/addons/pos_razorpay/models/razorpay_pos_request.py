@@ -29,24 +29,24 @@ class RazorpayPosRequest:
         :return The JSON-formatted content of the response.
         :rtype: dict
         """
-        endpoint = f"{self._razorpay_get_endpoint()}{endpoint}"
-        request_timeout = self.payment_method.env["ir.config_parameter"].sudo().get_param("pos_razorpay.timeout", REQUEST_TIMEOUT)
+        endpoint = f'{self._razorpay_get_endpoint()}{endpoint}'
+        request_timeout = self.payment_method.env['ir.config_parameter'].sudo().get_param('pos_razorpay.timeout', REQUEST_TIMEOUT)
         try:
             response = self.session.post(endpoint, json=payload, timeout=request_timeout)
             response.raise_for_status()
             res_json = response.json()
         except requests.exceptions.RequestException as error:
-            _logger.warning("Cannot connect with Razorpay POS. Error: %s", error)
+            _logger.warning('Cannot connect with Razorpay POS. Error: %s', error)
             return {'errorMessage': str(error)}
         except ValueError as error:
-            _logger.warning("Cannot decode response json. Error: %s", error)
-            return {'errorMessage': _("Cannot decode Razorpay POS response")}
+            _logger.warning('Cannot decode response json. Error: %s', error)
+            return {'errorMessage': _('Cannot decode Razorpay POS response')}
         return res_json
 
     def _razorpay_get_payment_request_body(self, payment_mode=True):
         request_parameters = {
             'pushTo': {
-                "deviceId": f"{self.razorpay_tid}|ezetap_android",
+                'deviceId': f'{self.razorpay_tid}|ezetap_android',
             },
         }
         if payment_mode:

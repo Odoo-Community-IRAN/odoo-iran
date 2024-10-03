@@ -32,50 +32,37 @@ class StockQuant(models.Model):
     def _compute_value(self):
         """ (Product.value_svl / Product.quantity_svl) * quant.quantity, i.e. average unit cost * on hand qty
         """
-        self.fetch(['company_id', 'location_id', 'owner_id', 'product_id', 'quantity'])
+        self.fetch(['company_id', 'location_id', 'owner_id', 'product_id', 'quantity', 'lot_id'])
+        self.value = 0
         for quant in self:
             quant.currency_id = quant.company_id.currency_id
             if not quant.location_id or not quant.product_id or\
                     not quant.location_id._should_be_valued() or\
                     quant._should_exclude_for_valuation() or\
                     float_is_zero(quant.quantity, precision_rounding=quant.product_id.uom_id.rounding):
-                quant.value = 0
                 continue
-            quantity = quant.product_id.with_company(quant.company_id).quantity_svl
+            if quant.product_id.lot_valuated:
+                quantity = quant.lot_id.with_company(quant.company_id).quantity_svl
+                value_svl = quant.lot_id.with_company(quant.company_id).value_svl
+            else:
+                quantity = quant.product_id.with_company(quant.company_id).quantity_svl
+                value_svl = quant.product_id.with_company(quant.company_id).value_svl
             if float_is_zero(quantity, precision_rounding=quant.product_id.uom_id.rounding):
-                quant.value = 0.0
                 continue
-            quant.value = quant.quantity * quant.product_id.with_company(quant.company_id).value_svl / quantity
+            quant.value = quant.quantity * value_svl / quantity
 
-    @api.model
-    def _read_group(self, domain, groupby=(), aggregates=(), having=(), offset=0, limit=None, order=None):
-        """ This override is done in order for the grouped list view to display the total value of
-        the quants inside a location. This doesn't work out of the box because `value` is a computed
-        field.
-        """
-        SPECIAL = {'value:sum'}
-        if SPECIAL.isdisjoint(aggregates):
-            return super()._read_group(domain, groupby, aggregates, having, offset, limit, order)
+    def _read_group_select(self, aggregate_spec, query):
+        # flag value as aggregatable, and manually sum the values from the
+        # records in the group
+        if aggregate_spec == 'value:sum':
+            return super()._read_group_select('id:recordset', query)
+        return super()._read_group_select(aggregate_spec, query)
 
-        base_aggregates = [*(agg for agg in aggregates if agg not in SPECIAL), 'id:recordset']
-        base_result = super()._read_group(domain, groupby, base_aggregates, having, offset, limit, order)
-
-        # base_result = [(a1, b1, records), (a2, b2, records), ...]
-        result = []
-        for *other, records in base_result:
-            for index, spec in enumerate(itertools.chain(groupby, aggregates)):
-                if spec in SPECIAL:
-                    field_name = spec.split(':')[0]
-                    other.insert(index, sum(records.mapped(field_name)))
-            result.append(tuple(other))
-
-        return result
-
-    @api.model
-    def read_group(self, domain, fields, *args, **kwargs):
-        if 'value' in fields:
-            fields = ['value:sum' if f == 'value' else f for f in fields]
-        return super().read_group(domain, fields, *args, **kwargs)
+    def _read_group_postprocess_aggregate(self, aggregate_spec, raw_values):
+        if aggregate_spec == 'value:sum':
+            column = super()._read_group_postprocess_aggregate('id:recordset', raw_values)
+            return (sum(records.mapped('value')) for records in column)
+        return super()._read_group_postprocess_aggregate(aggregate_spec, raw_values)
 
     def _apply_inventory(self):
         for accounting_date, inventory_ids in groupby(self, key=lambda q: q.accounting_date):

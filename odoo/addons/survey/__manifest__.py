@@ -2,7 +2,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 {
     'name': 'Surveys',
-    'version': '3.6',
+    'version': '3.7',
     'category': 'Marketing/Surveys',
     'description': """
 Create beautiful surveys and visualize answers
@@ -25,8 +25,10 @@ sent mails with personal token for the invitation of the survey.
     'data': [
         'report/survey_templates.xml',
         'report/survey_reports.xml',
+        'data/ir_actions_server_data.xml',
         'data/mail_message_subtype_data.xml',
         'data/mail_template_data.xml',
+        'data/survey_tour.xml',
         'security/survey_security.xml',
         'security/ir.model.access.csv',
         'views/survey_menus.xml',
@@ -75,6 +77,8 @@ sent mails with personal token for the invitation of the survey.
             ('include', 'web._assets_frontend_helpers'),
             'web/static/src/scss/pre_variables.scss',
             'web/static/lib/bootstrap/scss/_variables.scss',
+            'web/static/lib/bootstrap/scss/_variables-dark.scss',
+            'web/static/lib/bootstrap/scss/_maps.scss',
             'survey/static/src/scss/survey_templates_form.scss',
             'survey/static/src/scss/survey_templates_results.scss',
             'survey/static/src/xml/survey_breadcrumb_templates.xml',
@@ -106,6 +110,9 @@ sent mails with personal token for the invitation of the survey.
         ],
         'web.qunit_suite_tests': [
             'survey/static/tests/components/*.js',
+        ],
+        'web.assets_unit_tests': [
+            'survey/static/tests/fields/*.test.js',
         ],
         'web.assets_frontend': [
             'survey/static/src/js/tours/survey_tour.js',

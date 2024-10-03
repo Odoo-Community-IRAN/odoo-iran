@@ -51,7 +51,7 @@ class RelocateStockQuant(models.TransientModel):
     @api.depends('dest_package_id_domain')
     def _compute_dest_package_id(self):
         for wizard in self:
-            if wizard.dest_package_id and wizard.dest_package_id not in wizard.dest_package_id.search(literal_eval(wizard.dest_package_id_domain)):
+            if wizard.dest_package_id and not wizard.dest_package_id.search_count([('id', '=', wizard.dest_package_id.id)] + literal_eval(wizard.dest_package_id_domain), limit=1):
                 wizard.dest_package_id = False
 
     def action_relocate_quants(self):
@@ -73,4 +73,4 @@ class RelocateStockQuant(models.TransientModel):
             return lot_ids.action_lot_open_quants()
         elif self.env.context.get('single_product', False) and len(product_ids) == 1:
             return product_ids.action_update_quantity_on_hand()
-        return self.env['ir.actions.server']._for_xml_id(self.env.context.get('action_ref', 'stock.action_view_quants'))
+        return self.quant_ids.with_context(always_show_loc=1).action_view_quants()

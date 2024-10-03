@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
 import { fuzzyLookup } from "@web/core/utils/search";
@@ -8,13 +6,14 @@ import { DefaultCommandItem } from "@web/core/commands/command_palette";
 
 import { Component } from "@odoo/owl";
 
-class AppIconCommand extends Component {}
-AppIconCommand.template = "web.AppIconCommand";
-AppIconCommand.props = {
-    webIconData: { type: String, optional: true },
-    webIcon: { type: Object, optional: true },
-    ...DefaultCommandItem.props,
-};
+class AppIconCommand extends Component {
+    static template = "web.AppIconCommand";
+    static props = {
+        webIconData: { type: String, optional: true },
+        webIcon: { type: Object, optional: true },
+        ...DefaultCommandItem.props,
+    };
+}
 
 const commandCategoryRegistry = registry.category("command_categories");
 commandCategoryRegistry.add("apps", { namespace: "/" }, { sequence: 10 });

@@ -24,7 +24,7 @@
                                     <span class='o_form_label' invisible="active_user_count &lt;= 1">
                                         Active Users
                                     </span>
-                                    <a href="https://www.odoo.com/documentation/17.0/applications/general/users.html" title="Documentation" class="o_doc_link" target="_blank"></a>
+                                    <widget name="documentation_link" path="/applications/general/users.html" icon="fa-question-circle"/>
                                     <br/>
                                     <button name="%(base.action_res_users)d" icon="oi-arrow-right" type="action" string="Manage Users" class="btn-link o_web_settings_access_rights"/>
                                 </setting>
@@ -91,7 +91,7 @@
                                     </div>
                                 </setting>
                                 <field name="company_id" invisible="1"/>
-                                <setting id="inter_company" string="Inter-Company Transactions" company_dependent="1" help="Automatically generate counterpart documents for orders/invoices between companies" groups="base.group_multi_company" title="Configure company rules to automatically create SO/PO when one of your company sells/buys to another of your company.">
+                                <setting id="inter_company" string="Inter-Company Transactions" company_dependent="1" help="Automatically generate counterpart documents in recipient companies" groups="base.group_multi_company" title="Configure company rules to automatically create SO/PO when one of your company sells/buys to another of your company.">
                                     <field name="module_account_inter_company_rules" widget="upgrade_boolean"/>
                                     <div class="content-group" invisible="not module_account_inter_company_rules" id="inter_companies_rules">
                                         <div class="mt16 text-warning"><strong>Save</strong> this page and come back here to set up the feature.</div>
@@ -103,7 +103,9 @@
 
                         <div id="contacts_settings">
                             <block title="Contacts" name="contacts_setting_container">
-                                <setting id="sms" string="Send SMS" documentation="/applications/marketing/sms_marketing/pricing/pricing_and_faq.html" help="Send texts to your contacts" />
+                                <setting id="sms" string="Send SMS" documentation="/applications/marketing/sms_marketing/pricing/pricing_and_faq.html" help="Send texts to your contacts">
+                                    <field name="module_sms"/>
+                                </setting>
                                 <setting help="Automatically enrich your contact base with company data" title="When populating your address book, Odoo provides a list of matching companies. When selecting one item, the company data and logo are auto-filled." id="partner_autocomplete">
                                     <field name="module_partner_autocomplete"/>
                                 </setting>
@@ -111,7 +113,7 @@
                     </div>
 
                     <block title="Permissions" id="user_default_rights">
-                        <setting string="Default Access Rights" help="Set custom access rights for new users" title="By default, new users get highest access rights for all installed apps." id="access_rights">
+                        <setting string="Default Access Rights" help="Set custom access rights for new users" title="By default, new users get highest access rights for all installed apps. If unchecked, new users will only have basic employee access." id="access_rights">
                             <field name="user_default_rights"/>
                             <div class="content-group" invisible="not user_default_rights">
                                 <div class="mt8">
@@ -159,7 +161,7 @@
                                     <div class="mt16 text-warning"><strong>Save</strong> this page and come back here to set up the feature.</div>
                                 </div>
                             </setting>
-                            <setting string="Geo Localization" help="GeoLocalize your partners" id="base_geolocalize">
+                            <setting string="Geolocation" help="Geolocate your partners" id="base_geolocalize">
                                 <field name="module_base_geolocalize"/>
                                 <div class="content-group" invisible="not module_base_geolocalize" name="base_geolocalize_warning">
                                     <div class="mt16 text-warning"><strong>Save</strong> this page and come back here to choose your Geo Provider.</div>
@@ -189,22 +191,7 @@
                         <widget name='res_config_dev_tool'/>
                         <div id='about'>
                             <block title="About" name="about_setting_container">
-                                <setting id='appstore'>
-                                    <div class="d-flex">
-                                        <div>
-                                            <!-- FIXME Those links are defined directly in the template which means that we will have to
-                                            update the template code is the link ever changes -->
-                                            <a class="d-block mx-auto" href="https://play.google.com/store/apps/details?id=com.odoo.mobile" target="blank">
-                                                <img alt="On Google Play" class="d-block mx-auto img img-fluid" src="/base_setup/static/src/img/google_play.png"/>
-                                            </a>
-                                        </div>
-                                        <div>
-                                            <a class='d-block mx-auto' href="https://itunes.apple.com/us/app/odoo/id1272543640" target="blank">
-                                                <img alt="On Apple Store" class="d-block mx-auto img img-fluid" src="/base_setup/static/src/img/app_store.png"/>
-                                            </a>
-                                        </div>
-                                    </div>
-                                </setting>
+                                <widget name="mobile_apps_funnel"/>
                                 <widget name='res_config_edition'/>
                             </block>
                         </div>
@@ -215,6 +202,7 @@
 
         <record id="action_general_configuration" model="ir.actions.act_window">
             <field name="name">Settings</field>
+            <field name="path">settings</field>
             <field name="res_model">res.config.settings</field>
             <field name="view_mode">form</field>
             <field name="target">inline</field>

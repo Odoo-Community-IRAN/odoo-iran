@@ -359,7 +359,6 @@ class TestItEdiDoiRemaining(TestItEdiDoi):
                }).create({
                    'advance_payment_method': 'percentage',
                    'amount': 50,
-                   'deposit_account_id': self.company_data_2['default_account_revenue'].id,
                }).create_invoices()
 
         invoice = order.invoice_ids[0]
@@ -409,7 +408,7 @@ class TestItEdiDoiRemaining(TestItEdiDoi):
         ).reverse_moves()
 
         # The invoice we reversed invoiced more than the sales order amount.
-        credit_note = invoice.reversal_move_id
+        credit_note = invoice.reversal_move_ids
         self.assertEqual(
             credit_note.l10n_it_edi_doi_warning,
             "Pay attention, the threshold of your Declaration of Intent test 2019-threshold 1000 of 1,000.00\xa0€ is exceeded by 2,000.00\xa0€, this document included.\n"

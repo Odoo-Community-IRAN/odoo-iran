@@ -2,7 +2,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo.addons.hr_timesheet.tests.test_timesheet import TestCommonTimesheet
-from odoo.tests.common import Form
+from odoo.tests import Form
 
 
 class TestProjectTaskQuickCreate(TestCommonTimesheet):
@@ -37,9 +37,3 @@ class TestProjectTaskQuickCreate(TestCommonTimesheet):
             task = task_form.save()
             results = (task.name, len(task.tag_ids), len(task.user_ids), task.priority, task.allocated_hours)
             self.assertEqual(results, (expression, 0, 0, '0', 0))
-
-    def test_create_task_and_add_project(self):
-        task_form = Form(self.env['project.task'].with_context({'tracking_disable': True}), view="project.quick_create_task_form")
-        task_form.display_name = 'hello'
-        task_form.project_id = self.project_customer
-        self.assertEqual(task_form.display_name, 'hello')

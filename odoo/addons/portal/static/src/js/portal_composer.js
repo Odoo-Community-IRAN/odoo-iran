@@ -6,7 +6,7 @@ import { renderToElement } from "@web/core/utils/render";
 import publicWidget from "@web/legacy/js/public/public_widget";
 import { post } from "@web/core/network/http_service";
 import { Component } from "@odoo/owl";
-import { RPCError } from "@web/core/network/rpc_service";
+import { rpc, RPCError } from "@web/core/network/rpc";
 
 /**
  * Widget PortalComposer
@@ -35,9 +35,9 @@ var PortalComposer = publicWidget.Widget.extend({
             'token': false,
             'res_model': false,
             'res_id': false,
+            'send_button_label': _t("Send"),
         }, options || {});
         this.attachments = [];
-        this.rpc = this.bindService("rpc");
         this.notification = this.bindService("notification");
     },
     /**
@@ -87,7 +87,7 @@ var PortalComposer = publicWidget.Widget.extend({
 
         this.$sendButton.prop('disabled', true);
 
-        return this.rpc('/portal/attachment/remove', {
+        return rpc('/portal/attachment/remove', {
             'attachment_id': attachmentId,
             'access_token': accessToken,
         }).then(function () {
@@ -98,11 +98,11 @@ var PortalComposer = publicWidget.Widget.extend({
     },
     _prepareAttachmentData: function (file) {
         return {
-            'name': file.name,
-            'file': file,
-            'res_id': this.options.res_id,
-            'res_model': this.options.res_model,
-            'access_token': this.options.token,
+            is_pending: true,
+            thread_id: this.options.res_id,
+            thread_model: this.options.res_model,
+            token: this.options.token,
+            ufile: file,
         };
     },
     /**
@@ -120,7 +120,8 @@ var PortalComposer = publicWidget.Widget.extend({
                 if (odoo.csrf_token) {
                     data.csrf_token = odoo.csrf_token;
                 }
-                post('/portal/attachment/add', data).then(function (attachment) {
+                post('/mail/attachment/upload', data).then(function (res) {
+                    let attachment = res.data["ir.attachment"][0]
                     attachment.state = 'pending';
                     self.attachments.push(attachment);
                     self._updateAttachments();
@@ -148,9 +149,18 @@ var PortalComposer = publicWidget.Widget.extend({
      */
     _prepareMessageData: function () {
         return Object.assign(this.options || {}, {
-            'message': this.$('textarea[name="message"]').val(),
-            attachment_ids: this.attachments.map((a) => a.id),
+            thread_model: this.options.res_model,
+            thread_id: this.options.res_id,
+            post_data: {
+                body: this.$('textarea[name="message"]').val(),
+                attachment_ids: this.attachments.map((a) => a.id),
+                message_type: "comment",
+                subtype_xmlid: "mail.mt_comment",
+            },
             attachment_tokens: this.attachments.map((a) => a.access_token),
+            token: this.options.token,
+            hash: this.options.hash,
+            pid: this.options.pid,
         });
     },
     /**
@@ -199,7 +209,7 @@ var PortalComposer = publicWidget.Widget.extend({
      * @returns {Promise}
      */
     _chatterPostMessage: async function (route) {
-        const result = await this.rpc(route, this._prepareMessageData());
+        const result = await rpc(route, this._prepareMessageData());
         Component.env.bus.trigger('reload_chatter_content', result);
         return result;
     },

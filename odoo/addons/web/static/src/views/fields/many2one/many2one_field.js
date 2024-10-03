@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { browser } from "@web/core/browser/browser";
 import { isMobileOS } from "@web/core/browser/feature_detection";
 import { makeContext } from "@web/core/context";
@@ -8,16 +6,24 @@ import { _t } from "@web/core/l10n/translation";
 import { evaluateBooleanExpr } from "@web/core/py_js/py";
 import { registry } from "@web/core/registry";
 import { useChildRef, useOwnedDialogs, useService } from "@web/core/utils/hooks";
-import { escape } from "@web/core/utils/strings";
+import { escape, sprintf } from "@web/core/utils/strings";
 import { Many2XAutocomplete, useOpenMany2XRecord } from "@web/views/fields/relational_utils";
-import * as BarcodeScanner from "@web/webclient/barcode/barcode_scanner";
+import * as BarcodeScanner from "@web/core/barcode/barcode_dialog";
+import { isBarcodeScannerSupported } from "@web/core/barcode/barcode_video_scanner";
 import { standardFieldProps } from "../standard_field_props";
 
-import { Component, onWillUpdateProps, useState, markup } from "@odoo/owl";
+import { Component, markup, onWillUpdateProps, useState } from "@odoo/owl";
+import { getFieldDomain } from "@web/model/relational_model/utils";
 
 class CreateConfirmationDialog extends Component {
     static template = "web.Many2OneField.CreateConfirmationDialog";
     static components = { Dialog };
+    static props = {
+        name: String,
+        value: String,
+        create: Function,
+        close: Function,
+    };
 
     get title() {
         return _t("New: %s", this.props.name);
@@ -25,11 +31,10 @@ class CreateConfirmationDialog extends Component {
 
     get dialogContent() {
         return markup(
-            _t(
-                "Create <strong>%s</strong> as a new %s?",
-                escape(this.props.value),
-                escape(this.props.name)
-            )
+            sprintf(escape(_t("Create %(value)s as a new %(field)s?")), {
+                value: `<strong>${escape(this.props.value)}</strong>`,
+                field: escape(this.props.name),
+            })
         );
     }
 
@@ -64,7 +69,8 @@ export class Many2OneField extends Component {
         canWrite: { type: Boolean, optional: true },
         canQuickCreate: { type: Boolean, optional: true },
         canCreateEdit: { type: Boolean, optional: true },
-        context: { type: String, optional: true },
+        context: { type: Object, optional: true },
+        openActionContext: { type: String, optional: true },
         domain: { type: [Array, Function], optional: true },
         nameCreateField: { type: String, optional: true },
         searchLimit: { type: Number, optional: true },
@@ -160,6 +166,12 @@ export class Many2OneField extends Component {
     get relation() {
         return this.props.relation || this.props.record.fields[this.props.name].relation;
     }
+    get urlRelation() {
+        if (!this.relation.includes(".")) {
+            return "m-" + this.relation;
+        }
+        return this.relation;
+    }
     get string() {
         return this.props.string || this.props.record.fields[this.props.name].string || "";
     }
@@ -167,11 +179,7 @@ export class Many2OneField extends Component {
         return this.props.canOpen && !!this.value && !this.state.isFloating;
     }
     get context() {
-        const { context, record } = this.props;
-        const evalContext = record.getEvalContext
-            ? record.getEvalContext(false)
-            : record.evalContext;
-        return makeContext([context], evalContext);
+        return this.props.context;
     }
     get classFromDecoration() {
         const evalContext = this.props.record.evalContextWithVirtualIds;
@@ -231,15 +239,16 @@ export class Many2OneField extends Component {
         };
     }
     getDomain() {
-        let domain = this.props.domain;
-        if (typeof domain === "function") {
-            domain = domain();
-        }
-        return domain;
+        return getFieldDomain(this.props.record, this.props.name, this.props.domain);
     }
     async openAction() {
+        const { name, openActionContext, record } = this.props;
+        const context = makeContext(
+            [openActionContext || this.context, record.fields[name].context],
+            record.evalContext
+        );
         const action = await this.orm.call(this.relation, "get_formview_action", [[this.resId]], {
-            context: this.context,
+            context,
         });
         await this.action.doAction(action);
     }
@@ -322,7 +331,7 @@ export class Many2OneField extends Component {
     }
     get hasBarcodeButton() {
         const canScanBarcode = this.props.canScanBarcode;
-        const supported = BarcodeScanner.isBarcodeScannerSupported();
+        const supported = isBarcodeScannerSupported();
         return canScanBarcode && isMobileOS() && supported && !this.hasExternalButton;
     }
 }
@@ -373,7 +382,8 @@ export const many2OneField = {
             canWrite: hasWritePermission,
             canQuickCreate: canCreate && !options.no_quick_create,
             canCreateEdit: canCreate && !options.no_create_edit,
-            context: context,
+            context: dynamicInfo.context,
+            openActionContext: context || "{}",
             decorations,
             domain: dynamicInfo.domain,
             nameCreateField: options.create_name_field,

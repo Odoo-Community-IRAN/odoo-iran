@@ -25,6 +25,7 @@ class Contract(models.Model):
     active = fields.Boolean(default=True)
     structure_type_id = fields.Many2one('hr.payroll.structure.type', string="Salary Structure Type", compute="_compute_structure_type_id", readonly=False, store=True, tracking=True)
     employee_id = fields.Many2one('hr.employee', string='Employee', tracking=True, domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]", index=True)
+    active_employee = fields.Boolean(related="employee_id.active", string="Active Employee")
     department_id = fields.Many2one('hr.department', compute='_compute_employee_contract', store=True, readonly=False,
         domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]", string="Department")
     job_id = fields.Many2one('hr.job', compute='_compute_employee_contract', store=True, readonly=False,
@@ -38,7 +39,7 @@ class Contract(models.Model):
         'resource.calendar', 'Working Schedule', compute='_compute_employee_contract', store=True, readonly=False,
         default=lambda self: self.env.company.resource_calendar_id.id, copy=False, index=True, tracking=True,
         domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]")
-    wage = fields.Monetary('Wage', required=True, tracking=True, help="Employee's monthly gross wage.", group_operator="avg")
+    wage = fields.Monetary('Wage', required=True, tracking=True, help="Employee's monthly gross wage.", aggregator="avg")
     contract_wage = fields.Monetary('Contract Wage', compute='_compute_contract_wage')
     notes = fields.Html('Notes')
     state = fields.Selection([
@@ -46,14 +47,14 @@ class Contract(models.Model):
         ('open', 'Running'),
         ('close', 'Expired'),
         ('cancel', 'Cancelled')
-    ], string='Status', group_expand='_expand_states', copy=False,
+    ], string='Status', group_expand=True, copy=False,
         tracking=True, help='Status of the contract', default='draft')
     company_id = fields.Many2one('res.company', compute='_compute_employee_contract', store=True, readonly=False,
         default=lambda self: self.env.company, required=True)
     company_country_id = fields.Many2one('res.country', string="Company country", related='company_id.country_id', readonly=True)
     country_code = fields.Char(related='company_country_id.code', depends=['company_country_id'], readonly=True)
     contract_type_id = fields.Many2one('hr.contract.type', "Contract Type", tracking=True)
-    contracts_count = fields.Integer(related='employee_id.contracts_count')
+    contracts_count = fields.Integer(related='employee_id.contracts_count', groups="hr_contract.group_hr_contract_employee_manager")
 
     """
         kanban_state:
@@ -62,9 +63,9 @@ class Contract(models.Model):
             * red = Shows a warning on the employees kanban view
     """
     kanban_state = fields.Selection([
-        ('normal', 'Grey'),
-        ('done', 'Green'),
-        ('blocked', 'Red')
+        ('normal', 'Ongoing'),
+        ('done', 'Ready'),
+        ('blocked', 'Warning')
     ], string='Kanban State', default='normal', tracking=True, copy=False)
     currency_id = fields.Many2one(string="Currency", related='company_id.currency_id', readonly=True)
     permit_no = fields.Char('Work Permit No', related="employee_id.permit_no", readonly=False)
@@ -86,9 +87,6 @@ class Contract(models.Model):
     def _get_salary_costs_factor(self):
         self.ensure_one()
         return 12.0
-
-    def _expand_states(self, states, domain, order):
-        return [key for key, val in self._fields['state'].selection]
 
     @api.depends('employee_id')
     def _compute_employee_contract(self):
@@ -113,13 +111,17 @@ class Contract(models.Model):
             return default_structure
 
         for contract in self:
-            if not contract.structure_type_id or contract.structure_type_id.country_id != contract.company_id.country_id:
+            if not contract.structure_type_id or (contract.structure_type_id.country_id and contract.structure_type_id.country_id != contract.company_id.country_id):
                 contract.structure_type_id = _default_salary_structure(contract.company_id.country_id.id)
 
     @api.onchange('structure_type_id')
     def _onchange_structure_type_id(self):
         default_calendar = self.structure_type_id.default_resource_calendar_id
         if default_calendar and default_calendar.company_id == self.company_id:
+            # If the form was opened from the action_open_contract action,
+            # suggest current employee's calendar for the new contract instead of the default_calendar.
+            if self.env.context.get('from_action_open_contract'):
+                return
             self.resource_calendar_id = default_calendar
 
     @api.constrains('employee_id', 'state', 'kanban_state', 'date_start', 'date_end')
@@ -161,15 +163,6 @@ class Contract(models.Model):
                     'Contract %(contract)s: start date (%(start)s) must be earlier than contract end date (%(end)s).',
                     contract=contract.name, start=contract.date_start, end=contract.date_end,
                 ))
-
-    def _get_employee_vals_to_update(self):
-        self.ensure_one()
-        vals = {'contract_id': self.id}
-        if self.job_id and self.job_id != self.employee_id.job_id:
-            vals['job_id'] = self.job_id.id
-        if self.department_id:
-            vals['department_id'] = self.department_id.id
-        return vals
 
     @api.model
     def update_state(self):
@@ -272,6 +265,15 @@ class Contract(models.Model):
         else:
             self.write(vals)
 
+    def _get_employee_vals_to_update(self):
+        self.ensure_one()
+        vals = {'contract_id': self.id}
+        if self.job_id and self.job_id != self.employee_id.job_id:
+            vals['job_id'] = self.job_id.id
+        if self.department_id:
+            vals['department_id'] = self.department_id.id
+        return vals
+
     def _assign_open_contract(self):
         for contract in self:
             vals = contract._get_employee_vals_to_update()
@@ -291,6 +293,11 @@ class Contract(models.Model):
     def _get_contract_wage_field(self):
         self.ensure_one()
         return 'wage'
+
+    def _is_fully_flexible(self):
+        """ return True if contract has a fully flexible working calendar """
+        self.ensure_one()
+        return not self.resource_calendar_id
 
     def write(self, vals):
         old_state = {c.id: c.state for c in self}
@@ -318,13 +325,11 @@ class Contract(models.Model):
             for contract in self.filtered(lambda c: c.state == 'open'):
                 contract.state = 'close'
 
-        calendar = vals.get('resource_calendar_id')
-        if calendar:
+        if 'resource_calendar_id' in vals:
+            calendar = vals['resource_calendar_id']
             self.filtered(
                 lambda c: c.state == 'open' or (c.state == 'draft' and c.kanban_state == 'done' and c.employee_id.contracts_count == 1)
-            ).mapped('employee_id').filtered(
-                lambda e: e.resource_calendar_id
-            ).write({'resource_calendar_id': calendar})
+            ).employee_id.resource_calendar_id = calendar
 
         if 'state' in vals and 'kanban_state' not in vals:
             self.write({'kanban_state': 'normal'})
@@ -339,7 +344,7 @@ class Contract(models.Model):
             lambda c: c.state == 'open' or (c.state == 'draft' and c.kanban_state == 'done' and c.employee_id.contracts_count == 1)
         )
         # sync contract calendar -> calendar employee
-        for contract in open_contracts.filtered(lambda c: c.employee_id and c.resource_calendar_id):
+        for contract in open_contracts.filtered(lambda c: c.employee_id):
             contract.employee_id.resource_calendar_id = contract.resource_calendar_id
         return contracts
 

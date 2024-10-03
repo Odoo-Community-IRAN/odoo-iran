@@ -25,7 +25,7 @@ patch(ReorderDialog.prototype, {
 
     stockCheckCombinationInfo(product) {
         // Products that should have a max quantity available should be limited by default.
-        if (product.combinationInfo.allow_out_of_stock_order || product.type !== "product") {
+        if (product.combinationInfo.allow_out_of_stock_order || ! product.is_storable) {
             return;
         }
         product.max_quantity_available = product.combinationInfo.free_qty;
@@ -34,9 +34,11 @@ patch(ReorderDialog.prototype, {
         }
         if (product.max_quantity_available < product.qty) {
             product.qty_warning = _t(
-                "You ask for %s Units but only %s are available.",
-                product.qty.toFixed(1),
-                product.max_quantity_available.toFixed(1)
+                "You ask for %(quantity1)s Units but only %(quantity2)s are available.",
+                {
+                    quantity1: product.qty.toFixed(1),
+                    quantity2: product.max_quantity_available.toFixed(1),
+                }
             );
             product.qty = product.max_quantity_available;
             product.stock_warning = true;
@@ -64,9 +66,11 @@ patch(ReorderDialog.prototype, {
     changeProductQty(product, newQty) {
         if (product.max_quantity_available && newQty > product.max_quantity_available) {
             product.qty_warning = _t(
-                "You ask for %s Units but only %s are available.",
-                newQty.toFixed(1),
-                product.max_quantity_available.toFixed(1)
+                "You ask for %(quantity1)s Units but only %(quantity2)s are available.",
+                {
+                    quantity1: newQty.toFixed(1),
+                    quantity2: product.max_quantity_available.toFixed(1),
+                }
             );
             product.stock_warning = true;
             newQty = product.max_quantity_available;

@@ -1,22 +1,26 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from datetime import datetime, timedelta
-
-from odoo import fields, models, api
-
-class WebsiteTrack(models.Model):
-    _inherit = 'website.track'
-
-    product_id = fields.Many2one('product.product', ondelete='cascade', readonly=True, index='btree_not_null')
+from odoo import api, fields, models
 
 
 class WebsiteVisitor(models.Model):
     _inherit = 'website.visitor'
 
-    visitor_product_count = fields.Integer('Product Views', compute="_compute_product_statistics", help="Total number of views on products")
-    product_ids = fields.Many2many('product.product', string="Visited Products", compute="_compute_product_statistics")
-    product_count = fields.Integer('Products Views', compute="_compute_product_statistics", help="Total number of product viewed")
+    visitor_product_count = fields.Integer(
+        string="Product Views",
+        help="Total number of views on products",
+        compute='_compute_product_statistics',
+    )
+    product_ids = fields.Many2many(
+        string="Visited Products",
+        comodel_name='product.product',
+        compute='_compute_product_statistics',
+    )
+    product_count = fields.Integer(
+        string='Products Views',
+        help="Total number of product viewed",
+        compute='_compute_product_statistics',
+    )
 
     @api.depends('website_track_ids')
     def _compute_product_statistics(self):

@@ -5,7 +5,7 @@ import logging
 from lxml import etree
 from freezegun import freeze_time
 from odoo import tools
-from odoo.tests import tagged, Form
+from odoo.tests import Form, tagged
 from odoo.addons.l10n_it_edi.tests.common import TestItEdi
 
 _logger = logging.getLogger(__name__)
@@ -91,13 +91,6 @@ class TestItEdiDDT(TestItEdi):
                 'supplier_taxes_id': [(6, 0, [])],
             }
         ])
-
-    @classmethod
-    def setup_company_data(cls, company_name, **kwargs):
-        return super().setup_company_data(company_name, **{
-            **kwargs,
-            'country_id': cls.env.ref('base.it').id,
-        })
 
     def test_deferred_invoice(self):
         """ Create a sale order with multiple DDTs, and create an invoice with a later date.

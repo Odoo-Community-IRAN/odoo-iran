@@ -6,7 +6,7 @@ from odoo import models, fields, _
 class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
-    has_work_entries = fields.Boolean(compute='_compute_has_work_entries')
+    has_work_entries = fields.Boolean(compute='_compute_has_work_entries', groups="base.group_system,hr.group_hr_user")
 
     def _compute_has_work_entries(self):
         self.env.cr.execute("""
@@ -28,7 +28,7 @@ class HrEmployee(models.Model):
         return {
             'type': 'ir.actions.act_window',
             'name': _('%s work entries', self.display_name),
-            'view_mode': 'calendar,tree,form',
+            'view_mode': 'calendar,list,form',
             'res_model': 'hr.work.entry',
             'context': ctx,
             'domain': [('employee_id', '=', self.id)],

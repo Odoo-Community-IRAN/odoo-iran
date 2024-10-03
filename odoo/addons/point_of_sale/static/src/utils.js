@@ -1,4 +1,4 @@
-/** @odoo-module */
+import { parseDateTime } from "@web/core/l10n/dates";
 
 /*
  * comes from o_spreadsheet.js
@@ -29,27 +29,30 @@ export function deduceUrl(url) {
     }
     return url;
 }
-export function constructFullProductName(line, attribute_value_by_id, display_name) {
+
+export function constructFullProductName(line) {
     let attributeString = "";
+
     if (line.attribute_value_ids && line.attribute_value_ids.length > 0) {
-        for (const valId of line.attribute_value_ids) {
-            const value = attribute_value_by_id[valId];
+        for (const value of line.attribute_value_ids) {
             if (value.is_custom) {
                 const customValue = line.custom_attribute_value_ids.find(
-                    (cus) => cus.custom_product_template_attribute_value_id == parseInt(valId)
+                    (cus) =>
+                        cus.custom_product_template_attribute_value_id?.id == parseInt(value.id)
                 );
-                attributeString += customValue
-                    ? `${value.name}: ${customValue.custom_value}, `
-                    : `${value.name}, `;
+                if (customValue) {
+                    attributeString += `${value.attribute_id.name}: ${customValue.custom_value}, `;
+                }
             } else {
                 attributeString += `${value.name}, `;
             }
         }
+
         attributeString = attributeString.slice(0, -2);
-        attributeString = `(${attributeString})`;
+        attributeString = ` (${attributeString})`;
     }
 
-    return attributeString !== "" ? `${display_name} ${attributeString}` : display_name;
+    return `${line?.product_id?.display_name}${attributeString}`;
 }
 /**
  * Returns a random 5 digits alphanumeric code
@@ -65,6 +68,27 @@ export function random5Chars() {
 
 export function qrCodeSrc(url, { size = 200 } = {}) {
     return `/report/barcode/QR/${encodeURIComponent(url)}?width=${size}&height=${size}`;
+}
+
+/**
+ * @template T
+ * @param {T[]} entries - The array of objects to search through.
+ * @param {Function} [criterion=(x) => x] - A function that returns a number for each entry. The entry with the highest value of this function will be returned. If not provided, defaults to an identity function that returns the entry itself.
+ * @param {boolean} [inverted=false] - If true, the entry with the lowest value of the criterion function will be returned instead.
+ * @returns {T} The entry with the highest or lowest value of the criterion function, depending on the value of `inverted`.
+ */
+export function getMax(entries, { criterion = (x) => x, inverted = false } = {}) {
+    return entries.reduce((prev, current) => {
+        const res = criterion(prev) > criterion(current);
+        return (inverted ? !res : res) ? prev : current;
+    });
+}
+export function getMin(entries, options) {
+    return getMax(entries, { ...options, inverted: true });
+}
+export function getOnNotified(bus, channel) {
+    bus.addChannel(channel);
+    return (notif, callback) => bus.subscribe(`${channel}-${notif}`, callback);
 }
 
 /**
@@ -93,6 +117,13 @@ export function loadImage(url, options = {}) {
  * @param {HTMLElement} el
  */
 export function loadAllImages(el) {
+    if (!el) {
+        return Promise.resolve();
+    }
+
     const images = el.querySelectorAll("img");
-    return Promise.all(Array.from(images).map(img => loadImage(img.src)));
+    return Promise.all(Array.from(images).map((img) => loadImage(img.src)));
+}
+export function parseUTCString(utcStr) {
+    return parseDateTime(utcStr, { format: "yyyy-MM-dd HH:mm:ss", tz: "utc" });
 }

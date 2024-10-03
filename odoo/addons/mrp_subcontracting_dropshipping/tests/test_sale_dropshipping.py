@@ -98,7 +98,7 @@ class TestSaleDropshippingFlows(TestMrpSubcontractingCommon):
             ],
         })
         sale_order.action_confirm()
-        self.env['purchase.order'].search([], order='id desc', limit=1).button_confirm()
+        sale_order._get_purchase_orders().button_confirm()
         self.assertEqual(sale_order.order_line.qty_delivered, 0.0)
 
         picking = sale_order.picking_ids
@@ -109,8 +109,10 @@ class TestSaleDropshippingFlows(TestMrpSubcontractingCommon):
             delivered_before_case = 1.0 if case == 'return' else 0.0
             delivered_after_case = 0.0 if case == 'return' else 1.0
             return_form = Form(self.env['stock.return.picking'].with_context(active_ids=[picking.id], active_id=picking.id, active_model='stock.picking'))
+            with return_form.product_return_moves.edit(0) as line_form:
+                line_form.quantity = 1.0
             return_wizard = return_form.save()
-            action = return_wizard.create_returns()
+            action = return_wizard.action_create_returns()
             picking = self.env['stock.picking'].browse(action['res_id'])
             self.assertEqual(sale_order.order_line.qty_delivered, delivered_before_case, "Incorrect delivered qty for case '%s'" % case)
 
@@ -154,22 +156,20 @@ class TestSaleDropshippingFlows(TestMrpSubcontractingCommon):
             ],
         })
         sale_order.action_confirm()
-        self.env['purchase.order'].search([], order='id desc', limit=1).button_confirm()
+        sale_order._get_purchase_orders().button_confirm()
         self.assertEqual(sale_order.order_line.qty_delivered, 0.0, "Delivered components: 0/4")
 
         picking01 = sale_order.picking_ids
         picking01.move_ids.quantity = 2
         picking01.move_ids.picked = True
-        action = picking01.button_validate()
-        wizard = Form(self.env[action['res_model']].with_context(action['context'])).save()
-        wizard.process()
+        Form.from_action(self.env, picking01.button_validate()).save().process()
         self.assertEqual(sale_order.order_line.qty_delivered, 0.0, "Delivered components: 2/4")
 
         # Create a return of picking01 (with both components)
         return_form = Form(self.env['stock.return.picking'].with_context(active_id=picking01.id, active_model='stock.picking'))
         wizard = return_form.save()
         wizard.product_return_moves.write({'quantity': 2.0})
-        res = wizard.create_returns()
+        res = wizard.action_create_returns()
         return01 = self.env['stock.picking'].browse(res['res_id'])
 
         return01.move_ids.quantity = 2
@@ -180,9 +180,7 @@ class TestSaleDropshippingFlows(TestMrpSubcontractingCommon):
         picking02 = picking01.backorder_ids
         picking02.move_ids.quantity = 1
         picking02.move_ids.picked = True
-        action = picking02.button_validate()
-        wizard = Form(self.env[action['res_model']].with_context(action['context'])).save()
-        wizard.process()
+        Form.from_action(self.env, picking02.button_validate()).save().process()
         self.assertEqual(sale_order.order_line.qty_delivered, 0.0, "Delivered components: 1/4")
 
         picking03 = picking02.backorder_ids
@@ -195,7 +193,7 @@ class TestSaleDropshippingFlows(TestMrpSubcontractingCommon):
         return_form = Form(self.env['stock.return.picking'].with_context(active_id=return01.id, active_model='stock.picking'))
         wizard = return_form.save()
         wizard.product_return_moves.write({'quantity': 1.0})
-        res = wizard.create_returns()
+        res = wizard.action_create_returns()
         picking04 = self.env['stock.picking'].browse(res['res_id'])
 
         picking04.move_ids.quantity = 1
@@ -207,7 +205,7 @@ class TestSaleDropshippingFlows(TestMrpSubcontractingCommon):
         return_form = Form(self.env['stock.return.picking'].with_context(active_id=return01.id, active_model='stock.picking'))
         wizard = return_form.save()
         wizard.product_return_moves.write({'quantity': 1.0})
-        res = wizard.create_returns()
+        res = wizard.action_create_returns()
         picking04 = self.env['stock.picking'].browse(res['res_id'])
 
         picking04.move_ids.quantity = 1

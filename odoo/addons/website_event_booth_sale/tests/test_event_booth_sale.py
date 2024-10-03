@@ -27,7 +27,8 @@ class TestWebsiteEventBoothSale(HttpCaseWithUserPortal, TestWebsiteEventSaleComm
             'list_price': 20,
             'standard_price': 60.0,
             'taxes_id': [(6, 0, [cls.tax.id])],
-            'detailed_type': 'event_booth',
+            'type': 'service',
+            'service_tracking': 'event_booth',
         })
         cls.event_booth_category = cls.env['event.booth.category'].create({
             'name': 'Standard',
@@ -84,4 +85,4 @@ class TestWebsiteEventBoothSale(HttpCaseWithUserPortal, TestWebsiteEventSaleComm
             'state_id': self.env.ref('base.state_us_39').id,
             'phone': '+1 555-555-5555',
         })
-        self.start_tour("/web", 'event_booth_sale_pricelists_different_currencies', login='admin')
+        self.start_tour("/odoo", 'event_booth_sale_pricelists_different_currencies', login='admin')

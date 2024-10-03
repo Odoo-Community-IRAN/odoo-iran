@@ -1,6 +1,6 @@
-# -*- coding: utf-8 -*-
+import re
 
-from odoo import fields, models
+from odoo import api, fields, models, _
 
 
 class AccountAnalyticDistributionModel(models.Model):
@@ -23,7 +23,45 @@ class AccountAnalyticDistributionModel(models.Model):
         ondelete='cascade',
         help="Select a product category which will use analytic account specified in analytic default (e.g. create new customer invoice or Sales order if we select this product, it will automatically take this as an analytic account)",
     )
+    prefix_placeholder = fields.Char(compute='_compute_prefix_placeholder')
+
+    def _get_default_search_domain_vals(self):
+        return super()._get_default_search_domain_vals() | {
+            'product_id': False,
+            'product_categ_id': False,
+        }
+
+    def _get_applicable_models(self, vals):
+        applicable_models = super()._get_applicable_models(vals)
+
+        # Regex pattern to split by either ';' or ','
+        delimiter_pattern = re.compile(r'[;,]\s*')
+
+        return applicable_models.filtered(
+            lambda model:
+            not model.account_prefix or
+            any((vals.get('account_prefix') or '').startswith(prefix) for prefix in delimiter_pattern.split(model.account_prefix))
+        )
 
     def _create_domain(self, fname, value):
-        if not fname == 'account_prefix':
-            return super()._create_domain(fname, value)
+        if fname == 'account_prefix':
+            return []
+        return super()._create_domain(fname, value)
+
+    # To be able to see the placeholder when creating a record in the list view, need to depends on a field that has a
+    # value directly, analytic precision has a default.
+    @api.depends('analytic_precision')
+    def _compute_prefix_placeholder(self):
+        expense_account = self.env['account.account'].search([('account_type', '=', 'expense')], limit=1)
+        for model in self:
+            account_prefixes = "60, 61, 62"
+            if expense_account:
+                prefix_base = expense_account.code[:2]
+                try:
+                    # Convert prefix_base to an integer for numerical manipulation
+                    prefix_num = int(prefix_base)
+                    account_prefixes = f"{prefix_num}, {prefix_num + 1}, {prefix_num + 2}"
+                except ValueError:
+                    pass
+
+            model.prefix_placeholder = _("e.g. %(prefix)s", prefix=account_prefixes)

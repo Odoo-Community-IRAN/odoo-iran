@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo import api, fields, models
+from odoo import fields, models
 
 
 class ResPartner(models.Model):
@@ -54,12 +54,13 @@ class ResPartner(models.Model):
             search_operator = 'not in'
         return [('id', search_operator, subcontractor_ids)]
 
-    @api.depends_context('uid')
     def _compute_is_subcontractor(self):
-        """ Check if the user is a subcontractor before giving sudo access
-        """
+        """ Determine whether the partner is a subcontractor (for giving sudo access) """
         for partner in self:
-            partner.is_subcontractor = (partner.user_has_groups('base.group_portal') and partner.env['mrp.bom'].search_count([
-                ('type', '=', 'subcontract'),
-                ('subcontractor_ids', 'in', (partner.env.user.partner_id | partner.env.user.partner_id.commercial_partner_id).ids),
-            ]))
+            partner.is_subcontractor = (
+                any(user._is_portal() for user in partner.user_ids)
+                and partner.env['mrp.bom'].search_count([
+                    ('type', '=', 'subcontract'),
+                    ('subcontractor_ids', 'in', (partner | partner.commercial_partner_id).ids),
+                ], limit=1)
+            )

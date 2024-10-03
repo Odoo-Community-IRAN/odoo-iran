@@ -14,7 +14,6 @@ class AccountAnalyticAccount(models.Model):
     _description = 'Analytic Account'
     _order = 'plan_id, name asc'
     _check_company_auto = True
-    _check_company_domain = models.check_company_domain_parent_of
     _rec_names_search = ['name', 'code']
 
     name = fields.Char(
@@ -111,29 +110,31 @@ class AccountAnalyticAccount(models.Model):
 
     def copy_data(self, default=None):
         default = dict(default or {})
-        default.setdefault('name', _("%s (copy)", self.name))
-        return super().copy_data(default)
+        vals_list = super().copy_data(default=default)
+        if 'name' not in default:
+            for account, vals in zip(self, vals_list):
+                vals['name'] = _("%s (copy)", account.name)
+        return vals_list
 
-    @api.model
-    def _read_group(self, domain, groupby=(), aggregates=(), having=(), offset=0, limit=None, order=None):
-        """ Override _read_group to aggregate no-store compute: balance/debit/credit """
-        SPECIAL = {'balance:sum', 'debit:sum', 'credit:sum'}
-        if SPECIAL.isdisjoint(aggregates):
-            return super()._read_group(domain, groupby, aggregates, having, offset, limit, order)
+    def web_read(self, specification: dict[str, dict]) -> list[dict]:
+        self_context = self
+        if len(self) == 1:
+            self_context = self.with_context(analytic_plan_id=self.plan_id.id)
+        return super(AccountAnalyticAccount, self_context).web_read(specification)
 
-        base_aggregates = [*(agg for agg in aggregates if agg not in SPECIAL), 'id:recordset']
-        base_result = super()._read_group(domain, groupby, base_aggregates, having, offset, limit, order)
+    def _read_group_select(self, aggregate_spec, query):
+        # flag balance/debit/credit as aggregatable, and manually sum the values
+        # from the records in the group
+        if aggregate_spec in ('balance:sum', 'debit:sum', 'credit:sum'):
+            return super()._read_group_select('id:recordset', query)
+        return super()._read_group_select(aggregate_spec, query)
 
-        # base_result = [(a1, b1, records), (a2, b2, records), ...]
-        result = []
-        for *other, records in base_result:
-            for index, spec in enumerate(itertools.chain(groupby, aggregates)):
-                if spec in SPECIAL:
-                    field_name = spec.split(':')[0]
-                    other.insert(index, sum(records.mapped(field_name)))
-            result.append(tuple(other))
-
-        return result
+    def _read_group_postprocess_aggregate(self, aggregate_spec, raw_values):
+        if aggregate_spec in ('balance:sum', 'debit:sum', 'credit:sum'):
+            field_name = aggregate_spec.split(':')[0]
+            column = super()._read_group_postprocess_aggregate('id:recordset', raw_values)
+            return (sum(records.mapped(field_name)) for records in column)
+        return super()._read_group_postprocess_aggregate(aggregate_spec, raw_values)
 
     @api.depends('line_ids.amount')
     def _compute_debit_credit_balance(self):

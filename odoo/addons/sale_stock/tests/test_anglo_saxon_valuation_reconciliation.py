@@ -7,8 +7,9 @@ from odoo.tests import Form, tagged
 class TestValuationReconciliationCommon(ValuationReconciliationTestCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref=None):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.other_currency = cls.setup_other_currency('EUR')
 
         # Set the invoice_policy to delivery to have an accurate COGS entry.
         cls.test_product_delivery.invoice_policy = 'delivery'
@@ -16,7 +17,7 @@ class TestValuationReconciliationCommon(ValuationReconciliationTestCommon):
     def _create_sale(self, product, date, quantity=1.0):
         rslt = self.env['sale.order'].create({
             'partner_id': self.partner_a.id,
-            'currency_id': self.currency_data['currency'].id,
+            'currency_id': self.other_currency.id,
             'order_line': [
                 (0, 0, {
                     'name': product.name,
@@ -33,7 +34,7 @@ class TestValuationReconciliationCommon(ValuationReconciliationTestCommon):
     def _create_invoice_for_so(self, sale_order, product, date, quantity=1.0):
         rslt = self.env['account.move'].create({
             'partner_id': self.partner_a.id,
-            'currency_id': self.currency_data['currency'].id,
+            'currency_id': self.other_currency.id,
             'move_type': 'out_invoice',
             'invoice_date': date,
             'invoice_line_ids': [(0, 0, {
@@ -109,7 +110,7 @@ class TestValuationReconciliation(TestValuationReconciliationCommon):
             active_model='stock.picking'))
         stock_return_picking = stock_return_picking_form.save()
         stock_return_picking.product_return_moves.quantity = 1.0
-        stock_return_picking_action = stock_return_picking.create_returns()
+        stock_return_picking_action = stock_return_picking.action_create_returns()
         return_pick = self.env['stock.picking'].browse(stock_return_picking_action['res_id'])
         return_pick.action_assign()
         return_pick.move_ids.write({'quantity': 1, 'picked': True})
@@ -120,9 +121,9 @@ class TestValuationReconciliation(TestValuationReconciliationCommon):
         })
         new_invoice = self.env['account.move'].browse(refund_invoice_wiz.modify_moves()['res_id'])
         self.assertEqual(invoice.payment_state, 'reversed', "Invoice should be in 'reversed' state.")
-        self.assertEqual(invoice.reversal_move_id.payment_state, 'paid', "Refund should be in 'paid' state.")
+        self.assertEqual(invoice.reversal_move_ids.payment_state, 'paid', "Refund should be in 'paid' state.")
         self.assertEqual(new_invoice.state, 'draft', "New invoice should be in 'draft' state.")
-        self.check_reconciliation(invoice.reversal_move_id, return_pick, operation='sale')
+        self.check_reconciliation(invoice.reversal_move_ids, return_pick, operation='sale')
 
     def test_multiple_shipments_invoices(self):
         """ Tests the case into which we deliver part of the goods first, then 2 invoices at different rates, and finally the remaining quantities
@@ -158,10 +159,9 @@ class TestValuationReconciliation(TestValuationReconciliationCommon):
         in_type = wh.in_type_id
         product_1, product_2, = tuple(self.env['product.product'].create([{
             'name': f'P{i}',
-            # 'categ_id': fifo_categ.id,
             'list_price': 10 * i,
             'standard_price': 10 * i,
-            'type': 'product'
+            'is_storable': True,
         } for i in range(1, 3)]))
         product_1.categ_id.property_valuation = 'real_time'
         product_1.categ_id.property_cost_method = 'fifo'
@@ -173,7 +173,7 @@ class TestValuationReconciliation(TestValuationReconciliationCommon):
         # Create out_svls
         so = self.env['sale.order'].create({
             'partner_id': self.partner_a.id,
-            'currency_id': self.currency_data['currency'].id,
+            'currency_id': self.other_currency.id,
             'order_line': [
                 (0, 0, {
                     'name': product.name,
@@ -191,7 +191,7 @@ class TestValuationReconciliation(TestValuationReconciliationCommon):
         self.assertEqual(so.picking_ids.state, 'done')
         inv = self.env['account.move'].create({
             'partner_id': self.partner_a.id,
-            'currency_id': self.currency_data['currency'].id,
+            'currency_id': self.other_currency.id,
             'move_type': 'out_invoice',
             'invoice_date': '2021-01-10',
             'invoice_line_ids': [(0, 0, {

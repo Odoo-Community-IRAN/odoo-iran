@@ -22,4 +22,7 @@ from . import test_negative
 from . import test_past_accruals
 from . import test_allocations
 from . import test_multicompany
+from . import test_timeoff_event
+from . import test_working_hours
 from . import test_dashboard
+from . import test_expiring_leaves

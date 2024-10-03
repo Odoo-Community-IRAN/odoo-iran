@@ -1,18 +1,17 @@
-/** @odoo-module */
-
 import { Component, onWillStart, onWillUnmount, useState } from "@odoo/owl";
 import { useSelfOrder } from "@pos_self_order/app/self_order_service";
+import { rpc } from "@web/core/network/rpc";
 import { useService } from "@web/core/utils/hooks";
 
 // This component is only use in Kiosk mode
 export class PaymentPage extends Component {
     static template = "pos_self_order.PaymentPage";
+    static props = {};
 
     setup() {
         this.selfOrder = useSelfOrder();
         this.selfOrder.isOrder();
         this.router = useService("router");
-        this.rpc = useService("rpc");
         this.state = useState({
             selection: true,
             paymentMethodId: null,
@@ -23,10 +22,8 @@ export class PaymentPage extends Component {
         });
 
         onWillStart(async () => {
-            const paymentMethods = this.selfOrder.pos_payment_methods;
-
-            if (paymentMethods.length === 1) {
-                this.selectMethod(this.selfOrder.pos_payment_methods[0].id);
+            if (this.selfOrder.models["pos.payment.method"].length === 1) {
+                this.selectMethod(this.selfOrder.models["pos.payment.method"].getFirst().id);
             }
         });
     }
@@ -42,7 +39,9 @@ export class PaymentPage extends Component {
     }
 
     get selectedPaymentMethod() {
-        return this.selfOrder.pos_payment_methods.find((p) => p.id === this.state.paymentMethodId);
+        return this.selfOrder.models["pos.payment.method"].find(
+            (p) => p.id === this.state.paymentMethodId
+        );
     }
 
     // this function will be override by pos_online_payment_self_order module
@@ -50,8 +49,8 @@ export class PaymentPage extends Component {
     async startPayment() {
         this.selfOrder.paymentError = false;
         try {
-            const result = await this.rpc(`/kiosk/payment/${this.selfOrder.pos_config_id}/kiosk`, {
-                order: this.selfOrder.currentOrder,
+            const result = await rpc(`/kiosk/payment/${this.selfOrder.config.id}/kiosk`, {
+                order: this.selfOrder.currentOrder.serialize({ orm: true }),
                 access_token: this.selfOrder.access_token,
                 payment_method_id: this.state.paymentMethodId,
             });

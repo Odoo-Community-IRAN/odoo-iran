@@ -6,6 +6,7 @@ import re
 import odoo
 from odoo import _, api, fields, models, tools
 from odoo.osv import expression
+from odoo.addons.mail.tools.discuss import Store
 
 class Partner(models.Model):
     """ Update partner to add a field about notification preferences. Add a generic opt-out field that can be used
@@ -60,9 +61,8 @@ class Partner(models.Model):
         return dict((partner.id, partner) for partner in self)
 
     def _message_get_suggested_recipients(self):
-        recipients = super(Partner, self)._message_get_suggested_recipients()
-        for partner in self:
-            partner._message_add_suggested_recipient(recipients, partner=partner, reason=_('Partner Profile'))
+        recipients = super()._message_get_suggested_recipients()
+        self._message_add_suggested_recipient(recipients, partner=self, reason=_('Partner Profile'))
         return recipients
 
     def _message_get_default_recipients(self):
@@ -212,62 +212,54 @@ class Partner(models.Model):
     # DISCUSS
     # ------------------------------------------------------------
 
-    def mail_partner_format(self, fields=None):
-        partners_format = dict()
-        if not fields:
-            fields = {'id': True, 'name': True, 'email': True, 'active': True, 'im_status': True, 'is_company': True, 'user': {}, "write_date": True}
+    def _to_store(self, store: Store, /, *, fields=None, main_user_by_partner=None):
+        if fields is None:
+            fields = ["active", "email", "im_status", "is_company", "name", "user", "write_date"]
+        if not self.env.user._is_internal() and "email" in fields:
+            fields.remove("email")
         for partner in self:
-            data = {}
-            if 'id' in fields:
-                data['id'] = partner.id
-            if 'name' in fields:
-                data['name'] = partner.name
-            if 'email' in fields:
-                data['email'] = partner.email
-            if 'active' in fields:
-                data['active'] = partner.active
-            if 'im_status' in fields:
-                data['im_status'] = partner.im_status
-            if 'is_company' in fields:
-                data['is_company'] = partner.is_company
-            if "write_date" in fields:
-                data["write_date"] = odoo.fields.Datetime.to_string(partner.write_date)
+            data = partner._read_format(
+                [
+                    field
+                    for field in fields
+                    if field
+                    not in ["country", "display_name", "isAdmin", "notification_type", "user"]
+                ],
+                load=False,
+            )[0]
+            if "country" in fields:
+                c = partner.country_id
+                data["country"] = {"code": c.code, "id": c.id, "name": c.name} if c else False
+            if "display_name" in fields:
+                data["displayName"] = partner.display_name
             if 'user' in fields:
-                users = partner.with_context(active_test=False).user_ids
-                internal_users = users - users.filtered('share')
-                main_user = internal_users[0] if len(internal_users) > 0 else users[0] if len(users) > 0 else self.env['res.users']
-                data['user'] = {
-                    "id": main_user.id,
-                    "isInternalUser": not main_user.share,
-                } if main_user else False
-            if not self.env.user._is_internal():
-                data.pop('email', None)
-            data['type'] = "partner"
-            partners_format[partner] = data
-        return partners_format
+                main_user = main_user_by_partner and main_user_by_partner.get(partner)
+                if not main_user:
+                    users = partner.with_context(active_test=False).user_ids
+                    internal_users = users - users.filtered("share")
+                    main_user = (
+                        internal_users[0]
+                        if len(internal_users) > 0
+                        else users[0] if len(users) > 0 else self.env["res.users"]
+                    )
+                data['userId'] = main_user.id
+                data["isInternalUser"] = not main_user.share if main_user else False
+                if "isAdmin" in fields:
+                    data["isAdmin"] = main_user._is_admin()
+                if "notification_type" in fields:
+                    data["notification_preference"] = main_user.notification_type
+            store.add(partner, data)
 
-    def _message_fetch_failed(self):
-        """Returns first 100 messages, sent by the current partner, that have errors, in
-        the format expected by the web client."""
-        self.ensure_one()
-        notifications = self.env['mail.notification'].search([
-            ('author_id', '=', self.id),
-            ('notification_status', 'in', ('bounce', 'exception')),
-            ('mail_message_id.message_type', '!=', 'user_notification'),
-            ('mail_message_id.model', '!=', False),
-            ('mail_message_id.res_id', '!=', 0),
-        ], limit=100)
-        return notifications.mail_message_id._message_notification_format()
-
+    @api.readonly
     @api.model
     def get_mention_suggestions(self, search, limit=8):
         """ Return 'limit'-first partners' such that the name or email matches a 'search' string.
             Prioritize partners that are also (internal) users, and then extend the research to all partners.
-            The return format is a list of partner data (as per returned by `mail_partner_format()`).
+            The return format is a list of partner data (as per returned by `_to_store()`).
         """
         domain = self._get_mention_suggestions_domain(search)
         partners = self._search_mention_suggestions(domain, limit)
-        return list(partners.mail_partner_format().values())
+        return Store(partners).get_result()
 
     @api.model
     def _get_mention_suggestions_domain(self, search):
@@ -299,6 +291,7 @@ class Partner(models.Model):
             partners |= self.browse(query)
         return partners
 
+    @api.readonly
     @api.model
     def im_search(self, name, limit=20, excluded_ids=None):
         """ Search partner with a name and return its id, name and im_status.
@@ -319,7 +312,7 @@ class Partner(models.Model):
             ('share', '=', False),
             ('partner_id', 'not in', excluded_ids)
         ], order='name, id', limit=limit)
-        return list(users.partner_id.mail_partner_format().values())
+        return Store(users.partner_id).get_result()
 
     @api.model
     def _get_current_persona(self):

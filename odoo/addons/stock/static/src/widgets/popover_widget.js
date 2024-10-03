@@ -2,13 +2,16 @@
 import { registry } from "@web/core/registry";
 import { usePopover } from "@web/core/popover/popover_hook";
 import { Component } from "@odoo/owl";
+import { standardFieldProps } from "@web/views/fields/standard_field_props";
 
 /**
  * Extend this to add functionality to Popover (custom methods etc.)
  * need to extend PopoverWidgetField as well and set its Popover Component to new extension
  */
-export class PopoverComponent extends Component {}
-PopoverComponent.template = 'stock.popoverContent';
+export class PopoverComponent extends Component {
+    static template = "stock.popoverContent";
+    static props = ["record", "*"];
+}
 
 /**
  * Widget Popover for JSON field (char), renders a popover above an icon button on click
@@ -24,6 +27,9 @@ PopoverComponent.template = 'stock.popoverContent';
  */
 
 export class PopoverWidgetField extends Component {
+    static template = "stock.popoverButton";
+    static components = { Popover: PopoverComponent };
+    static props = {...standardFieldProps};
     setup(){
         let fieldValue = this.props.record.data[this.props.name];
         this.jsonValue = JSON.parse(fieldValue || "{}");
@@ -37,9 +43,6 @@ export class PopoverWidgetField extends Component {
         this.popover.open(ev.currentTarget, { ...this.jsonValue, record: this.props.record });
     }
 }
-
-PopoverWidgetField.template = 'stock.popoverButton';
-PopoverWidgetField.components = { Popover: PopoverComponent }
 
 export const popoverWidgetField = {
     component: PopoverWidgetField,

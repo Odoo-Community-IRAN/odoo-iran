@@ -3,15 +3,14 @@
 # 	* payment_demo
 # 
 # Translators:
-# Rasareeyar Lappiam, 2024
 # Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-08-13 10:28+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
+"POT-Creation-Date: 2024-09-26 08:56+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
 "Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Thai (https://app.transifex.com/odoo/teams/41243/th/)\n"
 "MIME-Version: 1.0\n"
@@ -30,8 +29,8 @@ msgid ""
 "                    <option value=\"pending\" title=\"Payment processing\">\n"
 "                        Pending\n"
 "                    </option>\n"
-"                    <option value=\"cancel\" title=\"Payment canceled by customer\">\n"
-"                        Canceled\n"
+"                    <option value=\"cancel\" title=\"Payment cancelled by customer\">\n"
+"                        Cancelled\n"
 "                    </option>\n"
 "                    <option value=\"error\" title=\"Processing error\">\n"
 "                        Error\n"
@@ -43,13 +42,13 @@ msgstr ""
 "                        สำเร็จ\n"
 "                    </option>\n"
 "                    <option value=\"pending\" title=\"Payment processing\">\n"
-"                        กำลังดำเนินการ\n"
+"                        รอดำเนินการ\n"
 "                    </option>\n"
-"                    <option value=\"cancel\" title=\"Payment canceled by customer\">\n"
+"                    <option value=\"cancel\" title=\"Payment cancelled by customer\">\n"
 "                        ยกเลิก\n"
 "                    </option>\n"
 "                    <option value=\"error\" title=\"Processing error\">\n"
-"                        ข้อผิดพลาด\n"
+"                        มีข้อผิดพลาด\n"
 "                    </option>\n"
 "                </select>"
 
@@ -151,6 +150,7 @@ msgstr "ยืนยันแล้ว"
 
 #. module: payment_demo
 #: model:ir.model.fields.selection,name:payment_demo.selection__payment_provider__code__demo
+#: model:payment.method,name:payment_demo.payment_method_demo
 msgid "Demo"
 msgstr "สาธิต"
 
@@ -162,7 +162,6 @@ msgstr "การชำระเงินด่วน Demo"
 #. module: payment_demo
 #. odoo-python
 #: code:addons/payment_demo/models/payment_provider.py:0
-#, python-format
 msgid "Demo providers should never be enabled."
 msgstr "ไม่ควรเปิดใช้งานผู้ให้บริการ Demo"
 
@@ -174,14 +173,12 @@ msgstr "ผิดพลาด"
 #. module: payment_demo
 #. odoo-javascript
 #: code:addons/payment_demo/static/src/js/express_checkout_form.js:0
-#, python-format
 msgid "No delivery method is available."
 msgstr ""
 
 #. module: payment_demo
 #. odoo-python
 #: code:addons/payment_demo/models/payment_transaction.py:0
-#, python-format
 msgid "No transaction found matching reference %s."
 msgstr "ไม่พบธุรกรรมที่ตรงกับการอ้างอิง %s"
 
@@ -213,7 +210,6 @@ msgstr "ธุรกรรมสำหรับการชำระเงิน
 #. module: payment_demo
 #. odoo-javascript
 #: code:addons/payment_demo/static/src/js/payment_demo_mixin.js:0
-#, python-format
 msgid "Payment processing failed"
 msgstr "การประมวลผลการชำระเงินล้มเหลว"
 
@@ -226,8 +222,8 @@ msgstr "การชำระเงินด้วยวิธีนี้จะ
 #: model_terms:ir.ui.view,arch_db:payment_demo.token_inline_form
 msgid ""
 "Payments made with this payment method will be automatically "
-"<b>canceled</b>."
-msgstr "การชำระเงินที่ทำด้วยวิธีนี้จะถูก<b>ยกเลิก</b>โดยอัตโนมัติ"
+"<b>cancelled</b>."
+msgstr "การชำระเงินด้วยวิธีการชำระเงินนี้จะ<b>ถูกยกเลิก</b>โดยอัตโนมัติ"
 
 #. module: payment_demo
 #: model_terms:ir.ui.view,arch_db:payment_demo.token_inline_form
@@ -274,7 +270,6 @@ msgstr "รหัสทางเทคนิคของผู้ให้บร
 #. module: payment_demo
 #. odoo-python
 #: code:addons/payment_demo/models/payment_transaction.py:0
-#, python-format
 msgid "The transaction is not linked to a token."
 msgstr "ธุรกรรมไม่ได้เชื่อมโยงกับโทเค็น"
 
@@ -286,7 +281,6 @@ msgstr "ยกเลิกการเผยแพร่"
 #. module: payment_demo
 #. odoo-javascript
 #: code:addons/payment_demo/static/src/js/express_checkout_form.js:0
-#, python-format
 msgid "Validation Error"
 msgstr "ข้อผิดพลาดในการตรวจสอบความถูกต้อง"
 
@@ -298,6 +292,5 @@ msgstr "XXXX XXXX XXXX XXXX"
 #. module: payment_demo
 #. odoo-python
 #: code:addons/payment_demo/models/payment_transaction.py:0
-#, python-format
 msgid "You selected the following demo payment status: %s"
 msgstr "คุณเลือกสถานะการชำระเงินสาธิตต่อไปนี้: %s"

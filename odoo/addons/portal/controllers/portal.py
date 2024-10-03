@@ -1,8 +1,5 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-import base64
-import json
 import math
 import re
 
@@ -133,9 +130,6 @@ def _build_url_w_params(url_string, query_params, remove_duplicates=True):
 
 class CustomerPortal(Controller):
 
-    MANDATORY_BILLING_FIELDS = ["name", "phone", "email", "street", "city", "country_id"]
-    OPTIONAL_BILLING_FIELDS = ["zipcode", "state_id", "vat", "company_name"]
-
     _items_per_page = 80
 
     def _prepare_portal_layout_values(self):
@@ -169,11 +163,17 @@ class CustomerPortal(Controller):
 
     @route(['/my/counters'], type='json', auth="user", website=True)
     def counters(self, counters, **kw):
-        return self._prepare_home_portal_values(counters)
+        cache = (request.session.portal_counters or {}).copy()
+        res = self._prepare_home_portal_values(counters)
+        cache.update({k: bool(v) for k, v in res.items() if k.endswith('_count')})
+        if cache != request.session.portal_counters:
+            request.session.portal_counters = cache
+        return res
 
     @route(['/my', '/my/home'], type='http', auth="user", website=True)
     def home(self, **kw):
         values = self._prepare_portal_layout_values()
+        values.update(self._prepare_home_portal_values([]))
         return request.render("portal.portal_my_home", values)
 
     @route(['/my/account'], type='http', auth='user', website=True)
@@ -276,12 +276,13 @@ class CustomerPortal(Controller):
         values = self._prepare_portal_layout_values()
         values['get_error'] = get_error
         values['open_deactivate_modal'] = True
+        credential = {'login': request.env.user.login, 'password': password, 'type': 'password'}
 
         if validation != request.env.user.login:
             values['errors'] = {'deactivate': 'validation'}
         else:
             try:
-                request.env['res.users']._check_credentials(password, {'interactive': True})
+                request.env['res.users']._check_credentials(credential, {'interactive': True})
                 request.env.user.sudo()._deactivate_portal_user(**post)
                 request.session.logout()
                 return request.redirect('/web/login?message=%s' % urls.url_quote(_('Account deleted!')))
@@ -294,63 +295,6 @@ class CustomerPortal(Controller):
             'X-Frame-Options': 'SAMEORIGIN',
             'Content-Security-Policy': "frame-ancestors 'self'",
         })
-
-    @http.route('/portal/attachment/add', type='http', auth='public', methods=['POST'], website=True)
-    def attachment_add(self, name, file, res_model, res_id, access_token=None, **kwargs):
-        """Process a file uploaded from the portal chatter and create the
-        corresponding `ir.attachment`.
-
-        The attachment will be created "pending" until the associated message
-        is actually created, and it will be garbage collected otherwise.
-
-        :param name: name of the file to save.
-        :type name: string
-
-        :param file: the file to save
-        :type file: werkzeug.FileStorage
-
-        :param res_model: name of the model of the original document.
-            To check access rights only, it will not be saved here.
-        :type res_model: string
-
-        :param res_id: id of the original document.
-            To check access rights only, it will not be saved here.
-        :type res_id: int
-
-        :param access_token: access_token of the original document.
-            To check access rights only, it will not be saved here.
-        :type access_token: string
-
-        :return: attachment data {id, name, mimetype, file_size, access_token}
-        :rtype: dict
-        """
-        try:
-            self._document_check_access(res_model, int(res_id), access_token=access_token)
-        except (AccessError, MissingError) as e:
-            raise UserError(_("The document does not exist or you do not have the rights to access it."))
-
-        IrAttachment = request.env['ir.attachment']
-
-        # Avoid using sudo when not necessary: internal users can create attachments,
-        # as opposed to public and portal users.
-        if not request.env.user._is_internal():
-            IrAttachment = IrAttachment.sudo()
-
-        # At this point the related message does not exist yet, so we assign
-        # those specific res_model and res_is. They will be correctly set
-        # when the message is created: see `portal_chatter_post`,
-        # or garbage collected otherwise: see  `_garbage_collect_attachments`.
-        attachment = IrAttachment.create({
-            'name': name,
-            'datas': base64.b64encode(file.read()),
-            'res_model': 'mail.compose.message',
-            'res_id': 0,
-            'access_token': IrAttachment._generate_access_token(),
-        })
-        return request.make_response(
-            data=json.dumps(attachment.read(['id', 'name', 'mimetype', 'file_size', 'access_token'])[0]),
-            headers=[('Content-Type', 'application/json')]
-        )
 
     @http.route('/portal/attachment/remove', type='json', auth='public')
     def attachment_remove(self, attachment_id, access_token=None):
@@ -367,7 +311,7 @@ class CustomerPortal(Controller):
         if attachment_sudo.res_model != 'mail.compose.message' or attachment_sudo.res_id != 0:
             raise UserError(_("The attachment %s cannot be removed because it is not in a pending state.", attachment_sudo.name))
 
-        if attachment_sudo.env['mail.message'].search([('attachment_ids', 'in', attachment_sudo.ids)]):
+        if attachment_sudo.env['mail.message'].search_count([('attachment_ids', 'in', attachment_sudo.ids)], limit=1):
             raise UserError(_("The attachment %s cannot be removed because it is linked to a message.", attachment_sudo.name))
 
         return attachment_sudo.unlink()
@@ -420,11 +364,11 @@ class CustomerPortal(Controller):
 
     def _get_mandatory_fields(self):
         """ This method is there so that we can override the mandatory fields """
-        return self.MANDATORY_BILLING_FIELDS
+        return ["name", "phone", "email", "street", "city", "country_id"]
 
     def _get_optional_fields(self):
         """ This method is there so that we can override the optional fields """
-        return self.OPTIONAL_BILLING_FIELDS
+        return ["street2", "zipcode", "state_id", "vat", "company_name"]
 
     def _document_check_access(self, model_name, document_id, access_token=None):
         """Check if current user is allowed to access the specified record.
@@ -441,8 +385,7 @@ class CustomerPortal(Controller):
         if not document_sudo:
             raise MissingError(_("This document does not exist."))
         try:
-            document.check_access_rights('read')
-            document.check_access_rule('read')
+            document.check_access('read')
         except AccessError:
             if not access_token or not document_sudo.access_token or not consteq(document_sudo.access_token, access_token):
                 raise
@@ -507,7 +450,7 @@ class CustomerPortal(Controller):
             'Content-Length': len(report),
         }
         if report_type == 'pdf' and download:
-            filename = "%s.pdf" % (re.sub(r'\W+', '-', model._get_report_base_filename()))
+            filename = "%s.pdf" % (re.sub(r'\W+', '_', model._get_report_base_filename()))
             headers['Content-Disposition'] = content_disposition(filename)
         return headers
 

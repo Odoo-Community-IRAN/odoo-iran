@@ -11,9 +11,9 @@ import io
 @tagged('post_install_l10n', '-at_install', 'post_install')
 class L10nHuEdiTestInvoiceXml(L10nHuEdiTestCommon):
     @classmethod
-    def setUpClass(cls, chart_template_ref='hu'):
+    def setUpClass(cls):
         with freeze_time('2024-02-01'):
-            super().setUpClass(chart_template_ref=chart_template_ref)
+            super().setUpClass()
 
     def test_invoice_and_credit_note(self):
         with freeze_time('2024-02-01'):

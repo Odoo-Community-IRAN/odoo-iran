@@ -3,16 +3,16 @@
 # 	* payment_razorpay
 # 
 # Translators:
-# Wil Odoo, 2024
 # Thi Huong Nguyen, 2024
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0+e\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-12-22 15:54+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Thi Huong Nguyen, 2024\n"
+"POT-Creation-Date: 2024-09-26 08:56+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Vietnamese (https://app.transifex.com/odoo/teams/41243/vi/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -21,18 +21,8 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0;\n"
 
 #. module: payment_razorpay
-#: model_terms:ir.ui.view,arch_db:payment_razorpay.payment_provider_form_razorpay
-msgid ""
-"<i class=\"oi oi-fw o_button_icon oi-arrow-right\"/>\n"
-"                        Enable recurring payments on Razorpay"
-msgstr ""
-"<i class=\"oi oi-fw o_button_icon oi-arrow-right\"/>\n"
-"                        Cho phép thanh toán định kỳ trên Razorpay"
-
-#. module: payment_razorpay
 #. odoo-python
 #: code:addons/payment_razorpay/models/payment_transaction.py:0
-#, python-format
 msgid ""
 "An error occurred during the processing of your payment. Please try again."
 msgstr ""
@@ -47,9 +37,13 @@ msgstr "Mã"
 #. module: payment_razorpay
 #. odoo-python
 #: code:addons/payment_razorpay/models/payment_provider.py:0
-#, python-format
 msgid "Could not establish the connection to the API."
 msgstr "Không thể thiết lập kết nối với API."
+
+#. module: payment_razorpay
+#: model_terms:ir.ui.view,arch_db:payment_razorpay.payment_provider_form_razorpay
+msgid "Enable recurring payments on Razorpay"
+msgstr "Bật thanh toán định kỳ trên Razorpay"
 
 #. module: payment_razorpay
 #: model_terms:ir.ui.view,arch_db:payment_razorpay.payment_provider_form_razorpay
@@ -64,7 +58,6 @@ msgstr "Mã khoá bí mật"
 #. module: payment_razorpay
 #. odoo-python
 #: code:addons/payment_razorpay/models/payment_transaction.py:0
-#, python-format
 msgid "No transaction found matching reference %s."
 msgstr "Không tìm thấy giao dịch nào khớp với mã %s."
 
@@ -74,6 +67,11 @@ msgid "Payment Provider"
 msgstr "Nhà cung cấp dịch vụ thanh toán"
 
 #. module: payment_razorpay
+#: model:ir.model,name:payment_razorpay.model_payment_token
+msgid "Payment Token"
+msgstr "Mã thanh toán"
+
+#. module: payment_razorpay
 #: model:ir.model,name:payment_razorpay.model_payment_transaction
 msgid "Payment Transaction"
 msgstr "Giao dịch thanh toán"
@@ -81,7 +79,6 @@ msgstr "Giao dịch thanh toán"
 #. module: payment_razorpay
 #. odoo-javascript
 #: code:addons/payment_razorpay/static/src/js/payment_form.js:0
-#, python-format
 msgid "Payment processing failed"
 msgstr "Xử lý thanh toán không thành công"
 
@@ -108,42 +105,36 @@ msgstr "Mật khẩu Webhook Razorpay"
 #. module: payment_razorpay
 #. odoo-python
 #: code:addons/payment_razorpay/models/payment_provider.py:0
-#, python-format
 msgid "Razorpay gave us the following information: '%s'"
 msgstr "Razorpay đã cung cấp cho chúng tôi thông tin sau: '%s'"
 
 #. module: payment_razorpay
 #. odoo-python
 #: code:addons/payment_razorpay/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with invalid status: %s"
 msgstr "Dữ liệu đã nhận với trạng thái không hợp lệ: %s"
 
 #. module: payment_razorpay
 #. odoo-python
 #: code:addons/payment_razorpay/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with missing entity id."
 msgstr "Dữ liệu đã nhận bị thiếu ID thực thể."
 
 #. module: payment_razorpay
 #. odoo-python
 #: code:addons/payment_razorpay/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with missing reference."
 msgstr "Dữ liệu đã nhận bị thiếu mã."
 
 #. module: payment_razorpay
 #. odoo-python
 #: code:addons/payment_razorpay/models/payment_transaction.py:0
-#, python-format
 msgid "Received data with missing status."
 msgstr "Dữ liệu đã nhận bị thiếu trạng thái."
 
 #. module: payment_razorpay
 #. odoo-python
 #: code:addons/payment_razorpay/models/payment_transaction.py:0
-#, python-format
 msgid "Received incomplete refund data."
 msgstr "Dữ liệu hoàn tiền không đầy đủ đã nhận."
 
@@ -155,14 +146,12 @@ msgstr "Mã khoá chỉ được sử dụng để xác định tài khoản v�
 #. module: payment_razorpay
 #. odoo-python
 #: code:addons/payment_razorpay/models/payment_transaction.py:0
-#, python-format
 msgid "The phone number is invalid."
 msgstr "Số điện thoại không hợp lệ."
 
 #. module: payment_razorpay
 #. odoo-python
 #: code:addons/payment_razorpay/models/payment_transaction.py:0
-#, python-format
 msgid "The phone number is missing."
 msgstr "Số điện thoại bị thiếu."
 
@@ -174,14 +163,12 @@ msgstr "Mã kỹ thuật của nhà cung cấp dịch vụ thanh toán này."
 #. module: payment_razorpay
 #. odoo-python
 #: code:addons/payment_razorpay/models/payment_transaction.py:0
-#, python-format
 msgid "The transaction is not linked to a token."
 msgstr "Giao dịch không được liên kết với token."
 
 #. module: payment_razorpay
 #. odoo-python
 #: code:addons/payment_razorpay/models/payment_transaction.py:0
-#, python-format
 msgid "Transactions processed by Razorpay can't be manually voided from Odoo."
 msgstr ""
 "Không thể vô hiệu hóa thủ công các giao dịch được xử lý bởi Razorpay khỏi "
@@ -191,3 +178,13 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:payment_razorpay.payment_provider_form_razorpay
 msgid "Webhook Secret"
 msgstr "Mật khẩu Webhook"
+
+#. module: payment_razorpay
+#. odoo-python
+#: code:addons/payment_razorpay/models/payment_token.py:0
+msgid ""
+"You can not pay amounts greater than %(currency_symbol)s %(max_amount)s with"
+" this payment method"
+msgstr ""
+"Bạn không thể thanh toán số tiền lớn hơn %(max_amount)s %(currency_symbol)s "
+"bằng phương thức thanh toán này"

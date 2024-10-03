@@ -13,7 +13,7 @@
                     <h1 class="mt32">403: Forbidden</h1>
                     <p>The page you were looking for could not be authorized.</p>
                     <p>Maybe you were looking for
-                        <a t-attf-href="/web#view_type=form&amp;model=survey.survey&amp;id=#{survey.id}&amp;action=survey.action_survey_form">this page</a> ?
+                        <a t-attf-href="/odoo/action-survey.action_survey_form/{{survey.id}}">this page</a> ?
                     </p>
                 </div>
             </div>
@@ -30,7 +30,7 @@
                         <h1><span t-field="survey.title"/> survey is empty</h1>
                         <p t-if="env.user.has_group('survey.group_survey_user')">
                             Please make sure you have at least one question in your survey. You also need at least one section if you chose the "Page per section" layout.<br />
-                            <a t-att-href="'/web#view_type=form&amp;model=survey.survey&amp;id=%s&amp;action=survey.action_survey_form' % survey.id"
+                            <a t-att-href="'/odoo/action-survey.action_survey_form/%s' % survey.id"
                                 class="btn btn-secondary"
                                 groups="survey.group_survey_manager">Edit in backend</a>
                         </p>
@@ -96,8 +96,12 @@
     <!-- ============================================================ -->
 
     <template id="survey_button_form_view" name="Survey: back to form view">
-        <div groups="survey.group_survey_user" t-ignore="true" class="alert alert-info p-2 border-0 rounded-0 d-print-none css_editable_mode_hidden mb-0 text-center">
-            <a t-attf-href="/web#view_type=form&amp;model=survey.survey&amp;id=#{survey.id}&amp;action=survey.action_survey_form"><span t-if="answer and answer.test_entry">This is a Test Survey Entry. </span><i class="oi oi-fw oi-arrow-right"/>Edit Survey</a>
+        <div t-ignore="true" t-if="answer and answer.test_entry" class="alert alert-info p-2 border-0 rounded-0 d-print-none css_editable_mode_hidden mb-0 text-center">
+            <p class="mb-1">This is a Test Survey Entry.</p>
+            <div class="survey_button_form_view_hook d-inline-block">
+                <a t-if="env.user.has_group('survey.group_survey_user')" t-attf-href="/odoo/action-survey.action_survey_form/{{survey.id}}">
+                    <i class="oi oi-fw oi-arrow-right"/>Go to Survey</a>
+            </div>
         </div>
         <div groups="survey.group_survey_user" t-if="survey.scoring_type != 'no_scoring' and survey.scoring_max_obtainable &lt;= 0"
             t-ignore="true" class="alert alert-warning p-2 border-0 rounded-0 d-print-none css_editable_mode_hidden mb-0 text-center">
@@ -106,21 +110,21 @@
     </template>
 
     <template id="survey_button_retake" name="Survey: retake button">
-        <div>
-            <t t-if="not answer.scoring_success and not answer.is_session_answer">
-                <t t-if="survey.is_attempts_limited">
-                    <t t-set="attempts_left" t-value="survey._get_number_of_attempts_lefts(answer.partner_id, answer.email, answer.invite_token)" />
-                    <t t-if="attempts_left > 0">
-                        <p><span>Number of attempts left</span>: <span t-esc="attempts_left"></span></p>
-                        <p><a role="button" class="btn btn-primary btn-lg" t-att-href="'/survey/retry/%s/%s' % (survey.access_token, answer.access_token)">
-                        Retry</a></p>
-                    </t>
-                </t>
-                <t t-else="">
-                    <p><a role="button" class="btn btn-primary btn-lg" t-att-href="'/survey/retry/%s/%s' % (survey.access_token, answer.access_token)">
-                        Take Again</a></p>
-                </t>
+        <div t-if="not answer.is_session_answer and not (survey.certification and answer.scoring_success)" class="d-print-none">
+            <t t-if="survey.is_attempts_limited">
+                <t t-set="attempts_left" t-value="survey._get_number_of_attempts_lefts(answer.partner_id, answer.email, answer.invite_token)" />
+                <p t-if="attempts_left > 0">
+                    <span>Number of attempts left</span>: <span t-out="attempts_left"/>
+                    <a role="button" class="btn btn-primary btn-lg ms-3" t-att-href="'/survey/retry/%s/%s' % (survey.access_token, answer.access_token)">
+                        Retry
+                    </a>
+                </p>
             </t>
+            <p t-else="">
+                <a role="button" class="btn btn-primary btn-lg" t-att-href="'/survey/retry/%s/%s' % (survey.access_token, answer.access_token)">
+                    Take Again
+                </a>
+            </p>
         </div>
     </template>
 
@@ -164,14 +168,14 @@
             <button
                 t-if="survey and survey.users_can_go_back"
                 t-att-disabled="not can_go_back"
-                type="submit" class="btn border-start p-0 shadow-none o_survey_navigation_submit" name="button_submit" value="previous" t-att-data-previous-page-id="previous_page_id">
+                type="submit" class="btn border-0 p-0 shadow-none o_survey_navigation_submit" name="button_submit" value="previous" t-att-data-previous-page-id="previous_page_id">
                 <i class="oi oi-chevron-left p-2" />
             </button>
             <t t-set="can_go_forward"
                 t-value="survey and survey.questions_layout in ['page_per_question', 'page_per_section'] and answer and answer.state != 'done' and not answer.is_session_answer"/>
             <button
                 t-att-disabled="not can_go_forward"
-                type="submit" class="btn border-start p-0 shadow-none o_survey_navigation_submit" t-att-value="'next' if not survey_last else 'finish'">
+                type="submit" class="btn border-0 p-0 shadow-none o_survey_navigation_submit" t-att-value="'next' if not survey_last else 'finish'">
                 <i class="oi oi-chevron-right p-2" />
             </button>
         </div>

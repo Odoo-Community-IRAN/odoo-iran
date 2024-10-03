@@ -2,8 +2,8 @@
 
 import { registry } from "@web/core/registry";
 import { zip } from "@web/core/utils/arrays";
-import { TourError } from "@web_tour/tour_service/tour_utils";
 import { accessSurveysteps } from "./survey_tour_session_tools";
+import { press } from "@odoo/hoot-dom";
 
 let rootWidget = null;
 
@@ -35,15 +35,11 @@ const getChartData = () => {
 };
 
 const nextScreen = () => {
-    const e = $.Event('keydown');
-    e.key = "ArrowRight";
-    $(document).trigger(e);
+    press("ArrowRight");
 };
 
 const previousScreen = () => {
-    const e = $.Event('keydown');
-    e.key = "ArrowLeft";
-    $(document).trigger(e);
+    press("ArrowLeft");
 };
 
 const REGULAR_ANSWER_COLOR = '#212529';
@@ -67,24 +63,24 @@ const INDEX_TO_ORDINAL = {
 const checkAnswerAppearance = (answerLabel, shownAnswer, expectedAnswerType) => {
     if (expectedAnswerType === 'correct') {
         if (!shownAnswer.backgroundColor.includes('0.8') || shownAnswer.labelColor !== CORRECT_ANSWER_COLOR) {
-            throw new TourError(`${answerLabel} should be shown as "correct"!`);
+            console.error(`${answerLabel} should be shown as "correct"!`);
         }
     } else if (expectedAnswerType === 'incorrect') {
         if (!shownAnswer.backgroundColor.includes('0.2') || shownAnswer.labelColor !== WRONG_ANSWER_COLOR) {
-            throw new TourError(`${answerLabel} should be shown as "incorrect"!`);
+            console.error(`${answerLabel} should be shown as "incorrect"!`);
         }
     } else if (expectedAnswerType === 'regular') {
         if (!shownAnswer.backgroundColor.includes('0.8') || shownAnswer.labelColor !== REGULAR_ANSWER_COLOR) {
-            throw new TourError(`${answerLabel} should not be shown as "correct" or "incorrect"!`);
+            console.error(`${answerLabel} should not be shown as "correct" or "incorrect"!`);
         }
     } else {
-        throw new Error(`Unsupported answer type.`);
+        console.error(`Unsupported answer type.`);
     }
 };
 
 const checkAnswerValue = (answerLabel, shownAnswerValue, expectedAnswerValue) => {
     if (shownAnswerValue !== expectedAnswerValue) {
-        throw new TourError(expectedAnswerValue === 0 ?
+        console.error(expectedAnswerValue === 0 ?
             `${answerLabel} should not be picked by any user!` :
             `${answerLabel} should be picked by ${expectedAnswerValue} users!`
         );
@@ -109,13 +105,13 @@ const checkAnswers = (chartData, expectedAnswersData) => {
 
 const checkAnswersAllZeros = (chartData) => {
     if (chartData.find(answerData => answerData !== 0).length) {
-        throw new TourError('Chart data should all be 0!');
+        console.error('Chart data should all be 0!');
     }
 };
 
 const checkAnswersCount = (chartData, expectedCount) => {
     if (chartData.length !== expectedCount) {
-        throw new TourError(`Chart data should contain ${expectedCount} records!`);
+        console.error(`Chart data should contain ${expectedCount} records!`);
     }
 };
 
@@ -125,7 +121,7 @@ const checkAnswersCount = (chartData, expectedCount) => {
  * Break down of the main points:
  * - Open the 'session manager' (the session was already created by a previous tour)
  * - Display the nickname question, and move to the next one (as answers are not displayed)
- * - Check answers are correctly displayed for the 3 'simple' question types (text, date, datetime)
+ * - Check answers are correctly displayed for the 4 'simple' question types (text, date, datetime, integer (scale))
  * - Move to the choice question and check that answers are displayed
  *   (The check is rather complex, see 'getChartData' for details)
  * - If everything is correctly displayed, move to the next question
@@ -138,13 +134,14 @@ const checkAnswersCount = (chartData, expectedCount) => {
  * - Close the survey session
  */
 registry.category("web_tour.tours").add('test_survey_session_manage_tour', {
-    url: "/web",
+    url: "/odoo",
     test: true,
     steps: () => [].concat(accessSurveysteps, [{
     trigger: 'button[name="action_open_session_manager"]',
+    run: "click",
 }, {
+    // check nickname question is displayed
     trigger: 'h1:contains("Nickname")',
-    isCheck: true // check nickname question is displayed
 }, {
     trigger: 'body',
     run: async () => { rootWidget = await odoo.loader.modules.get('root.widget'); }
@@ -152,81 +149,101 @@ registry.category("web_tour.tours").add('test_survey_session_manage_tour', {
     trigger: 'h1',
     run: nextScreen
 }, {
+    // check text question is displayed
     trigger: 'h1:contains("Text Question")',
-    isCheck: true // check text question is displayed
 }, {
+    // check we have 3 answers
     trigger: '.o_survey_session_progress_small:contains("3 / 3")',
-    isCheck: true // check we have 3 answers
 }, {
+    // check attendee 1 answer is displayed
     trigger: '.o_survey_session_text_answer_container:contains("Attendee 1 is the best")',
-    isCheck: true // check attendee 1 answer is displayed
 }, {
+    // check attendee 2 answer is displayed
     trigger: '.o_survey_session_text_answer_container:contains("Attendee 2 rulez")',
-    isCheck: true // check attendee 2 answer is displayed
 }, {
+    // check attendee 3 answer is displayed
     trigger: '.o_survey_session_text_answer_container:contains("Attendee 3 will crush you")',
-    isCheck: true // check attendee 3 answer is displayed
 }, {
     trigger: 'h1',
     run: nextScreen
 }, {
+    // check we have 2 answers
     trigger: '.o_survey_session_progress_small:contains("2 / 3")',
-    isCheck: true // check we have 2 answers
 }, {
+    // check attendee 1 answer is displayed
     trigger: '.o_survey_session_text_answer_container:contains("10/10/2010")',
-    isCheck: true // check attendee 1 answer is displayed
 }, {
+    // check attendee 2 answer is displayed
     trigger: '.o_survey_session_text_answer_container:contains("11/11/2011")',
-    isCheck: true // check attendee 2 answer is displayed
 }, {
     trigger: 'h1',
     run: previousScreen
 }, {
+    // check text question is displayed
     trigger: 'h1:contains("Text Question")',
-    isCheck: true // check text question is displayed
 }, {
+    // check we have 3 answers
     trigger: '.o_survey_session_progress_small:contains("3 / 3")',
-    isCheck: true // check we have 3 answers
 }, {
+    // check attendee 1 answer is displayed
     trigger: '.o_survey_session_text_answer_container:contains("Attendee 1 is the best")',
-    isCheck: true // check attendee 1 answer is displayed
 }, {
+    // check attendee 2 answer is displayed
     trigger: '.o_survey_session_text_answer_container:contains("Attendee 2 rulez")',
-    isCheck: true // check attendee 2 answer is displayed
 }, {
+    // check attendee 3 answer is displayed
     trigger: '.o_survey_session_text_answer_container:contains("Attendee 3 will crush you")',
-    isCheck: true // check attendee 3 answer is displayed
 }, {
     trigger: 'h1',
     run: nextScreen
 }, {
+    // check we have 2 answers
     trigger: '.o_survey_session_progress_small:contains("2 / 3")',
-    isCheck: true // check we have 2 answers
 }, {
+    // check attendee 1 answer is displayed
     trigger: '.o_survey_session_text_answer_container:contains("10/10/2010")',
-    isCheck: true // check attendee 1 answer is displayed
 }, {
+    // check attendee 2 answer is displayed
     trigger: '.o_survey_session_text_answer_container:contains("11/11/2011")',
-    isCheck: true // check attendee 2 answer is displayed
 }, {
     trigger: 'h1',
     run: nextScreen
 }, {
+    // check we have 2 answers
     trigger: '.o_survey_session_progress_small:contains("2 / 3")',
-    isCheck: true // check we have 2 answers
 }, {
+    // check attendee 2 answer is displayed
     trigger: '.o_survey_session_text_answer_container:contains("10/10/2010 10:00:00")',
-    isCheck: true // check attendee 2 answer is displayed
 }, {
+    // check attendee 3 answer is displayed
     trigger: '.o_survey_session_text_answer_container:contains("11/11/2011 15:55:55")',
-    isCheck: true // check attendee 3 answer is displayed
 }, {
     trigger: 'h1',
     run: nextScreen
-}, {
+},
+{
+    trigger: 'h1:contains("Scale Question")',
+},
+{
+    content: "chart check 1",
+    trigger: '.o_survey_session_progress_small[style*="width: 100%"]',
+    run: () => {
+        checkAnswers(getChartData(), [
+            ...Array(5).fill({ value: 0, type: "regular" }),
+            { value: 2, type: "regular" }, // 2 votes for the scale value 5
+            { value: 1, type: "regular" }, // 1 vote for the scale value 6
+            ...Array(4).fill({ value: 0, type: "regular" }),
+        ]);
+        nextScreen();
+    }
+},
+{
     trigger: 'h1:contains("Regular Simple Choice")',
+},
+{
+    content: "chart check 2",
+    trigger: '.o_survey_session_progress_small[style*="width: 100%"]',
     // Wait for answers' data to be fetched (see commit message).
-    extra_trigger: '.o_survey_session_progress_small[style*="width: 100%"]',
     run: () => {
         checkAnswers(getChartData(), [
             {value: 2, type: "regular"},
@@ -234,20 +251,29 @@ registry.category("web_tour.tours").add('test_survey_session_manage_tour', {
             {value: 0, type: "regular"},
         ]);
         nextScreen();
-    }
-}, {
-    trigger: 'h1:contains("Scored Simple Choice")',
+    }, 
+},
+{
+    trigger: "h1:contains(  Scored Simple Choice)",
+},
+{
+    content: "chart check 3",
+    trigger: '.o_survey_session_progress_small[style*="width: 100%"]',
     run: () => {
         const chartData = getChartData();
         checkAnswersCount(chartData, 4);
         checkAnswersAllZeros(chartData);
 
         nextScreen();
-    }
-}, {
+    },
+},
+{
     trigger: 'h1:contains("Scored Simple Choice")',
+},
+{
+    content: "chart check 4",
+    trigger: '.o_survey_session_progress_small[style*="width: 100%"]',
     // Wait for progressbar to be updated ("late" enough DOM change after onNext() is triggered).
-    extra_trigger: '.o_survey_session_progress_small[style*="width: 100%"]',
     run: () => {
         checkAnswers(getChartData(), [
             {value: 1, type: "regular"},
@@ -256,11 +282,15 @@ registry.category("web_tour.tours").add('test_survey_session_manage_tour', {
             {value: 0, type: "regular"},
         ]);
         nextScreen();
-    }
-}, {
+    },
+},
+{
+    trigger: '.o_survey_session_navigation_next_label:contains("Show Leaderboard")',
+},
+{
+    content: "chart check 5",
     trigger: 'h1:contains("Scored Simple Choice")',
     // Wait for Button to be updated ("late" enough DOM change after onNext() is triggered).
-    extra_trigger: '.o_survey_session_navigation_next_label:contains("Show Leaderboard")',
     run: () => {
         checkAnswers(getChartData(), [
             {value: 1, type: "correct"},
@@ -270,10 +300,10 @@ registry.category("web_tour.tours").add('test_survey_session_manage_tour', {
         ]);
         nextScreen();
         nextScreen();
-    }
+    },
 }, {
     trigger: 'h1:contains("Timed Scored Multiple Choice")',
-    run: ()=> {
+    async run() {
         const chartData = getChartData();
         checkAnswersCount(chartData, 3);
         checkAnswersAllZeros(chartData);
@@ -281,28 +311,29 @@ registry.category("web_tour.tours").add('test_survey_session_manage_tour', {
         // after 1 second, results are displayed automatically because question timer runs out
         // we add 1 extra second because of the way the timer works:
         // it only triggers the time_up event 1 second AFTER the delay is passed
-        setTimeout(() => {
-            checkAnswers(getChartData(), [
-                {value: 2, type: "regular"},
-                {value: 2, type: "regular"},
-                {value: 1, type: "regular"},
-            ]);
+        await new Promise((resolve) => {
+            setTimeout(() => {
+                checkAnswers(getChartData(), [
+                    {value: 2, type: "regular"},
+                    {value: 2, type: "regular"},
+                    {value: 1, type: "regular"},
+                ]);
 
-            nextScreen();
-            checkAnswers(getChartData(), [
-                {value: 2, type: "correct"},
-                {value: 2, type: "correct"},
-                {value: 1, type: "incorrect"},
-            ]);
+                nextScreen();
+                checkAnswers(getChartData(), [
+                    {value: 2, type: "correct"},
+                    {value: 2, type: "correct"},
+                    {value: 1, type: "incorrect"},
+                ]);
 
-            nextScreen();
-        }, 2100);
+                nextScreen();
+                resolve();
+            }, 2100);
+        });
     }
 }, {
+    // Final Leaderboard is displayed
     trigger: 'h1:contains("Final Leaderboard")',
-    isCheck: true // Final Leaderboard is displayed
-}, {
-    trigger: 'h1',
     run: () => {
         // previous screen testing
         previousScreen();
@@ -328,11 +359,12 @@ registry.category("web_tour.tours").add('test_survey_session_manage_tour', {
         }
     }
 }, {
+    // Final Leaderboard is displayed
     trigger: 'h1:contains("Final Leaderboard")',
-    isCheck: true // Final Leaderboard is displayed
 }, {
-    trigger: '.o_survey_session_close:has("i.fa-close")'
+    trigger:".o_survey_session_close:has(i.fa-close)",
+    run: "click",
 }, {
+    // check that we can start another session
     trigger: 'button[name="action_start_session"]',
-    isCheck: true // check that we can start another session
 }])});

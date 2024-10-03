@@ -127,12 +127,9 @@ class MassMailingList(models.Model):
         for mailing_list in self:
             mailing_list.display_name = f"{mailing_list.name} ({mailing_list.contact_count})"
 
-    def copy(self, default=None):
-        self.ensure_one()
-
-        default = dict(default or {},
-                       name=_('%s (copy)', self.name),)
-        return super(MassMailingList, self).copy(default)
+    def copy_data(self, default=None):
+        vals_list = super().copy_data(default=default)
+        return [dict(vals, name=self.env._("%s (copy)", mailing_list.name)) for mailing_list, vals in zip(self, vals_list)]
 
     # ------------------------------------------------------
     # ACTIONS
@@ -153,7 +150,6 @@ class MassMailingList(models.Model):
 
     def action_send_mailing(self):
         """Open the mailing form view, with the current lists set as recipients."""
-        view = self.env.ref('mass_mailing.mailing_mailing_view_form_full_width')
         action = self.env["ir.actions.actions"]._for_xml_id('mass_mailing.mailing_mailing_action_mail')
 
         action.update({
@@ -165,7 +161,6 @@ class MassMailingList(models.Model):
             },
             'target': 'current',
             'view_type': 'form',
-            'views': [(view.id, 'form')],
         })
 
         return action

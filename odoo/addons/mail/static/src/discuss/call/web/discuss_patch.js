@@ -1,27 +1,22 @@
-/* @odoo-module */
-
-import { Discuss } from "@mail/core/common/discuss";
-import { useChildSubEnv, useEffect, useState } from "@odoo/owl";
+import { Discuss } from "@mail/core/public_web/discuss";
 
 import { patch } from "@web/core/utils/patch";
+
+import { useEffect } from "@odoo/owl";
 
 patch(Discuss.prototype, {
     setup(...args) {
         super.setup(...args);
-        const state = useState({ openInviteButton: 0 });
-        useChildSubEnv({
-            onStartMeeting: () => {
-                state.openInviteButton++;
-            },
-        });
         useEffect(
             () => {
-                if (state.openInviteButton === 0) {
-                    return;
+                if (this.thread && this.thread === this.store.openInviteThread) {
+                    this.threadActions.actions
+                        .find((action) => action.id === "invite-people")
+                        ?.onSelect();
+                    this.store.openInviteThread = null;
                 }
-                this.threadActions.actions.find((action) => action.id === "add-users")?.onSelect();
             },
-            () => [state.openInviteButton]
+            () => [this.store.openInviteThread]
         );
     },
 });

@@ -20,6 +20,14 @@ class TestSaleOrder(SaleCommon):
     # Those tests do not rely on accounting common on purpose
     #   If you need the accounting setup, use other classes (TestSaleToInvoice probably)
 
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.partner1, cls.partner2 = cls.env['res.partner'].create([
+            {'name': 'Partner 1'},
+            {'name': 'Partner 2'},
+        ])
+
     def test_computes_auto_fill(self):
         free_product, dummy_product = self.env['product.product'].create([{
             'name': 'Free product',
@@ -388,7 +396,7 @@ class TestSaleOrder(SaleCommon):
         tax_a = self.env['account.tax'].create({
             'name': 'Test tax',
             'type_tax_use': 'sale',
-            'price_include': False,
+            'price_include_override': 'tax_excluded',
             'amount_type': 'percent',
             'amount': 15.0,
         })
@@ -447,25 +455,24 @@ class TestSaleOrder(SaleCommon):
         self.assertFalse(public_user.has_group('sale.group_auto_done_setting'))
         self.assertTrue(self.sale_order.locked)
 
-    def test_generate_account_analytic_when_confirm_so(self):
-        """ Test generate account analytic when SO with expense product is confirmed """
-        restaurant_expenses_product = self.env['product.product'].create({
-            'name': 'Restaurant Expenses',
-            'type': 'service',
-            'expense_policy': 'sales_price',
-            'list_price': 14.0,
-            'standard_price': 10.0,
+    def test_draft_quotation_followers(self):
+        sale_order = self.env['sale.order'].create({
+            'partner_id': self.partner1.id,
         })
-        sale_order = self.env['sale.order'].with_user(self.sale_user).create({
-            'partner_id': self.partner.id,
-            'order_line': [Command.create({
-                'product_id': restaurant_expenses_product.id,
-                'product_uom_qty': 1,
-            })],
+
+        sale_order.partner_id = self.partner2
+
+        self.assertNotIn(self.partner2, sale_order.message_partner_ids)
+
+    def test_sent_quotation_followers(self):
+        sale_order = self.env['sale.order'].create({
+            'partner_id': self.partner1.id,
         })
-        self.assertFalse(sale_order.analytic_account_id)
-        sale_order.action_confirm()
-        self.assertTrue(sale_order.analytic_account_id, "An analytic account should be generated")
+        sale_order.action_quotation_sent()
+
+        sale_order.partner_id = self.partner2
+
+        self.assertIn(self.partner2, sale_order.message_partner_ids)
 
     def test_so_discount_is_not_reset(self):
         """ Discounts should not be recomputed on order confirmation """
@@ -476,6 +483,16 @@ class TestSaleOrder(SaleCommon):
             self.sale_order.action_confirm()
             self.sale_order.order_line.flush_recordset(['discount'])
             patched.assert_not_called()
+
+    def test_so_company_empty(self):
+        """Check emptying company on SO form"""
+        company_2 = self.env['res.company'].create({
+            'name': 'Company 2'
+        })
+        self.env.companies = [self.env.company, company_2]
+        so_form = Form(self.env['sale.order'])
+        with self.assertRaises(ValidationError):
+            so_form.company_id = self.env['res.company']
 
     def test_so_is_not_invoiceable_if_only_discount_line_is_to_invoice(self):
         self.sale_order.order_line.product_id.invoice_policy = 'delivery'
@@ -668,24 +685,11 @@ class TestSalesTeam(SaleCommon):
         partner = self.env['res.partner'].create({
             'name': 'Customer of User In Team',
             'user_id': self.user_in_team.id,
-            'team_id': self.sale_team_2.id,
         })
         sale_order = self.env['sale.order'].create({
             'partner_id': partner.id,
         })
         self.assertEqual(sale_order.team_id.id, self.sale_team.id, 'Should assign to team of sales person')
-
-    def test_assign_sales_team_from_partner_team(self):
-        """If no team set on the customer's sales person, fall back to the customer's team"""
-        partner = self.env['res.partner'].create({
-            'name': 'Customer of User Not In Team',
-            'user_id': self.user_not_in_team.id,
-            'team_id': self.sale_team_2.id,
-        })
-        sale_order = self.env['sale.order'].create({
-            'partner_id': partner.id,
-        })
-        self.assertEqual(sale_order.team_id.id, self.sale_team_2.id, 'Should assign to team of partner')
 
     def test_assign_sales_team_when_changing_user(self):
         """When we assign a sales person, change the team on the sales order to their team"""
@@ -863,35 +867,6 @@ class TestSalesTeam(SaleCommon):
         with self.assertRaises(ValidationError):
             self.sale_order.prepayment_percent = 1.01
 
-    def test_sales_team_defined_on_partner_user_no_team(self):
-        """ Test that sale order picks up a team from res.partner on change if user has no team specified """
-
-        crm_team0 = self.env['crm.team'].create({
-            'name':"Test Team A"
-        })
-
-        crm_team1 = self.env['crm.team'].create({
-            'name':"Test Team B"
-        })
-
-        partner_a = self.env['res.partner'].create({
-            'name': 'Partner A',
-            'team_id': crm_team0.id,
-        })
-
-        partner_b = self.env['res.partner'].create({
-            'name': 'Partner B',
-            'team_id': crm_team1.id,
-        })
-
-        sale_order = self.env['sale.order'].with_user(self.user_not_in_team).create({
-            'partner_id': partner_a.id,
-        })
-
-        self.assertEqual(sale_order.team_id, crm_team0, "Sales team should change to partner's")
-        sale_order.with_user(self.user_not_in_team).write({'partner_id': partner_b.id})
-        self.assertEqual(sale_order.team_id, crm_team1, "Sales team should change to partner's")
-
     def test_qty_delivered_on_creation(self):
         """Checks that the qty delivered of sol is automatically set to 0.0 when an so is created"""
         sale_order = self.env['sale.order'].create({
@@ -901,8 +876,6 @@ class TestSalesTeam(SaleCommon):
                     'product_id': self.product.id,
                 })],
         })
-        # As we want to determine if the value is set in the DB we need to perform a search
-        self.assertFalse(self.env['sale.order.line'].search(['&', ('order_id', '=', sale_order.id), ('qty_delivered', '=', False)]))
         self.assertEqual(self.env['sale.order.line'].search(['&', ('order_id', '=', sale_order.id), ('qty_delivered', '=', 0.0)]), sale_order.order_line)
 
     def test_action_recompute_taxes(self):
@@ -915,7 +888,7 @@ class TestSalesTeam(SaleCommon):
             'amount_type': 'percent',
             'amount': 25.0,
             'include_base_amount': True,
-            'price_include': True,
+            'price_include_override': 'tax_included',
         })
 
         mapped_tax_a = self.env['account.tax'].create({
@@ -923,7 +896,7 @@ class TestSalesTeam(SaleCommon):
             'amount_type': 'percent',
             'amount': 12.5,
             'include_base_amount': True,
-            'price_include': True,
+            'price_include_override': 'tax_included',
         })
 
         mapped_tax_b = self.env['account.tax'].create({
@@ -931,14 +904,14 @@ class TestSalesTeam(SaleCommon):
             'amount_type': 'percent',
             'amount': 5.0,
             'include_base_amount': True,
-            'price_include': True,
+            'price_include_override': 'tax_included',
         })
 
         sales_tax = self.env['account.tax'].create({
             'name': "VAT 20%",
             'amount_type': 'percent',
             'amount': 20.0,
-            'price_include': True,
+            'price_include_override': 'tax_included',
         })
 
         mapping_a = self.env['account.fiscal.position'].create({
@@ -952,7 +925,7 @@ class TestSalesTeam(SaleCommon):
 
         # taxes and standard price need to be set on the product, as they will be
         # recomputed when changing the fiscal position.
-        self.consumable_product.write({
+        self.product.write({
             'lst_price': 300,
             'taxes_id': [Command.set((special_tax + sales_tax).ids)],
         })
@@ -961,7 +934,7 @@ class TestSalesTeam(SaleCommon):
             'partner_id': self.partner.id,
             'order_line': [
                 Command.create({
-                    'product_id': self.consumable_product.id,
+                    'product_id': self.product.id,
                     'product_uom_qty': 1.0,
                 }),
             ],
@@ -979,127 +952,3 @@ class TestSalesTeam(SaleCommon):
         order.action_update_taxes()
         self.assertEqual(order.amount_total, 252)
         self.assertEqual(order.amount_tax, 52)
-
-    def test_recompute_taxes_rounded_globally_multi_company_currency(self):
-        '''
-        Check that taxes computation are made in the currency of the company
-        configured on the SO lines.
-        '''
-        # create a currency with no decimal
-        currency_b = self.env['res.currency'].create({
-            'name': 'B',
-            'symbol': 'B',
-            'rounding': 1.000000,
-        })
-        # create a company with USD as currency (rounding == 0.01)
-        company_a = self.env['res.company'].create({
-            'name': 'Company A',
-            'country_id': self.env.ref('base.us').id,
-        })
-        # create a company with currency_b as currency
-        company_b = self.env['res.company'].create({
-            'name': 'Company B',
-            'tax_calculation_rounding_method': 'round_globally',
-            'currency_id': currency_b.id,
-        })
-        # set company_b as default company of current user
-        self.env.user.company_id = company_b
-        tax_group_a = self.env['account.tax.group'].create({
-            'name': 'Tax Group A',
-            'company_id': company_a.id,
-        })
-        tax_a = self.env['account.tax'].create({
-            'name': 'Tax A',
-            'amount': 10,
-            'company_id': company_a.id,
-            'tax_group_id': tax_group_a.id,
-            'country_id': self.env.ref('base.us').id,
-        })
-        # create a SO from company_a
-        so = self.env['sale.order'].create({
-            'partner_id': self.partner.id,
-            'company_id': company_a.id,
-            'order_line': [
-                Command.create({
-                    'product_id': self.product.id,
-                    'product_uom_qty': 1,
-                    'price_unit': 123.4,
-                    'tax_id': tax_a.ids,
-                }),
-            ],
-        })
-        # edit the price unit
-        so.write({
-            'order_line': [
-                Command.update(so.order_line[0].id, {'price_unit': 123.5}),
-            ],
-        })
-        # call "flush_all" as it is done in "call_kw" method to test
-        # the tax values that have been recomputed after it
-        self.env.flush_all()
-        self.assertEqual(so.amount_tax, 12.35)
-        self.assertEqual(so.amount_total, 135.85)
-        # set "Rounding Method" of company A to "Round Globally"
-        company_a.tax_calculation_rounding_method = 'round_globally'
-        # edit the price unit
-        so.write({
-            'order_line': [
-                Command.update(so.order_line[0].id, {'price_unit': 123.6}),
-            ],
-        })
-        self.env.flush_all()
-        self.assertEqual(so.amount_tax, 12.36)
-        self.assertEqual(so.amount_total, 135.96)
-
-    def test_recompute_taxes_rounded_globally_currency_precision(self):
-        '''
-        Check that taxes computation are made in the currency of the company
-        configured on the SO lines.
-        '''
-        # create a currency with no decimal
-        currency_b = self.env['res.currency'].create({
-            'name': 'B',
-            'symbol': 'B',
-            'rounding': 1.000000,
-        })
-        # create a company with currency_b as currency
-        company_b = self.env['res.company'].create({
-            'name': 'Company B',
-            'tax_calculation_rounding_method': 'round_globally',
-            'currency_id': currency_b.id,
-        })
-        # set company_b as default company of current user
-        self.env.user.company_id = company_b
-
-        pricelist_b = self.env['product.pricelist'].with_company(company_b).create({
-            'name': 'pricelist b',
-            'currency_id': self.env.ref('base.USD').id,
-        })
-        tax_group_a = self.env['account.tax.group'].create({
-            'name': 'Tax Group',
-            'company_id': company_b.id,
-        })
-        tax = self.env['account.tax'].create({
-            'name': 'Tax A',
-            'amount': 19,
-            'company_id': company_b.id,
-            'country_id': self.env.ref('base.us').id,
-            'tax_group_id': tax_group_a.id,
-        })
-        so = self.env['sale.order'].create({
-            'partner_id': self.partner.id,
-            'company_id': company_b.id,
-            'pricelist_id': pricelist_b.id,
-            'order_line': [
-                Command.create({
-                    'product_id': self.product.id,
-                    'product_uom_qty': 1,
-                    'price_unit': 15.31,
-                    'tax_id': tax.ids,
-                }),
-            ],
-        })
-        self.assertEqual(so.amount_tax, 2.91)
-        self.assertEqual(so.amount_total, 18.22)
-        self.assertEqual(so.order_line.price_tax, 2.91)
-        self.assertEqual(so.order_line.price_total, 18.22)

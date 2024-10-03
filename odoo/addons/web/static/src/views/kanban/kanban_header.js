@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
 import { Component, useRef } from "@odoo/owl";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
@@ -18,6 +16,10 @@ import { utils } from "@web/core/ui/ui_service";
 
 class KanbanHeaderTooltip extends Component {
     static template = "web.KanbanGroupTooltip";
+    static props = {
+        tooltip: Array,
+        close: Function,
+    };
 }
 
 export class KanbanHeader extends Component {
@@ -279,7 +281,10 @@ kanbanHeaderConfigItems.add(
         label: _t("Archive All"),
         method: "archiveGroup",
         isVisible: ({ permissions }) => permissions.canArchiveGroup,
-        class: "o_column_archive_records",
+        class: ({ props }) => ({
+            o_column_archive_records: true,
+            disabled: props.list.model.useSampleModel,
+        }),
     },
     { sequence: 40 }
 );
@@ -289,7 +294,10 @@ kanbanHeaderConfigItems.add(
         label: _t("Unarchive All"),
         method: "unarchiveGroup",
         isVisible: ({ permissions }) => permissions.canArchiveGroup,
-        class: "o_column_unarchive_records",
+        class: ({ props }) => ({
+            o_column_unarchive_records: true,
+            disabled: props.list.model.useSampleModel,
+        }),
     },
     { sequence: 50 }
 );

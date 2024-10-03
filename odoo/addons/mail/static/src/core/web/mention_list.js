@@ -1,12 +1,9 @@
-/** @odoo-module */
-
 import { _t } from "@web/core/l10n/translation";
 import { Component, useEffect, useState } from "@odoo/owl";
 import { useService, useAutofocus } from "@web/core/utils/hooks";
 
 import { NavigableList } from "@mail/core/common/navigable_list";
 import { useSequential } from "@mail/utils/common/hooks";
-import { markEventHandled } from "@web/core/utils/misc";
 
 export class MentionList extends Component {
     static template = "mail.MentionList";
@@ -16,10 +13,16 @@ export class MentionList extends Component {
         close: { type: Function, optional: true },
         type: { type: String },
     };
+    static defaultProps = {
+        close: () => {},
+    };
+
     setup() {
+        super.setup();
         this.state = useState({
             searchTerm: "",
             options: [],
+            isFetching: false,
         });
         this.orm = useService("orm");
         this.store = useState(useService("mail.store"));
@@ -34,21 +37,23 @@ export class MentionList extends Component {
                     return;
                 }
                 this.sequential(async () => {
-                    await this.suggestionService.fetchSuggestions({
-                        delimiter: this.props.type === "partner" ? "@" : "#",
-                        term: this.state.searchTerm,
-                    });
-                    const suggestions = this.suggestionService.searchSuggestions(
+                    this.state.isFetching = true;
+                    try {
+                        await this.suggestionService.fetchSuggestions({
+                            delimiter: this.props.type === "partner" ? "@" : "#",
+                            term: this.state.searchTerm,
+                        });
+                    } finally {
+                        this.state.isFetching = false;
+                    }
+                    const { suggestions } = this.suggestionService.searchSuggestions(
                         {
                             delimiter: this.props.type === "partner" ? "@" : "#",
                             term: this.state.searchTerm,
                         },
                         { sort: true }
                     );
-                    this.state.options = [
-                        ...suggestions.mainSuggestions,
-                        ...suggestions.extraSuggestions,
-                    ];
+                    this.state.options = suggestions;
                 });
             },
             () => [this.state.searchTerm]
@@ -70,8 +75,11 @@ export class MentionList extends Component {
         const props = {
             anchorRef: this.ref.el,
             position: "bottom-fit",
-            placeholder: _t("Loading"),
-            onSelect: this.props.onSelect,
+            isLoading: !!this.state.searchTerm && this.state.isFetching,
+            onSelect: (...args) => {
+                this.props.onSelect(...args);
+                this.props.close();
+            },
             options: [],
         };
         switch (this.props.type) {
@@ -97,6 +105,11 @@ export class MentionList extends Component {
     }
 
     onKeydown(ev) {
-        markEventHandled(ev, "MentionList.onKeydown");
+        switch (ev.key) {
+            case "Escape": {
+                this.props.close();
+                break;
+            }
+        }
     }
 }

@@ -1,14 +1,12 @@
-/* @odoo-module */
-
 import { Component, useState } from "@odoo/owl";
 
 import { useDiscussSystray } from "@mail/utils/common/hooks";
-
 import { Dropdown } from "@web/core/dropdown/dropdown";
+import { useDropdownState } from "@web/core/dropdown/dropdown_hooks";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { Domain } from "@web/core/domain";
-import { RPCError } from "@web/core/network/rpc_service";
+import { user } from "@web/core/user";
 
 export class ActivityMenu extends Component {
     static components = { Dropdown };
@@ -16,36 +14,17 @@ export class ActivityMenu extends Component {
     static template = "mail.ActivityMenu";
 
     setup() {
+        super.setup();
         this.discussSystray = useDiscussSystray();
         this.store = useState(useService("mail.store"));
         this.action = useService("action");
-        this.userId = useService("user").userId;
+        this.userId = user.userId;
         this.ui = useState(useService("ui"));
-        this.fetchSystrayActivities();
-    }
-
-    async fetchSystrayActivities() {
-        const groups = await this.env.services.orm.call("res.users", "systray_get_activities");
-        let total = 0;
-        for (const group of groups) {
-            total += group.total_count || 0;
-        }
-        this.store.activityCounter = total;
-        this.store.activityGroups = groups;
-        this.sortActivityGroups();
-    }
-
-    /**
-     * Sort by model ID ASC but always place the activity group for "mail.activity" model at the end (other activities).
-     */
-    sortActivityGroups() {
-        const getSortId = (activityGroup) =>
-            activityGroup.model === "mail.activity" ? Number.MAX_VALUE : activityGroup.id;
-        this.store.activityGroups.sort((g1, g2) => getSortId(g1) - getSortId(g2));
+        this.dropdown = useDropdownState();
     }
 
     onBeforeOpen() {
-        this.fetchSystrayActivities();
+        this.store.fetchData({ systray_get_activities: true });
     }
 
     availableViews(group) {
@@ -58,28 +37,19 @@ export class ActivityMenu extends Component {
     }
 
     openActivityGroup(group, filter="all") {
-        document.body.click(); // hack to close dropdown
+        this.dropdown.close();
         const context = {
             // Necessary because activity_ids of mail.activity.mixin has auto_join
             // So, duplicates are faking the count and "Load more" doesn't show up
             force_search_count: 1,
         };
         if (group.model === "mail.activity") {
-            this.action
-                .doAction("mail.mail_activity_without_access_action", {
-                    additionalContext: {
-                        active_ids: group.activity_ids,
-                    },
-                })
-                .catch((error) => {
-                    if (error instanceof RPCError) {
-                        this.action.doAction("mail.mail_activity_action", {
-                            additionalContext: {
-                                active_ids: group.activity_ids,
-                            },
-                        });
-                    }
-                });
+            this.action.doAction("mail.mail_activity_without_access_action", {
+                additionalContext: {
+                    active_ids: group.activity_ids,
+                    active_model: "mail.activity",
+                },
+            });
             return;
         }
 
@@ -87,16 +57,15 @@ export class ActivityMenu extends Component {
             context["search_default_activities_overdue"] = 1;
             context["search_default_activities_today"] = 1;
         }
-        else if(filter === "overdue"){
+        else if (filter === "overdue") {
             context["search_default_activities_overdue"] = 1;
         }
-        else if(filter === "today"){
+        else if (filter === "today") {
             context["search_default_activities_today"] = 1;
         }
-        else if(filter === "upcoming_all"){
+        else if (filter === "upcoming_all") {
             context["search_default_activities_upcoming_all"] = 1;
         }
-
 
         let domain = [["activity_user_id", "=", this.userId]];
         if (group.domain) {
@@ -119,6 +88,11 @@ export class ActivityMenu extends Component {
                 viewType: group.view_type,
             }
         );
+    }
+
+    openMyActivities() {
+        this.dropdown.close();
+        this.action.doAction("mail.mail_activity_action_my", { clearBreadcrumbs: true });
     }
 }
 

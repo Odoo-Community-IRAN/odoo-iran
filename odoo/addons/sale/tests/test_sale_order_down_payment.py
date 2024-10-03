@@ -9,10 +9,12 @@ from .common import TestSaleCommon
 class TestSaleOrderDownPayment(TestSaleCommon):
 
     @classmethod
-    def setUpClass(cls, chart_template_ref=None):
-        super().setUpClass(chart_template_ref=chart_template_ref)
+    def setUpClass(cls):
+        super().setUpClass()
 
-        SaleOrder = cls.env['sale.order'].with_context(tracking_disable=True)
+        cls.other_currency = cls.setup_other_currency('EUR')
+
+        SaleOrder = cls.env['sale.order']
 
         cls.tax_account = cls.env['account.account'].search([('account_type', '=', 'liability_current')], limit=1)
         cls.tax_10 = cls.create_tax(10)
@@ -94,7 +96,6 @@ class TestSaleOrderDownPayment(TestSaleCommon):
         payment_params = {
             'advance_payment_method': 'percentage',
             'amount': 50,
-            'deposit_account_id': cls.revenue_account.id,
             **kwargs,
         }
         downpayment = cls.env['sale.advance.payment.inv'].with_context(so_context).create(payment_params)
@@ -105,7 +106,10 @@ class TestSaleOrderDownPayment(TestSaleCommon):
     def _assert_invoice_lines_values(self, lines, expected):
         return self.assertRecordValues(lines, [dict(zip(expected[0], x)) for x in expected[1:]])
 
-    def test_tax_breakdown(self):
+    def test_tax_and_account_breakdown(self):
+        income_acc_2 = self.revenue_account.copy()
+        self.sale_order.order_line[1].product_id.product_tmpl_id.property_account_income_id = income_acc_2
+
         self.sale_order.order_line[0].tax_id = self.tax_15 + self.tax_10
         self.sale_order.order_line[1].tax_id = self.tax_10
         self.sale_order.order_line[2].tax_id = self.tax_10
@@ -118,7 +122,8 @@ class TestSaleOrderDownPayment(TestSaleCommon):
             ['account_id',               'tax_ids',                      'balance',     'price_total'],
             # base lines
             [self.revenue_account.id,    (self.tax_15 + self.tax_10).ids, -100,         125          ],
-            [self.revenue_account.id,    self.tax_10.ids,                 -200,         220          ],
+            [income_acc_2.id,            self.tax_10.ids,                 -100,         110          ],
+            [self.revenue_account.id,    self.tax_10.ids,                 -100,         110          ],
             [self.revenue_account.id,    self.env['account.tax'],         -100,         100          ],
             # taxes
             [self.tax_account.id,        self.env['account.tax'],         -30,          0            ],
@@ -127,6 +132,42 @@ class TestSaleOrderDownPayment(TestSaleCommon):
             [self.receivable_account.id, self.env['account.tax'],         down_pay_amt, 0            ],
         ]
         self._assert_invoice_lines_values(invoice.line_ids, expected)
+        invoice.action_post()
+
+        # Deliver product_service_delivery and product_delivery_no
+        self.sale_order.order_line[1].qty_delivered = 2
+        self.sale_order.order_line[3].qty_delivered = 2
+
+        # Full Invoice
+        invoicing_wizard = self.env['sale.advance.payment.inv'].create({
+            'sale_order_ids': [Command.link(self.sale_order.id)],
+            'advance_payment_method': 'delivered',
+        })
+        action = invoicing_wizard.create_invoices()
+        full_invoice = self.env['account.move'].browse(action['res_id'])
+        # pylint: disable=C0326
+        full_invoice_expected = [
+            # keys
+            ['account_id',               'tax_ids',                      'balance',     'price_total'],
+            # product lines
+            [self.revenue_account.id,    (self.tax_15 + self.tax_10).ids, -200,         250          ],
+            [income_acc_2.id,            self.tax_10.ids,                 -200,         220          ],
+            [self.revenue_account.id,    self.tax_10.ids,                 -200,         220          ],
+            [self.revenue_account.id,    self.env['account.tax'],         -200,         200          ],
+            # downpayment section
+            [False,                      [],                              0,            0            ],
+            # deduction downpayment lines
+            [self.revenue_account.id,    (self.tax_15 + self.tax_10).ids, 100,          -125         ],
+            [income_acc_2.id,            self.tax_10.ids,                 100,          -110         ],
+            [self.revenue_account.id,    self.tax_10.ids,                 100,          -110         ],
+            [self.revenue_account.id,    self.env['account.tax'],         100,          -100         ],
+            # taxes
+            [self.tax_account.id,        self.env['account.tax'],         -30,          0            ],
+            [self.tax_account.id,        self.env['account.tax'],         -15,          0            ],
+            # receivable (same as dwonpayment since downpayment 50%)
+            [self.receivable_account.id, self.env['account.tax'],         down_pay_amt, 0            ],
+        ]
+        self._assert_invoice_lines_values(full_invoice.line_ids, full_invoice_expected)
 
     def test_tax_with_diff_tax_on_invoice_breakdown(self):
         # if a generated invoice has it's taxes changed, this should not affect the next downpayment on an SO
@@ -153,7 +194,7 @@ class TestSaleOrderDownPayment(TestSaleCommon):
         self._assert_invoice_lines_values(invoice.line_ids, expected)
 
     def test_tax_breakdown_other_currency(self):
-        self.sale_order.currency_id = self.currency_data['currency']  # rate = 2.0
+        self.sale_order.currency_id = self.other_currency  # rate = 2.0
         self.sale_order.order_line[0].tax_id = self.tax_15 + self.tax_10
         self.sale_order.order_line[1].tax_id = self.tax_10
         self.sale_order.order_line[2].tax_id = self.tax_10
@@ -223,7 +264,7 @@ class TestSaleOrderDownPayment(TestSaleCommon):
         self._assert_invoice_lines_values(invoice.line_ids, expected)
 
     def test_tax_price_include_breakdown(self):
-        tax_10_incl = self.create_tax(10, {'price_include': True})
+        tax_10_incl = self.create_tax(10, {'price_include_override': 'tax_included'})
         self.sale_order.order_line[0].tax_id = tax_10_incl + self.tax_10
         self.sale_order.order_line[1].tax_id = self.tax_10
         self.sale_order.order_line[2].tax_id = self.tax_10
@@ -247,7 +288,7 @@ class TestSaleOrderDownPayment(TestSaleCommon):
         self._assert_invoice_lines_values(invoice.line_ids, expected)
 
     def test_tax_price_include_include_base_amount_breakdown(self):
-        tax_10_pi_ba = self.create_tax(10, {'price_include': True, 'include_base_amount': True})
+        tax_10_pi_ba = self.create_tax(10, {'price_include_override': 'tax_included', 'include_base_amount': True})
         self.tax_10.sequence = 2
         self.sale_order.order_line[0].tax_id = tax_10_pi_ba + self.tax_10
         self.sale_order.order_line[1].tax_id = self.tax_10
@@ -296,7 +337,7 @@ class TestSaleOrderDownPayment(TestSaleCommon):
         self._assert_invoice_lines_values(invoice.line_ids, expected)
 
     def test_tax_price_include_include_base_amount_breakdown_with_discount(self):
-        tax_10_pi_ba = self.create_tax(10, {'price_include': True, 'include_base_amount': True})
+        tax_10_pi_ba = self.create_tax(10, {'price_include_override': 'tax_included', 'include_base_amount': True})
         self.tax_10.sequence = 2
         self.sale_order.order_line[0].tax_id = tax_10_pi_ba + self.tax_10
         self.sale_order.order_line[0].discount = 25.0
@@ -323,9 +364,9 @@ class TestSaleOrderDownPayment(TestSaleCommon):
 
     def test_tax_fixed_amount_breakdown(self):
         tax_10_fix_a = self.create_tax(10, {'amount_type': 'fixed', 'include_base_amount': True})
-        tax_10_a = self.tax_10.copy()
         tax_10_fix_b = self.create_tax(10, {'amount_type': 'fixed', 'include_base_amount': True})
         tax_10_fix_c = self.create_tax(10, {'amount_type': 'fixed'})
+        tax_10_a = self.tax_10
         tax_10_b = self.create_tax(10)
         tax_group_1 = self.env['account.tax'].create({
             'name': "Tax Group",
@@ -342,14 +383,14 @@ class TestSaleOrderDownPayment(TestSaleCommon):
         self.sale_order.order_line[0].tax_id = tax_group_1
         self.sale_order.order_line[1].tax_id = tax_group_2
         self.sale_order.order_line[2].tax_id = tax_10_a
+        self.make_downpayment()
 
-        # Line 1: 200 + 84 = 284
+        # Line 1: 200 + 80 = 284
         # Line 2: 200 + 40 = 240
         # Line 3: 200 + 20 = 220
         # Line 4: 200
         # Total: 944
 
-        self.make_downpayment()
         invoice = self.sale_order.invoice_ids
         # pylint: disable=C0326
         expected = [
@@ -369,8 +410,8 @@ class TestSaleOrderDownPayment(TestSaleCommon):
         self._assert_invoice_lines_values(invoice.line_ids, expected)
 
     def test_tax_fixed_amount_price_include(self):
-        tax_fix = self.create_tax(5, {'amount_type': 'fixed', 'include_base_amount': True, 'price_include': True})
-        tax_percentage = self.create_tax(21, {'amount_type': 'percent', 'price_include': True})
+        tax_fix = self.create_tax(5, {'amount_type': 'fixed', 'include_base_amount': True, 'price_include_override': 'tax_included'})
+        tax_percentage = self.create_tax(21, {'amount_type': 'percent', 'price_include_override': 'tax_included'})
         sale_order = self.env['sale.order'].create({
             'partner_id': self.partner_a.id,
             'partner_invoice_id': self.partner_a.id,
@@ -391,7 +432,6 @@ class TestSaleOrderDownPayment(TestSaleCommon):
             .create({
                 'advance_payment_method': 'fixed',
                 'fixed_amount': 200.0,
-                'deposit_account_id': self.revenue_account.id,
             })
         downpayment.create_invoices()
         sale_order.action_confirm()
@@ -469,9 +509,9 @@ class TestSaleOrderDownPayment(TestSaleCommon):
         an_acc_01 = str(self.env['account.analytic.account'].create({'name': 'Account 01', 'plan_id': analytic_plan.id}).id)
         an_acc_02 = str(self.env['account.analytic.account'].create({'name': 'Account 02', 'plan_id': analytic_plan.id}).id)
         tax_10_fix_a = self.create_tax(10, {'amount_type': 'fixed', 'include_base_amount': True})
-        tax_10_a = self.tax_10.copy()
         tax_10_fix_b = self.create_tax(10, {'amount_type': 'fixed', 'include_base_amount': True})
         tax_10_fix_c = self.create_tax(10, {'amount_type': 'fixed'})
+        tax_10_a = self.tax_10
         tax_10_b = self.create_tax(10)
         tax_group_1 = self.env['account.tax'].create({
             'name': "Tax Group",
@@ -490,7 +530,7 @@ class TestSaleOrderDownPayment(TestSaleCommon):
         self.sale_order.order_line[1].tax_id = tax_group_2
         self.sale_order.order_line[2].tax_id = tax_10_a
 
-        # Line 1: 200 + 84 = 284
+        # Line 1: 200 + 80 = 284
         # Line 2: 200 + 40 = 240
         # Line 3: 200 + 20 = 220
         # Line 4: 200
@@ -544,7 +584,6 @@ class TestSaleOrderDownPayment(TestSaleCommon):
         payment_params = {
             'advance_payment_method': 'fixed',
             'fixed_amount': 550.0,
-            'deposit_account_id': self.revenue_account.id,
         }
         downpayment = self.env['sale.advance.payment.inv'].with_context(so_context).create(payment_params)
         downpayment.create_invoices()
@@ -598,7 +637,6 @@ class TestSaleOrderDownPayment(TestSaleCommon):
         payment_params = {
             'advance_payment_method': 'fixed',
             'fixed_amount': 200.0,
-            'deposit_account_id': self.revenue_account.id,
         }
         downpayment = self.env['sale.advance.payment.inv'].with_context(so_context).create(payment_params)
         action = downpayment.create_invoices()
@@ -623,7 +661,6 @@ class TestSaleOrderDownPayment(TestSaleCommon):
         # final invoice which is a credit note as there ar no deliveries to invoice and there already is 200 paid
         payment_params = {
             'advance_payment_method': 'delivered',
-            'deposit_account_id': self.revenue_account.id,
         }
         downpayment = self.env['sale.advance.payment.inv'].with_context({**so_context, 'raise_if_nothing_to_invoice': False}).create(payment_params)
         action = downpayment.create_invoices()
@@ -633,15 +670,15 @@ class TestSaleOrderDownPayment(TestSaleCommon):
             # keys
             ['account_id',               'tax_ids',    'balance', 'price_total'],
             # line section
-            [[],                         [],           0.0,       0.0          ],
+            [False,                      [],           0.0,       0.0          ],
             # down payment
             [self.revenue_account.id,    tax_21_a.ids, 82.64,     100.0        ],
             [self.revenue_account.id,    tax_21_b.ids, 82.64,     100.0        ],
+            # receivable
+            [self.receivable_account.id, [],           -200,      0.0          ],
             # taxes
             [self.tax_account.id,        [],           17.36,     0.0          ],
             [self.tax_account.id,        [],           17.36,     0.0          ],
-            # receivable
-            [self.receivable_account.id, [],           -200,      0.0          ],
         ]
         self._assert_invoice_lines_values(invoice.line_ids, expected)
         self.assertEqual(downpayment.amount_invoiced, 200.0, "Amount invoiced is not equal to downpayment amount")
@@ -661,7 +698,7 @@ class TestSaleOrderDownPayment(TestSaleCommon):
             [self.revenue_account.id,    tax_21_a.ids, -1000.0,   1210.0       ],
             [self.revenue_account.id,    tax_21_b.ids, -1000.0,   1210.0       ],
             # line section
-            [[],                         [],           0.0,       0.0          ],
+            [False,                      [],           0.0,       0.0          ],
             # down payment
             [self.revenue_account.id,    tax_21_a.ids, 82.64,     -100.0       ],
             [self.revenue_account.id,    tax_21_b.ids, 82.64,     -100.0       ],
@@ -706,7 +743,6 @@ class TestSaleOrderDownPayment(TestSaleCommon):
         payment_params = {
             'advance_payment_method': 'fixed',
             'fixed_amount': 200.0,
-            'deposit_account_id': self.revenue_account.id,
         }
         downpayment = self.env['sale.advance.payment.inv'].with_context(so_context).create(payment_params)
         action = downpayment.create_invoices()
@@ -729,10 +765,7 @@ class TestSaleOrderDownPayment(TestSaleCommon):
         self.assertEqual(downpayment.amount_invoiced, 200.0, "Amount invoiced is not equal to downpayment amount")
 
         # final invoice which is a credit note as there ar no deliveries to invoice and there already is 200 paid
-        payment_params = {
-            'advance_payment_method': 'delivered',
-            'deposit_account_id': self.revenue_account.id,
-        }
+        payment_params = {'advance_payment_method': 'delivered'}
         downpayment = self.env['sale.advance.payment.inv'].with_context({**so_context, 'raise_if_nothing_to_invoice': False}).create(payment_params)
         action = downpayment.create_invoices()
         invoice = self.env['account.move'].browse(action['res_id'])
@@ -741,15 +774,15 @@ class TestSaleOrderDownPayment(TestSaleCommon):
             # keys
             ['account_id',               'tax_ids',    'balance', 'price_total'],
             # line section
-            [[],                         [],           0.0,       0.0          ],
+            [False,                      [],           0.0,       0.0          ],
             # down payment
             [self.revenue_account.id,    tax_24_a.ids, 80.65,     100.0        ],
             [self.revenue_account.id,    tax_24_b.ids, 80.65,     100.0        ],
+            # receivable
+            [self.receivable_account.id, [],           -200,      0.0          ],
             # taxes
             [self.tax_account.id,        [],           19.35,     0.0          ],
             [self.tax_account.id,        [],           19.35,     0.0          ],
-            # receivable
-            [self.receivable_account.id, [],           -200,      0.0          ],
         ]
         self._assert_invoice_lines_values(invoice.line_ids, expected)
         self.assertEqual(downpayment.amount_invoiced, 200.0, "Amount invoiced is not equal to downpayment amount")
@@ -769,7 +802,7 @@ class TestSaleOrderDownPayment(TestSaleCommon):
             [self.revenue_account.id,    tax_24_a.ids, -1000.0,   1240.0       ],
             [self.revenue_account.id,    tax_24_b.ids, -1000.0,   1240.0       ],
             # line section
-            [[],                         [],            0.0,      0.0          ],
+            [False,                      [],            0.0,      0.0          ],
             # down payment
             [self.revenue_account.id,    tax_24_a.ids,  80.65,    -100.0       ],
             [self.revenue_account.id,    tax_24_b.ids,  80.65,    -100.0       ],
@@ -837,7 +870,6 @@ class TestSaleOrderDownPayment(TestSaleCommon):
         payment_params = {
             'advance_payment_method': 'fixed',
             'fixed_amount': 500.0,
-            'deposit_account_id': self.revenue_account.id,
         }
         downpayment = self.env['sale.advance.payment.inv'].with_context(so_context).create(payment_params)
         action = downpayment.create_invoices()
@@ -866,10 +898,7 @@ class TestSaleOrderDownPayment(TestSaleCommon):
         downpayment = self.env['sale.advance.payment.inv'].with_context(so_context).create(payment_params)
         self.assertEqual(downpayment.amount_invoiced, 500.0, "Amount invoiced is not equal to downpayment amount")
         # final invoice
-        payment_params = {
-            'advance_payment_method': 'delivered',
-            'deposit_account_id': self.revenue_account.id,
-        }
+        payment_params = {'advance_payment_method': 'delivered'}
         downpayment = self.env['sale.advance.payment.inv'].with_context(so_context).create(payment_params)
         action = downpayment.create_invoices()
         invoice = self.env['account.move'].browse(action['res_id'])
@@ -884,7 +913,7 @@ class TestSaleOrderDownPayment(TestSaleCommon):
             [self.revenue_account.id,   tax_25_b.ids,  -968.0,    1210.0       ],
             [self.revenue_account.id,   tax_25_c.ids,  -968.0,    1210.0       ],
             # line section
-            [[],                        [],            0.0,       0.0          ],
+            [False,                     [],            0.0,       0.0          ],
             # down payment
             [self.revenue_account.id,    tax_21_a.ids, 82.64,    -100.0       ],
             [self.revenue_account.id,    tax_21_b.ids, 82.64,    -100.0       ],
@@ -927,7 +956,6 @@ class TestSaleOrderDownPayment(TestSaleCommon):
         payment_params = {
             'advance_payment_method': 'fixed',
             'fixed_amount': 840.0,  # with 20% tax applied, amount tax excluded is 700.0
-            'deposit_account_id': self.revenue_account.id,
         }
         downpayment = self.env['sale.advance.payment.inv'].with_context(so_context).create(payment_params)
         action = downpayment.create_invoices()
@@ -1010,7 +1038,7 @@ class TestSaleOrderDownPayment(TestSaleCommon):
             # base lines
             [self.revenue_account.id,   self.tax_15.ids,    -100.0,             115.0],
             # line section
-            [[],                        [],                 0.0,                0.0],
+            [False,                     [],                 0.0,                0.0],
             # down payment
             [self.revenue_account.id,   self.tax_15.ids,    43.48,              -50.0],
             # taxes

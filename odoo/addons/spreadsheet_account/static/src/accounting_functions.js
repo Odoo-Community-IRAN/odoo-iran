@@ -4,6 +4,7 @@ import { _t } from "@web/core/l10n/translation";
 import { sprintf } from "@web/core/utils/strings";
 
 import * as spreadsheet from "@odoo/o-spreadsheet";
+import { EvaluationError } from "@odoo/o-spreadsheet";
 const { functionRegistry } = spreadsheet.registries;
 const { arg, toBoolean, toString, toNumber, toJsDate } = spreadsheet.helpers;
 
@@ -128,7 +129,7 @@ export function parseAccountingDate(dateRange, locale) {
             parseAccountingDay(dateRange, locale)
         );
     } catch {
-        throw new Error(
+        throw new EvaluationError(
             sprintf(
                 _t(
                     `'%s' is not a valid period. Supported formats are "21/12/2022", "Q1/2022", "12/2022", and "2022".`
@@ -158,29 +159,31 @@ functionRegistry.add("ODOO.CREDIT", {
     args: ODOO_FIN_ARGS(),
     category: "Odoo",
     returns: ["NUMBER"],
-    computeValueAndFormat: function (
+    compute: function (
         accountCodes,
         dateRange,
         offset = { value: 0 },
         companyId = { value: null },
         includeUnposted = { value: false }
     ) {
-        accountCodes = toString(accountCodes?.value)
+        const _accountCodes = toString(accountCodes)
             .split(",")
             .map((code) => code.trim())
             .sort();
-        offset = toNumber(offset.value, this.locale);
-        dateRange = parseAccountingDate(dateRange, this.locale);
-        includeUnposted = toBoolean(includeUnposted.value);
-        const value = this.getters.getAccountPrefixCredit(
-            accountCodes,
-            dateRange,
-            offset,
-            companyId.value,
-            includeUnposted
-        );
-        const format = this.getters.getCompanyCurrencyFormat(companyId.value) || "#,##0.00";
-        return { value, format };
+        const _offset = toNumber(offset, this.locale);
+        const _dateRange = parseAccountingDate(dateRange, this.locale);
+        const _companyId = companyId?.value;
+        const _includeUnposted = toBoolean(includeUnposted);
+        return {
+            value: this.getters.getAccountPrefixCredit(
+                _accountCodes,
+                _dateRange,
+                _offset,
+                _companyId,
+                _includeUnposted
+            ),
+            format: this.getters.getCompanyCurrencyFormat(_companyId) || "#,##0.00",
+        };
     },
 });
 
@@ -189,29 +192,31 @@ functionRegistry.add("ODOO.DEBIT", {
     args: ODOO_FIN_ARGS(),
     category: "Odoo",
     returns: ["NUMBER"],
-    computeValueAndFormat: function (
+    compute: function (
         accountCodes,
         dateRange,
         offset = { value: 0 },
         companyId = { value: null },
         includeUnposted = { value: false }
     ) {
-        accountCodes = toString(accountCodes?.value)
+        const _accountCodes = toString(accountCodes)
             .split(",")
             .map((code) => code.trim())
             .sort();
-        offset = toNumber(offset.value, this.locale);
-        dateRange = parseAccountingDate(dateRange, this.locale);
-        includeUnposted = toBoolean(includeUnposted.value);
-        const value = this.getters.getAccountPrefixDebit(
-            accountCodes,
-            dateRange,
-            offset,
-            companyId.value,
-            includeUnposted
-        );
-        const format = this.getters.getCompanyCurrencyFormat(companyId.value) || "#,##0.00";
-        return { value, format };
+        const _offset = toNumber(offset, this.locale);
+        const _dateRange = parseAccountingDate(dateRange, this.locale);
+        const _companyId = companyId?.value;
+        const _includeUnposted = toBoolean(includeUnposted);
+        return {
+            value: this.getters.getAccountPrefixDebit(
+                _accountCodes,
+                _dateRange,
+                _offset,
+                _companyId,
+                _includeUnposted
+            ),
+            format: this.getters.getCompanyCurrencyFormat(_companyId) || "#,##0.00",
+        };
     },
 });
 
@@ -220,37 +225,37 @@ functionRegistry.add("ODOO.BALANCE", {
     args: ODOO_FIN_ARGS(),
     category: "Odoo",
     returns: ["NUMBER"],
-    computeValueAndFormat: function (
+    compute: function (
         accountCodes,
         dateRange,
         offset = { value: 0 },
         companyId = { value: null },
         includeUnposted = { value: false }
     ) {
-        accountCodes = toString(accountCodes?.value)
+        const _accountCodes = toString(accountCodes)
             .split(",")
             .map((code) => code.trim())
             .sort();
-        offset = toNumber(offset.value, this.locale);
-        dateRange = parseAccountingDate(dateRange, this.locale);
-        includeUnposted = toBoolean(includeUnposted.value);
+        const _offset = toNumber(offset, this.locale);
+        const _dateRange = parseAccountingDate(dateRange, this.locale);
+        const _companyId = companyId?.value;
+        const _includeUnposted = toBoolean(includeUnposted);
         const value =
             this.getters.getAccountPrefixDebit(
-                accountCodes,
-                dateRange,
-                offset,
-                companyId.value,
-                includeUnposted
+                _accountCodes,
+                _dateRange,
+                _offset,
+                _companyId,
+                _includeUnposted
             ) -
             this.getters.getAccountPrefixCredit(
-                accountCodes,
-                dateRange,
-                offset,
-                companyId.value,
-                includeUnposted
+                _accountCodes,
+                _dateRange,
+                _offset,
+                _companyId,
+                _includeUnposted
             );
-        const format = this.getters.getCompanyCurrencyFormat(companyId.value) || "#,##0.00";
-        return { value, format };
+        return { value, format: this.getters.getCompanyCurrencyFormat(_companyId) || "#,##0.00" };
     },
 });
 
@@ -262,15 +267,15 @@ functionRegistry.add("ODOO.FISCALYEAR.START", {
     ],
     category: "Odoo",
     returns: ["NUMBER"],
-    computeFormat: function () {
-        return this.locale.dateFormat;
-    },
-    compute: function (date, companyId = null) {
+    compute: function (date, companyId = { value: null }) {
         const startDate = this.getters.getFiscalStartDate(
             toJsDate(date, this.locale),
-            companyId === null ? null : toNumber(companyId, this.locale)
+            companyId.value === null ? null : toNumber(companyId, this.locale)
         );
-        return toNumber(startDate, this.locale);
+        return {
+            value: toNumber(startDate, this.locale),
+            format: this.locale.dateFormat,
+        };
     },
 });
 
@@ -282,15 +287,15 @@ functionRegistry.add("ODOO.FISCALYEAR.END", {
     ],
     category: "Odoo",
     returns: ["NUMBER"],
-    computeFormat: function () {
-        return this.locale.dateFormat;
-    },
-    compute: function (date, companyId = null) {
+    compute: function (date, companyId = { value: null }) {
         const endDate = this.getters.getFiscalEndDate(
             toJsDate(date, this.locale),
-            companyId === null ? null : toNumber(companyId, this.locale)
+            companyId.value === null ? null : toNumber(companyId, this.locale)
         );
-        return toNumber(endDate, this.locale);
+        return {
+            value: toNumber(endDate, this.locale),
+            format: this.locale.dateFormat,
+        };
     },
 });
 

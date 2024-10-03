@@ -7,7 +7,8 @@ from psycopg2 import IntegrityError
 import pytz
 
 from odoo.exceptions import ValidationError
-from odoo.tests.common import tagged, Form
+from odoo.tests import Form
+from odoo.tests.common import tagged
 from odoo.tools import mute_logger
 from odoo.addons.hr_work_entry_contract.tests.common import TestWorkEntryBase
 

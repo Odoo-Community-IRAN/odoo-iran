@@ -3,16 +3,15 @@
 # 	* base_install_request
 # 
 # Translators:
-# Wil Odoo, 2023
-# Fernanda Alvarez, 2023
+# Wil Odoo, 2024
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 17.0\n"
+"Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 21:55+0000\n"
-"PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Fernanda Alvarez, 2023\n"
+"POT-Creation-Date: 2024-09-26 08:55+0000\n"
+"PO-Revision-Date: 2024-09-25 09:41+0000\n"
+"Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Spanish (Latin America) (https://app.transifex.com/odoo/teams/41243/es_419/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -33,7 +32,7 @@ msgid ""
 "            <t t-out=\"object.body_html\"></t>\n"
 "        </blockquote>\n"
 "        <br><br>\n"
-"        <a style=\"background-color:#875A7B; padding:8px 16px 8px 16px; text-decoration:none; color:#fff; border-radius:5px\" t-attf-href=\"/web?#action=base_install_request.action_base_module_install_review&amp;active_id={{ object.module_id.id }}&amp;menu_id={{ ctx['menu_id'] }}\">Review Request</a>\n"
+"        <a style=\"background-color:#875A7B; padding:8px 16px 8px 16px; text-decoration:none; color:#fff; border-radius:5px\" t-attf-href=\"/odoo/{{ object.module_id.id }}/action-base_install_request.action_base_module_install_review?menu_id={{ ctx['menu_id'] }}\">Review Request</a>\n"
 "        <br><br>\n"
 "        Thanks,\n"
 "        <t t-if=\"not is_html_empty(object.user_id.signature)\">\n"
@@ -45,32 +44,10 @@ msgid ""
 "</div>\n"
 "            "
 msgstr ""
-"<div style=\"margin: 0px; padding: 0px;\">\n"
-"    <p style=\"margin: 0px; padding: 0px; font-size: 13px;\">\n"
-"        Hola,\n"
-"        <br><br>\n"
-"        <span style=\"font-weight: bold;\" t-out=\"object.user_id.name\"></span> solicitó activar el módulo <span style=\"font-weight: bold;\" t-out=\"object.module_id.shortdesc\"></span>, el cual está incluido en su suscripción <span style=\"color: #875A7B; font-weight: bold;\">sin costo adicional</span>, pero es necesario que un administrador ejecute esta acción.\n"
-"        <br><br>\n"
-"        <blockquote>\n"
-"            <t t-out=\"object.body_html\"></t>\n"
-"        </blockquote>\n"
-"        <br><br>\n"
-"        <a style=\"background-color:#875A7B; padding:8px 16px 8px 16px; text-decoration:none; color:#fff; border-radius:5px\" t-attf-href=\"/web?#action=base_install_request.action_base_module_install_review&amp;active_id={{ object.module_id.id }}&amp;menu_id={{ ctx['menu_id'] }}\">Revisar la solicitud</a>\n"
-"        <br><br>\n"
-"        Gracias,\n"
-"        <t t-if=\"not is_html_empty(object.user_id.signature)\">\n"
-"            <br><br>\n"
-"            <t t-out=\"object.user_id.signature or ''\">--<br>Mitchell Admin</t>\n"
-"        </t>\n"
-"        <br><br>\n"
-"    </p>\n"
-"</div>\n"
-"            "
 
 #. module: base_install_request
 #. odoo-python
 #: code:addons/base_install_request/models/ir_module_module.py:0
-#, python-format
 msgid "Activation Request of \"%s\""
 msgstr "Solicitud de activación de \"%s\""
 
@@ -172,7 +149,6 @@ msgstr "Sin costo adicional, esta aplicación es gratuita."
 #. module: base_install_request
 #. odoo-python
 #: code:addons/base_install_request/wizard/base_module_install_request.py:0
-#, python-format
 msgid "No module selected."
 msgstr "No hay ningún módulo seleccionado."
 
@@ -200,7 +176,6 @@ msgstr "Se instalarán las siguientes aplicaciones:"
 #. module: base_install_request
 #. odoo-python
 #: code:addons/base_install_request/wizard/base_module_install_request.py:0
-#, python-format
 msgid "The module is already installed."
 msgstr "El módulo ya está instalado."
 
@@ -232,7 +207,6 @@ msgstr "Está por instalar una aplicación adicional"
 #. module: base_install_request
 #. odoo-python
 #: code:addons/base_install_request/wizard/base_module_install_request.py:0
-#, python-format
 msgid "Your request has been successfully sent"
 msgstr "Su solicitud se envió con éxito"
 

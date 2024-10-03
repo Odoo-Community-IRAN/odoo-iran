@@ -1,8 +1,8 @@
 /** @odoo-module */
 
-import { useService } from "@web/core/utils/hooks";
 
 import { Domain } from '@web/core/domain';
+import { rpc } from "@web/core/network/rpc";
 import { SearchModel } from '@web/search/search_model';
 import { useState, onWillStart } from "@odoo/owl";
 
@@ -10,14 +10,14 @@ export class LunchSearchModel extends SearchModel {
     setup() {
         super.setup(...arguments);
 
-        this.rpc = useService('rpc');
         this.lunchState = useState({
             locationId: false,
             userId: false,
+            date: new Date(),
         });
 
         onWillStart(async () => {
-            const locationId = await this.rpc('/lunch/user_location_get', {});
+            const locationId = await rpc('/lunch/user_location_get', {});
             this.updateLocationId(locationId);
         });
     }
@@ -47,6 +47,16 @@ export class LunchSearchModel extends SearchModel {
 
     updateLocationId(locationId) {
         this.lunchState.locationId = locationId;
+        this._notify();
+    }
+
+    updateDate(date) {
+        this.lunchState.date.setTime(date);
+        const domain_key = ['available_on_sun', 'available_on_mon', 'available_on_tue', 'available_on_wed',
+        'available_on_thu', 'available_on_fri', 'available_on_sat'][this.lunchState.date.getDay()];
+        const filter = Object.values(this.searchItems).find(o => o['name'] === domain_key);
+        this.deactivateGroup(filter.groupId)
+        this.toggleSearchItem(filter.id);
         this._notify();
     }
 

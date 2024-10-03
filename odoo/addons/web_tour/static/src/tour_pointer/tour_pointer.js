@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 import { Component, useEffect, useRef } from "@odoo/owl";
-import { usePosition } from "@web/core/position_hook";
+import { usePosition } from "@web/core/position/position_hook";
 
 /**
  * @typedef {import("../tour_service/tour_pointer_state").TourPointerState} TourPointerState
@@ -21,6 +21,7 @@ export class TourPointer extends Component {
                 content: { type: String, optional: true },
                 isOpen: { type: Boolean, optional: true },
                 isVisible: { type: Boolean, optional: true },
+                isZone: { type: Boolean, optional: true },
                 onClick: { type: [Function, { value: null }], optional: true },
                 onMouseEnter: { type: [Function, { value: null }], optional: true },
                 onMouseLeave: { type: [Function, { value: null }], optional: true },
@@ -66,9 +67,17 @@ export class TourPointer extends Component {
                 }
             },
         };
-        Object.defineProperty(positionOptions, "position", { get: () => this.position, enumerable: true });
-        const position = usePosition("pointer", () => this.props.pointerState.anchor, positionOptions);
+        Object.defineProperty(positionOptions, "position", {
+            get: () => this.position,
+            enumerable: true,
+        });
+        const position = usePosition(
+            "pointer",
+            () => this.props.pointerState.anchor,
+            positionOptions
+        );
         const rootRef = useRef("pointer");
+        const zoneRef = useRef("zone");
         /** @type {DOMREct | null} */
         let dimensions = null;
         let lastMeasuredContent = null;
@@ -77,10 +86,21 @@ export class TourPointer extends Component {
         let [anchorX, anchorY] = [0, 0];
         useEffect(() => {
             const { el: pointer } = rootRef;
+            const { el: zone } = zoneRef;
             if (pointer) {
                 const hasContentChanged = lastMeasuredContent !== this.content;
                 const hasOpenStateChanged = lastOpenState !== this.isOpen;
                 lastOpenState = this.isOpen;
+
+                // Check is the pointed element is a zone
+                if (this.props.pointerState.isZone) {
+                    const { anchor } = this.props.pointerState;
+                    const { left, top, width, height } = anchor.getBoundingClientRect();
+                    zone.style.minWidth = width + "px";
+                    zone.style.minHeight = height + "px";
+                    zone.style.left = left + "px";
+                    zone.style.top = top + "px";
+                }
 
                 // Content changed: we must re-measure the dimensions of the text.
                 if (hasContentChanged) {
@@ -142,7 +162,7 @@ export class TourPointer extends Component {
     }
 
     get isOpen() {
-        return this.props.pointerState.isOpen;
+        return this.props.pointerState.isOpen && this.content;
     }
 
     get position() {

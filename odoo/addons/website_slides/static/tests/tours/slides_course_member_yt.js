@@ -2,7 +2,7 @@
 
 import { registry } from "@web/core/registry";
 
-function patchFullScreen(){
+function patchFullScreen() {
     /**
      * Alter this method for test purposes.
      * This will make the video start at 10 minutes.
@@ -12,9 +12,9 @@ function patchFullScreen(){
     FullScreen.include({
         _renderSlide: function () {
 
-            var slide = this.get('slide');
+            const slide = this._slideValue;
             slide.embedUrl += '&start=260';
-            this.set('slide', slide);
+            this._updateSlideValue(slide);
 
             return this._super.call(this, arguments);
         }
@@ -44,31 +44,37 @@ registry.category("web_tour.tours").add('course_member_youtube', {
 },
 // eLearning: go on /all, find free course and join it
 {
-    trigger: 'a.o_wslides_home_all_slides'
+    trigger: 'a.o_wslides_home_all_slides',
+    run: "click",
 }, {
-    trigger: 'a:contains("Choose your wood")'
+    trigger: 'a:contains("Choose your wood")',
+    run: "click",
 }, {
-    trigger: 'a:contains("Join this Course")'
+    trigger: 'a:contains("Join this Course")',
+    run: "click",
 }, {
+    // check membership
     trigger: '.o_wslides_js_course_join:contains("You\'re enrolled")',
-    run: function () {} // check membership
 }, {
     trigger: 'a:contains("Comparing Hardness of Wood Species")',
+    run: "click",
 },  {
+    // check progression
     trigger: '.o_wslides_progress_percentage:contains("50")',
-    run: function () {} // check progression
 }, {
     trigger: '.o_wslides_fs_slide_name:contains("Wood Bending With Steam Box")',
+    run: "click",
 }, {
+    // check player loading
     trigger: '.player',
-    run: function () {} // check player loading
 }, {
+    // check that video slide is marked as 'done'
     trigger: '.o_wslides_fs_sidebar_section_slides li:contains("Wood Bending With Steam Box") .o_wslides_slide_completed',
-    run: function () {} // check that video slide is marked as 'done'
 }, {
+    // check progression
     trigger: '.o_wslides_channel_completion_completed:contains(Completed)',
-    run: function () {} // check progression
 }, {
-    trigger: 'a:contains("Back to course")'
+    trigger: 'a:contains("Back to course")',
+    run: "click",
 }
 ]});

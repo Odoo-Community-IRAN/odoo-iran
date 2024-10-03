@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo import tools
+from odoo import Command
 
 import odoo
 from odoo.addons.point_of_sale.tests.common import TestPoSCommon
-from odoo.tests.common import Form
+from odoo.tests import Form
 from odoo.exceptions import UserError
 
 
@@ -85,9 +84,9 @@ class TestPoSProductsWithTax(TestPoSCommon):
         self._run_test({
             'payment_methods': self.cash_pm1 | self.bank_pm1,
             'orders': [
-                {'pos_order_lines_ui_args': [(self.product1, 10), (self.product2, 5)], 'uid': '00100-010-0001'},
-                {'pos_order_lines_ui_args': [(self.product2, 7), (self.product3, 4)], 'uid': '00100-010-0002'},
-                {'pos_order_lines_ui_args': [(self.product1, 1), (self.product3, 5), (self.product2, 3)], 'payments': [(self.bank_pm1, 230.25)], 'uid': '00100-010-0003'},
+                {'pos_order_lines_ui_args': [(self.product1, 10), (self.product2, 5)], 'uuid': '00100-010-0001'},
+                {'pos_order_lines_ui_args': [(self.product2, 7), (self.product3, 4)], 'uuid': '00100-010-0002'},
+                {'pos_order_lines_ui_args': [(self.product1, 1), (self.product3, 5), (self.product2, 3)], 'payments': [(self.bank_pm1, 230.25)], 'uuid': '00100-010-0003'},
             ],
             'before_closing_cb': _before_closing_cb,
             'journal_entries_before_closing': {},
@@ -99,8 +98,8 @@ class TestPoSProductsWithTax(TestPoSCommon):
                         {'account_id': self.sales_account.id, 'partner_id': False, 'debit': 0, 'credit': 110, 'reconciled': False, 'display_type': 'product'},
                         {'account_id': self.sales_account.id, 'partner_id': False, 'debit': 0, 'credit': 272.73, 'reconciled': False, 'display_type': 'product'},
                         {'account_id': self.sales_account.id, 'partner_id': False, 'debit': 0, 'credit': 245.45, 'reconciled': False, 'display_type': 'product'},
-                        {'account_id': self.bank_pm1.receivable_account_id.id, 'partner_id': False, 'debit': 230.25, 'credit': 0, 'reconciled': True, 'display_type': 'product'},
-                        {'account_id': self.cash_pm1.receivable_account_id.id, 'partner_id': False, 'debit': 474.64, 'credit': 0, 'reconciled': True, 'display_type': 'product'},
+                        {'account_id': self.bank_pm1.receivable_account_id.id, 'partner_id': False, 'debit': 230.25, 'credit': 0, 'reconciled': True, 'display_type': 'payment_term'},
+                        {'account_id': self.cash_pm1.receivable_account_id.id, 'partner_id': False, 'debit': 474.64, 'credit': 0, 'reconciled': True, 'display_type': 'payment_term'},
                     ],
                 },
                 'cash_statement': [
@@ -178,10 +177,10 @@ class TestPoSProductsWithTax(TestPoSCommon):
         self._run_test({
             'payment_methods': self.cash_pm1 | self.bank_pm1,
             'orders': [
-                {'pos_order_lines_ui_args': [(self.product3, 1), (self.product1, 6), (self.product2, 3)], 'uid': '00100-010-0001'},
-                {'pos_order_lines_ui_args': [(self.product2, 20), (self.product1, 1)], 'payments': [(self.bank_pm1, 410.7)], 'uid': '00100-010-0002'},
-                {'pos_order_lines_ui_args': [(self.product1, 10), (self.product3, 10)], 'payments': [(self.bank_pm1, 426.09)], 'customer': self.customer, 'is_invoiced': True, 'uid': '09876-098-0987'},
-                {'pos_order_lines_ui_args': [(self.product4, 1)], 'payments': [(self.bank_pm1, 54.99)], 'customer': self.customer, 'is_invoiced': True, 'uid': '00100-010-0004'},
+                {'pos_order_lines_ui_args': [(self.product3, 1), (self.product1, 6), (self.product2, 3)], 'uuid': '00100-010-0001'},
+                {'pos_order_lines_ui_args': [(self.product2, 20), (self.product1, 1)], 'payments': [(self.bank_pm1, 410.7)], 'uuid': '00100-010-0002'},
+                {'pos_order_lines_ui_args': [(self.product1, 10), (self.product3, 10)], 'payments': [(self.bank_pm1, 426.09)], 'customer': self.customer, 'is_invoiced': True, 'uuid': '09876-098-0987'},
+                {'pos_order_lines_ui_args': [(self.product4, 1)], 'payments': [(self.bank_pm1, 54.99)], 'customer': self.customer, 'is_invoiced': True, 'uuid': '00100-010-0004'},
             ],
             'before_closing_cb': _before_closing_cb,
             'journal_entries_before_closing': {
@@ -266,7 +265,7 @@ class TestPoSProductsWithTax(TestPoSCommon):
             self.assertAlmostEqual(orders_total, self.pos_session.total_payments_amount, msg='Total order amount should be equal to the total payment amount.')
 
             # return order
-            order_to_return = self.pos_session.order_ids.filtered(lambda order: '12345-123-1234' in order.pos_reference)
+            order_to_return = self.pos_session.order_ids.filtered(lambda order: '12345-123-1234' in order.uuid)
             order_to_return.refund()
 
             refund_order = self.pos_session.order_ids.filtered(lambda order: order.state == 'draft')
@@ -289,7 +288,7 @@ class TestPoSProductsWithTax(TestPoSCommon):
         self._run_test({
             'payment_methods': self.cash_pm1 | self.bank_pm1,
             'orders': [
-                {'pos_order_lines_ui_args': [(self.product1, 3), (self.product2, 2), (self.product3, 1)], 'payments': [(self.cash_pm1, 104.01)], 'customer': self.customer, 'is_invoiced': True, 'uid': '12345-123-1234'},
+                {'pos_order_lines_ui_args': [(self.product1, 3), (self.product2, 2), (self.product3, 1)], 'payments': [(self.cash_pm1, 104.01)], 'customer': self.customer, 'is_invoiced': True, 'uuid': '12345-123-1234'},
             ],
             'before_closing_cb': _before_closing_cb,
             'journal_entries_before_closing': {
@@ -347,7 +346,7 @@ class TestPoSProductsWithTax(TestPoSCommon):
             tax_ids=tax_21_incl.ids,
         )
         self.open_new_session()
-        self.env['pos.order'].create_from_ui([self.create_ui_order_data([
+        self.env['pos.order'].sync_from_ui([self.create_ui_order_data([
             (product1, 1),
             (product2, -1),
         ])])
@@ -393,7 +392,7 @@ class TestPoSProductsWithTax(TestPoSCommon):
             tax_ids=tax_21_incl.ids,
         )
         self.open_new_session()
-        self.env['pos.order'].create_from_ui([self.create_ui_order_data([
+        self.env['pos.order'].sync_from_ui([self.create_ui_order_data([
             (product1, 1),
             (product2, -1),
         ])])
@@ -439,7 +438,7 @@ class TestPoSProductsWithTax(TestPoSCommon):
             tax_ids=tax_21_incl.ids,
         )
         self.open_new_session()
-        self.env['pos.order'].create_from_ui([self.create_ui_order_data([
+        self.env['pos.order'].sync_from_ui([self.create_ui_order_data([
             (product1, 1, 10),
             (product2, -1, 10),
         ])])
@@ -486,7 +485,7 @@ class TestPoSProductsWithTax(TestPoSCommon):
             tax_ids=tax_21_incl.ids,
         )
         self.open_new_session()
-        self.env['pos.order'].create_from_ui([self.create_ui_order_data([
+        self.env['pos.order'].sync_from_ui([self.create_ui_order_data([
             (product1, 6, 5),
             (product2, -6, 5),
         ])])
@@ -532,7 +531,7 @@ class TestPoSProductsWithTax(TestPoSCommon):
         })
 
         self.open_new_session()
-        self.env['pos.order'].create_from_ui([self.create_ui_order_data([
+        self.env['pos.order'].sync_from_ui([self.create_ui_order_data([
             (zero_amount_product, 1),
         ])])
         self.pos_session.action_pos_session_validate()
@@ -638,14 +637,19 @@ class TestPoSProductsWithTax(TestPoSCommon):
             'taxes_id': [],
         })
         # configure a session on Branch XX
+        self.xx_bank_journal = self.env['account.journal'].with_company(branch_xx).create({
+            'name': 'Bank',
+            'type': 'bank',
+            'company_id': branch_xx.id,
+            'code': 'BNK',
+            'sequence': 15,
+        })
         xx_config = self.env['pos.config'].with_company(branch_xx).create({
             'name': 'Branch XX config',
             'company_id': branch_xx.id,
         })
-        xx_account_receivable = self.company_data['default_account_receivable'].copy()
-        xx_account_receivable.company_id = branch_xx
-        xx_cash_journal = self.company_data['default_journal_cash'].copy()
-        xx_cash_journal.company_id = branch_xx
+        xx_account_receivable = self.company_data['default_account_receivable'].copy({'company_ids': [Command.set(branch_xx.ids)]})
+        xx_cash_journal = self.company_data['default_journal_cash'].copy({'company_id': branch_xx.id})
         xx_cash_payment_method = self.env['pos.payment.method'].create({
             'name': 'XX Cash Payment',
             'receivable_account_id': xx_account_receivable.id,
@@ -662,23 +666,23 @@ class TestPoSProductsWithTax(TestPoSCommon):
         # - Product no tax from XX      => tax from Branch X should be set
         # - Product no tax from branch  => 2 taxes from parent company should be set
         # - Product no tax              => no tax should be set
-        pos_data = pos_session.load_pos_data()
+        pos_data = pos_session.load_data([])
         self.assertEqual(
-            next(iter(filter(lambda p: p['id'] == product_all_taxes.id, pos_data['product.product'])))['taxes_id'],
+            next(iter(filter(lambda p: p['id'] == product_all_taxes.id, pos_data['product.product']['data'])))['taxes_id'],
             tax_xx.ids
         )
         self.assertEqual(
-            next(iter(filter(lambda p: p['id'] == product_no_xx_tax.id, pos_data['product.product'])))['taxes_id'],
+            next(iter(filter(lambda p: p['id'] == product_no_xx_tax.id, pos_data['product.product']['data'])))['taxes_id'],
             tax_x.ids
         )
-        tax_data_no_branch = next(iter(filter(lambda p: p['id'] == product_no_branch_tax.id, pos_data['product.product'])))['taxes_id']
+        tax_data_no_branch = next(iter(filter(lambda p: p['id'] == product_no_branch_tax.id, pos_data['product.product']['data'])))['taxes_id']
         tax_data_no_branch.sort()
         self.assertEqual(
             tax_data_no_branch,
             (tax_a + tax_b).ids
         )
         self.assertEqual(
-            next(iter(filter(lambda p: p['id'] == product_no_tax.id, pos_data['product.product'])))['taxes_id'],
+            next(iter(filter(lambda p: p['id'] == product_no_tax.id, pos_data['product.product']['data'])))['taxes_id'],
             []
         )
 
@@ -697,4 +701,4 @@ class TestPoSProductsWithTax(TestPoSCommon):
             })
         with self.assertRaises(UserError):
             with Form(self.variant_product.product_tmpl_id) as product:
-                product.detailed_type = "combo"
+                product.type = "combo"

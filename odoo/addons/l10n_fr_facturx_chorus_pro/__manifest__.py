@@ -12,7 +12,7 @@ Add support to fill three optional fields used when using Chorus Pro, especially
     'depends': [
         'account',
         'account_edi_ubl_cii',
-        'l10n_fr'
+        'l10n_fr_account',
     ],
     'data': [
         'views/account_move_views.xml',

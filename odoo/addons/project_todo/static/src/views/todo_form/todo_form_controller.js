@@ -1,11 +1,8 @@
-/** @odoo-module **/
+import { onWillStart } from "@odoo/owl";
 
 import { _t } from "@web/core/l10n/translation";
+import { user } from "@web/core/user";
 import { FormController } from "@web/views/form/form_controller";
-import { TodoEditableBreadcrumbName } from "@project_todo/components/todo_editable_breadcrumb_name/todo_editable_breadcrumb_name";
-import { TodoDoneCheckmark } from "@project_todo/components/todo_done_checkmark/todo_done_checkmark";
-
-import { onWillStart } from "@odoo/owl";
 
 /**
  *  The FormController is overridden to be able to manage the edition of the name of a to-do directly
@@ -13,12 +10,13 @@ import { onWillStart } from "@odoo/owl";
  */
 
 export class TodoFormController extends FormController {
-    static template = "project_todo.TodoFormView";
-
+    static components = {
+        ...FormController.components,
+    };
     setup() {
         super.setup();
         onWillStart(async () => {
-            this.projectAccess = await this.user.hasGroup("project.group_project_user");
+            this.projectAccess = await user.hasGroup("project.group_project_user");
         });
     }
 
@@ -48,8 +46,3 @@ export class TodoFormController extends FormController {
         return menuItems;
     }
 }
-
-Object.assign(TodoFormController.components, {
-    TodoEditableBreadcrumbName,
-    TodoDoneCheckmark,
-});

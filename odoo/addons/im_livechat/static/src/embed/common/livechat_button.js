@@ -1,44 +1,22 @@
-/* @odoo-module */
-
+import { SESSION_STATE } from "@im_livechat/embed/common/livechat_service";
 import { Component, useExternalListener, useRef, useState } from "@odoo/owl";
-import { makeDraggableHook } from "@web/core/utils/draggable_hook_builder_owl";
+
+import { useMovable } from "@mail/utils/common/hooks";
 
 import { useService } from "@web/core/utils/hooks";
 import { debounce } from "@web/core/utils/timing";
 
 const LIVECHAT_BUTTON_SIZE = 56;
 
-const useMovable = makeDraggableHook({
-    name: "useMovable",
-    onWillStartDrag({ ctx, addCleanup, addStyle, getRect }) {
-        const { height } = getRect(ctx.current.element);
-        ctx.current.container = document.createElement("div");
-        addStyle(ctx.current.container, {
-            position: "fixed",
-            top: 0,
-            bottom: `${height}px`,
-            left: 0,
-            right: 0,
-        });
-        ctx.current.element.after(ctx.current.container);
-        addCleanup(() => ctx.current.container.remove());
-    },
-    onDrop({ ctx, getRect }) {
-        const { top, left } = getRect(ctx.current.element);
-        return { top, left };
-    },
-});
-
 export class LivechatButton extends Component {
     static template = "im_livechat.LivechatButton";
+    static props = {};
     static DEBOUNCE_DELAY = 500;
 
     setup() {
         this.store = useState(useService("mail.store"));
         /** @type {import('@im_livechat/embed/common/livechat_service').LivechatService} */
         this.livechatService = useState(useService("im_livechat.livechat"));
-        /** @type {import('@mail/core/common/thread_service').ThreadService} */
-        this.threadService = useService("mail.thread");
         this.onClick = debounce(this.onClick.bind(this), LivechatButton.DEBOUNCE_DELAY, {
             leading: true,
         });
@@ -80,15 +58,15 @@ export class LivechatButton extends Component {
 
     onClick() {
         this.state.animateNotification = false;
-        this.threadService.openChat();
+        this.livechatService.open();
     }
 
     get isShown() {
         return (
             this.livechatService.initialized &&
             this.livechatService.available &&
-            !this.livechatService.shouldRestoreSession &&
-            this.store.discuss.chatWindows.length === 0
+            this.livechatService.state === SESSION_STATE.NONE &&
+            Object.keys(this.store.ChatWindow.records).length === 0
         );
     }
 }

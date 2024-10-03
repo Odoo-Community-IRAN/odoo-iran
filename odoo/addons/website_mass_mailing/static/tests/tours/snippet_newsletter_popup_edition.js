@@ -1,27 +1,30 @@
 /** @odoo-module **/
 
-import wTourUtils from "@website/js/tours/tour_utils";
+import {
+    clickOnSave,
+    insertSnippet,
+    registerWebsitePreviewTour,
+} from '@website/js/tours/tour_utils';
 import snippetNewsletterPopupUseTour from "@website_mass_mailing/../tests/tours/snippet_newsletter_popup_use";
 
-wTourUtils.registerWebsitePreviewTour("snippet_newsletter_popup_edition", {
+registerWebsitePreviewTour("snippet_newsletter_popup_edition", {
     test: true,
     url: "/",
     edition: true,
 }, () => [
-    wTourUtils.dragNDrop({
+    ...insertSnippet({
         id: 's_newsletter_subscribe_popup',
         name: 'Newsletter Popup',
+        groupName: "Contact & Forms",
     }),
     {
         content: "Check the modal is opened for edition",
-        trigger: 'iframe .o_newsletter_popup .modal:visible',
-        in_modal: false,
-        run: () => null,
+        trigger: ':iframe .o_newsletter_popup .modal:visible',
     },
-    ...wTourUtils.clickOnSave(),
+    ...clickOnSave(),
     {
         content: "Check the modal has been saved, closed",
-        trigger: 'iframe body:has(.o_newsletter_popup)',
+        trigger: ':iframe body:has(.o_newsletter_popup)',
         run: snippetNewsletterPopupUseTour.ensurePopupNotVisible,
     }
 ]);

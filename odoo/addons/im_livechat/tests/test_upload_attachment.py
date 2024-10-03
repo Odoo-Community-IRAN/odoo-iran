@@ -14,7 +14,7 @@ class TestUploadAttachment(HttpCase):
         livechat_channel = self.env["im_livechat.channel"].create(
             {"name": "Test Livechat Channel", "user_ids": [operator.id]}
         )
-        channel_info = self.make_jsonrpc_request(
+        data = self.make_jsonrpc_request(
             "/im_livechat/get_session",
             {
                 "anonymous_name": "Visitor",
@@ -22,13 +22,15 @@ class TestUploadAttachment(HttpCase):
                 "persisted": True,
             },
         )
-        self.make_jsonrpc_request("/im_livechat/visitor_leave_session", {"uuid": channel_info["uuid"]})
+        self.make_jsonrpc_request(
+            "/im_livechat/visitor_leave_session", {"channel_id": data["discuss.channel"][0]["id"]}
+        )
         with mute_logger("odoo.http"), file_open("addons/web/__init__.py") as file:
             response = self.url_open(
                 "/mail/attachment/upload",
                 {
                     "csrf_token": http.Request.csrf_token(self),
-                    "thread_id": channel_info["id"],
+                    "thread_id": data["discuss.channel"][0]["id"],
                     "thread_model": "discuss.channel",
                 },
                 files={"ufile": file},

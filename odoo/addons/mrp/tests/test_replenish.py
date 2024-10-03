@@ -48,7 +48,7 @@ class TestMrpReplenish(TestMrpCommon):
         route_manufacture.rule_ids.delay = 2
         product_1 = self.env['product.product'].create({
             'name': 'Cake',
-            'type': 'product',
+            'is_storable': True,
             'route_ids': [(6, 0, [route_manufacture.id])]
         })
 
@@ -109,8 +109,7 @@ class TestMrpReplenish(TestMrpCommon):
         basic_mo.picking_ids.button_validate()
         self.assertEqual(basic_mo.move_raw_ids.mapped('state'), ['assigned', 'assigned'])
 
-        scrap_wizard_dict = basic_mo.button_scrap()
-        scrap_form = Form(self.env[scrap_wizard_dict['res_model']].with_context(scrap_wizard_dict['context']))
+        scrap_form = Form.from_action(self.env, basic_mo.button_scrap())
         scrap_form.product_id = product_to_scrap
         scrap_form.should_replenish = True
         self.assertEqual(scrap_form.location_id, warehouse.pbm_loc_id)

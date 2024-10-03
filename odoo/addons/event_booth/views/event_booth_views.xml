@@ -28,11 +28,7 @@
                         </group>
                     </group>
                 </sheet>
-                <div class="oe_chatter">
-                    <field name="message_follower_ids" groups="base.group_user"/>
-                    <field name="activity_ids"/>
-                    <field name="message_ids"/>
-                </div>
+                <chatter/>
             </form>
         </field>
     </record>
@@ -58,16 +54,16 @@
         <field name="priority">48</field>
         <field name="arch" type="xml">
             <xpath expr="//div[@name='button_box']" position="replace"/>
-            <xpath expr="//div[hasclass('oe_chatter')]" position="replace"/>
+            <xpath expr="//chatter" position="replace"/>
         </field>
     </record>
 
     <record id="event_booth_view_tree_from_event" model="ir.ui.view">
-        <field name="name">event.booth.view.tree.from.event</field>
+        <field name="name">event.booth.view.list.from.event</field>
         <field name="model">event.booth</field>
         <field name="priority">32</field>
         <field name="arch" type="xml">
-            <tree string="Booths" sample="1" expand="1">
+            <list string="Booths" sample="1" expand="1">
                 <field name="name" decoration-bf="1"/>
                 <field name="booth_category_id"/>
                 <field name="partner_id"/>
@@ -77,12 +73,12 @@
                 <field name="state" widget="badge"
                        decoration-info="state == 'available'"
                        decoration-success="state == 'unavailable'"/>
-            </tree>
+            </list>
         </field>
     </record>
 
     <record id="event_booth_view_tree" model="ir.ui.view">
-        <field name="name">event.booth.view.tree</field>
+        <field name="name">event.booth.view.list</field>
         <field name="model">event.booth</field>
         <field name="inherit_id" ref="event_booth_view_tree_from_event"/>
         <field name="mode">primary</field>
@@ -102,22 +98,12 @@
             <kanban default_group_by="state" quick_create_view="event_booth.event_booth_view_form_quick_create" sample="1">
                 <field name="name"/>
                 <templates>
-                    <t t-name="kanban-box">
-                        <div class="o_kanban_content oe_kanban_global_click">
-                            <div class="o_kanban_record_title">
-                                <field name="name"/>
-                            </div>
-                            <div class="d-flex flex-column">
-                                <div class="o_kanban_record_bottom">
-                                    <div class="oe_kanban_bottom_left">
-                                        <field name="booth_category_id"/>
-                                    </div>
-                                    <div class="oe_kanban_bottom_right">
-                                        <field name="activity_ids" widget="kanban_activity"/>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                    <t t-name="card">
+                        <field class="fw-bold fs-5" name="name"/>
+                        <footer class="p-0">
+                            <field name="booth_category_id"/>
+                            <field class="ms-auto" name="activity_ids" widget="kanban_activity"/>
+                        </footer>
                     </t>
                 </templates>
             </kanban>
@@ -131,7 +117,7 @@
         <field name="mode">primary</field>
         <field name="priority">16</field>
         <field name="arch" type="xml">
-            <xpath expr="//div[hasclass('o_kanban_record_bottom')]" position="before">
+            <xpath expr="//footer" position="before">
                 <field name="event_id"/>
             </xpath>
         </field>
@@ -196,7 +182,7 @@
     <record id="event_booth_action" model="ir.actions.act_window">
         <field name="name">Booths</field>
         <field name="res_model">event.booth</field>
-        <field name="view_mode">kanban,tree,form,graph,pivot</field>
+        <field name="view_mode">kanban,list,form,graph,pivot</field>
         <field name="domain">[]</field>
         <field name="context">{'search_default_group_by_state': 1}</field>
         <field name="help" type="html">
@@ -211,7 +197,7 @@
     <record id="event_booth_action_from_event" model="ir.actions.act_window">
         <field name="name">Booths</field>
         <field name="res_model">event.booth</field>
-        <field name="view_mode">kanban,tree,form,graph,pivot</field>
+        <field name="view_mode">kanban,list,form,graph,pivot</field>
         <field name="domain">[('event_id', '=', active_id)]</field>
         <field name="context">{'default_event_id': active_id, 'search_default_group_by_state': 1}</field>
         <field name="help" type="html">
@@ -230,7 +216,7 @@
     </record>
     <record id="event_booth_action_from_event_view_tree" model="ir.actions.act_window.view">
         <field name="sequence">2</field>
-        <field name="view_mode">tree</field>
+        <field name="view_mode">list</field>
         <field name="view_id" ref="event_booth_view_tree_from_event"/>
         <field name="act_window_id" ref="event_booth_action_from_event"/>
     </record>

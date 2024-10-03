@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { registry } from "@web/core/registry";
 import { CheckBox } from "@web/core/checkbox/checkbox";
 import { localization } from "@web/core/l10n/localization";
@@ -12,6 +10,10 @@ const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 export class WeekDays extends Component {
     static template = "web.WeekDays";
     static components = { CheckBox };
+    static props = {
+        record: Object,
+        readonly: Boolean,
+    };
 
     get weekdays() {
         return [

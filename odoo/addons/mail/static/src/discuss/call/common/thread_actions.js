@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { threadActionsRegistry } from "@mail/core/common/thread_actions";
 import { CallSettings } from "@mail/discuss/call/common/call_settings";
 
@@ -12,9 +10,7 @@ threadActionsRegistry
     .add("call", {
         condition(component) {
             return (
-                component.thread?.allowCalls &&
-                !component.thread?.eq(component.rtc.state.channel) &&
-                !component.props.chatWindow?.hidden
+                component.thread?.allowCalls && !component.thread?.eq(component.rtc.state.channel)
             );
         },
         icon: "fa fa-fw fa-phone",
@@ -24,6 +20,7 @@ threadActionsRegistry
             component.rtc.toggleCall(component.thread);
         },
         sequence: 10,
+        sequenceQuick: 30,
         setup() {
             const component = useComponent();
             component.rtc = useState(useService("discuss.rtc"));
@@ -31,22 +28,20 @@ threadActionsRegistry
     })
     .add("settings", {
         component: CallSettings,
+        componentProps(action) {
+            return { isCompact: true };
+        },
         condition(component) {
             return (
                 component.thread?.allowCalls &&
-                (!component.props.chatWindow || component.props.chatWindow.isOpen)
+                (component.props.chatWindow?.isOpen || component.store.inPublicPage)
             );
         },
-        panelOuterClass: "o-discuss-CallSettings",
         icon: "fa fa-fw fa-gear",
         iconLarge: "fa fa-fw fa-lg fa-gear",
-        name: _t("Show Call Settings"),
-        nameActive: _t("Hide Call Settings"),
-        sequence(component) {
-            return component.props.chatWindow && component.thread?.eq(component.rtc.state.channel)
-                ? 6
-                : 60;
-        },
+        name: _t("Call Settings"),
+        sequence: 20,
+        sequenceGroup: 30,
         setup() {
             const component = useComponent();
             component.rtc = useState(useService("discuss.rtc"));

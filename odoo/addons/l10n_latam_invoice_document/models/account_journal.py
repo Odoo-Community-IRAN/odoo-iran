@@ -32,13 +32,20 @@ class AccountJournal(models.Model):
     @api.constrains('l10n_latam_use_documents')
     def check_use_document(self):
         for rec in self:
-            if rec.env['account.move'].search([('journal_id', '=', rec.id), ('posted_before', '=', True)], limit=1):
+            if rec.env['account.move'].search_count([('journal_id', '=', rec.id), ('posted_before', '=', True)], limit=1):
                 raise ValidationError(_(
                     'You can not modify the field "Use Documents?" if there are validated invoices in this journal!'))
 
-    @api.onchange('type', 'l10n_latam_use_documents')
-    def _onchange_type(self):
-        res = super()._onchange_type()
-        if self.l10n_latam_use_documents:
-            self.refund_sequence = False
-        return res
+    @api.depends('type', 'l10n_latam_use_documents')
+    def _compute_debit_sequence(self):
+        super()._compute_debit_sequence()
+        for journal in self:
+            if journal.l10n_latam_use_documents:
+                journal.debit_sequence = False
+
+    @api.depends('type', 'l10n_latam_use_documents')
+    def _compute_refund_sequence(self):
+        super()._compute_refund_sequence()
+        for journal in self:
+            if journal.l10n_latam_use_documents:
+                journal.refund_sequence = False

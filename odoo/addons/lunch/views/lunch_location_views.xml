@@ -33,11 +33,11 @@
         <field name="name">lunch.location.view.form</field>
         <field name="model">lunch.location</field>
         <field name="arch" type="xml">
-            <tree editable="bottom">
+            <list editable="bottom">
                 <field name="name"/>
                 <field name="address"/>
                 <field name="company_id" groups="base.group_multi_company"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -47,20 +47,10 @@
         <field name="arch" type="xml">
             <kanban class="o_kanban_mobile">
                 <templates>
-                    <t t-name="kanban-box">
-                        <div class="oe_kanban_card oe_kanban_global_click">
-                            <div class="oe_kanban_content">
-                                <div class="o_kanban_record_top">
-                                    <div class="o_kanban_record_headings">
-                                        <strong class="o_kanban_record_title"><field name="name"/></strong>
-                                    </div>
-                                </div>
-                                <div class="o_kanban_record_body">
-                                    <field name="company_id" groups="base.group_multi_company"/><br/>
-                                    <field name="address"/>
-                                </div>
-                            </div>
-                        </div>
+                    <t t-name="card">
+                        <field name="name" class="fw-bold fs-5"/>
+                        <field name="company_id" groups="base.group_multi_company"/>
+                        <field name="address"/>
                     </t>
                 </templates>
             </kanban>
@@ -70,7 +60,7 @@
     <record id="lunch_location_action" model="ir.actions.act_window">
         <field name="name">Lunch Locations</field>
         <field name="res_model">lunch.location</field>
-        <field name="view_mode">tree,form,kanban</field>
+        <field name="view_mode">list,form,kanban</field>
         <field name="search_view_id" ref="lunch_location_view_search"/>
         <field name="help" type="html">
             <!-- TODO: better help message -->

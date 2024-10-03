@@ -1,24 +1,18 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
+import itertools
+from collections.abc import Iterable, Iterator
 
-from odoo.tools.sql import make_identifier, SQL, IDENT_RE
-
-
-def _sql_table(table: str | SQL | None) -> SQL | None:
-    """ Wrap an optional table as an SQL object. """
-    if isinstance(table, str):
-        return SQL.identifier(table) if IDENT_RE.match(table) else SQL(f"({table})")
-    return table
+from .sql import SQL, make_identifier
 
 
-def _sql_from_table(alias: str, table: SQL | None) -> SQL:
+def _sql_from_table(alias: str, table: SQL) -> SQL:
     """ Return a FROM clause element from ``alias`` and ``table``. """
-    if table is None:
-        return SQL.identifier(alias)
-    return SQL("%s AS %s", table, SQL.identifier(alias))
+    if (alias_identifier := SQL.identifier(alias)) == table:
+        return table
+    return SQL("%s AS %s", table, alias_identifier)
 
 
-def _sql_from_join(kind: SQL, alias: str, table: SQL | None, condition: SQL) -> SQL:
+def _sql_from_join(kind: SQL, alias: str, table: SQL, condition: SQL) -> SQL:
     """ Return a FROM clause element for a JOIN. """
     return SQL("%s %s ON (%s)", kind, _sql_from_table(alias, table), condition)
 
@@ -29,7 +23,7 @@ _SQL_JOINS = {
 }
 
 
-def _generate_table_alias(src_table_alias, link):
+def _generate_table_alias(src_table_alias: str, link: str) -> str:
     """ Generate a standard table alias name. An alias is generated as following:
 
         - the base is the source table name (that can already be an alias)
@@ -49,45 +43,46 @@ def _generate_table_alias(src_table_alias, link):
     return make_identifier(f"{src_table_alias}__{link}")
 
 
-class Query(object):
+class Query:
     """ Simple implementation of a query object, managing tables with aliases,
     join clauses (with aliases, condition and parameters), where clauses (with
     parameters), order, limit and offset.
 
-    :param cr: database cursor (for lazy evaluation)
+    :param env: model environment (for lazy evaluation)
     :param alias: name or alias of the table
     :param table: a table expression (``str`` or ``SQL`` object), optional
     """
 
-    def __init__(self, cr, alias: str, table: (str | SQL | None) = None):
+    def __init__(self, env, alias: str, table: (SQL | None) = None):
         # database cursor
-        self._cr = cr
+        self._env = env
 
-        # tables {alias: table(SQL|None)}
-        self._tables = {alias: _sql_table(table)}
+        self._tables: dict[str, SQL] = {
+            alias: table if table is not None else SQL.identifier(alias),
+        }
 
-        # joins {alias: (kind(SQL), table(SQL|None), condition(SQL))}
-        self._joins = {}
+        # joins {alias: (kind(SQL), table(SQL), condition(SQL))}
+        self._joins: dict[str, tuple[SQL, SQL, SQL]] = {}
 
         # holds the list of WHERE conditions (to be joined with 'AND')
-        self._where_clauses = []
+        self._where_clauses: list[SQL] = []
 
         # order, limit, offset
-        self._order = None
-        self.limit = None
-        self.offset = None
+        self._order: SQL | None = None
+        self.limit: int | None = None
+        self.offset: int | None = None
 
         # memoized result
-        self._ids = None
+        self._ids: tuple[int, ...] | None = None
 
     def make_alias(self, alias: str, link: str) -> str:
         """ Return an alias based on ``alias`` and ``link``. """
         return _generate_table_alias(alias, link)
 
-    def add_table(self, alias: str, table: (str | SQL | None) = None):
+    def add_table(self, alias: str, table: (SQL | None) = None):
         """ Add a table with a given alias to the from clause. """
         assert alias not in self._tables and alias not in self._joins, f"Alias {alias!r} already in {self}"
-        self._tables[alias] = _sql_table(table)
+        self._tables[alias] = table if table is not None else SQL.identifier(alias)
         self._ids = None
 
     def add_join(self, kind: str, alias: str, table: str | SQL | None, condition: SQL):
@@ -95,7 +90,9 @@ class Query(object):
         sql_kind = _SQL_JOINS.get(kind.upper())
         assert sql_kind is not None, f"Invalid JOIN type {kind!r}"
         assert alias not in self._tables, f"Alias {alias!r} already used"
-        table = _sql_table(table)
+        table = table or alias
+        if isinstance(table, str):
+            table = SQL.identifier(table)
 
         if alias in self._joins:
             assert self._joins[alias] == (sql_kind, table, condition)
@@ -105,10 +102,10 @@ class Query(object):
 
     def add_where(self, where_clause: str | SQL, where_params=()):
         """ Add a condition to the where clause. """
-        self._where_clauses.append(SQL(where_clause, *where_params))
+        self._where_clauses.append(SQL(where_clause, *where_params)) # pylint: disable = sql-injection
         self._ids = None
 
-    def join(self, lhs_alias: str, lhs_column: str, rhs_table: str, rhs_column: str, link: str):
+    def join(self, lhs_alias: str, lhs_column: str, rhs_table: str | SQL, rhs_column: str, link: str) -> str:
         """
         Perform a join between a table already present in the current Query object and
         another table.  This method is essentially a shortcut for methods :meth:`~.make_alias`
@@ -127,7 +124,7 @@ class Query(object):
         self.add_join('JOIN', rhs_alias, rhs_table, condition)
         return rhs_alias
 
-    def left_join(self, lhs_alias: str, lhs_column: str, rhs_table: str, rhs_column: str, link: str):
+    def left_join(self, lhs_alias: str, lhs_column: str, rhs_table: str, rhs_column: str, link: str) -> str:
         """ Add a LEFT JOIN to the current table (if necessary), and return the
         alias corresponding to ``rhs_table``.
 
@@ -146,7 +143,7 @@ class Query(object):
 
     @order.setter
     def order(self, value: SQL | str | None):
-        self._order = SQL(value) if value is not None else None
+        self._order = SQL(value) if value is not None else None # pylint: disable = sql-injection
 
     @property
     def table(self) -> str:
@@ -156,15 +153,16 @@ class Query(object):
     @property
     def from_clause(self) -> SQL:
         """ Return the FROM clause of ``self``, without the FROM keyword. """
-        tables = SQL(", ").join(
-            _sql_from_table(alias, table)
-            for alias, table in self._tables.items()
-        )
+        tables = SQL(", ").join(itertools.starmap(_sql_from_table, self._tables.items()))
         if not self._joins:
             return tables
-        items = [tables]
-        for alias, (kind, table, condition) in self._joins.items():
-            items.append(_sql_from_join(kind, alias, table, condition))
+        items = (
+            tables,
+            *(
+                _sql_from_join(kind, alias, table, condition)
+                for alias, (kind, table, condition) in self._joins.items()
+            ),
+        )
         return SQL(" ").join(items)
 
     @property
@@ -172,7 +170,7 @@ class Query(object):
         """ Return the WHERE condition of ``self``, without the WHERE keyword. """
         return SQL(" AND ").join(self._where_clauses)
 
-    def is_empty(self):
+    def is_empty(self) -> bool:
         """ Return whether the query is known to return nothing. """
         return self._ids == ()
 
@@ -196,7 +194,12 @@ class Query(object):
         """
         if self._ids is not None and not args:
             # inject the known result instead of the subquery
-            return SQL("%s", self._ids or (None,))
+            if not self._ids:
+                # in case we have nothing, we want to use a sub_query with no records
+                # because an empty tuple leads to a syntax error
+                # and a tuple containing just None creates issues for `NOT IN`
+                return SQL("(SELECT 1 WHERE FALSE)")
+            return SQL("%s", self._ids)
 
         if self.limit or self.offset:
             # in this case, the ORDER BY clause is necessary
@@ -210,22 +213,15 @@ class Query(object):
             SQL(" WHERE %s", self.where_clause) if self._where_clauses else SQL(),
         )
 
-    def get_sql(self):
-        """ Returns (query_from, query_where, query_params). """
-        from_string, from_params = self.from_clause
-        where_string, where_params = self.where_clause
-        return from_string, where_string, from_params + where_params
-
-    def get_result_ids(self):
+    def get_result_ids(self) -> tuple[int, ...]:
         """ Return the result of ``self.select()`` as a tuple of ids. The result
         is memoized for future use, which avoids making the same query twice.
         """
         if self._ids is None:
-            self._cr.execute(self.select())
-            self._ids = tuple(row[0] for row in self._cr.fetchall())
+            self._ids = tuple(id_ for id_, in self._env.execute_query(self.select()))
         return self._ids
 
-    def set_result_ids(self, ids, ordered=True):
+    def set_result_ids(self, ids: Iterable[int], ordered: bool = True) -> None:
         """ Set up the query to return the lines given by ``ids``. The parameter
         ``ordered`` tells whether the query must be ordered to match exactly the
         sequence ``ids``.
@@ -253,23 +249,22 @@ class Query(object):
             self.add_where(SQL("%s IN %s", SQL.identifier(self.table, 'id'), ids))
         self._ids = ids
 
-    def __str__(self):
+    def __str__(self) -> str:
         sql = self.select()
         return f"<Query: {sql.code!r} with params: {sql.params!r}>"
 
     def __bool__(self):
         return bool(self.get_result_ids())
 
-    def __len__(self):
+    def __len__(self) -> int:
         if self._ids is None:
             if self.limit or self.offset:
                 # optimization: generate a SELECT FROM, and then count the rows
                 sql = SQL("SELECT COUNT(*) FROM (%s) t", self.select(""))
             else:
                 sql = self.select('COUNT(*)')
-            self._cr.execute(sql)
-            return self._cr.fetchone()[0]
+            return self._env.execute_query(sql)[0][0]
         return len(self.get_result_ids())
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[int]:
         return iter(self.get_result_ids())

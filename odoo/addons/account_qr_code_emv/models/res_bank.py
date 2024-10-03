@@ -4,14 +4,12 @@ import re
 
 from odoo import _, api, fields, models
 from odoo.tools.misc import remove_accents
-
 from odoo.addons.account_qr_code_emv.const import CURRENCY_MAPPING
 
 
 class ResPartnerBank(models.Model):
     _inherit = 'res.partner.bank'
 
-    country_code = fields.Char(related='partner_id.country_code', string="Country Code")
     display_qr_setting = fields.Boolean(compute='_compute_display_qr_setting')
     include_reference = fields.Boolean(string="Include Reference", help="Include the reference in the QR code.")
     proxy_type = fields.Selection([('none', 'None')], string="Proxy Type", default='none')
@@ -53,7 +51,10 @@ class ResPartnerBank(models.Model):
     def _get_qr_code_vals_list(self, qr_method, amount, currency, debtor_partner, free_communication, structured_communication):
         tag, merchant_account_info = self._get_merchant_account_info()
         currency_code = CURRENCY_MAPPING[currency.name]
-        amount = amount.is_integer() and int(amount) or amount
+        if not currency.is_zero(amount):
+            amount = amount.is_integer() and int(amount) or amount
+        else:
+            amount = None
         merchant_name = self.partner_id.name and self._remove_accents(self.partner_id.name)[:25] or 'NA'
         merchant_city = self.partner_id.city and self._remove_accents(self.partner_id.city)[:15] or ''
         comment = structured_communication or free_communication or ''

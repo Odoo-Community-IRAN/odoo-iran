@@ -7,13 +7,14 @@
         <field name="name">Work Entry</field>
         <field name="res_model">hr.work.entry</field>
         <field name="context">{'search_default_work_entries_error': 1}</field>
-        <field name="view_mode">tree,calendar,form,pivot</field>
+        <field name="view_mode">list,calendar,form,pivot</field>
     </record>
 
     <record id="hr_work_entry_action" model="ir.actions.act_window">
         <field name="name">Work Entry</field>
         <field name="res_model">hr.work.entry</field>
-        <field name="view_mode">calendar,tree,form,pivot</field>
+        <field name="path">work-entries</field>
+        <field name="view_mode">calendar,list,form,pivot</field>
         <field name="context">{
             'search_default_work_entries_error': True
         }</field>
@@ -84,10 +85,10 @@
     </record>
 
     <record id="hr_work_entry_view_tree" model="ir.ui.view">
-        <field name="name">hr.work.entry.tree</field>
+        <field name="name">hr.work.entry.list</field>
         <field name="model">hr.work.entry</field>
         <field name="arch" type="xml">
-            <tree multi_edit="1" sample="1">
+            <list multi_edit="1" sample="1">
                 <field name="name"/>
                 <field name="work_entry_type_id" options="{'no_create': True, 'no_open': True}"/>
                 <field name="code" optional="hidden"/>
@@ -96,7 +97,7 @@
                 <field name="state"/>
                 <field name="date_start" string="Beginning" readonly="1"/>
                 <field name="date_stop" string="End" readonly="1"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -121,6 +122,8 @@
                 <field name="department_id"/>
                 <field name="work_entry_type_id"/>
                 <field name="name"/>
+                <filter name="work_entries_draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+                <filter name="work_entries_validated" string="Validated" domain="[('state', '=', 'validated')]"/>
                 <filter name="work_entries_error" string="Conflicting" domain="[('state', '=', 'conflict')]"/>
                 <separator/>
                 <filter name="date_filter" string="Date" date="date_start"/>
@@ -155,7 +158,7 @@
     <record id="hr_work_entry_type_action" model="ir.actions.act_window">
         <field name="name">Work Entry Types</field>
         <field name="res_model">hr.work.entry.type</field>
-        <field name="view_mode">tree,kanban,form</field>
+        <field name="view_mode">list,kanban,form</field>
         <field name="search_view_id" ref="hr_work_entry_type_view_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
@@ -165,14 +168,14 @@
     </record>
 
     <record id="hr_work_entry_type_view_tree" model="ir.ui.view">
-        <field name="name">hr.work.entry.type.tree</field>
+        <field name="name">hr.work.entry.type.list</field>
         <field name="model">hr.work.entry.type</field>
         <field name="arch" type="xml">
-            <tree>
+            <list>
                 <field name="name"/>
                 <field name="code"/>
                 <field name="color" widget="color_picker"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -196,6 +199,9 @@
                             <field name="sequence" groups="base.group_no_one"/>
                             <field name="color" widget="color_picker"/>
                         </group>
+                        <group>
+                            <field name="country_id" options="{'no_create': True, 'no_open': True}"/>
+                        </group>
                     </group>
                     <group name="other">
                         <group name="time_off" string="Time Off Options" class="o_form_fw_labels"/>
@@ -209,23 +215,14 @@
         <field name="name">hr.work.entry.type.kanban.view</field>
         <field name="model">hr.work.entry.type</field>
         <field name="arch" type="xml">
-            <kanban>
-                <field name="color"/>
+            <kanban highlight_color="color">
                 <templates>
-                    <t t-name="kanban-menu" t-if="!selection_mode">
-                        <ul class="oe_kanban_colorpicker" data-field="color"/>
+                    <t t-name="menu" t-if="!selection_mode">
+                        <field name="color" widget="kanban_color_picker"/>
                     </t>
-                    <t t-name="kanban-box">
-                        <div t-attf-class="#{!selection_mode ? kanban_color(record.color.raw_value) : ''} oe_kanban_global_click">
-                            <div class="oe_kanban_content">
-                                <div>
-                                    <strong class="o_kanban_record_title"><span><field name="name"/></span></strong>
-                                </div>
-                                <div>
-                                    <span class="text-muted o_kanban_record_subtitle"><field name="code"/></span>
-                                </div>
-                            </div>
-                        </div>
+                    <t t-name="card" t-attf-class="#{!selection_mode ? record.color.raw_value : ''}">
+                        <field class="fw-bold fs-5" name="name"/>
+                        <field class="text-muted" name="code"/>
                     </t>
                 </templates>
             </kanban>

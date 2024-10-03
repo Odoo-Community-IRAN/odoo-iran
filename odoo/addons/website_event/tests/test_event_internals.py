@@ -5,60 +5,23 @@ from datetime import datetime, timedelta
 
 from odoo.fields import Datetime as FieldsDatetime
 from odoo.tests.common import users
+from odoo.addons.website.tests.test_website_visitor import MockVisitor
 from odoo.addons.website.tools import MockRequest
 from odoo.addons.website_event.controllers.main import WebsiteEventController
-from odoo.addons.website_event.tests.common import TestEventQuestionCommon
+from odoo.addons.event.tests.common import EventCase
 
 
-class TestEventData(TestEventQuestionCommon):
+class TestEventData(EventCase, MockVisitor):
 
-    @users('user_eventmanager')
-    def test_event_type_configuration_from_type(self):
-        """ Enure configuration & translations are copied from Event Type on Event creation """
-        self.env['res.lang'].sudo()._activate_lang('nl_NL')
-
-        event_type = self.event_type_questions.with_user(self.env.user)
-        event_type_question_nl = self.event_question_1.with_context(lang='nl_NL')
-        event_type_question_nl.title = "Vraag1"
-        event_type_question_nl.answer_ids[0].name = "V1-Antwoord1"
-
-        event = self.env['event.event'].create({
-            'name': 'Event Update Type',
-            'event_type_id': event_type.id,
-            'date_begin': FieldsDatetime.to_string(datetime.today() + timedelta(days=1)),
-            'date_end': FieldsDatetime.to_string(datetime.today() + timedelta(days=15)),
-        })
-
-        self.assertEqual(
-            event.question_ids.mapped('question_type'),
-            ['name', 'email', 'phone', 'simple_choice', 'simple_choice', 'text_box'])
-        self.assertEqual(event.specific_question_ids.filtered(
-            lambda q: q.question_type in ['simple_choice', 'text_box']).title, 'Question1')
-        self.assertEqual(event.specific_question_ids.filtered(
-            lambda q: q.question_type in ['name', 'email', 'phone', 'company_name'])
-                         .mapped('title'), ['Name', 'Email', 'Phone'])
-        self.assertEqual(
-            set(event.specific_question_ids.filtered(
-            lambda q: q.question_type in ['simple_choice', 'text_box']).mapped('answer_ids.name')),
-            set(['Q1-Answer1', 'Q1-Answer2']))
-        self.assertEqual(len(event.general_question_ids), 2)
-        self.assertEqual(event.general_question_ids[0].title, 'Question2')
-        self.assertEqual(event.general_question_ids[1].title, 'Question3')
-        self.assertEqual(
-            set(event.general_question_ids[0].mapped('answer_ids.name')),
-            set(['Q2-Answer1', 'Q2-Answer2']))
-        # verify translations
-        event_question_nl = event.specific_question_ids.filtered_domain([
-            ('title', '=', self.event_question_1.title),
-        ]).with_context(lang='nl_NL')
-        self.assertNotEqual(event_question_nl.title, self.event_question_1.title,
-            "Translated title should differ from untranslated title.")
-        self.assertEqual(event_question_nl.title, event_type_question_nl.title,
-            "Translated title should be copied.")
-        self.assertEqual(
-            set(event_question_nl.answer_ids.mapped('name')),
-            set(event_type_question_nl.answer_ids.mapped('name')),
-            "Translated answer names should be copied.")
+    @classmethod
+    def setUpClass(cls):
+        super(TestEventData, cls).setUpClass()
+        cls.event_public, cls.event_link_only, cls.event_logged_users = cls.env['event.event'].sudo().create([{
+            'name': 'event',
+            'website_visibility': website_visibility,
+            'website_published': True,
+        } for website_visibility in ['public', 'link', 'logged_users']])
+        cls.events_visibility_test = cls.event_public | cls.event_link_only | cls.event_logged_users
 
     def test_process_attendees_form(self):
         event = self.env['event.event'].create({
@@ -224,3 +187,51 @@ class TestEventData(TestEventQuestionCommon):
         # should fetch "registration_2" because the answer to the first question is "Q1-Answer2"
         # should fetch "registration_3" because the answer to the third question is "Answer2" (as free text)
         self.assertEqual(search_res, registration_2 | registration_3)
+
+    @users('user_employee')
+    def test_website_visibility_internal_user(self):
+        """ Check website visibility value for an internal user """
+        visible_events = self.env['event.event'].search([
+            ('id', 'in', self.events_visibility_test.ids),
+            ('is_visible_on_website', '=', True)])
+        self.assertIn(self.event_public, visible_events)
+        self.assertNotIn(self.event_link_only, visible_events)
+        self.assertIn(self.event_logged_users, visible_events)
+
+    @users('portal_test')
+    def test_website_visibility_portal_user(self):
+        """ Check website visibility value for a portal user """
+        visible_events = self.env['event.event'].search([
+            ('id', 'in', self.events_visibility_test.ids),
+            ('is_visible_on_website', '=', True)])
+        self.assertIn(self.event_public, visible_events)
+        self.assertNotIn(self.event_link_only, visible_events)
+        self.assertIn(self.event_logged_users, visible_events)
+
+    @users('public_test')
+    def test_website_visibility_public_user(self):
+        """ Check website visibility value for public user """
+        visible_events = self.env['event.event'].search([
+            ('id', 'in', self.events_visibility_test.ids),
+            ('is_visible_on_website', '=', True)])
+        self.assertIn(self.event_public, visible_events)
+        self.assertNotIn(self.event_link_only, visible_events)
+        self.assertNotIn(self.event_logged_users, visible_events)
+
+        # Check that a visitor can see event where he is participating
+        website_visitor = self.env['website.visitor'].sudo().create({
+            "name": 'Website Visitor',
+            "access_token": 'c8d20bd006c3bf46b875451defb5991d'
+        })
+        self.env['event.registration'].sudo().create({
+            'name': "Registration from visitor",
+            'event_id': self.event_link_only.id,
+            'visitor_id': website_visitor.id,
+        })
+        with self.mock_visitor_from_request(force_visitor=website_visitor):
+            visible_events = self.env['event.event'].search([
+                ('id', 'in', self.events_visibility_test.ids),
+                ('is_visible_on_website', '=', True)])
+            self.assertIn(self.event_public, visible_events)
+            self.assertIn(self.event_link_only, visible_events, "Should now be visible because visitor is participating")
+            self.assertNotIn(self.event_logged_users, visible_events)

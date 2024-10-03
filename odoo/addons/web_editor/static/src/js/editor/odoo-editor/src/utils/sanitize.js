@@ -8,7 +8,7 @@ import {
     isSelfClosingElement,
     moveNodes,
     preserveCursor,
-    isFontAwesome,
+    isIconElement,
     getDeepRange,
     isUnbreakable,
     isEditorTab,
@@ -56,7 +56,7 @@ export function areSimilarElements(node, node2) {
     if ([node, node2].some(n => hasPseudoElementContent(n, ':before') || hasPseudoElementContent(n, ':after'))) {
         return false; // The nodes have pseudo elements with content.
     }
-    if (isFontAwesome(node) || isFontAwesome(node2)) {
+    if (isIconElement(node) || isIconElement(node2)) {
         return false;
     }
     if (nodeName === 'LI' && node.classList.contains('oe-nested')) {
@@ -240,7 +240,7 @@ function sanitizeNode(node, root) {
         li.classList.add('oe-nested');
         node = li;
         restoreCursor && restoreCursor();
-    } else if (isFontAwesome(node) && node.textContent !== '\u200B') {
+    } else if (isIconElement(node) && node.textContent !== '\u200B') {
         // Ensure a zero width space is present inside the FA element.
         node.textContent = '\u200B';
     } else if (isEditorTab(node)) {

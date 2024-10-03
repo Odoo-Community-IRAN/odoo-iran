@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { ActivityArchParser } from "@mail/views/web/activity/activity_arch_parser";
 import { ActivityController } from "@mail/views/web/activity/activity_controller";
 import { ActivityModel } from "@mail/views/web/activity/activity_model";
@@ -9,9 +7,6 @@ import { registry } from "@web/core/registry";
 
 export const activityView = {
     type: "activity",
-    display_name: "Activity",
-    icon: "fa fa-clock-o",
-    multiRecord: true,
     searchMenuTypes: ["filter", "favorite"],
     Controller: ActivityController,
     Renderer: ActivityRenderer,

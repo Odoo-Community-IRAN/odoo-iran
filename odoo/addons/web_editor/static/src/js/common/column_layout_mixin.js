@@ -27,18 +27,6 @@ export const ColumnLayoutMixin = {
         return Math.floor((12 - offsetSize) / colSize);
     },
     /**
-     * TODO: remove in master
-     * Retrieves the mobile order as a match array if there is one.
-     *
-     * @private
-     * @param {HTMLElement} el
-     * @returns {Array|null} class match ["order-XX", "XX"]
-     */
-    _getItemMobileOrder(el) {
-        const order = el.style.order;
-        return order ? [`order-${order}`, order.toString()] : null;
-    },
-    /**
      * Gets the first item, whether it has a mobile order or not.
      *
      * @private

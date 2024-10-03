@@ -1,20 +1,12 @@
-/** @odoo-module **/
-
 import { Component, onWillRender, useState } from "@odoo/owl";
 import { useDateTimePicker } from "@web/core/datetime/datetime_hook";
-import {
-    areDatesEqual,
-    deserializeDate,
-    deserializeDateTime,
-    formatDate,
-    formatDateTime,
-    today,
-} from "@web/core/l10n/dates";
+import { areDatesEqual, deserializeDate, deserializeDateTime, today } from "@web/core/l10n/dates";
 import { evaluateBooleanExpr } from "@web/core/py_js/py";
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
 import { ensureArray } from "@web/core/utils/arrays";
-import { archParseBoolean } from "@web/views/utils";
+import { exprToBoolean } from "@web/core/utils/strings";
+import { formatDate, formatDateTime } from "../formatters";
 import { standardFieldProps } from "../standard_field_props";
 
 /**
@@ -29,7 +21,10 @@ import { standardFieldProps } from "../standard_field_props";
  *  rounding?: number;
  *  startDateField?: string;
  *  warnFuture?: boolean;
+ *  showSeconds?: boolean;
  *  showTime?: boolean;
+ *  minPrecision?: string;
+ *  maxPrecision?: string;
  * }} DateTimeFieldProps
  *
  * @typedef {import("@web/core/datetime/datetime_picker").DateTimePickerProps} DateTimePickerProps
@@ -48,9 +43,24 @@ export class DateTimeField extends Component {
         rounding: { type: Number, optional: true },
         startDateField: { type: String, optional: true },
         warnFuture: { type: Boolean, optional: true },
+        showSeconds: { type: Boolean, optional: true },
         showTime: { type: Boolean, optional: true },
+        minPrecision: {
+            type: String,
+            optional: true,
+            validate: (props) => ["days", "months", "years", "decades"].includes(props),
+        },
+        maxPrecision: {
+            type: String,
+            optional: true,
+            validate: (props) => ["days", "months", "years", "decades"].includes(props),
+        },
+        condensed: { type: Boolean, optional: true },
     };
-    static defaultProps = { showTime: true };
+    static defaultProps = {
+        showSeconds: true,
+        showTime: true,
+    };
 
     static template = "web.DateTimeField";
 
@@ -99,12 +109,22 @@ export class DateTimeField extends Component {
             }
             if (!isNaN(this.props.rounding)) {
                 pickerProps.rounding = this.props.rounding;
+            } else if (!this.props.showSeconds) {
+                pickerProps.rounding = 0;
+            }
+            if (this.props.maxPrecision) {
+                pickerProps.maxPrecision = this.props.maxPrecision;
+            }
+            if (this.props.minPrecision) {
+                pickerProps.minPrecision = this.props.minPrecision;
             }
             return pickerProps;
         };
 
         const dateTimePicker = useDateTimePicker({
             target: "root",
+            showSeconds: this.props.showSeconds,
+            condensed: this.props.condensed,
             get pickerProps() {
                 return getPickerProps();
             },
@@ -119,22 +139,11 @@ export class DateTimeField extends Component {
                 } else {
                     toUpdate[this.props.name] = this.state.value;
                 }
-                // when startDateField and endDateField are set, and one of them has changed, we keep
-                // the unchanged one to make sure ORM protects both fields from being recomputed by the
-                // server, ORM team will handle this properly on master, then we can remove unchanged values
-                if (!this.startDateField || !this.endDateField) {
-                    // If startDateField or endDateField are not set, delete unchanged fields
-                    for (const fieldName in toUpdate) {
-                        if (areDatesEqual(toUpdate[fieldName], this.props.record.data[fieldName])) {
-                            delete toUpdate[fieldName];
-                        }
-                    }
-                } else {
-                    // If both startDateField and endDateField are set, check if they haven't changed
-                    if (areDatesEqual(toUpdate[this.startDateField], this.props.record.data[this.startDateField]) &&
-                        areDatesEqual(toUpdate[this.endDateField], this.props.record.data[this.endDateField])) {
-                        delete toUpdate[this.startDateField];
-                        delete toUpdate[this.endDateField];
+
+                // If startDateField or endDateField are not set, delete unchanged fields
+                for (const fieldName in toUpdate) {
+                    if (areDatesEqual(toUpdate[fieldName], this.props.record.data[fieldName])) {
+                        delete toUpdate[fieldName];
                     }
                 }
 
@@ -159,7 +168,9 @@ export class DateTimeField extends Component {
      */
     async addDate(valueIndex) {
         const values = this.values;
-        values[valueIndex] = values[valueIndex ? 0 : 1];
+        values[valueIndex] = valueIndex
+            ? values[0].plus({ hours: 1 })
+            : values[1].minus({ hours: 1 });
 
         this.state.focusedDateIndex = valueIndex;
         this.state.value = values;
@@ -173,10 +184,11 @@ export class DateTimeField extends Component {
      */
     getFormattedValue(valueIndex) {
         const value = this.values[valueIndex];
+        const { condensed, showSeconds, showTime } = this.props;
         return value
-            ? this.field.type === "date" || !this.props.showTime
-                ? formatDate(value)
-                : formatDateTime(value)
+            ? this.field.type === "date"
+                ? formatDate(value, { condensed })
+                : formatDateTime(value, { condensed, showSeconds, showTime })
             : "";
     }
 
@@ -295,18 +307,55 @@ export const dateField = {
             type: "boolean",
             help: _t(`Displays a warning icon if the input dates are in the future.`),
         },
+        {
+            label: _t("Minimal precision"),
+            name: "min_precision",
+            type: "selection",
+            help: _t(
+                `Choose which minimal precision (days, months, ...) you want in the datetime picker.`
+            ),
+            choices: [
+                { label: _t("Days"), value: "days" },
+                { label: _t("Months"), value: "months" },
+                { label: _t("Years"), value: "years" },
+                { label: _t("Decades"), value: "decades" },
+            ],
+        },
+        {
+            label: _t("Maximal precision"),
+            name: "max_precision",
+            type: "selection",
+            help: _t(
+                `Choose which maximal precision (days, months, ...) you want in the datetime picker.`
+            ),
+            choices: [
+                { label: _t("Days"), value: "days" },
+                { label: _t("Months"), value: "months" },
+                { label: _t("Years"), value: "years" },
+                { label: _t("Decades"), value: "decades" },
+            ],
+        },
+        {
+            label: _t("Condensed display"),
+            name: "condensed",
+            type: "boolean",
+            help: _t(`Set to true to display days, months (and hours) with unpadded numbers`),
+        },
     ],
     supportedTypes: ["date"],
     extractProps: ({ attrs, options }, dynamicInfo) => ({
         endDateField: options[END_DATE_FIELD_OPTION],
         maxDate: options.max_date,
         minDate: options.min_date,
-        alwaysRange: archParseBoolean(options.always_range),
+        alwaysRange: exprToBoolean(options.always_range),
         placeholder: attrs.placeholder,
         required: dynamicInfo.required,
         rounding: options.rounding && parseInt(options.rounding, 10),
         startDateField: options[START_DATE_FIELD_OPTION],
-        warnFuture: archParseBoolean(options.warn_future),
+        warnFuture: exprToBoolean(options.warn_future),
+        minPrecision: options.min_precision,
+        maxPrecision: options.max_precision,
+        condensed: options.condensed,
     }),
     fieldDependencies: ({ type, attrs, options }) => {
         const deps = [];
@@ -349,6 +398,13 @@ export const dateTimeField = {
             ),
         },
         {
+            label: _t("Show seconds"),
+            name: "show_seconds",
+            type: "boolean",
+            default: true,
+            help: _t(`Displays or hides the seconds in the datetime value.`),
+        },
+        {
             label: _t("Show time"),
             name: "show_time",
             type: "boolean",
@@ -358,7 +414,8 @@ export const dateTimeField = {
     ],
     extractProps: ({ attrs, options }, dynamicInfo) => ({
         ...dateField.extractProps({ attrs, options }, dynamicInfo),
-        showTime: archParseBoolean(options.show_time ?? true),
+        showSeconds: exprToBoolean(options.show_seconds ?? true),
+        showTime: exprToBoolean(options.show_time ?? true),
     }),
     supportedTypes: ["datetime"],
 };
@@ -391,6 +448,7 @@ export const dateRangeField = {
         },
     ],
     supportedTypes: ["date", "datetime"],
+    listViewWidth: ({ type }) => (type === "datetime" ? 294 : 180),
     isValid: (record, fieldname, fieldInfo) => {
         if (fieldInfo.widget === "daterange") {
             if (
@@ -415,7 +473,7 @@ export const dateRangeField = {
             }
         }
         return !record.isFieldInvalid(fieldname);
-    }
+    },
 };
 
 registry

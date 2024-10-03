@@ -5,30 +5,28 @@
 
     .o_calendar_renderer .o_calendar_widget {
         .hr_mandatory_day {
-            .fc-day-number {
+            .fc-daygrid-day-number {
                 font-weight: 600;
             }
         }
 
-        > .fc-view-container {
-            > .fc-dayGridYear-view .hr_mandatory_day:not(.fc-disabled-day):not(.fc-today):not(:hover),
-            > .fc-dayGridMonth-view .hr_mandatory_day:not(.fc-disabled-day):not(.fc-today) {
-                .fc-day-number {
-                    color: var(--mandatory-day-color) !important;
-                }
+        > .fc-view-container > .fc-dayGridYear-view .hr_mandatory_day:not(.fc-day-disabled):not(.fc-day-today) .fc-daygrid-day-top:not(:hover),
+        > .fc-view-harness > .fc-dayGridMonth-view .hr_mandatory_day:not(.fc-day-disabled):not(.fc-day-today) {
+            .fc-daygrid-day-number {
+                color: var(--mandatory-day-color) !important;
             }
         }
 
-        .fc-bgevent {
+        .fc-bg-event {
             border-radius: $border-radius-pill;
         }
 
         @for $size from 1 through length($o-colors) {
-            .hr_mandatory_day_top_#{$size - 1} {
+            .hr_mandatory_day_#{$size - 1} {
                 --mandatory-day-color: #{nth($o-colors, $size)};
             }
 
-            .fc-day-top.fc-today.hr_mandatory_day_top_#{$size - 1} {
+            .fc-dayGridMonth-view .fc-day.fc-day-today.hr_mandatory_day_#{$size - 1} {
                 --o-cw-bg: var(--mandatory-day-color);
             }
         }

@@ -30,7 +30,7 @@ class MailingSMSController(http.Controller):
     def blacklist_page(self, mailing_id, trace_code, **post):
         check_res = self._check_trace(mailing_id, trace_code)
         if not check_res.get('trace'):
-            return request.redirect('/web')
+            return request.redirect('/odoo')
         return request.render('mass_mailing_sms.blacklist_main', {
             'mailing_id': mailing_id,
             'trace_code': trace_code,
@@ -40,7 +40,7 @@ class MailingSMSController(http.Controller):
     def blacklist_number(self, mailing_id, trace_code, **post):
         check_res = self._check_trace(mailing_id, trace_code)
         if not check_res.get('trace'):
-            return request.redirect('/web')
+            return request.redirect('/odoo')
         # parse and validate number
         sms_number = post.get('sms_number', '').strip(' ')
         country = request.env['res.country'].search([('code', '=', request.geoip.country_code)], limit=1)
@@ -70,8 +70,8 @@ class MailingSMSController(http.Controller):
             else:
                 blacklist_rec = request.env['phone.blacklist'].sudo().add(tocheck_number)
                 blacklist_rec._message_log(
-                    body=_('Blacklist through SMS Marketing unsubscribe (mailing ID: %s - model: %s)',
-                           trace.mass_mailing_id.id, trace.mass_mailing_id.mailing_model_id.display_name))
+                    body=_('Blacklist through SMS Marketing unsubscribe (mailing ID: %(mailing_id)s - model: %(model)s)',
+                           mailing_id=trace.mass_mailing_id.id, model=trace.mass_mailing_id.mailing_model_id.display_name))
             lists_optin = request.env['mailing.subscription'].sudo().search([
                 ('contact_id.phone_sanitized', '=', tocheck_number),
                 ('list_id', 'not in', mailing_list_ids.ids),

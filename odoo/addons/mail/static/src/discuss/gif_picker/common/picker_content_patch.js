@@ -1,5 +1,3 @@
-/* @odoo-module */
-
 import { useState } from "@odoo/owl";
 import { patch } from "@web/core/utils/patch";
 import { useService } from "@web/core/utils/hooks";
@@ -12,6 +10,5 @@ patch(PickerContent.prototype, {
     setup() {
         super.setup();
         this.store = useState(useService("mail.store"));
-        this.gifPickerService = useState(useService("discuss.gifPicker"));
     },
 });

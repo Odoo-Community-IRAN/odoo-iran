@@ -3,7 +3,7 @@
 
 from datetime import datetime
 
-from odoo import api, fields, models, _
+from odoo import api, fields, models
 
 
 class MailTracking(models.Model):
@@ -16,7 +16,6 @@ class MailTracking(models.Model):
         'ir.model.fields', required=False, readonly=True,
         index=True, ondelete='set null')
     field_info = fields.Json('Removed field information')
-    field_groups = fields.Char(compute='_compute_field_groups')
 
     old_value_integer = fields.Integer('Old Value Integer', readonly=True)
     old_value_float = fields.Float('Old Value Float', readonly=True)
@@ -35,14 +34,34 @@ class MailTracking(models.Model):
 
     mail_message_id = fields.Many2one('mail.message', 'Message ID', required=True, index=True, ondelete='cascade')
 
-    @api.depends('mail_message_id', 'field_id')
-    def _compute_field_groups(self):
-        for tracking in self:
-            field = None
-            if tracking.field_id:
-                model = self.env[tracking.field_id.model]
-                field = model._fields.get(tracking.field_id.name)
-            tracking.field_groups = field.groups if field else 'base.group_system'
+    def _filter_has_field_access(self, env):
+        """ Return the subset of self for which the user in env has access. As
+        this model is admin-only, it is generally accessed as sudo and we need
+        to distinguish context environment from tracking values environment.
+
+        If tracking is linked to a field, user should have access to the field.
+        Otherwise only members of "base.group_system" can access it. """
+
+        def has_field_access(tracking):
+            if not tracking.field_id:
+                return env.is_system()
+            model_field = env[tracking.field_id.model]._fields.get(tracking.field_id.name)
+            return model_field.is_accessible(env) if model_field else False
+
+        return self.filtered(has_field_access)
+
+    def _filter_free_field_access(self):
+        """ Return the subset of self which is available for all users: trackings
+        linked to an existing field without access group. It is used notably
+        when sending tracking summary through notifications. """
+
+        def has_free_access(tracking):
+            if not tracking.field_id:
+                return False
+            model_field = self.env[tracking.field_id.model]._fields.get(tracking.field_id.name)
+            return model_field and not model_field.groups
+
+        return self.filtered(has_free_access)
 
     @api.model
     def _create_tracking_values(self, initial_value, new_value, col_name, col_info, record):
@@ -157,7 +176,7 @@ class MailTracking(models.Model):
         # generate dict of field information, if available
         fields_col_info = (
             tracked_fields.get(tracking.field_id.name) or {
-                'string': tracking.field_info['desc'] if tracking.field_info else _('Unknown'),
+                'string': tracking.field_info['desc'] if tracking.field_info else self.env._('Unknown'),
                 'type': tracking.field_info['type'] if tracking.field_info else 'char',
             } for tracking in self
         )

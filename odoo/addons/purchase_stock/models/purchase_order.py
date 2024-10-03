@@ -5,6 +5,8 @@ from markupsafe import Markup
 from odoo import api, Command, fields, models, SUPERUSER_ID, _
 from odoo.tools.float_utils import float_compare
 from odoo.exceptions import UserError
+from odoo.tools import format_list
+from odoo.tools.misc import OrderedSet
 
 
 class PurchaseOrder(models.Model):
@@ -31,7 +33,10 @@ class PurchaseOrder(models.Model):
         ('pending', 'Not Received'),
         ('partial', 'Partially Received'),
         ('full', 'Fully Received'),
-    ], string='Receipt Status', compute='_compute_receipt_status', store=True)
+    ], string='Receipt Status', compute='_compute_receipt_status', store=True,
+       help="Red: Late\n\
+            Orange: To process today\n\
+            Green: On time")
 
     @api.depends('order_line.move_ids.picking_id')
     def _compute_picking_ids(self):
@@ -114,32 +119,60 @@ class PurchaseOrder(models.Model):
         self._create_picking()
         return result
 
+    def _prepare_grouped_data(self, rfq):
+        match_fields = super()._prepare_grouped_data(rfq)
+        return match_fields + (rfq.picking_type_id.id,)
+
     def button_cancel(self):
+        order_lines_ids = OrderedSet()
+        pickings_to_cancel_ids = OrderedSet()
+
+        purchase_orders_with_receipt = self.filtered(lambda po: any(move.state == 'done' for move in po.order_line.move_ids))
+        if purchase_orders_with_receipt:
+            raise UserError(_("Unable to cancel purchase order(s): %s since they have receipts that are already done.", format_list(self.env, purchase_orders_with_receipt.mapped('display_name'))))
         for order in self:
-            for move in order.order_line.mapped('move_ids'):
-                if move.state == 'done':
-                    raise UserError(_('Unable to cancel purchase order %s as some receptions have already been done.', order.name))
             # If the product is MTO, change the procure_method of the closest move to purchase to MTS.
             # The purpose is to link the po that the user will manually generate to the existing moves's chain.
             if order.state in ('draft', 'sent', 'to approve', 'purchase'):
-                for order_line in order.order_line:
-                    order_line.move_ids._action_cancel()
-                    if order_line.move_dest_ids:
-                        move_dest_ids = order_line.move_dest_ids.filtered(lambda move: move.state != 'done' and not move.scrapped)
-                        moves_to_unlink = move_dest_ids.filtered(lambda m: len(m.created_purchase_line_ids.ids) > 1)
-                        if moves_to_unlink:
-                            moves_to_unlink.created_purchase_line_ids = [Command.unlink(order_line.id)]
-                        move_dest_ids -= moves_to_unlink
-                        if order_line.propagate_cancel:
-                            move_dest_ids._action_cancel()
-                        else:
-                            move_dest_ids.write({'procure_method': 'make_to_stock'})
-                            move_dest_ids._recompute_state()
+                order_lines_ids.update(order.order_line.ids)
 
-            for pick in order.picking_ids.filtered(lambda r: r.state != 'cancel'):
-                pick.action_cancel()
+            pickings_to_cancel_ids.update(order.picking_ids.filtered(lambda r: r.state != 'cancel').ids)
 
-            order.order_line.write({'move_dest_ids': [(5, 0, 0)]})
+        order_lines = self.env['purchase.order.line'].browse(order_lines_ids)
+
+        moves_to_cancel_ids = OrderedSet()
+        moves_to_recompute_ids = OrderedSet()
+        for order_line in order_lines:
+            moves_to_cancel_ids.update(order_line.move_ids.ids)
+            if order_line.move_dest_ids:
+                move_dest_ids = order_line.move_dest_ids.filtered(lambda move: move.state != 'done' and not move.scrapped
+                                                                  and move.rule_id.route_id == move.location_dest_id.warehouse_id.reception_route_id)
+                moves_to_unlink = move_dest_ids.filtered(lambda m: len(m.created_purchase_line_ids.ids) > 1)
+                if moves_to_unlink:
+                    moves_to_unlink.created_purchase_line_ids = [Command.unlink(order_line.id)]
+                move_dest_ids -= moves_to_unlink
+                if order_line.propagate_cancel:
+                    moves_to_cancel_ids.update(move_dest_ids.ids)
+                else:
+                    moves_to_recompute_ids.update(move_dest_ids.ids)
+            if order_line.group_id:
+                order_line.group_id.purchase_line_ids = [Command.unlink(order_line.id)]
+
+        if moves_to_cancel_ids:
+            moves_to_cancel = self.env['stock.move'].browse(moves_to_cancel_ids)
+            moves_to_cancel._action_cancel()
+
+        if moves_to_recompute_ids:
+            moves_to_recompute = self.env['stock.move'].browse(moves_to_recompute_ids)
+            moves_to_recompute.write({'procure_method': 'make_to_stock'})
+            moves_to_recompute._recompute_state()
+
+        if pickings_to_cancel_ids:
+            pikings_to_cancel = self.env['stock.picking'].browse(pickings_to_cancel_ids)
+            pikings_to_cancel.action_cancel()
+
+        if order_lines:
+            order_lines.write({'move_dest_ids': [(5, 0, 0)]})
 
         return super().button_cancel()
 
@@ -203,15 +236,24 @@ class PurchaseOrder(models.Model):
 
     def _get_destination_location(self):
         self.ensure_one()
-        if self.dest_address_id:
+        if self.dest_address_id and self.picking_type_id.code == "dropship":
             return self.dest_address_id.property_stock_customer.id
         return self.picking_type_id.default_location_dest_id.id
+
+    def _get_final_location_record(self):
+        self.ensure_one()
+        if self.dest_address_id and self.picking_type_id.code == 'dropship':
+            return self.dest_address_id.property_stock_customer
+        return self.picking_type_id.warehouse_id.lot_stock_id
 
     @api.model
     def _get_picking_type(self, company_id):
         picking_type = self.env['stock.picking.type'].search([('code', '=', 'incoming'), ('warehouse_id.company_id', '=', company_id)])
         if not picking_type:
             picking_type = self.env['stock.picking.type'].search([('code', '=', 'incoming'), ('warehouse_id', '=', False)])
+        company_warehouse = self.env['stock.warehouse'].search([('company_id', '=', company_id)], limit=1)
+        if not company_warehouse:
+            self.env['stock.warehouse']._warehouse_redirect_warning()
         return picking_type[:1]
 
     def _prepare_picking(self):
@@ -237,7 +279,7 @@ class PurchaseOrder(models.Model):
     def _create_picking(self):
         StockPicking = self.env['stock.picking']
         for order in self.filtered(lambda po: po.state in ('purchase', 'done')):
-            if any(product.type in ['product', 'consu'] for product in order.order_line.product_id):
+            if any(product.type == 'consu' for product in order.order_line.product_id):
                 order = order.with_company(order.company_id)
                 pickings = order.picking_ids.filtered(lambda x: x.state not in ('done', 'cancel'))
                 if not pickings:

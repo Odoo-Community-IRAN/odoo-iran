@@ -1,19 +1,9 @@
-/** @odoo-module **/
-
-import { useDebugCategory } from "@web/core/debug/debug_context";
-import { useSetupAction } from "@web/webclient/actions/action_hook";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { browser } from "@web/core/browser/browser";
 import { evaluateExpr } from "@web/core/py_js/py";
 
 import { useComponent, useEffect, xml } from "@odoo/owl";
-
-export function useSetupView(params) {
-    const component = useComponent();
-    useDebugCategory("view", { component });
-    useSetupAction(params);
-}
 
 export function useViewArch(arch, params = {}) {
     const CATEGORY = "__processed_archs__";
@@ -59,15 +49,6 @@ export function useActionLinks({ resModel, reload }) {
 
     const orm = useService("orm");
     const { doAction } = useService("action");
-
-    function checkAndCollapseBootstrap(target) {
-        // the handler should have stopped the Event
-        // But we still need to alert bootstrap if we need to
-        // This function should be removed when we get rid of bootstrap as a JS framework
-        if (target.dataset.bsToggle === "collapse") {
-            $(target).trigger("click.bs.collapse.data-api");
-        }
-    }
 
     async function handler(ev) {
         ev.preventDefault();
@@ -124,7 +105,6 @@ export function useActionLinks({ resModel, reload }) {
             }
             keepLast.add(doAction(action, options));
         }
-        checkAndCollapseBootstrap(target);
     }
 
     return (ev) => {

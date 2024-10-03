@@ -79,9 +79,10 @@ class Database(http.Controller):
             # country code could be = "False" which is actually True in python
             country_code = post.get('country_code') or False
             dispatch_rpc('db', 'create_database', [master_pwd, name, bool(post.get('demo')), lang, password, post['login'], country_code, post['phone']])
-            request.session.authenticate(name, post['login'], password)
+            credential = {'login': post['login'], 'password': password, 'type': 'password'}
+            request.session.authenticate(name, credential)
             request.session.db = name
-            return request.redirect('/web')
+            return request.redirect('/odoo')
         except Exception as e:
             _logger.exception("Database creation error.")
             error = "Database creation error: %s" % (str(e) or repr(e))
@@ -126,6 +127,8 @@ class Database(http.Controller):
             dispatch_rpc('db', 'change_admin_password', ["admin", master_pwd])
         try:
             odoo.service.db.check_super(master_pwd)
+            if name not in http.db_list():
+                raise Exception("Database %r is not known" % name)
             ts = datetime.datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S")
             filename = "%s_%s.%s" % (name, ts, backup_format)
             headers = [

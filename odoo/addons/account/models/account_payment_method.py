@@ -21,14 +21,16 @@ class AccountPaymentMethod(models.Model):
     def create(self, vals_list):
         payment_methods = super().create(vals_list)
         methods_info = self._get_payment_method_information()
+        return self._auto_link_payment_methods(payment_methods, methods_info)
+
+    def _auto_link_payment_methods(self, payment_methods, methods_info):
+        # This method was extracted from create so it can be overriden in the upgrade script.
+        # In said script we can then allow for a custom behavior for the payment.method.line on the journals.
         for method in payment_methods:
             information = methods_info.get(method.code, {})
-
             if information.get('mode') == 'multi':
                 method_domain = method._get_payment_method_domain(method.code)
-
                 journals = self.env['account.journal'].search(method_domain)
-
                 self.env['account.payment.method.line'].create([{
                     'name': method.name,
                     'payment_method_id': method.id,
@@ -37,26 +39,25 @@ class AccountPaymentMethod(models.Model):
         return payment_methods
 
     @api.model
-    def _get_payment_method_domain(self, code):
+    def _get_payment_method_domain(self, code, with_currency=True, with_country=True):
         """
-        :return: The domain specyfying which journal can accomodate this payment method.
+        :param code: string of the payment method line code to check.
+        :param with_currency: if False (default True), ignore the currency_id domain if it exists.
+        :return: The domain specifying which journal can accommodate this payment method.
         """
         if not code:
             return []
         information = self._get_payment_method_information().get(code)
+        journal_types = information.get('type', ('bank', 'cash', 'credit'))
+        domains = [[('type', 'in', journal_types)]]
 
-        currency_ids = information.get('currency_ids')
-        country_id = information.get('country_id')
-        default_domain = [('type', 'in', ('bank', 'cash'))]
-        domains = [information.get('domain', default_domain)]
-
-        if currency_ids:
+        if with_currency and (currency_ids := information.get('currency_ids')):
             domains += [expression.OR([
                 [('currency_id', '=', False), ('company_id.currency_id', 'in', currency_ids)],
-                [('currency_id', 'in', currency_ids)]],
-            )]
+                [('currency_id', 'in', currency_ids)],
+            ])]
 
-        if country_id:
+        if with_country and (country_id := information.get('country_id')):
             domains += [[('company_id.account_fiscal_country_id', '=', country_id)]]
 
         return expression.AND(domains)
@@ -66,16 +67,17 @@ class AccountPaymentMethod(models.Model):
         """
         Contains details about how to initialize a payment method with the code x.
         The contained info are:
-            mode: Either unique if we only want one of them at a single time (payment providers for example)
-                   or multi if we want the method on each journal fitting the domain.
-            domain: The domain defining the eligible journals.
-            currency_id: The id of the currency necessary on the journal (or company) for it to be eligible.
-            country_id: The id of the country needed on the company for it to be eligible.
-            hidden: If set to true, the method will not be automatically added to the journal,
-                    and will not be selectable by the user.
+
+        - ``mode``: One of the following:
+          "unique" if the method cannot be used twice on the same company,
+          "electronic" if the method cannot be used twice on the same company for the same 'payment_provider_id',
+          "multi" if the method can be duplicated on the same journal.
+        - ``type``: Tuple containing one or both of these items: "bank" and "cash"
+        - ``currency_ids``: The ids of the currency necessary on the journal (or company) for it to be eligible.
+        - ``country_id``: The id of the country needed on the company for it to be eligible.
         """
         return {
-            'manual': {'mode': 'multi', 'domain': [('type', 'in', ('bank', 'cash'))]},
+            'manual': {'mode': 'multi', 'type': ('bank', 'cash', 'credit')},
         }
 
     @api.model
@@ -85,6 +87,10 @@ class AccountPaymentMethod(models.Model):
         This hook will be used to return the list of sdd payment method codes
         """
         return []
+
+    def unlink(self):
+        self.env['account.payment.method.line'].search([('payment_method_id', 'in', self.ids)]).unlink()
+        return super().unlink()
 
 
 class AccountPaymentMethodLine(models.Model):
@@ -100,7 +106,6 @@ class AccountPaymentMethodLine(models.Model):
         comodel_name='account.payment.method',
         domain="[('payment_type', '=?', payment_type), ('id', 'in', available_payment_method_ids)]",
         required=True,
-        ondelete='cascade'
     )
     payment_account_id = fields.Many2one(
         comodel_name='account.account',
@@ -112,7 +117,6 @@ class AccountPaymentMethodLine(models.Model):
     )
     journal_id = fields.Many2one(
         comodel_name='account.journal',
-        ondelete="cascade",
         check_company=True,
     )
 
@@ -123,11 +127,11 @@ class AccountPaymentMethodLine(models.Model):
     available_payment_method_ids = fields.Many2many(related='journal_id.available_payment_method_ids')
 
     @api.depends('journal_id')
-    @api.depends_context('show_payment_journal_id')
+    @api.depends_context('hide_payment_journal_id')
     def _compute_display_name(self):
-        if not self.env.context.get('show_payment_journal_id'):
-            return super()._compute_display_name()
         for method in self:
+            if self.env.context.get('hide_payment_journal_id'):
+                return super()._compute_display_name()
             method.display_name = f"{method.name} ({method.journal_id.name})"
 
     @api.depends('payment_method_id.name')
@@ -162,7 +166,7 @@ class AccountPaymentMethodLine(models.Model):
         :param account_id: The id of an account.account.
         """
         account = self.env['account.account'].browse(account_id)
-        if not account.reconcile and account.account_type not in ('asset_cash', 'liability_credit_card') and account.internal_group != 'off_balance':
+        if not account.reconcile and account.account_type not in ('asset_cash', 'liability_credit_card', 'off_balance'):
             account.reconcile = True
 
     @api.model_create_multi

@@ -1,8 +1,11 @@
 /** @odoo-module */
+// @ts-check
 
-import { getOdooFunctions } from "../helpers/odoo_functions_helpers";
+import { helpers } from "@odoo/o-spreadsheet";
 
-/** @typedef {import("@spreadsheet/helpers/odoo_functions_helpers").Token} Token */
+const { getFunctionsFromTokens } = helpers;
+
+/** @typedef {import("@odoo/o-spreadsheet").Token} Token */
 
 /**
  * Parse a spreadsheet formula and detect the number of LIST functions that are
@@ -13,7 +16,7 @@ import { getOdooFunctions } from "../helpers/odoo_functions_helpers";
  * @returns {number}
  */
 export function getNumberOfListFormulas(tokens) {
-    return getOdooFunctions(tokens, ["ODOO.LIST", "ODOO.LIST.HEADER"]).length;
+    return getFunctionsFromTokens(tokens, ["ODOO.LIST", "ODOO.LIST.HEADER"]).length;
 }
 
 /**
@@ -24,5 +27,5 @@ export function getNumberOfListFormulas(tokens) {
  * @returns {import("../helpers/odoo_functions_helpers").OdooFunctionDescription|undefined}
  */
 export function getFirstListFunction(tokens) {
-    return getOdooFunctions(tokens, ["ODOO.LIST", "ODOO.LIST.HEADER"])[0];
+    return getFunctionsFromTokens(tokens, ["ODOO.LIST", "ODOO.LIST.HEADER"])[0];
 }

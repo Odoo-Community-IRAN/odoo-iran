@@ -1,5 +1,3 @@
-/** @odoo-module **/
-
 import { binaryOperators, comparators } from "./py_tokenizer";
 
 // -----------------------------------------------------------------------------
@@ -369,7 +367,11 @@ function _parse(tokens, bp = 0) {
  */
 export function parse(tokens) {
     if (tokens.length) {
-        return _parse(tokens, 0);
+        const ast = _parse(tokens, 0);
+        if (tokens.length) {
+            throw new ParserError("Token(s) unused");
+        }
+        return ast;
     }
     throw new ParserError("Missing token");
 }

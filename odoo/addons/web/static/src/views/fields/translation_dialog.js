@@ -1,18 +1,31 @@
-/** @odoo-module **/
-
 import { Dialog } from "@web/core/dialog/dialog";
+import { user } from "@web/core/user";
 import { useService } from "@web/core/utils/hooks";
 import { loadLanguages, _t } from "@web/core/l10n/translation";
+import { jsToPyLocale } from "@web/core/l10n/utils";
 
 import { Component, onWillStart } from "@odoo/owl";
 
 export class TranslationDialog extends Component {
+    static template = "web.TranslationDialog";
+    static components = { Dialog };
+    static props = {
+        fieldName: String,
+        resId: Number,
+        resModel: String,
+        userLanguageValue: { type: String, optional: true },
+        isComingFromTranslationAlert: { type: Boolean, optional: true },
+        onSave: Function,
+        close: Function,
+        isText: { type: Boolean, optional: true },
+        showSource: { type: Boolean, optional: true },
+    };
     setup() {
         super.setup();
         this.title = _t("Translate: %s", this.props.fieldName);
 
+        this.user = user;
         this.orm = useService("orm");
-        this.user = useService("user");
 
         this.terms = [];
         this.updatedTerms = {};
@@ -36,7 +49,7 @@ export class TranslationDialog extends Component {
                 // the user is currently utilizing. Then we set the translation value coming
                 // from the value of the field in the form
                 if (
-                    term.lang === this.user.lang &&
+                    term.lang === jsToPyLocale(user.lang) &&
                     !this.props.showSource &&
                     !this.props.isComingFromTranslationAlert
                 ) {
@@ -80,8 +93,7 @@ export class TranslationDialog extends Component {
                     if (!translations[term.lang]) {
                         translations[term.lang] = {};
                     }
-                    const oldTermValue = term.value ? term.value : term.source;
-                    translations[term.lang][oldTermValue] = updatedTermValue || term.source;
+                    translations[term.lang][term.source] = updatedTermValue || term.source;
                 } else {
                     translations[term.lang] = updatedTermValue || false;
                 }
@@ -98,5 +110,3 @@ export class TranslationDialog extends Component {
         this.props.close();
     }
 }
-TranslationDialog.template = "web.TranslationDialog";
-TranslationDialog.components = { Dialog };

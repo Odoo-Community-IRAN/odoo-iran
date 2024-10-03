@@ -6,12 +6,13 @@
     'version': '3.3',
     'category': 'Accounting/Localizations/Account Charts',
     'author': 'Onestein (http://www.onestein.eu)',
-    'website': 'https://www.odoo.com/documentation/17.0/applications/finance/fiscal_localizations/netherlands.html',
+    'website': 'https://www.odoo.com/documentation/master/applications/finance/fiscal_localizations/netherlands.html',
     'depends': [
         'base_iban',
         'base_vat',
         'account',
     ],
+    'auto_install': ['account'],
     'data': [
         'data/account_account_tag.xml',
         'data/account_tax_report_data.xml',

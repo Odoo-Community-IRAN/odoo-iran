@@ -2,7 +2,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo import Command, fields
-from odoo.tests.common import Form, tagged
+from odoo.tests import Form, tagged
 from odoo.tools.float_utils import float_round, float_compare
 
 from odoo.addons.mrp_subcontracting.tests.common import TestMrpSubcontractingCommon
@@ -292,6 +292,7 @@ class TestAccountSubcontractingFlows(TestMrpSubcontractingCommon):
         picking_form.partner_id = self.subcontractor_partner1
         with picking_form.move_ids_without_package.new() as move:
             move.product_id = self.finished
+            move.product_uom_qty = todo_nb
             move.quantity = todo_nb
         picking_receipt = picking_form.save()
         # Mimic the extra cost on the po line
@@ -305,7 +306,6 @@ class TestAccountSubcontractingFlows(TestMrpSubcontractingCommon):
         lot_comp2 = self.env['stock.lot'].create({
             'name': 'lot_comp2',
             'product_id': self.comp2.id,
-            'company_id': self.env.company.id,
         })
         serials_finished = []
         serials_comp1 = []
@@ -313,12 +313,10 @@ class TestAccountSubcontractingFlows(TestMrpSubcontractingCommon):
             serials_finished.append(self.env['stock.lot'].create({
                 'name': 'serial_fin_%s' % i,
                 'product_id': self.finished.id,
-                'company_id': self.env.company.id,
             }))
             serials_comp1.append(self.env['stock.lot'].create({
                 'name': 'serials_comp1_%s' % i,
                 'product_id': self.comp1.id,
-                'company_id': self.env.company.id,
             }))
 
         for i in range(todo_nb):
@@ -358,7 +356,6 @@ class TestAccountSubcontractingFlows(TestMrpSubcontractingCommon):
         lot01, lot02 = self.env['stock.lot'].create([{
             'name': "Lot of %s" % product.name,
             'product_id': product.id,
-            'company_id': self.env.company.id,
         } for product in (self.comp1, self.comp2)])
 
         receipt_form = Form(self.env['stock.picking'])
@@ -386,8 +383,7 @@ class TestAccountSubcontractingFlows(TestMrpSubcontractingCommon):
 
             action = receipt.button_validate()
             if isinstance(action, dict):
-                wizard = Form(self.env[action['res_model']].with_context(action['context'])).save()
-                wizard.process()
+                Form.from_action(self.env, action).save().process()
                 receipt = receipt.backorder_ids
 
         self.assertRecordValues(self.finished.stock_valuation_layer_ids, [
@@ -588,7 +584,7 @@ class TestBomPriceSubcontracting(TestBomPriceCommon):
         })
         product = self.env['product.product'].create({
             'name': 'product',
-            'type': 'product',
+            'is_storable': True,
             'standard_price': 100,
             'company_id': self.env.company.id,
         })

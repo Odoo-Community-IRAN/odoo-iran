@@ -33,17 +33,17 @@ class TestRepair(common.TransactionCase):
         # Storable products
         cls.product_storable_no = cls.env['product.product'].create({
             'name': 'Product Storable No Tracking',
-            'type': 'product',
+            'is_storable': True,
             'tracking': 'none',
         })
         cls.product_storable_serial = cls.env['product.product'].create({
             'name': 'Product Storable Serial',
-            'type': 'product',
+            'is_storable': True,
             'tracking': 'serial',
         })
         cls.product_storable_lot = cls.env['product.product'].create({
             'name': 'Product Storable Lot',
-            'type': 'product',
+            'is_storable': True,
             'tracking': 'lot',
         })
 
@@ -55,7 +55,7 @@ class TestRepair(common.TransactionCase):
         })
         cls.product_storable_order_repair = cls.env['product.product'].create({
             'name': 'Repair Storable',
-            'type': 'product',
+            'is_storable': True,
             'create_repair': True,
         })
         cls.product_service_order_repair = cls.env['product.product'].create({
@@ -164,7 +164,6 @@ class TestRepair(common.TransactionCase):
                 qDict['lot_id'] = cls.env['stock.lot'].create({
                     'name': name + str(offset + x),
                     'product_id': product.id,
-                    'company_id': cls.env.company.id
                 }).id
             vals.append(qDict)
 
@@ -282,17 +281,12 @@ class TestRepair(common.TransactionCase):
                 # move_ids with quantity (LOWER or HIGHER than) product_uom_qty MUST NOT be splitted
         # Any line with quantity < product_uom_qty => Warning
         repair.move_ids.picked = True
-        end_action = repair.action_repair_end()
-        self.assertEqual(end_action.get("res_model"), "repair.warn.uncomplete.move")
-        warn_uncomplete_wizard = Form(
-            self.env['repair.warn.uncomplete.move']
-            .with_context(**end_action['context'])
-            ).save()
+        self.assertTrue(repair.has_uncomplete_moves)
         # LineB : no serial => ValidationError
         lot = lineB.move_line_ids.lot_id
         with self.assertRaises(UserError) as err:
             lineB.move_line_ids.lot_id = False
-            warn_uncomplete_wizard.action_validate()
+            repair.action_repair_done()
 
         # LineB with lots
         lineB.move_line_ids.lot_id = lot
@@ -305,13 +299,8 @@ class TestRepair(common.TransactionCase):
         self.assertEqual(lineD.state, 'assigned')
         num_of_lines = len(repair.move_ids)
         self.assertFalse(repair.move_id)
-        end_action = repair.action_repair_end()
-        self.assertEqual(end_action.get("res_model"), "repair.warn.uncomplete.move")
-        warn_uncomplete_wizard = Form(
-            self.env['repair.warn.uncomplete.move']
-            .with_context(**end_action['context'])
-            ).save()
-        warn_uncomplete_wizard.action_validate()
+        self.assertTrue(repair.has_uncomplete_moves)
+        repair.action_repair_end()
         self.assertFalse((repair.move_id | repair.move_ids).picking_id, "No picking for repair moves")
         self.assertEqual(repair.state, "done")
         done_moves = repair.move_ids - lineD
@@ -521,7 +510,7 @@ class TestRepair(common.TransactionCase):
 
         product = self.env['product.product'].create({
             'name': 'Test Product',
-            'type': 'product',
+            'is_storable': True,
         })
         self.env['stock.quant']._update_available_quantity(product, self.stock_location_14, 1)
         picking_form = Form(self.env['stock.picking'])
@@ -543,14 +532,14 @@ class TestRepair(common.TransactionCase):
             active_model='stock.picking'))
         stock_return_picking = stock_return_picking_form.save()
         stock_return_picking.product_return_moves.quantity = 1.0
-        stock_return_picking_action = stock_return_picking.create_returns()
+        stock_return_picking_action = stock_return_picking.action_create_returns()
         return_picking = self.env['stock.picking'].browse(stock_return_picking_action['res_id'])
         return_picking.move_ids.picked = True
         return_picking.button_validate()
         self.assertEqual(return_picking.state, 'done')
 
         res_dict = return_picking.action_repair_return()
-        repair_form = Form(self.env[(res_dict.get('res_model'))].with_context(res_dict['context']), view=res_dict['view_id'])
+        repair_form = Form.from_action(self.env, res_dict)
         repair_form.product_id = product
         # The repair needs to be saved to ensure the context is correctly set.
         repair = repair_form.save()
@@ -574,7 +563,7 @@ class TestRepair(common.TransactionCase):
         Test That a repair order can be validated when the repaired product is tracked and in a package
         """
         self.product_product_3.tracking = 'serial'
-        self.product_product_3.type = 'product'
+        self.product_product_3.is_storable = True
         # Create two serial numbers
         sn_1 = self.env['stock.lot'].create({'name': 'sn_1', 'product_id': self.product_product_3.id})
         sn_2 = self.env['stock.lot'].create({'name': 'sn_2', 'product_id': self.product_product_3.id})
@@ -620,7 +609,7 @@ class TestRepair(common.TransactionCase):
         """
         product_a = self.env['product.product'].create({
             'name': 'productA',
-            'detailed_type': 'product',
+            'is_storable': True,
             'tracking': 'serial',
             'create_repair': True,
         })
@@ -699,3 +688,43 @@ class TestRepair(common.TransactionCase):
         self.assertEqual(len(res), 1, "The invoice should have one line")
         self.assertEqual(res[0]['product_name'], self.product_storable_serial.display_name, "The product name should be the same")
         self.assertEqual(res[0]['lot_name'], quant.lot_id.name, "The lot name should be the same")
+
+    def test_create_repair_order_from_cross_company_sn(self):
+        """
+        Test that a repair order can be created from a cross-company SN.
+        """
+        sn_01 = self.env['stock.lot'].create({'name': 'sn_1', 'product_id': self.product_product_3.id})
+        action = sn_01.action_lot_open_repairs()
+        repair_order = self.env['repair.order'].with_context(action.get('context')).create({
+            'product_id': self.product_product_3.id,
+            'product_uom': self.product_product_3.uom_id.id,
+            'partner_id': self.res_partner_12.id,
+        })
+        self.assertEqual(repair_order.company_id, self.env.company)
+
+    def test_delivered_qty_of_generated_so(self):
+        """
+        Test that checks that `qty_delivered` of the generated SOL is correctly set when the repair is done.
+        """
+        repair_order = self.env['repair.order'].create({
+            'product_id': self.product_storable_order_repair.id,
+            'product_uom': self.product_storable_order_repair.uom_id.id,
+            'partner_id': self.res_partner_1.id,
+            'move_ids': [
+                Command.create({
+                    'product_id': self.product_consu_order_repair.id,
+                    'product_uom_qty': 1.0,
+                    'state': 'draft',
+                    'repair_line_type': 'add',
+                })
+            ],
+        })
+        repair_order.action_validate()
+        repair_order.action_repair_start()
+        repair_order.action_repair_end()
+        self.assertEqual(repair_order.state, 'done')
+        self.assertEqual(repair_order.move_ids.quantity, 1.0)
+        repair_order.action_create_sale_order()
+        sale_order = repair_order.sale_order_id
+        sale_order.action_confirm()
+        self.assertEqual(sale_order.order_line.qty_delivered, 1.0)

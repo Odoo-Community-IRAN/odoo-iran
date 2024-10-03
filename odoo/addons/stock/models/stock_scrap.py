@@ -19,7 +19,7 @@ class StockScrap(models.Model):
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company, required=True)
     origin = fields.Char(string='Source Document')
     product_id = fields.Many2one(
-        'product.product', 'Product', domain="[('type', 'in', ['product', 'consu'])]",
+        'product.product', 'Product', domain="[('type', '=', 'consu')]",
         required=True, check_company=True)
     product_uom_id = fields.Many2one(
         'uom.uom', 'Unit of Measure',
@@ -52,7 +52,11 @@ class StockScrap(models.Model):
         ('done', 'Done')],
         string='Status', default="draft", readonly=True, tracking=True)
     date_done = fields.Datetime('Date', readonly=True)
-    should_replenish = fields.Boolean(string='Replenish Quantities')
+    should_replenish = fields.Boolean(string='Replenish Quantities', help="Trigger replenishment for scrapped products")
+    scrap_reason_tag_ids = fields.Many2many(
+        comodel_name='stock.scrap.reason.tag',
+        string='Scrap Reason',
+    )
 
     @api.depends('product_id')
     def _compute_product_uom_id(self):
@@ -61,7 +65,10 @@ class StockScrap(models.Model):
 
     @api.depends('company_id', 'picking_id')
     def _compute_location_id(self):
-        groups = self.env['stock.warehouse']._read_group(
+        company_warehouses = self.env['stock.warehouse'].search([('company_id', 'in', self.company_id.ids)])
+        if len(company_warehouses) == 0 and self.company_id:
+            self.env['stock.warehouse']._warehouse_redirect_warning()
+        groups = company_warehouses._read_group(
             [('company_id', 'in', self.company_id.ids)], ['company_id'], ['lot_stock_id:array_agg'])
         locations_per_company = {
             company.id: lot_stock_ids[0] if lot_stock_ids else False
@@ -94,11 +101,11 @@ class StockScrap(models.Model):
     @api.onchange('lot_id')
     def _onchange_serial_number(self):
         if self.product_id.tracking == 'serial' and self.lot_id:
-            message, recommended_location = self.env['stock.quant']._check_serial_number(self.product_id,
-                                                                                         self.lot_id,
-                                                                                         self.company_id,
-                                                                                         self.location_id,
-                                                                                         self.picking_id.location_dest_id)
+            message, recommended_location = self.env['stock.quant'].sudo()._check_serial_number(self.product_id,
+                                                                                                self.lot_id,
+                                                                                                self.company_id,
+                                                                                                self.location_id,
+                                                                                                self.picking_id.location_dest_id)
             if message:
                 if recommended_location:
                     self.location_id = recommended_location
@@ -118,6 +125,7 @@ class StockScrap(models.Model):
             'product_id': self.product_id.id,
             'product_uom': self.product_uom_id.id,
             'state': 'draft',
+            'product_uom_qty': self.scrap_qty,
             'location_id': self.location_id.id,
             'scrapped': True,
             'scrap_id': self.id,
@@ -139,7 +147,6 @@ class StockScrap(models.Model):
 
     def do_scrap(self):
         self._check_company()
-        self = self.with_context(clean_context(self.env.context))
         for scrap in self:
             scrap.name = self.env['ir.sequence'].next_by_code('stock.scrap') or _('New')
             move = self.env['stock.move'].create(scrap._prepare_move_values())
@@ -176,7 +183,7 @@ class StockScrap(models.Model):
         return action
 
     def _should_check_available_qty(self):
-        return self.product_id.type == 'product'
+        return self.product_id.is_storable
 
     def check_available_qty(self):
         if not self._should_check_available_qty():
@@ -210,7 +217,7 @@ class StockScrap(models.Model):
                 'default_product_uom_name': self.product_id.uom_name
             })
             return {
-                'name': self.product_id.display_name + _(': Insufficient Quantity To Scrap'),
+                'name': _('%(product)s: Insufficient Quantity To Scrap', product=self.product_id.display_name),
                 'view_mode': 'form',
                 'res_model': 'stock.warn.insufficient.qty.scrap',
                 'view_id': self.env.ref('stock.stock_warn_insufficient_qty_scrap_form_view').id,
@@ -218,3 +225,17 @@ class StockScrap(models.Model):
                 'context': ctx,
                 'target': 'new'
             }
+
+
+class StockScrapReasonTag(models.Model):
+    _name = 'stock.scrap.reason.tag'
+    _description = 'Scrap Reason Tag'
+    _order = 'sequence, id'
+
+    name = fields.Char(string="Name", required=True, translate=True)
+    sequence = fields.Integer(default=10)
+    color = fields.Char(string="Color", default='#3C3C3C')
+
+    _sql_constraints = [
+        ('name_uniq', 'unique (name)', "Tag name already exists!"),
+    ]

@@ -1,19 +1,19 @@
-/* @odoo-module */
-
 import { Composer } from "@mail/core/common/composer";
 import { ImStatus } from "@mail/core/common/im_status";
 import { Thread } from "@mail/core/common/thread";
 import { AutoresizeInput } from "@mail/core/common/autoresize_input";
+import { CountryFlag } from "@mail/core/common/country_flag";
 import { useThreadActions } from "@mail/core/common/thread_actions";
 import { ThreadIcon } from "@mail/core/common/thread_icon";
 import {
+    useHover,
     useMessageEdition,
     useMessageHighlight,
     useMessageToReplyTo,
 } from "@mail/utils/common/hooks";
 import { isEventHandled } from "@web/core/utils/misc";
 
-import { Component, useChildSubEnv, useRef, useState } from "@odoo/owl";
+import { Component, toRaw, useChildSubEnv, useRef, useState } from "@odoo/owl";
 
 import { Dropdown } from "@web/core/dropdown/dropdown";
 import { DropdownItem } from "@web/core/dropdown/dropdown_item";
@@ -30,6 +30,7 @@ import { Typing } from "@mail/discuss/typing/common/typing";
  */
 export class ChatWindow extends Component {
     static components = {
+        CountryFlag,
         Dropdown,
         DropdownItem,
         Thread,
@@ -43,21 +44,24 @@ export class ChatWindow extends Component {
     static template = "mail.ChatWindow";
 
     setup() {
+        super.setup();
         this.store = useState(useService("mail.store"));
-        this.chatWindowService = useState(useService("mail.chat_window"));
-        this.threadService = useState(useService("mail.thread"));
         this.messageEdition = useMessageEdition();
         this.messageHighlight = useMessageHighlight();
         this.messageToReplyTo = useMessageToReplyTo();
-        this.typingService = useState(useService("discuss.typing"));
         this.state = useState({
+            actionsDisabled: false,
             actionsMenuOpened: false,
             jumpThreadPresent: 0,
+            editingGuestName: false,
             editingName: false,
         });
         this.ui = useState(useService("ui"));
         this.contentRef = useRef("content");
         this.threadActions = useThreadActions();
+        this.actionsMenuButtonHover = useHover("actionsMenuButton");
+        this.parentChannelHover = useHover("parentChannel");
+
         useChildSubEnv({
             closeActionPanel: () => this.threadActions.activeAction?.close(),
             inChatWindow: true,
@@ -86,7 +90,8 @@ export class ChatWindow extends Component {
     }
 
     onKeydown(ev) {
-        if (ev.target.closest(".o-dropdown")) {
+        const chatWindow = toRaw(this.props.chatWindow);
+        if (ev.target.closest(".o-dropdown") || ev.target.closest(".o-dropdown--menu")) {
             return;
         }
         ev.stopPropagation(); // not letting home menu steal my CTRL-C
@@ -105,14 +110,11 @@ export class ChatWindow extends Component {
                 this.close({ escape: true });
                 break;
             case "Tab": {
-                const index = this.chatWindowService.visible.findIndex((cw) =>
-                    cw.eq(this.props.chatWindow)
-                );
-                if (index === 0) {
-                    this.chatWindowService.visible[this.chatWindowService.visible.length - 1]
-                        .autofocus++;
+                const index = this.store.chatHub.opened.findIndex((cw) => cw.eq(chatWindow));
+                if (index === this.store.chatHub.opened.length - 1) {
+                    this.store.chatHub.opened[0].focus();
                 } else {
-                    this.chatWindowService.visible[index - 1].autofocus++;
+                    this.store.chatHub.opened[index + 1].focus();
                 }
                 break;
             }
@@ -120,24 +122,28 @@ export class ChatWindow extends Component {
     }
 
     onClickHeader() {
-        if (!this.ui.isSmall && !this.state.editingName) {
-            this.toggleFold();
+        if (
+            this.ui.isSmall ||
+            this.state.editingName ||
+            !this.thread ||
+            this.state.actionsDisabled
+        ) {
+            return;
         }
+        this.toggleFold();
     }
 
     toggleFold() {
+        const chatWindow = toRaw(this.props.chatWindow);
         if (this.ui.isSmall || this.state.actionsMenuOpened) {
             return;
         }
-        if (this.props.chatWindow.hidden) {
-            this.chatWindowService.makeVisible(this.props.chatWindow);
-        } else {
-            this.chatWindowService.toggleFold(this.props.chatWindow);
-        }
+        chatWindow.fold();
     }
 
     async close(options) {
-        await this.chatWindowService.close(this.props.chatWindow, options);
+        const chatWindow = toRaw(this.props.chatWindow);
+        await chatWindow.close(options);
     }
 
     get actionsMenuTitleText() {
@@ -145,12 +151,21 @@ export class ChatWindow extends Component {
     }
 
     async renameThread(name) {
-        await this.threadService.renameThread(this.thread, name);
+        const thread = toRaw(this.thread);
+        await thread.rename(name);
         this.state.editingName = false;
     }
 
-    async onActionsMenuStateChanged(state) {
-        await new Promise(setTimeout); // wait for bubbling header
-        this.state.actionsMenuOpened = state.open;
+    async renameGuest(name) {
+        const newName = name.trim();
+        if (this.store.self.name !== newName) {
+            await this.store.self.updateGuestName(newName);
+        }
+        this.state.editingGuestName = false;
+    }
+
+    async onActionsMenuStateChanged(isOpen) {
+        // await new Promise(setTimeout); // wait for bubbling header
+        this.state.actionsMenuOpened = isOpen;
     }
 }

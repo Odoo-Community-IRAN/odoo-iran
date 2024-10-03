@@ -5,7 +5,7 @@
     'countries': ['vn'],
     'version': '2.0.3',
     'author': 'General Solutions',
-    'website': 'https://www.odoo.com/documentation/17.0/applications/finance/fiscal_localizations/vietnam.html',
+    'website': 'https://www.odoo.com/documentation/master/applications/finance/fiscal_localizations/vietnam.html',
     'category': 'Accounting/Localizations/Account Charts',
     'description': """
 This is the module to manage the accounting chart, bank information for Vietnam in Odoo.
@@ -26,9 +26,12 @@ This is the module to manage the accounting chart, bank information for Vietnam 
     'depends': [
         'account_qr_code_emv',
         'base_iban',
+        'account',
     ],
+    'auto_install': ['account'],
     'data': [
         'data/account_tax_report_data.xml',
+        'views/account_move_views.xml',
         'views/res_bank_views.xml',
     ],
     'demo': [

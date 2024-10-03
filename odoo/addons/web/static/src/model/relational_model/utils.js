@@ -1,7 +1,6 @@
-/* @odoo-module */
-
 import { markup, onWillDestroy, onWillStart, onWillUpdateProps, useComponent } from "@odoo/owl";
 import { evalPartialContext, makeContext } from "@web/core/context";
+import { Domain } from "@web/core/domain";
 import {
     deserializeDate,
     deserializeDateTime,
@@ -15,6 +14,7 @@ import { omit } from "@web/core/utils/objects";
 import { effect } from "@web/core/utils/reactive";
 import { batched } from "@web/core/utils/timing";
 import { orderByToString } from "@web/search/utils/order_by";
+import { rpc } from "@web/core/network/rpc";
 
 /**
  * @param {boolean || string} value boolean or string encoding a python expression
@@ -48,12 +48,6 @@ export function makeActiveField({
 }
 
 const AGGREGATABLE_FIELD_TYPES = ["float", "integer", "monetary"]; // types that can be aggregated in grouped views
-
-export class FetchRecordError extends Error {
-    constructor(resIds) {
-        super(`Can't fetch record(s) ${resIds}. They might have been deleted.`);
-    }
-}
 
 export function addFieldDependencies(activeFields, fields, fieldDependencies = []) {
     for (const field of fieldDependencies) {
@@ -260,6 +254,10 @@ export function extractFieldsFromArchInfo({ fieldNodes, widgetNodes }, fields) {
                 activeField.required = "False";
             }
         }
+        if (fields[fieldName].type === "many2one_reference" && fieldNode.views) {
+            const viewDescr = fieldNode.views.default;
+            activeField.related = extractFieldsFromArchInfo(viewDescr, viewDescr.fields);
+        }
 
         if (fieldName in activeFields) {
             patchActiveFields(activeFields[fieldName], activeField);
@@ -309,25 +307,44 @@ export function getFieldContext(
     };
 }
 
+export function getFieldDomain(record, fieldName, domain) {
+    if (typeof domain === "function") {
+        domain = domain();
+        domain = typeof domain === "function" ? domain() : domain;
+    }
+    if (domain) {
+        return domain;
+    }
+    // Fallback to the domain defined in the field definition in python
+    domain = record.fields[fieldName].domain;
+    return typeof domain === "string"
+        ? new Domain(evaluateExpr(domain, record.evalContext)).toList()
+        : domain || [];
+}
+
 export function getBasicEvalContext(config) {
     const { uid, allowed_company_ids } = config.context;
     return {
         context: config.context,
         uid,
         allowed_company_ids,
-        active_id: config.resId || false, // deprecated, will be removed in v18
-        active_ids: config.resId ? [config.resId] : [], // deprecated, will be removed in v18
-        active_model: config.resModel, // deprecated, will be removed in v18
         current_company_id: config.currentCompanyId,
     };
 }
 
-export function getFieldsSpec(
-    activeFields,
-    fields,
-    evalContext,
-    { parentActiveFields, withInvisible } = {}
-) {
+function getFieldContextForSpec(activeFields, fields, fieldName, evalContext) {
+    let context = activeFields[fieldName].context;
+    if (!context || context === "{}") {
+        context = fields[fieldName].context || {};
+    } else {
+        context = evalPartialContext(context, evalContext);
+    }
+    if (Object.keys(context).length > 0) {
+        return context;
+    }
+}
+
+export function getFieldsSpec(activeFields, fields, evalContext, { withInvisible } = {}) {
     const fieldsSpec = {};
     const properties = [];
     for (const fieldName in activeFields) {
@@ -335,45 +352,65 @@ export function getFieldsSpec(
             continue;
         }
         const { related, limit, defaultOrderBy, invisible } = activeFields[fieldName];
+        const isAlwaysInvisible = invisible === "True" || invisible === "1";
         fieldsSpec[fieldName] = {};
-        // X2M
-        if (related && ((invisible !== "True" && invisible !== "1") || withInvisible)) {
-            fieldsSpec[fieldName].fields = getFieldsSpec(
-                related.activeFields,
-                related.fields,
-                evalContext,
-                { parentActiveFields: activeFields, withInvisible }
-            );
-            fieldsSpec[fieldName].limit = limit;
-            if (defaultOrderBy) {
-                fieldsSpec[fieldName].order = orderByToString(defaultOrderBy);
+        switch (fields[fieldName].type) {
+            case "one2many":
+            case "many2many": {
+                if (related && (withInvisible || !isAlwaysInvisible)) {
+                    fieldsSpec[fieldName].fields = getFieldsSpec(
+                        related.activeFields,
+                        related.fields,
+                        evalContext,
+                        { withInvisible }
+                    );
+                    fieldsSpec[fieldName].context = getFieldContextForSpec(
+                        activeFields,
+                        fields,
+                        fieldName,
+                        evalContext
+                    );
+                    fieldsSpec[fieldName].limit = limit;
+                    if (defaultOrderBy) {
+                        fieldsSpec[fieldName].order = orderByToString(defaultOrderBy);
+                    }
+                }
+                break;
             }
-        }
-        // Properties
-        if (fields[fieldName].type === "properties") {
-            properties.push(fieldName);
-        }
-        // M2O
-        if (fields[fieldName].type === "many2one") {
-            fieldsSpec[fieldName].fields = {};
-            if (invisible !== "True" && invisible !== "1") {
-                fieldsSpec[fieldName].fields.display_name = {};
+            case "many2one":
+            case "reference": {
+                fieldsSpec[fieldName].fields = {};
+                if (!isAlwaysInvisible) {
+                    fieldsSpec[fieldName].fields.display_name = {};
+                    fieldsSpec[fieldName].context = getFieldContextForSpec(
+                        activeFields,
+                        fields,
+                        fieldName,
+                        evalContext
+                    );
+                }
+                break;
             }
-        }
-        if (["many2one", "one2many", "many2many"].includes(fields[fieldName].type)) {
-            let context = activeFields[fieldName].context;
-            if (!context || context === "{}") {
-                context = fields[fieldName].context || {};
-            } else {
-                context = evalPartialContext(context, evalContext);
+            case "many2one_reference": {
+                if (related && !isAlwaysInvisible) {
+                    fieldsSpec[fieldName].fields = getFieldsSpec(
+                        related.activeFields,
+                        related.fields,
+                        evalContext
+                    );
+                    fieldsSpec[fieldName].context = getFieldContextForSpec(
+                        activeFields,
+                        fields,
+                        fieldName,
+                        evalContext
+                    );
+                }
+                break;
             }
-            if (Object.keys(context).length > 0) {
-                fieldsSpec[fieldName].context = context;
+            case "properties": {
+                properties.push(fieldName);
+                break;
             }
-        }
-        // Reference
-        if (fields[fieldName].type === "reference") {
-            fieldsSpec[fieldName].fields = { display_name: {} };
         }
     }
 
@@ -434,6 +471,20 @@ export function parseServerValue(field, value) {
             return {
                 resId: value.id.id,
                 resModel: value.id.model,
+                displayName: value.display_name,
+            };
+        }
+        case "many2one_reference": {
+            if (value === 0) {
+                // unset many2one_reference fields' value is 0
+                return false;
+            }
+            if (typeof value === "number") {
+                // many2one_reference fetched without "fields" key in spec -> only returns the id
+                return { resId: value };
+            }
+            return {
+                resId: value.id,
                 displayName: value.display_name,
             };
         }
@@ -678,4 +729,114 @@ export function useRecordObserver(callback) {
             return fct();
         }
     });
+}
+
+/**
+ * Resequence records based on provided parameters.
+ *
+ * @param {Object} params
+ * @param {Array} params.records - The list of records to resequence.
+ * @param {string} params.resModel - The model to be used for resequencing.
+ * @param {Object} params.orm
+ * @param {string} params.fieldName - The field used to handle the sequence.
+ * @param {number} params.movedId - The id of the record being moved.
+ * @param {number} [params.targetId] - The id of the target position, the record will be resequenced
+ *                                     after the target. If undefined, the record will be resequenced
+ *                                     as the first record.
+ * @param {Boolean} [params.asc] - Resequence in ascending or descending order
+ * @param {Function} [params.getSequence] - Function to get the sequence of a record.
+ * @param {Function} [params.getResId] - Function to get the resID of the record.
+ * @param {Object} [params.context]
+ * @returns {Promise<any>} - The list of the resequenced fieldName
+ */
+export async function resequence({
+    records,
+    resModel,
+    orm,
+    fieldName,
+    movedId,
+    targetId,
+    asc = true,
+    getSequence = (record) => record[fieldName],
+    getResId = (record) => record.id,
+    context,
+}) {
+    // Find indices
+    const fromIndex = records.findIndex((d) => d.id === movedId);
+    let toIndex = 0;
+    if (targetId !== null) {
+        const targetIndex = records.findIndex((d) => d.id === targetId);
+        toIndex = fromIndex > targetIndex ? targetIndex + 1 : targetIndex;
+    }
+
+    // Determine which records/groups need to be modified
+    const firstIndex = Math.min(fromIndex, toIndex);
+    const lastIndex = Math.max(fromIndex, toIndex) + 1;
+    let reorderAll = records.some((record) => getSequence(record) === undefined);
+    if (!reorderAll) {
+        let lastSequence = (asc ? -1 : 1) * Infinity;
+        for (let index = 0; index < records.length; index++) {
+            const sequence = getSequence(records[index]);
+            if (
+                ((index < firstIndex || index >= lastIndex) &&
+                    ((asc && lastSequence >= sequence) || (!asc && lastSequence <= sequence))) ||
+                (index >= firstIndex && index < lastIndex && lastSequence === sequence)
+            ) {
+                reorderAll = true;
+            }
+            lastSequence = sequence;
+        }
+    }
+
+    // Save the original list in case of error
+    const originalOrder = [...records];
+    // Perform the resequence in the list of records/groups
+    const record = records[fromIndex];
+    if (fromIndex !== toIndex) {
+        records.splice(fromIndex, 1);
+        records.splice(toIndex, 0, record);
+    }
+
+    // Creates the list of records/groups to modify
+    let toReorder = records;
+    if (!reorderAll) {
+        toReorder = toReorder.slice(firstIndex, lastIndex).filter((r) => r.id !== movedId);
+        if (fromIndex < toIndex) {
+            toReorder.push(record);
+        } else {
+            toReorder.unshift(record);
+        }
+    }
+    if (!asc) {
+        toReorder.reverse();
+    }
+
+    const resIds = toReorder.map((d) => getResId(d)).filter((id) => id && !isNaN(id));
+    const sequences = toReorder.map(getSequence);
+    const offset = sequences.length && Math.min(...sequences);
+
+    // Try to write new sequences on the affected records/groups
+    const params = {
+        model: resModel,
+        ids: resIds,
+        context: context,
+        field: fieldName,
+    };
+    if (offset) {
+        params.offset = offset;
+    }
+    try {
+        const wasResequenced = await rpc("/web/dataset/resequence", params);
+        if (!wasResequenced) {
+            return;
+        }
+    } catch (error) {
+        // If the server fails to resequence, rollback the original list
+        records.splice(0, records.length, ...originalOrder);
+        throw error;
+    }
+
+    // Read the actual values set by the server and update the records/groups
+    const kwargs = { context };
+    return orm.read(resModel, resIds, [fieldName], kwargs);
 }

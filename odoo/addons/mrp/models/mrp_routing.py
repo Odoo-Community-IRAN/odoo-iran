@@ -1,19 +1,22 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo import api, fields, models, _, tools
+from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError
+from odoo.tools import float_round
 
 
 class MrpRoutingWorkcenter(models.Model):
     _name = 'mrp.routing.workcenter'
     _description = 'Work Center Usage'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
+
     _order = 'bom_id, sequence, id'
     _check_company_auto = True
 
     name = fields.Char('Operation', required=True)
     active = fields.Boolean(default=True)
-    workcenter_id = fields.Many2one('mrp.workcenter', 'Work Center', required=True, check_company=True)
+    workcenter_id = fields.Many2one('mrp.workcenter', 'Work Center', required=True, check_company=True, tracking=True)
     sequence = fields.Integer(
         'Sequence', default=100,
         help="Gives the sequence order when displaying a list of routing Work Centers.")
@@ -23,19 +26,19 @@ class MrpRoutingWorkcenter(models.Model):
     company_id = fields.Many2one('res.company', 'Company', related='bom_id.company_id')
     worksheet_type = fields.Selection([
         ('pdf', 'PDF'), ('google_slide', 'Google Slide'), ('text', 'Text')],
-        string="Worksheet", default="text"
+        string="Worksheet", default="text", tracking=True
     )
     note = fields.Html('Description')
     worksheet = fields.Binary('PDF')
-    worksheet_google_slide = fields.Char('Google Slide', help="Paste the url of your Google Slide. Make sure the access to the document is public.")
+    worksheet_google_slide = fields.Char('Google Slide', help="Paste the url of your Google Slide. Make sure the access to the document is public.", tracking=True)
     time_mode = fields.Selection([
         ('auto', 'Compute based on tracked time'),
         ('manual', 'Set duration manually')], string='Duration Computation',
-        default='manual')
+        default='manual', tracking=True)
     time_mode_batch = fields.Integer('Based on', default=10)
     time_computed_on = fields.Char('Computed on last', compute='_compute_time_computed_on')
     time_cycle_manual = fields.Float(
-        'Manual Duration', default=60,
+        'Manual Duration', default=60, tracking=True,
         help="Time in minutes:"
         "- In manual mode, time used"
         "- In automatic mode, supposed first time when there aren't any work orders yet")
@@ -71,7 +74,7 @@ class MrpRoutingWorkcenter(models.Model):
             operation.time_cycle = operation.time_cycle_manual
         for operation in self - manual_ops:
             data = self.env['mrp.workorder'].search([
-                ('operation_id', '=', operation.id),
+                ('operation_id', 'in', operation.ids),
                 ('qty_produced', '>', 0),
                 ('state', '=', 'done')],
                 limit=operation.time_mode_batch,
@@ -86,7 +89,7 @@ class MrpRoutingWorkcenter(models.Model):
             for item in data:
                 total_duration += item['duration']
                 capacity = item['workcenter_id']._get_capacity(item.product_id)
-                cycle_number += tools.float_round((item['qty_produced'] / capacity or 1.0), precision_digits=0, rounding_method='UP')
+                cycle_number += float_round((item['qty_produced'] / capacity or 1.0), precision_digits=0, rounding_method='UP')
             if cycle_number:
                 operation.time_cycle = total_duration / cycle_number
             else:
@@ -102,7 +105,7 @@ class MrpRoutingWorkcenter(models.Model):
 
     @api.constrains('blocked_by_operation_ids')
     def _check_no_cyclic_dependencies(self):
-        if not self._check_m2m_recursion('blocked_by_operation_ids'):
+        if self._has_cycle('blocked_by_operation_ids'):
             raise ValidationError(_("You cannot create cyclic dependency."))
 
     @api.model_create_multi
@@ -150,11 +153,11 @@ class MrpRoutingWorkcenter(models.Model):
             'type': 'ir.actions.act_window',
             'name': _('Select Operations to Copy'),
             'res_model': 'mrp.routing.workcenter',
-            'view_mode': 'tree,form',
+            'view_mode': 'list,form',
             'domain': ['|', ('bom_id', '=', False), ('bom_id.active', '=', True)],
             'context' : {
                 'bom_id': self.env.context["bom_id"],
-                'tree_view_ref': 'mrp.mrp_routing_workcenter_copy_to_bom_tree_view',
+                'list_view_ref': 'mrp.mrp_routing_workcenter_copy_to_bom_tree_view',
             }
         }
 
@@ -170,8 +173,16 @@ class MrpRoutingWorkcenter(models.Model):
             return False
         return not product._match_all_variant_values(self.bom_product_template_attribute_value_ids)
 
-    def _get_comparison_values(self):
-        if not self:
-            return False
-        self.ensure_one()
-        return tuple(self[key] for key in  ('name', 'company_id', 'workcenter_id', 'time_mode', 'time_cycle_manual', 'bom_product_template_attribute_value_ids'))
+    def _get_duration_expected(self, product, quantity, unit=False, workcenter=False):
+        product = product or self.bom_id.product_tmpl_id
+        if self._skip_operation_line(product):
+            return 0
+        unit = unit or product.uom_id
+        quantity = self.bom_id.product_uom_id._compute_quantity(quantity, unit)
+        workcenter = workcenter or self.workcenter_id
+        capacity = workcenter._get_capacity(product)
+        cycle_number = float_round(quantity / capacity, precision_digits=0, rounding_method='UP')
+        return workcenter._get_expected_duration(product) + cycle_number * self.time_cycle * 100.0 / workcenter.time_efficiency
+
+    def _compute_operation_cost(self):
+        return (self.time_cycle / 60.0) * (self.workcenter_id.costs_hour)

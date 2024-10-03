@@ -11,7 +11,17 @@ class LivechatChannelController(ChannelController):
         force_guest_env(guest_token)
         return self.discuss_channel_messages(channel_id, before, after, limit, around)
 
-    @route("/im_livechat/cors/channel/set_last_seen_message", methods=["POST"], type="json", auth="public", cors="*")
-    def livechat_channel_mark_as_seen(self, guest_token, channel_id, last_message_id, allow_older=False):
+    @route("/im_livechat/cors/channel/mark_as_read", methods=["POST"], type="json", auth="public", cors="*")
+    def livechat_channel_mark_as_read(self, guest_token, **kwargs):
         force_guest_env(guest_token)
-        return self.discuss_channel_mark_as_seen(channel_id, last_message_id, allow_older)
+        return self.discuss_channel_mark_as_read(**kwargs)
+
+    @route("/im_livechat/cors/channel/fold", methods=["POST"], type="json", auth="public", cors="*")
+    def livechat_channel_fold(self, guest_token, channel_id, state, state_count):
+        force_guest_env(guest_token)
+        return self.discuss_channel_fold(channel_id, state, state_count)
+
+    @route("/im_livechat/cors/channel/notify_typing", methods=["POST"], type="json", auth="public", cors="*")
+    def livechat_channel_notify_typing(self, guest_token, channel_id, is_typing):
+        force_guest_env(guest_token)
+        return self.discuss_channel_notify_typing(channel_id, is_typing)

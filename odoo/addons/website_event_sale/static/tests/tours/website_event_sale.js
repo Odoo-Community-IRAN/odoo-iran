@@ -1,62 +1,103 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import wsTourUtils from '@website_sale/js/tours/tour_utils';
+import * as wsTourUtils from "@website_sale/js/tours/tour_utils";
 
-registry.category("web_tour.tours").add('event_buy_tickets', {
+registry.category("web_tour.tours").add("event_buy_tickets", {
     test: true,
-    url: '/event',
+    url: "/event",
     steps: () => [
         {
             content: "Go to the `Events` page",
             trigger: 'a[href*="/event"]:contains("Conference for Architects TEST"):first',
-        }, 
+            run: "click",
+        },
         {
             content: "Open the register modal",
             trigger: 'button:contains("Register")',
+            run: "click",
+        },
+        {
+            trigger: '#wrap:not(:has(a[href*="/event"]:contains("Conference for Architects")))',
         },
         {
             content: "Select 1 unit of `Standard` ticket type",
-            extra_trigger: '#wrap:not(:has(a[href*="/event"]:contains("Conference for Architects")))',
-            trigger: 'select:eq(0)',
-            run: 'text 1',
+            trigger: ".modal select:eq(0)",
+            run: "select 1",
+        },
+        {
+            trigger: ".modal select:eq(0):has(option:contains(1):selected)",
         },
         {
             content: "Select 2 units of `VIP` ticket type",
-            extra_trigger: 'select:eq(0):has(option:contains(1):propSelected)',
-            trigger: 'select:eq(1)',
-            run: 'text 2',
+            trigger: ".modal select:eq(1)",
+            run: "select 2",
+        },
+        {
+            trigger: ".modal select:eq(1):has(option:contains(2):selected)",
         },
         {
             content: "Click on `Order Now` button",
-            extra_trigger: 'select:eq(1):has(option:contains(2):propSelected)',
-            trigger: '.btn-primary:contains("Register")',
+            trigger: '.modal .btn-primary:contains("Register")',
+            run: "click",
         },
         {
             content: "Fill attendees details",
             trigger: 'form[id="attendee_registration"] .btn[type=submit]',
-            run: function () {
-                $("input[name*='1-name']").val("Att1");
-                $("input[name*='1-phone']").val("111 111");
-                $("input[name*='1-email']").val("att1@example.com");
-                $("input[name*='2-name']").val("Att2");
-                $("input[name*='2-phone']").val("222 222");
-                $("input[name*='2-email']").val("att2@example.com");
-                $("input[name*='3-name']").val("Att3");
-                $("input[name*='3-phone']").val("333 333");
-                $("input[name*='3-email']").val("att3@example.com");
-            },
+        },
+        {
+            trigger: ".modal#modal_attendees_registration input[name*='1-email']",
+            run: "edit att1@example.com",
+        },
+        {
+            trigger: ".modal#modal_attendees_registration input[name*='1-phone']",
+            run: "edit 111 111",
+        },
+        {
+            trigger: ".modal#modal_attendees_registration input[name*='2-name']",
+            run: "edit Att2",
+        },
+        {
+            trigger: ".modal#modal_attendees_registration input[name*='2-phone']",
+            run: "edit 222 222",
+        },
+        {
+            trigger: ".modal#modal_attendees_registration input[name*='2-email']",
+            run: "edit att2@example.com",
+        },
+        {
+            trigger: ".modal#modal_attendees_registration input[name*='1-name']",
+            run: "edit Att1",
+        },
+        {
+            trigger: ".modal#modal_attendees_registration input[name*='3-name']",
+            run: "edit Att3",
+        },
+        {
+            trigger: ".modal#modal_attendees_registration input[name*='3-phone']",
+            run: "edit 333 333",
+        },
+        {
+            trigger: ".modal#modal_attendees_registration input[name*='3-email']",
+            run: "edit att3@example.com",
+        },
+        {
+            trigger:
+                ".modal#modal_attendees_registration input[name*='1-name'], .modal#modal_attendees_registration input[name*='2-name'], .modal#modal_attendees_registration input[name*='3-name']",
+        },
+        {
+            trigger: "input[name*='1-name'], input[name*='2-name'], input[name*='3-name']",
         },
         {
             content: "Validate attendees details",
-            extra_trigger: "input[name*='1-name'], input[name*='2-name'], input[name*='3-name']",
-            trigger: 'button[type=submit]',
+            trigger: ".modal#modal_attendees_registration button[type=submit]",
+            run: "click",
         },
-        wsTourUtils.goToCart({quantity: 3}),
+        wsTourUtils.goToCart({ quantity: 3 }),
         wsTourUtils.goToCheckout(),
         ...wsTourUtils.assertCartAmounts({
-            untaxed: '4,000.00',
+            untaxed: "4,000.00",
         }),
         ...wsTourUtils.payWithTransfer(),
-    ]
+    ],
 });

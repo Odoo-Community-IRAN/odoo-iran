@@ -9,7 +9,8 @@ import requests
 
 from stdnum.eu.vat import check_vies
 
-from odoo import api, fields, models, tools, _
+from odoo import api, fields, models, _
+from odoo.tools.image import base64_to_image
 
 _logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ class ResPartner(models.Model):
             # avoid keeping falsy images (may happen that a blank page is returned that leads to an incorrect image)
             if iap_data['image_1920']:
                 try:
-                    tools.base64_to_image(iap_data['image_1920'])
+                    base64_to_image(iap_data['image_1920'])
                 except Exception:
                     iap_data.pop('image_1920')
         return iap_data
@@ -143,7 +144,7 @@ class ResPartner(models.Model):
                 _logger.info('Calling VIES service to check VAT for autocomplete: %s', vat)
                 vies_result = check_vies(vat, timeout=timeout)
             except Exception:
-                _logger.exception("Failed VIES VAT check.")
+                _logger.warning("Failed VIES VAT check.", exc_info=True)
             if vies_result:
                 name = vies_result['name']
                 if vies_result['valid'] and name != '---':
@@ -236,10 +237,7 @@ class ResPartner(models.Model):
         arch, view = super()._get_view(view_id, view_type, **options)
 
         if view_type == 'form':
-            for node in arch.xpath(
-                "//field[@name='name']"
-                "|//field[@name='vat']"
-            ):
-                node.attrib['widget'] = 'field_partner_autocomplete'
+            for node in arch.xpath("//field[@name='name' or @name='vat']"):
+                node.set('widget', 'field_partner_autocomplete')
 
         return arch, view

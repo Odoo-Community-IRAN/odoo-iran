@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo.tests.common import TransactionCase, Form, tagged
+from odoo.tests import Form, TransactionCase, tagged
 
 
 @tagged('post_install', '-at_install')
 class TestSaleMrpKitBom(TransactionCase):
 
-    def _create_product(self, name, product_type, price):
+    def _create_product(self, name, storable, price):
         return self.env['product.product'].create({
             'name': name,
-            'type': product_type,
+            'is_storable': storable,
             'standard_price': price,
         })
 
@@ -92,11 +92,11 @@ class TestSaleMrpKitBom(TransactionCase):
             'name': 'customer'
         })
 
-        self.kit_product = self._create_product('Kit Product', 'product', 1.00)
+        self.kit_product = self._create_product('Kit Product', True, 1.00)
         # Creating components
-        self.component_a = self._create_product('Component A', 'product', 1.00)
+        self.component_a = self._create_product('Component A', True, 1.00)
         self.component_a.product_tmpl_id.standard_price = 6
-        self.component_b = self._create_product('Component B', 'product', 1.00)
+        self.component_b = self._create_product('Component B', True, 1.00)
         self.component_b.product_tmpl_id.standard_price = 10
 
         cat = self.env['product.category'].create({
@@ -147,8 +147,8 @@ class TestSaleMrpKitBom(TransactionCase):
 
         self.env.ref('product.decimal_product_uom').digits = 5
 
-        self.kit = self._create_product('Kit', 'product', 0.00)
-        self.comp = self._create_product('Component', 'product', 0.00)
+        self.kit = self._create_product('Kit', True, 0.00)
+        self.comp = self._create_product('Component', True, 0.00)
 
         # Create BoM for Kit
         bom_product_form = Form(self.env['mrp.bom'])
@@ -194,10 +194,10 @@ class TestSaleMrpKitBom(TransactionCase):
         """Check the quantity delivered, when one product is a kit
         and his bom uses another product that is also a kit"""
 
-        self.kitA = self._create_product('Kit A', 'consu', 0.00)
-        self.kitB = self._create_product('Kit B', 'consu', 0.00)
-        self.compA = self._create_product('ComponentA', 'consu', 0.00)
-        self.compB = self._create_product('ComponentB', 'consu', 0.00)
+        self.kitA = self._create_product('Kit A', False, 0.00)
+        self.kitB = self._create_product('Kit B', False, 0.00)
+        self.compA = self._create_product('ComponentA', False, 0.00)
+        self.compB = self._create_product('ComponentB', False, 0.00)
 
         # Create BoM for KitB
         bom_product_formA = Form(self.env['mrp.bom'])
@@ -263,9 +263,9 @@ class TestSaleMrpKitBom(TransactionCase):
         wh = self.env['stock.warehouse'].search([('company_id', '=', self.env.user.id)], limit=1)
         wh.write({'delivery_steps': 'pick_ship'})
 
-        kitA = self._create_product('Kit Product', 'product', 0.00)
-        compA = self._create_product('ComponentA', 'product', 0.00)
-        compB = self._create_product('ComponentB', 'product', 0.00)
+        kitA = self._create_product('Kit Product', True, 0.00)
+        compA = self._create_product('ComponentA', True, 0.00)
+        compB = self._create_product('ComponentB', True, 0.00)
 
         # Create BoM for KitB
         bom_product_formA = Form(self.env['mrp.bom'])
@@ -300,10 +300,12 @@ class TestSaleMrpKitBom(TransactionCase):
         so.action_confirm()
 
         pick = so.picking_ids[0]
-        ship = so.picking_ids[1]
-
         self.assertTrue(pick.move_ids_without_package[0].bom_line_id, "All component from kits should have a bom line")
         self.assertTrue(pick.move_ids_without_package[1].bom_line_id, "All component from kits should have a bom line")
+        pick.move_ids.write({'quantity': 1, 'picked': True})
+        pick.button_validate()
+
+        ship = so.picking_ids[1]
         self.assertTrue(ship.move_ids_without_package[0].bom_line_id, "All component from kits should have a bom line")
         self.assertTrue(ship.move_ids_without_package[1].bom_line_id, "All component from kits should have a bom line")
 
@@ -317,11 +319,11 @@ class TestSaleMrpKitBom(TransactionCase):
         wh = self.env['stock.warehouse'].search([('company_id', '=', self.env.user.id)], limit=1)
         wh.write({'delivery_steps': 'pick_ship'})
 
-        kitAB = self._create_product('Kit AB', 'product', 0.00)
-        kitABC = self._create_product('Kit ABC', 'product', 0.00)
-        compA = self._create_product('ComponentA', 'product', 0.00)
-        compB = self._create_product('ComponentB', 'product', 0.00)
-        compC = self._create_product('ComponentC', 'product', 0.00)
+        kitAB = self._create_product('Kit AB', True, 0.00)
+        kitABC = self._create_product('Kit ABC', True, 0.00)
+        compA = self._create_product('ComponentA', True, 0.00)
+        compB = self._create_product('ComponentB', True, 0.00)
+        compC = self._create_product('ComponentC', True, 0.00)
 
         # Create BoM for KitB
         bom_product_formA = Form(self.env['mrp.bom'])
@@ -381,14 +383,13 @@ class TestSaleMrpKitBom(TransactionCase):
         so.action_confirm()
 
         pick = so.picking_ids[0]
-        ship = so.picking_ids[1]
-
         for move in pick.move_ids:
             move.write({'quantity': 1, 'picked': True})
 
         pick.action_put_in_pack()
         pick.button_validate()
 
+        ship = so.picking_ids[1]
         ship.package_level_ids.write({'is_done': True})
         ship.package_level_ids._set_is_done()
 
@@ -418,7 +419,7 @@ class TestSaleMrpKitBom(TransactionCase):
         """
         kit_1, component_1, product_1, kit_3, kit_4 = self.env['product.product'].create([{
             'name': n,
-            'type': 'product',
+            'is_storable': True,
         } for n in ['Kit 1', 'Compo 1', 'Product 1', 'Kit 3', 'Kit 4']])
         kit_1.description_sale = "test"
 
@@ -527,13 +528,15 @@ class TestSaleMrpKitBom(TransactionCase):
         self.assertFalse(keys, "All keys should be in the report with the defined order")
 
     def test_sale_multistep_kit_qty_change(self):
-        self.env['stock.warehouse'].search([], limit=1).write({'delivery_steps': 'pick_ship'})
+        warehouse = self.env['stock.warehouse'].search([], limit=1)
+        warehouse.write({'delivery_steps': 'pick_ship'})
         self.partner = self.env['res.partner'].create({'name': 'Test Partner'})
 
         kit_prod = self._create_product('kit_prod', 'product', 0.00)
         sub_kit = self._create_product('sub_kit', 'product', 0.00)
         component = self._create_product('component', 'product', 0.00)
         component.uom_id = self.env.ref('uom.product_uom_dozen')
+        self.env['stock.quant']._update_available_quantity(component, warehouse.lot_stock_id, 30)
         # 6 kit_prod == 5 component
         self.env['mrp.bom'].create([{  # 2 kit_prod == 5 sub_kit
             'product_tmpl_id': kit_prod.product_tmpl_id.id,
@@ -565,8 +568,6 @@ class TestSaleMrpKitBom(TransactionCase):
         so.action_confirm()
         picking_pick = so.picking_ids[0]
         picking_pick.picking_type_id.create_backorder = 'never'
-        picking_ship = so.picking_ids[1]
-        picking_ship.picking_type_id.create_backorder = 'never'
 
         # Check the component qty in the created picking should be 25
         self.assertEqual(picking_pick.move_ids.product_qty, 30 * 5 / 6)
@@ -576,9 +577,12 @@ class TestSaleMrpKitBom(TransactionCase):
         # Check the component qty after the update should be 50
         self.assertEqual(picking_pick.move_ids.product_qty, 60 * 5 / 6)
 
-        # Recieve half the quantity 25 component == 30 kit_prod
+        # Deliver half the quantity 25 component == 30 kit_prod
         picking_pick.move_ids.quantity = 25
         picking_pick.button_validate()
+
+        picking_ship = so.picking_ids[1]
+        picking_ship.picking_type_id.create_backorder = 'never'
         picking_ship.move_ids.quantity = 25
         picking_ship.button_validate()
         self.assertEqual(so.order_line.qty_delivered, 25 / 5 * 6)
@@ -593,9 +597,25 @@ class TestSaleMrpKitBom(TransactionCase):
                 'quantity': 10,
                 'to_refund': True
             })
-        res = return_wiz.create_returns()
+        res = return_wiz.action_create_returns()
         return_pick = self.env['stock.picking'].browse(res['res_id'])
 
         # Process all components and validate the return
         return_pick.button_validate()
         self.assertEqual(so.order_line.qty_delivered, 15 / 5 * 6)
+
+        # Resend 5 components
+        stock_return_picking_form = Form(self.env['stock.return.picking']
+            .with_context(active_ids=return_pick.ids, active_id=return_pick.id,
+            active_model='stock.picking'))
+        return_wiz = stock_return_picking_form.save()
+        for return_move in return_wiz.product_return_moves:
+            return_move.write({
+                'quantity': 5,
+                'to_refund': True
+            })
+        res = return_wiz.action_create_returns()
+
+        # Validate the return
+        self.env['stock.picking'].browse(res['res_id']).button_validate()
+        self.assertEqual(so.order_line.qty_delivered, 20 / 5 * 6)

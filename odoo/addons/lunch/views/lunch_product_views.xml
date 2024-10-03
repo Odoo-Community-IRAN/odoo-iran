@@ -34,10 +34,10 @@
     </record>
 
     <record id="lunch_product_view_tree" model="ir.ui.view">
-        <field name="name">lunch.product.tree</field>
+        <field name="name">lunch.product.list</field>
         <field name="model">lunch.product</field>
         <field name="arch" type="xml">
-            <tree string="Products Tree">
+            <list string="Products List">
                 <field name="currency_id" column_invisible="True"/>
                 <field name="name"/>
                 <field name="category_id"/>
@@ -45,17 +45,17 @@
                 <field name="company_id" groups="base.group_multi_company"/>
                 <field name="description"/>
                 <field name="price" widget="monetary"/>
-            </tree>
+            </list>
         </field>
     </record>
 
     <record id="lunch_product_view_tree_order" model="ir.ui.view">
-        <field name="name">lunch.product.tree.order</field>
+        <field name="name">lunch.product.list.order</field>
         <field name="inherit_id" ref="lunch_product_view_tree"/>
         <field name="model">lunch.product</field>
         <field name="mode">primary</field>
         <field name="arch" type="xml">
-            <xpath expr="//tree" position="attributes">
+            <xpath expr="//list" position="attributes">
                 <attribute name="js_class">lunch_list</attribute>
                 <attribute name="create">0</attribute>
             </xpath>
@@ -103,45 +103,31 @@
         <field name="priority">999</field>
         <field name="arch" type="xml">
             <kanban js_class="lunch_kanban" create="0" edit="0" group_create="0" class="o_kanban_mobile">
-                <field name="id"/>
-                <field name="name"/>
-                <field name="category_id"/>
-                <field name="supplier_id"/>
-                <field name="description"/>
                 <field name="currency_id"/>
-                <field name="company_id"/>
                 <field name="is_new"/>
                 <templates>
-                    <t t-name="kanban-box">
-                        <div class="oe_kanban_global_click o_kanban_record_has_image_fill">
-                            <field name="image_128" class="o_lunch_image o_kanban_image_fill_left" options="{'placeholder': '/lunch/static/img/lunch.png', 'size': [94, 94]}" widget="image"/>
-                            <div class="oe_kanban_details ml8">
-                                <div class="o_kanban_record_top">
-                                    <div class="o_kanban_record_headings">
-                                        <strong class="o_kanban_record_title">
-                                            <div class="d-flex align-items-center justify-content-between">
-                                                <div>
-                                                    <field class="pe-1" name="is_favorite" widget="boolean_favorite" nolabel="1"/>
-                                                    <strong><span t-esc="record.name.value"/></strong>
-                                                </div>
-                                                <div class="text-primary">
-                                                    <div t-if="record.is_new.raw_value" class="o_lunch_new_product me-1 py-1 fs-6 badge rounded-pill text-bg-success">
-                                                        New
-                                                    </div>
-                                                    <field name="price" widget="monetary"/>
-                                                </div>
-                                            </div>
-                                        </strong>
-                                        <span class="o_kanban_record_subtitle"><span t-esc="record.supplier_id.value"/></span>
-                                    </div>
+                    <t t-name="card" class="row g-0">
+                        <aside class="col-4">
+                            <field name="image_128" options="{'placeholder': '/lunch/static/img/lunch.png', 'size': [94, 94], 'img_class': 'w-100 h-100'}" widget="image"/>
+                        </aside>
+                        <main class="col">
+                            <div class="d-flex">
+                                <div class="d-flex">
+                                    <field class="pe-1 pt-1" name="is_favorite" widget="lunch_is_favorite" nolabel="1"/>
+                                    <field name="name" class="fw-bolder fs-5" />
                                 </div>
-                                <div class="o_kanban_record_bottom">
-                                    <ul>
-                                        <li t-out="record.description.value" class="text-muted"/>
-                                    </ul>
+                                <div class="text-primary ms-auto">
+                                    <div t-if="record.is_new.raw_value" class="o_lunch_new_product me-1 py-1 fs-6 badge rounded-pill text-bg-success">
+                                        New
+                                    </div>
+                                    <field name="price" widget="monetary" class="fw-bold "/>
                                 </div>
                             </div>
-                        </div>
+                            <field name="supplier_id" />
+                            <footer class="pt-0 mt-0">
+                                <field name="description" class="text-muted"/>
+                            </footer>
+                        </main>
                     </t>
                 </templates>
             </kanban>
@@ -161,32 +147,20 @@
                 <field name="description"/>
                 <field name="currency_id"/>
                 <templates>
-                    <t t-name="kanban-box">
-                        <div class="oe_kanban_global_click o_kanban_record_has_image_fill">
-                            <div class="o_kanban_image_fill_left d-none d-md-block">
-                                <img t-attf-src="#{kanban_image('lunch.product', 'image_128', record.id.raw_value)}" t-att-alt="record.id.value"/>
+                    <t t-name="card" class="flex-row">
+                        <aside class="o_kanban_aside_full d-none d-md-block">
+                            <field name="image_128" widget="image" alt="Product Image"/>
+                        </aside>
+                        <main>
+                            <div class="d-flex">
+                                <field name="name" class="fw-bold fs-5"/>
+                                <field name="price" widget="monetary" class="fw-bold ms-auto"/>
                             </div>
-                            <div class="oe_kanban_details">
-                                <div class="o_kanban_record_top">
-                                    <div class="o_kanban_record_headings">
-                                        <strong class="o_kanban_record_title">
-                                            <div>
-                                                <div class="float-end">
-                                                    <field name="price" widget="monetary"/>
-                                                </div>
-                                                <strong><span t-esc="record.name.value"/></strong>
-                                            </div>
-                                        </strong>
-                                        <span class="o_kanban_record_subtitle"><span t-esc="record.supplier_id.value"/></span>
-                                    </div>
-                                </div>
-                                <div class="o_kanban_record_bottom">
-                                    <ul>
-                                        <li t-out="record.description.value" class="text-muted"/>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
+                            <field name="supplier_id" />
+                            <footer class="pt-0 mt-0">
+                                <field name="description" class="text-muted"/>
+                            </footer>
+                        </main>
                     </t>
                 </templates>
             </kanban>
@@ -196,7 +170,7 @@
     <record id="lunch_product_action_statbutton" model="ir.actions.act_window">
         <field name="name">Products</field>
         <field name="res_model">lunch.product</field>
-        <field name="view_mode">kanban,tree,form</field>
+        <field name="view_mode">kanban,list,form</field>
         <field name="context">{'search_default_group_by_supplier': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
@@ -208,13 +182,13 @@
     </record>
 
     <record id="lunch_product_category_view_tree" model="ir.ui.view">
-        <field name="name">Product category Tree</field>
+        <field name="name">Product category List</field>
         <field name="model">lunch.product.category</field>
         <field name="arch" type="xml">
-            <tree string="Products List">
+            <list string="Products List">
                 <field name='name' string="Product Category"/>
                 <field name="company_id" groups="base.group_multi_company"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -251,32 +225,21 @@
         <field name="model">lunch.product.category</field>
         <field name="arch" type="xml">
             <kanban class="o_kanban_mobile">
-                <field name="id"/>
                 <templates>
-                    <t t-name="kanban-box">
-                        <div class="oe_kanban_global_click o_kanban_record_has_image_fill o_kanban_record">
-                            <div class="o_kanban_image_fill_left d-none d-md-block">
-                                <img t-attf-src="#{kanban_image('lunch.product.category', 'image_128', record.id.raw_value)}" t-att-alt="record.id.value"/>
-                            </div>
-                            <div class="oe_kanban_details">
-                                <div class="o_kanban_record_top">
-                                    <div class="o_kanban_record_headings">
-                                        <div class="float-end">
-                                            <button class="badge text-bg-primary" type="action"
-                                                name="%(lunch.lunch_product_action_statbutton)d"
-                                                context="{'search_default_category_id': id,'default_category_id': id}"
-                                                invisible="product_count == 0">
-                                                <field string="Products" name="product_count" widget="statinfo"/>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="o_kanban_record_body">
-                                    <strong><field name="name"/></strong><br/>
-                                    <field name="company_id" groups="base.group_multi_company"/>
-                                </div>
-                            </div>
-                        </div>
+                    <t t-name="card">
+                        <aside class="d-none d-md-block">
+                            <field name="image_128" widget="image"/>
+                        </aside>
+                        <main>
+                            <button class="badge text-bg-primary ms-auto" type="action"
+                                name="%(lunch.lunch_product_action_statbutton)d"
+                                context="{'search_default_category_id': id,'default_category_id': id}"
+                                invisible="product_count == 0">
+                                <field string="Products" name="product_count" widget="statinfo"/>
+                            </button>
+                            <field name="name" class="fw-bold"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </main>
                     </t>
                 </templates>
             </kanban>
@@ -297,7 +260,7 @@
     <record id="lunch_product_action" model="ir.actions.act_window">
         <field name="name">Products</field>
         <field name="res_model">lunch.product</field>
-        <field name="view_mode">tree,kanban,form</field>
+        <field name="view_mode">list,kanban,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
             Create a new product for lunch
@@ -309,15 +272,15 @@
 
     <record id="lunch_product_action_order" model="ir.actions.act_window">
         <field name="name">Order Your Lunch</field>
+        <field name="path">lunch</field>
         <field name="res_model">lunch.product</field>
-        <field name="view_mode">kanban,tree</field>
+        <field name="view_mode">kanban,list</field>
         <field name="view_ids" eval="[
             (5, 0, 0),
             (0, 0, {'view_mode': 'kanban', 'view_id': ref('view_lunch_product_kanban_order')}),
-            (0, 0, {'view_mode': 'tree', 'view_id': ref('lunch_product_view_tree_order')})
+            (0, 0, {'view_mode': 'list', 'view_id': ref('lunch_product_view_tree_order')})
         ]"/>
         <field name="search_view_id" ref="lunch_product_view_search"/>
-        <field name="context">{'search_default_available_today': 1}</field>
         <field name="domain">[]</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
@@ -331,7 +294,7 @@
     <record id="lunch_product_category_action" model="ir.actions.act_window">
         <field name="name">Product Categories</field>
         <field name="res_model">lunch.product.category</field>
-        <field name="view_mode">tree,form,kanban</field>
+        <field name="view_mode">list,form,kanban</field>
         <field name="search_view_id" ref="lunch_product_category_view_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">

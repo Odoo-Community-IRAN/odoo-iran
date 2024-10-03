@@ -18,6 +18,7 @@
                 @include border-end-radius($border-radius);
                 padding-right: $o-horizontal-padding; // Compensate container padding
                 overflow: hidden; // to prevent scroll due to last arrow
+                flex-grow: 1;
             }
 
             &.o_last {
@@ -75,6 +76,16 @@
                         border-left-color: map-get($-btn-secondary-design, active-border);
                     }
                 }
+            }
+        }
+    }
+}
+.o_cell {
+    .o_field_statusbar {
+        > .o_statusbar_status {
+            justify-content: flex-end;
+            .o_arrow_button:not(.d-none) {
+                flex: 1 1 auto !important;
             }
         }
     }

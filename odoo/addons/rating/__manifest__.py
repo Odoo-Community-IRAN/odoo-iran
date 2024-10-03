@@ -20,14 +20,24 @@ This module allows a customer to give rating.
     'installable': True,
     'assets': {
         'web.assets_backend': [
-            'rating/static/src/**/*',
-            ('remove', 'rating/static/src/scss/rating_templates.scss'),
+            "rating/static/src/core/common/**/*",
+            "rating/static/src/core/web/**/*",
         ],
         'web.assets_frontend': [
             'rating/static/src/scss/rating_templates.scss',
         ],
-        'web.tests_assets': [
+        'web.assets_unit_tests': [
             'rating/static/tests/**/*',
+            ('remove', 'rating/static/tests/helpers/**/*'),
+        ],
+        'web.tests_assets': [
+            'rating/static/tests/helpers/**/*',
+        ],
+        "mail.assets_public": [
+            "rating/static/src/core/common/**/*",
+        ],
+        "portal.assets_chatter": [
+            "rating/static/src/core/common/**/*",
         ],
     },
     'license': 'LGPL-3',

@@ -101,7 +101,7 @@ class ModuleCategory(models.Model):
 
     @api.constrains('parent_id')
     def _check_parent_not_circular(self):
-        if not self._check_recursion():
+        if self._has_cycle():
             raise ValidationError(_("Error ! You cannot create recursive categories."))
 
 
@@ -196,7 +196,7 @@ class Module(models.Model):
                     for element, attribute, link, pos in html.iterlinks():
                         if element.get('src') and not '//' in element.get('src') and not 'static/' in element.get('src'):
                             element.set('src', "/%s/static/description/%s" % (module.name, element.get('src')))
-                    module.description_html = tools.html_sanitize(lxml.html.tostring(html))
+                    module.description_html = tools.html_sanitize(lxml.html.tostring(html, encoding='unicode'))
             except FileNotFoundError:
                 overrides = {
                     'embed_stylesheet': False,
@@ -289,6 +289,7 @@ class Module(models.Model):
     sequence = fields.Integer('Sequence', default=100)
     dependencies_id = fields.One2many('ir.module.module.dependency', 'module_id',
                                        string='Dependencies', readonly=True)
+    country_ids = fields.Many2many('res.country', 'module_country', 'module_id', 'country_id')
     exclusion_ids = fields.One2many('ir.module.module.exclusion', 'module_id',
                                     string='Exclusions', readonly=True)
     auto_install = fields.Boolean('Automatic Installation',
@@ -341,18 +342,17 @@ class Module(models.Model):
         """ Domain to retrieve the modules that should be loaded by the registry. """
         return [('state', '=', 'installed')]
 
-    @classmethod
-    def check_external_dependencies(cls, module_name, newstate='to install'):
-        terp = cls.get_module_info(module_name)
+    def check_external_dependencies(self, module_name, newstate='to install'):
+        terp = self.get_module_info(module_name)
         try:
             modules.check_manifest_dependencies(terp)
         except Exception as e:
             if newstate == 'to install':
-                msg = _('Unable to install module "%s" because an external dependency is not met: %s', module_name, e.args[0])
+                msg = _('Unable to install module "%(module)s" because an external dependency is not met: %(dependency)s', module=module_name, dependency=e.args[0])
             elif newstate == 'to upgrade':
-                msg = _('Unable to upgrade module "%s" because an external dependency is not met: %s', module_name, e.args[0])
+                msg = _('Unable to upgrade module "%(module)s" because an external dependency is not met: %(dependency)s', module=module_name, dependency=e.args[0])
             else:
-                msg = _('Unable to process module "%s" because an external dependency is not met: %s', module_name, e.args[0])
+                msg = _('Unable to process module "%(module)s" because an external dependency is not met: %(dependency)s', module=module_name, dependency=e.args[0])
             raise UserError(msg)
 
     def _state_update(self, newstate, states_to_update, level=100):
@@ -371,7 +371,10 @@ class Module(models.Model):
             update_mods, ready_mods = self.browse(), self.browse()
             for dep in module.dependencies_id:
                 if dep.state == 'unknown':
-                    raise UserError(_("You try to install module %r that depends on module %r.\nBut the latter module is not available in your system.", module.name, dep.name))
+                    raise UserError(_(
+                        'You try to install module "%(module)s" that depends on module "%(dependency)s".\nBut the latter module is not available in your system.',
+                        module=module.name, dependency=dep.name,
+                    ))
                 if dep.depend_id.state == newstate:
                     ready_mods += dep.depend_id
                 else:
@@ -391,16 +394,20 @@ class Module(models.Model):
 
     @assert_log_admin_access
     def button_install(self):
+        company_countries = self.env['res.company'].search([]).country_id
         # domain to select auto-installable (but not yet installed) modules
         auto_domain = [('state', '=', 'uninstalled'), ('auto_install', '=', True)]
 
         # determine whether an auto-install module must be installed:
         #  - all its dependencies are installed or to be installed,
         #  - at least one dependency is 'to install'
+        #  - if the module is country specific, at least one company is in one of the countries
         install_states = frozenset(('installed', 'to install', 'to upgrade'))
         def must_install(module):
             states = {dep.state for dep in module.dependencies_id if dep.auto_install_required}
-            return states <= install_states and 'to install' in states
+            return states <= install_states and 'to install' in states and (
+                not module.country_ids or module.country_ids & company_countries
+            )
 
         modules = self
         while modules:
@@ -418,7 +425,11 @@ class Module(models.Model):
         for module in install_mods:
             for exclusion in module.exclusion_ids:
                 if exclusion.name in install_names:
-                    raise UserError(_('Modules %r and %r are incompatible.', module.shortdesc, exclusion.exclusion_id.shortdesc))
+                    raise UserError(_(
+                        'Modules "%(module)s" and "%(incompatible_module)s" are incompatible.',
+                        module=module.shortdesc,
+                        incompatible_module=exclusion.exclusion_id.shortdesc,
+                    ))
 
         # check category exclusions
         def closure(module):
@@ -438,7 +449,7 @@ class Module(models.Model):
             if modules and not any(modules <= closure(module) for module in modules):
                 labels = dict(self.fields_get(['state'])['state']['selection'])
                 raise UserError(
-                    _('You are trying to install incompatible modules in category %r:%s', category.name, ''.join(
+                    _('You are trying to install incompatible modules in category "%(category)s":%(module_list)s', category=category.name, module_list=''.join(
                         f"\n- {module.shortdesc} ({labels[module.state]})"
                         for module in modules
                     ))
@@ -561,7 +572,7 @@ class Module(models.Model):
         return {
             'type': 'ir.actions.act_url',
             'target': 'self',
-            'url': '/web',
+            'url': '/odoo',
         }
 
     def _button_immediate_function(self, function):
@@ -679,7 +690,7 @@ class Module(models.Model):
             module = todo[i]
             i += 1
             if module.state not in ('installed', 'to upgrade'):
-                raise UserError(_("Can not upgrade module %r. It is not installed.", module.name))
+                raise UserError(_("Cannot upgrade module “%s”. It is not installed.", module.name))
             if self.get_module_info(module.name).get("installable", True):
                 self.check_external_dependencies(module.name, 'to upgrade')
             for dep in Dependency.search([('name', '=', module.name)]):
@@ -698,7 +709,7 @@ class Module(models.Model):
                 continue
             for dep in module.dependencies_id:
                 if dep.state == 'unknown':
-                    raise UserError(_('You try to upgrade the module %s that depends on the module: %s.\nBut this module is not available in your system.', module.name, dep.name))
+                    raise UserError(_('You try to upgrade the module %(module)s that depends on the module: %(dependency)s.\nBut this module is not available in your system.', module=module.name, dependency=dep.name))
                 if dep.state == 'uninstalled':
                     to_install += self.search([('name', '=', dep.name)]).ids
 
@@ -784,6 +795,7 @@ class Module(models.Model):
 
     def _update_from_terp(self, terp):
         self._update_dependencies(terp.get('depends', []), terp.get('auto_install'))
+        self._update_countries(terp.get('countries', []))
         self._update_exclusions(terp.get('excludes', []))
         self._update_category(terp.get('category', 'Uncategorized'))
 
@@ -799,6 +811,16 @@ class Module(models.Model):
                          (list(auto_install_requirements or ()), self.id))
         self.env['ir.module.module.dependency'].invalidate_model(['auto_install_required'])
         self.invalidate_recordset(['dependencies_id'])
+
+    def _update_countries(self, countries=()):
+        existing = set(self.country_ids.ids)
+        needed = set(self.env['res.country'].search([('code', 'in', [c.upper() for c in countries])]).ids)
+        for dep in (needed - existing):
+            self._cr.execute('INSERT INTO module_country (module_id, country_id) values (%s, %s)', (self.id, dep))
+        for dep in (existing - needed):
+            self._cr.execute('DELETE FROM module_country WHERE module_id = %s and country_id = %s', (self.id, dep))
+        self.invalidate_recordset(['country_ids'])
+        self.env['res.company'].invalidate_model(['uninstalled_l10n_module_ids'])
 
     def _update_exclusions(self, excludes=None):
         self.env['ir.module.module.exclusion'].flush_model()
@@ -873,13 +895,18 @@ class Module(models.Model):
     def search_panel_select_range(self, field_name, **kwargs):
         if field_name == 'category_id':
             enable_counters = kwargs.get('enable_counters', False)
-            domain = [('parent_id', '=', False), ('child_ids.module_ids', '!=', False)]
+            domain = [
+                ('parent_id', '=', False),
+                '|',
+                ('module_ids.application', '!=', False),
+                ('child_ids.module_ids', '!=', False),
+            ]
 
             excluded_xmlids = [
                 'base.module_category_website_theme',
                 'base.module_category_theme',
             ]
-            if not self.user_has_groups('base.group_no_one'):
+            if not self.env.user.has_group('base.group_no_one'):
                 excluded_xmlids.append('base.module_category_hidden')
 
             excluded_category_ids = []
@@ -918,18 +945,19 @@ class Module(models.Model):
         return super(Module, self).search_panel_select_range(field_name, **kwargs)
 
     @api.model
-    def _load_module_terms(self, modules, langs, overwrite=False):
+    def _load_module_terms(self, modules, langs, overwrite=False, imported_module=False):
         """ Load PO files of the given modules for the given languages. """
         # load i18n files
         translation_importer = TranslationImporter(self.env.cr, verbose=False)
 
         for module_name in modules:
-            modpath = get_module_path(module_name)
+            modpath = get_module_path(module_name, downloaded=imported_module)
             if not modpath:
                 continue
             for lang in langs:
                 is_lang_imported = False
-                for po_path in get_po_paths(module_name, lang):
+                env = self.env if imported_module else None
+                for po_path in get_po_paths(module_name, lang, env=env):
                     _logger.info('module %s: loading translation file %s for language %s', module_name, po_path, lang)
                     translation_importer.load_file(po_path, lang)
                     is_lang_imported = True
@@ -983,6 +1011,27 @@ class ModuleDependency(models.Model):
     def _compute_state(self):
         for dependency in self:
             dependency.state = dependency.depend_id.state or 'unknown'
+
+    @api.model
+    def all_dependencies(self, module_names):
+        to_search = {key: True for key in module_names}
+        res = {}
+        def search_direct_deps(to_search, res):
+            to_search_list = list(to_search.keys())
+            dependencies = self.web_search_read(domain=[("module_id.name", "in", to_search_list)], specification={"module_id":{"fields":{"name":{}}}, "name": {}, })["records"]
+            to_search.clear()
+            for dependency in dependencies:
+                dep_name = dependency["name"]
+                mod_name = dependency["module_id"]["name"]
+                if dep_name not in res and dep_name not in to_search and dep_name not in to_search_list:
+                    to_search[dep_name] = True
+                if mod_name not in res:
+                    res[mod_name] = list()
+                res[mod_name].append(dep_name)
+        search_direct_deps(to_search, res)
+        while to_search:
+            search_direct_deps(to_search, res)
+        return res
 
 
 class ModuleExclusion(models.Model):
