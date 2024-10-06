@@ -9,7 +9,7 @@
     'author': "Odoo Community Iran",
     'website': "https://odoo-community.ir/",
     'category': 'Technical',
-    'version': '1.0',
+    'version': '1.0.1',
     "license": "AGPL-3",
     'depends': ['base', 'mail', 'web_enterprise'],
     'data': [

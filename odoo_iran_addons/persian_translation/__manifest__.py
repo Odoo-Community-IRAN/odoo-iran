@@ -4,14 +4,12 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 {
     "name": "Persian Translator",
-    "summary": """
-        Short (1 phrase/line) summary of the module's purpose, used as
-        subtitle on modules listing or apps.openerp.com""",
+    "summary": """Persian Translator""",
     "author": "Odoo Community Iran",
     "license": "AGPL-3",
     "website": "https://odoo-community.ir/",
     "category": "Technical",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "depends": ["base"],
     "data": [
         "security/ir.model.access.csv",

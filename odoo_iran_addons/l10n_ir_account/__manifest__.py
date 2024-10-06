@@ -5,7 +5,7 @@
 
 {
     "name": "Iran - Accounting",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "countries": ["ir"],
     "category": "Accounting/Localizations/Account Charts",
     "summary": """iran accounting chart and localization.""",
