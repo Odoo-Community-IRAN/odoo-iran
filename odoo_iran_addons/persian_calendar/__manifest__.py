@@ -10,7 +10,7 @@
     'website': "https://odoo-community.ir/",
     'category': 'Localization/Iran',
     'images': ['static/description/theme_screenshot.jpg'],
-    'version': '1.0.2',
+    'version': '1.0.3',
     'license': 'LGPL-3',
     'depends': ['base', 'web'],
     'assets': {
@@ -26,6 +26,8 @@
             'persian_calendar/static/src/js/list.js',
             'persian_calendar/static/src/js/datetime_field.js',
             'persian_calendar/static/src/js/jdatetime.js',
+            'persian_calendar/static/src/js/calendar_hook.js',
+            'persian_calendar/static/src/js/jfullcalendar.js',
         ]
     }
 }
