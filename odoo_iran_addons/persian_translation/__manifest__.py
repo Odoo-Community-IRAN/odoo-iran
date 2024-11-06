@@ -11,7 +11,7 @@
     "license": "AGPL-3",
     "website": "https://odoo-community.ir/",
     "category": "Technical",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "depends": ["base"],
     "data": [
         "security/ir.model.access.csv",
