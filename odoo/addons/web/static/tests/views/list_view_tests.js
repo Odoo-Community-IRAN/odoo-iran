@@ -2842,46 +2842,6 @@ QUnit.module("Views", (hooks) => {
         assert.verifySteps(["openRecord", "openRecord"]);
     });
 
-    QUnit.test("open invalid but unchanged record", async function (assert) {
-        const listView = registry.category("views").get("list");
-        class CustomListController extends listView.Controller {
-            openRecord(record) {
-                assert.step("openRecord");
-                assert.strictEqual(record.resId, 2);
-                return super.openRecord(record);
-            }
-        }
-        registry.category("views").add("custom_list", {
-            ...listView,
-            Controller: CustomListController,
-        });
-
-        const list = await makeView({
-            type: "list",
-            resModel: "foo",
-            serverData,
-            arch: `
-                <tree js_class="custom_list">
-                    <field name="foo"/>
-                    <field name="date" required="1"/>
-                </tree>`,
-        });
-
-        patchWithCleanup(list.env.services.notification, {
-            add: () => {
-                throw new Error("should not display a notification");
-            },
-        });
-
-        // second record is invalid as date is not set
-        assert.strictEqual(
-            target.querySelector(".o_data_row:nth-child(2) .o_data_cell[name=date]").innerText,
-            ""
-        );
-        await click(target.querySelector(".o_data_row:nth-child(2) .o_data_cell"));
-        assert.verifySteps(["openRecord"]);
-    });
-
     QUnit.test(
         "execute an action before and after each valid save in a list view",
         async function (assert) {
@@ -4581,7 +4541,7 @@ QUnit.module("Views", (hooks) => {
                 <tree>
                     <field name="company_currency_id" column_invisible="1"/>
                     <field name="currency_id" column_invisible="1"/>
-                    <field name="amount"/>
+                    <field name="amount" sum="Sum"/>
                     <field name="amount_currency"/>
                 </tree>`,
             });
@@ -4600,6 +4560,12 @@ QUnit.module("Views", (hooks) => {
                 target.querySelectorAll("tfoot td")[1].textContent,
                 "—",
                 "aggregates monetary should never work if different currencies are used"
+            );
+            assert.strictEqual(
+                target.querySelectorAll("tfoot td")[2].textContent,
+                "",
+                "monetary aggregation should only be attempted with an active aggregation function" +
+                    " when using different currencies"
             );
         }
     );
@@ -11481,6 +11447,163 @@ QUnit.module("Views", (hooks) => {
             $(target).find("tbody tr td.o_list_number").text(),
             "1423",
             "the int_field (sequence) should have been correctly updated"
+        );
+    });
+
+    QUnit.test("resequence with NULL values", async function (assert) {
+        const mockedActionService = {
+            start() {
+                return {
+                    doActionButton(params) {
+                        if (params.name === "reload") {
+                            params.onClose();
+                        } else {
+                            throw makeServerError();
+                        }
+                    },
+                };
+            },
+        };
+        serviceRegistry.add("action", mockedActionService, { force: true });
+
+        serverData.models = {
+            // we want the data to be minimal to have a minimal test
+            foo: {
+                fields: { int_field: { string: "int_field", type: "integer", sortable: true } },
+                records: [
+                    { id: 1, int_field: 1 },
+                    { id: 2 },
+                    { id: 3, int_field: 3 },
+                    { id: 4, int_field: 2 },
+                ],
+            },
+        };
+        await makeView({
+            type: "list",
+            resModel: "foo",
+            serverData,
+            arch: `
+                <tree default_order="int_field">
+                    <field name="int_field" widget="handle"/>
+                    <field name="id"/>
+                    <button name="reload" class="reload" string="Confirm" type="object"/>
+                </tree>`,
+            async mockRPC(route, args, performRPC) {
+                if (args.method === "web_search_read") {
+                    const res = await performRPC(route, args);
+                    const serverRecords = Object.fromEntries(
+                        Object.values(serverData.models.foo.records).map((e) => [e.id, e])
+                    );
+                    // when sorted, NULL values are last
+                    const getServerValue = (record) =>
+                        serverRecords[record.id].int_field === false
+                            ? Number.MAX_SAFE_INTEGER
+                            : serverRecords[record.id].int_field;
+
+                    res.records.sort((a, b) => getServerValue(a) - getServerValue(b));
+                    return res;
+                }
+            },
+        });
+        assert.deepEqual(
+            Array.from(document.querySelectorAll(".o_field_cell[name=id]")).map(
+                (e) => e.textContent
+            ),
+            ["1", "4", "3", "2"],
+            "2 should be the last one because NULL is sorted last in python"
+        );
+
+        // drag and drop the fourth line in third position
+        await dragAndDrop("tbody tr:nth-child(4) .o_handle_cell", "tbody tr:nth-child(3)");
+        assert.deepEqual(
+            Array.from(document.querySelectorAll(".o_field_cell[name=id]")).map(
+                (e) => e.textContent
+            ),
+            ["1", "4", "2", "3"]
+        );
+
+        await click(target.querySelector("button.reload"));
+        assert.deepEqual(
+            Array.from(document.querySelectorAll(".o_field_cell[name=id]")).map(
+                (e) => e.textContent
+            ),
+            ["1", "4", "2", "3"],
+            "The order should be kept"
+        );
+    });
+
+    QUnit.test("resequence with only NULL values", async function (assert) {
+        const mockedActionService = {
+            start() {
+                return {
+                    doActionButton(params) {
+                        if (params.name === "reload") {
+                            params.onClose();
+                        } else {
+                            throw makeServerError();
+                        }
+                    },
+                };
+            },
+        };
+        serviceRegistry.add("action", mockedActionService, { force: true });
+
+        serverData.models = {
+            // we want the data to be minimal to have a minimal test
+            foo: {
+                fields: { int_field: { string: "int_field", type: "integer", sortable: true } },
+                records: [{ id: 1 }, { id: 2 }, { id: 3 }],
+            },
+        };
+        await makeView({
+            type: "list",
+            resModel: "foo",
+            serverData,
+            arch: `
+                <tree default_order="int_field">
+                    <field name="int_field" widget="handle"/>
+                    <field name="id"/>
+                    <button name="reload" class="reload" string="Confirm" type="object"/>
+                </tree>`,
+            async mockRPC(route, args, performRPC) {
+                if (args.method === "web_search_read") {
+                    const res = await performRPC(route, args);
+                    const serverRecords = Object.fromEntries(
+                        Object.values(serverData.models.foo.records).map((e) => [e.id, e])
+                    );
+                    // when sorted, NULL values are last
+                    const getServerValue = (record) =>
+                        serverRecords[record.id].int_field === false
+                            ? Number.MAX_SAFE_INTEGER
+                            : serverRecords[record.id].int_field;
+
+                    res.records.sort((a, b) => getServerValue(a) - getServerValue(b));
+                    return res;
+                }
+            },
+        });
+        assert.deepEqual(
+            Array.from(document.querySelectorAll(".o_field_cell[name=id]")).map(
+                (e) => e.textContent
+            ),
+            ["1", "2", "3"]
+        );
+
+        // drag and drop the third line in second position
+        await dragAndDrop("tbody tr:nth-child(3) .o_handle_cell", "tbody tr:nth-child(2)");
+        assert.deepEqual(
+            Array.from(document.querySelectorAll(".o_field_cell[name=id]")).map(
+                (e) => e.textContent
+            ),
+            ["1", "3", "2"]
+        );
+
+        await click(target.querySelector("button.reload"));
+        assert.deepEqual(
+            Array.from(document.querySelectorAll(".o_field_cell[name=id]")).map(
+                (e) => e.textContent
+            ),
+            ["1", "3", "2"]
         );
     });
 
@@ -20602,5 +20725,51 @@ QUnit.module("Views", (hooks) => {
             "1-2 / 5",
             "pager should be updated to 1-2 / 5"
         );
+    });
+
+    QUnit.test("properties do not disappear after domain change", async (assert) => {
+        const definition0 = {
+            type: "char",
+            name: "property_char",
+            string: "Property char",
+        };
+        serverData.models.bar.records[0].definitions = [definition0];
+        for (const record of serverData.models.foo.records) {
+            if (record.m2o === 1) {
+                record.properties = [{ ...definition0, value: "AA" }];
+            }
+        }
+
+        await makeView({
+            type: "list",
+            resModel: "foo",
+            serverData,
+            arch: `
+                <tree editable="bottom">
+                    <field name="m2o"/>
+                    <field name="properties"/>
+                </tree>
+            `,
+            searchViewArch: `
+                <search>
+                    <filter name="properties_filter" string="My filter" domain="[['properties.property_char', '=', 'AA']]"/>
+                    <group>
+                        <!-- important -->
+                        <filter name="properties_groupby" string="My groupby" context="{'group_by':'properties'}"/>
+                    </group>
+                </search>
+            `,
+        });
+
+        await click(target, ".o_optional_columns_dropdown_toggle");
+        await click(target, ".o_optional_columns_dropdown input[type='checkbox']");
+        assert.containsOnce(target, ".o_list_renderer th[data-name='properties.property_char']");
+
+        await toggleSearchBarMenu(target);
+        await toggleMenuItem(target, "My filter");
+        assert.containsOnce(target, ".o_list_renderer th[data-name='properties.property_char']");
+
+        await toggleMenuItem(target, "My filter");
+        assert.containsOnce(target, ".o_list_renderer th[data-name='properties.property_char']");
     });
 });

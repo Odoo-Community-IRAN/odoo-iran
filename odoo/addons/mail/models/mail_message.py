@@ -737,7 +737,9 @@ class Message(models.Model):
         messages_by_partner = defaultdict(lambda: self.env['mail.message'])
         partners_with_user = self.partner_ids.filtered('user_ids')
         for elem in self:
-            for partner in elem.partner_ids & partners_with_user:
+            for partner in (
+                elem.partner_ids & partners_with_user | elem.notification_ids.author_id
+            ):
                 messages_by_partner[partner] |= elem
 
         # Notify front-end of messages deletion for partners having a user
@@ -872,7 +874,13 @@ class Message(models.Model):
         group_domain = [("message_id", "=", self.id), ("content", "=", content)]
         count = self.env["mail.message.reaction"].search_count(group_domain)
         group_command = "ADD" if count > 0 else "DELETE"
-        personas = [("ADD" if action == "add" else "DELETE", {"id": guest.id if guest else partner.id, "type": "guest" if guest else "partner"})] if guest or partner else []
+        persona = guest or partner
+        personas = []
+        if persona:
+            persona_data = {"id": persona.id, "type": "guest" if guest else "partner"}
+            if group_command == "ADD":
+                persona_data.update({"name": persona.name, "write_date": persona.write_date})
+            personas = [("ADD" if action == "add" else "DELETE", persona_data)]
         group_values = {
             "content": content,
             "count": count,

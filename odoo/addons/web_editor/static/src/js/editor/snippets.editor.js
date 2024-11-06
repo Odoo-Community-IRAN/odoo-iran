@@ -2088,7 +2088,7 @@ var SnippetsMenu = Widget.extend({
             // Note: we cannot listen to keyup in .o_default_snippet_text
             // elements via delegation because keyup only bubbles from focusable
             // elements which contenteditable are not.
-            const selection = this.ownerDocument.getSelection();
+            const selection = this.$body[0].ownerDocument.getSelection();
             if (!selection.rangeCount) {
                 return;
             }
@@ -3196,6 +3196,16 @@ var SnippetsMenu = Widget.extend({
         // TODO: Remove in master and add it back in the template.
         const $vAlignOption = $html.find("#row_valign_snippet_option");
         $vAlignOption[0].dataset.js = "vAlignment";
+
+        // Replace the "src" attribute of iframes with "data-o-src-on-drop" to
+        // prevent the iframes from loading in the snippet menu. This is a fix
+        // in stable that is no longer needed in later versions, where the
+        // snippets' HTML code is no longer rendered in the snippet menu.
+        const iframeEls = $html.find("[data-snippet] iframe[src]");
+        for (const iframeEl of iframeEls) {
+            iframeEl.dataset.oSrcOnDrop = iframeEl.getAttribute("src");
+            iframeEl.removeAttribute("src");
+        }
     },
     /**
      * Creates a snippet editor to associated to the given snippet. If the given
@@ -3497,6 +3507,14 @@ var SnippetsMenu = Widget.extend({
                     dynamicSvg.src = colorCustomizedURL.pathname + colorCustomizedURL.search;
                 });
 
+                // The iframes must be loaded when the drag-and-drop starts and not when the snippet
+                // menu is loaded.
+                const iframeEls = $toInsert[0].querySelectorAll("iframe[data-o-src-on-drop]");
+                for (const iframeEl of iframeEls) {
+                    iframeEl.setAttribute("src", iframeEl.dataset.oSrcOnDrop);
+                    delete iframeEl.dataset.oSrcOnDrop;
+                }
+
                 if (!$selectorSiblings.length && !$selectorChildren.length) {
                     console.warn($snippet.find('.oe_snippet_thumbnail_title').text() + " have not insert action: data-drop-near or data-drop-in");
                     return;
@@ -3594,16 +3612,7 @@ var SnippetsMenu = Widget.extend({
                     }
 
                     var $target = $toInsert;
-
-                    if ($target[0].classList.contains("o_snippet_drop_in_only")) {
-                        // If it's a "drop in only" snippet, after dropping
-                        // it, we modify it so that it's no longer a
-                        // draggable snippet but rather simple HTML code, as
-                        // if the element had been created with the editor.
-                        $target[0].classList.remove("o_snippet_drop_in_only");
-                        delete $target[0].dataset.snippet;
-                        delete $target[0].dataset.name;
-                    }
+                    this._updateDroppedSnippet($target);
 
                     this.options.wysiwyg.odooEditor.observerUnactive('dragAndDropCreateSnippet');
                     await this._scrollToSnippet($target, this.$scrollable);
@@ -3844,6 +3853,23 @@ var SnippetsMenu = Widget.extend({
      */
     _allowInTranslationMode($snippet) {
         return globalSelector.is($snippet, { onlyTextOptions: true });
+    },
+    /**
+     * Allows to update the snippets to build & adapt dynamic content right
+     * after adding it to the DOM.
+     *
+     * @private
+     */
+    _updateDroppedSnippet($target) {
+        if ($target[0].classList.contains("o_snippet_drop_in_only")) {
+            // If it's a "drop in only" snippet, after dropping
+            // it, we modify it so that it's no longer a
+            // draggable snippet but rather simple HTML code, as
+            // if the element had been created with the editor.
+            $target[0].classList.remove("o_snippet_drop_in_only");
+            delete $target[0].dataset.snippet;
+            delete $target[0].dataset.name;
+        }
     },
 
     //--------------------------------------------------------------------------
