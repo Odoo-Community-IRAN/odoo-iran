@@ -6,6 +6,7 @@
 # Simo Suurla <simo@suurla.fi>, 2024
 # Kari Lindgren <kari.lindgren@emsystems.fi>, 2024
 # Martin Trigaux, 2024
+# Jarmo Kortetjärvi <jarmo.kortetjarvi@gmail.com>, 2024
 # Tuomo Aura <tuomo.aura@web-veistamo.fi>, 2024
 # Ossi Mantylahti <ossi.mantylahti@obs-solutions.fi>, 2024
 # 
@@ -13,7 +14,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-09-26 08:55+0000\n"
+"POT-Creation-Date: 2024-10-25 07:49+0000\n"
 "PO-Revision-Date: 2024-09-25 09:41+0000\n"
 "Last-Translator: Ossi Mantylahti <ossi.mantylahti@obs-solutions.fi>, 2024\n"
 "Language-Team: Finnish (https://app.transifex.com/odoo/teams/41243/fi/)\n"
@@ -48,16 +49,12 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:pos_hr.pos_config_form_view_inherit
 #: model_terms:ir.ui.view,arch_db:pos_hr.res_config_settings_view_form
 msgid "Advanced rights"
-msgstr ""
+msgstr "Edistyneet oikeudet"
 
 #. module: pos_hr
 #: model_terms:ir.ui.view,arch_db:pos_hr.pos_config_form_view_inherit
-msgid "All Employees"
-msgstr ""
-
-#. module: pos_hr
 #: model_terms:ir.ui.view,arch_db:pos_hr.res_config_settings_view_form
-msgid "All employees"
+msgid "All Employees"
 msgstr ""
 
 #. module: pos_hr
@@ -69,7 +66,7 @@ msgstr "Pankkitiliotteen rivi"
 #: model_terms:ir.ui.view,arch_db:pos_hr.pos_config_form_view_inherit
 #: model_terms:ir.ui.view,arch_db:pos_hr.res_config_settings_view_form
 msgid "Basic rights"
-msgstr ""
+msgstr "Perusoikeudet"
 
 #. module: pos_hr
 #: model_terms:ir.ui.view,arch_db:pos_hr.view_pos_daily_sales_reports_wizard
@@ -90,7 +87,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:pos_hr.field_pos_session__employee_id
 #: model_terms:ir.ui.view,arch_db:pos_hr.pos_order_list_select_inherit
 msgid "Cashier"
-msgstr ""
+msgstr "Myyjä"
 
 #. module: pos_hr
 #. odoo-python
@@ -107,7 +104,7 @@ msgstr ""
 #. odoo-javascript
 #: code:addons/pos_hr/static/src/app/select_cashier_mixin.js:0
 msgid "Change Cashier"
-msgstr ""
+msgstr "Vaihda myyjää"
 
 #. module: pos_hr
 #. odoo-python
@@ -118,7 +115,7 @@ msgstr ""
 #. module: pos_hr
 #: model:ir.model,name:pos_hr.model_res_config_settings
 msgid "Config Settings"
-msgstr ""
+msgstr "Asetukset"
 
 #. module: pos_hr
 #. odoo-javascript
@@ -145,6 +142,11 @@ msgstr "Hylkää"
 #: model:ir.model.fields,field_description:pos_hr.field_report_pos_order__employee_id
 #: model_terms:ir.ui.view,arch_db:pos_hr.view_report_pos_order_search_inherit
 msgid "Employee"
+msgstr "Työntekijä"
+
+#. module: pos_hr
+#: model:ir.actions.report,name:pos_hr.multi_employee_sales_report_action
+msgid "Employee Sales Details"
 msgstr ""
 
 #. module: pos_hr
@@ -167,13 +169,13 @@ msgstr ""
 #: model:ir.model.fields,field_description:pos_hr.field_pos_config__basic_employee_ids
 #: model:ir.model.fields,field_description:pos_hr.field_res_config_settings__pos_basic_employee_ids
 msgid "Employees with basic access"
-msgstr ""
+msgstr "Työntekijät, joilla on perusoikeudet"
 
 #. module: pos_hr
 #: model:ir.model.fields,field_description:pos_hr.field_pos_config__advanced_employee_ids
 #: model:ir.model.fields,field_description:pos_hr.field_res_config_settings__pos_advanced_employee_ids
 msgid "Employees with manager access"
-msgstr ""
+msgstr "Työntekijät, joilla on esimiehen oikeudet"
 
 #. module: pos_hr
 #. odoo-javascript
@@ -185,29 +187,24 @@ msgstr ""
 #: model:ir.model.fields,help:pos_hr.field_pos_config__basic_employee_ids
 #: model:ir.model.fields,help:pos_hr.field_res_config_settings__pos_basic_employee_ids
 msgid "If left empty, all employees can log in to PoS"
-msgstr ""
+msgstr "Jos tyhjä, kaikki työntekijät voivat kirjautua kassaan"
 
 #. module: pos_hr
 #: model:ir.model.fields,help:pos_hr.field_pos_config__advanced_employee_ids
 #: model:ir.model.fields,help:pos_hr.field_res_config_settings__pos_advanced_employee_ids
 msgid "If left empty, only Odoo users have extended rights in PoS"
-msgstr ""
+msgstr "Jos tyhjä, vain Odoo-käyttäjillä on laajennetut oikeudet kassassa"
 
 #. module: pos_hr
 #. odoo-javascript
 #: code:addons/pos_hr/static/src/overrides/components/navbar/navbar.xml:0
 msgid "Lock"
-msgstr ""
+msgstr "Lukitse"
 
 #. module: pos_hr
 #. odoo-javascript
 #: code:addons/pos_hr/static/src/app/select_cashier_mixin.js:0
 msgid "No Cashiers"
-msgstr ""
-
-#. module: pos_hr
-#: model_terms:ir.ui.view,arch_db:pos_hr.res_config_settings_view_form
-msgid "No employee"
 msgstr ""
 
 #. module: pos_hr
@@ -238,7 +235,7 @@ msgstr ""
 #. odoo-javascript
 #: code:addons/pos_hr/static/src/app/select_cashier_mixin.js:0
 msgid "Password?"
-msgstr ""
+msgstr "Salasana?"
 
 #. module: pos_hr
 #. odoo-javascript
@@ -255,7 +252,7 @@ msgstr ""
 #. module: pos_hr
 #: model:ir.model,name:pos_hr.model_pos_config
 msgid "Point of Sale Configuration"
-msgstr ""
+msgstr "Kassan asetukset"
 
 #. module: pos_hr
 #: model:ir.model,name:pos_hr.model_pos_daily_sales_reports_wizard
@@ -265,12 +262,12 @@ msgstr "Kassan päivittäinen raportti"
 #. module: pos_hr
 #: model:ir.model,name:pos_hr.model_pos_order
 msgid "Point of Sale Orders"
-msgstr ""
+msgstr "Kassan tilaukset"
 
 #. module: pos_hr
 #: model:ir.model,name:pos_hr.model_report_pos_order
 msgid "Point of Sale Orders Report"
-msgstr ""
+msgstr "Kassan tilausten raportti"
 
 #. module: pos_hr
 #: model:ir.model,name:pos_hr.model_pos_payment
@@ -280,7 +277,7 @@ msgstr "Kassan maksut"
 #. module: pos_hr
 #: model:ir.model,name:pos_hr.model_pos_session
 msgid "Point of Sale Session"
-msgstr ""
+msgstr "Kassan istunto"
 
 #. module: pos_hr
 #. odoo-javascript
@@ -294,12 +291,8 @@ msgid "Product Variant"
 msgstr "Tuotevariaatio"
 
 #. module: pos_hr
-#: model:ir.actions.report,name:pos_hr.multi_employee_sales_report_action
-msgid "Sales Details"
-msgstr "Myynnin yksityiskohdat"
-
-#. module: pos_hr
 #: model_terms:ir.ui.view,arch_db:pos_hr.pos_config_form_view_inherit
+#: model_terms:ir.ui.view,arch_db:pos_hr.res_config_settings_view_form
 msgid "Select Employee(s)"
 msgstr ""
 
@@ -355,3 +348,5 @@ msgid ""
 "You cannot delete an employee that may be used in an active PoS session, "
 "close the session(s) first: \n"
 msgstr ""
+"Et voi poistaa työntekijää, jota voidaan käyttää aktiivisessa "
+"kassaistunnossa, sulje istunnot ensin:\n"

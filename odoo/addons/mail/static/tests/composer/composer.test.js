@@ -102,6 +102,22 @@ test("add an emoji", async () => {
     await contains(".o-mail-Composer-input", { value: "😤" });
 });
 
+test("emojis are auto-substituted from text", async () => {
+    const pyEnv = await startServer();
+    const channelId = pyEnv["discuss.channel"].create({ name: "swamp-safari" });
+    await start();
+    await openDiscuss(channelId);
+    await insertText(".o-mail-Composer-input", ":)");
+    await click(".o-mail-Composer-send:enabled");
+    await contains(".o-mail-Message-body", { text: "😊" });
+    await insertText(".o-mail-Composer-input", "x'D");
+    await click(".o-mail-Composer-send:enabled");
+    await contains(".o-mail-Message-body", { text: "😂" });
+    await insertText(".o-mail-Composer-input", ">:)");
+    await click(".o-mail-Composer-send:enabled");
+    await contains(".o-mail-Message-body", { text: "😈" });
+});
+
 test("Exiting emoji picker brings the focus back to the Composer textarea [REQUIRE FOCUS]", async () => {
     const pyEnv = await startServer();
     const channelId = pyEnv["discuss.channel"].create({ name: "" });
@@ -395,13 +411,13 @@ test("composer suggestion should match with input selection", async () => {
     await openDiscuss(channelId);
     await contains(".o-mail-Composer-input", { value: "" });
     await insertText(".o-mail-Composer-input", "#");
-    await contains(".o-mail-Composer-suggestion", { text: "#Mario Party" });
+    await contains(".o-mail-Composer-suggestion", { text: "Mario Party" });
     await click(".o-mail-Composer-suggestion");
     await contains(".o-mail-Composer-input", { value: "#Mario Party " });
     await insertText(".o-mail-Composer-input", "@");
     await contains(".o-mail-Composer-suggestion", { text: "Luigi" });
     $(".o-mail-Composer-input")[0].setSelectionRange(3, 3);
-    await contains(".o-mail-Composer-suggestion", { text: "#Mario Party" });
+    await contains(".o-mail-Composer-suggestion", { text: "Mario Party" });
     const textarea = $(".o-mail-Composer-input")[0];
     textarea.setSelectionRange(textarea.value.length, textarea.value.length);
     await contains(".o-mail-Composer-suggestion", { text: "Luigi" });

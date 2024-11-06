@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-09-26 08:55+0000\n"
+"POT-Creation-Date: 2024-10-25 07:48+0000\n"
 "PO-Revision-Date: 2024-09-25 09:41+0000\n"
 "Last-Translator: Wil Odoo, 2024\n"
 "Language-Team: Korean (https://app.transifex.com/odoo/teams/41243/ko/)\n"
@@ -61,7 +61,7 @@ msgstr "%(event_name)s - 등록자 %(attendee_name)s"
 #. odoo-python
 #: code:addons/event/models/event_event.py:0
 msgid "%(start_date)s to %(end_date)s"
-msgstr ""
+msgstr "%(start_date)s부터 %(end_date)s"
 
 #. module: event
 #. odoo-python
@@ -80,6 +80,12 @@ msgstr "%(ticket_name)s (매진)"
 #: code:addons/event/models/event_event.py:0
 msgid "%s (copy)"
 msgstr "%s (사본)"
+
+#. module: event
+#. odoo-javascript
+#: code:addons/event/static/src/client_action/event_registration_summary_dialog.js:0
+msgid "'%(name)s' badge sent to printer '%(printer)s'"
+msgstr ""
 
 #. module: event
 #: model:ir.actions.report,print_report_name:event.action_report_event_event_attendee_list
@@ -171,12 +177,12 @@ msgstr "5-10"
 #. module: event
 #: model:ir.model.fields.selection,name:event.selection__event_event__badge_format__96x134
 msgid "96x134mm (Badge Printer)"
-msgstr ""
+msgstr "96x134mm (배지 프린터)"
 
 #. module: event
 #: model:ir.model.fields.selection,name:event.selection__event_event__badge_format__96x82
 msgid "96x82mm (Badge Printer)"
-msgstr ""
+msgstr "96x82mm (배지 프린터)"
 
 #. module: event
 #: model_terms:event.event,description:event.event_0
@@ -330,7 +336,7 @@ msgstr "<i class=\"fa fa-ticket\" title=\"Ticket type\"/>"
 #. module: event
 #: model_terms:ir.ui.view,arch_db:event.view_event_kanban
 msgid "<i class=\"oi oi-arrow-right me-2\" title=\"End date\"/>"
-msgstr ""
+msgstr "<i class=\"oi oi-arrow-right me-2\" title=\"종료일\"/>"
 
 #. module: event
 #: model_terms:event.event,description:event.event_2
@@ -2037,7 +2043,7 @@ msgstr "참석자"
 #. odoo-javascript
 #: code:addons/event/static/src/client_action/event_registration_summary_dialog.xml:0
 msgid "Auto-Print"
-msgstr ""
+msgstr "자동 출력"
 
 #. module: event
 #: model:ir.model.fields,field_description:event.field_event_event__seats_available
@@ -2053,12 +2059,12 @@ msgstr "배지"
 #. module: event
 #: model:ir.actions.report,name:event.action_report_event_registration_badge_96x134
 msgid "Badge (96x134mm)"
-msgstr ""
+msgstr "배지 (96x134mm)"
 
 #. module: event
 #: model:ir.actions.report,name:event.action_report_event_registration_badge_96x82
 msgid "Badge (96x82mm)"
-msgstr ""
+msgstr "배지 (96x82mm)"
 
 #. module: event
 #: model:ir.model.fields,field_description:event.field_event_event__badge_image
@@ -2310,12 +2316,6 @@ msgid "Configuration"
 msgstr "설정"
 
 #. module: event
-#. odoo-javascript
-#: code:addons/event/static/src/client_action/event_registration_summary_dialog.xml:0
-msgid "Confirm"
-msgstr "승인"
-
-#. module: event
 #: model_terms:ir.ui.view,arch_db:event.event_registration_view_kanban
 msgid "Confirm Attendance"
 msgstr "참석 확인"
@@ -2329,7 +2329,7 @@ msgstr "참석 확인 버튼"
 #. odoo-javascript
 #: code:addons/event/static/src/client_action/event_registration_summary_dialog.xml:0
 msgid "Confirm attendance?"
-msgstr ""
+msgstr "참석을 확인하시겠습니까?"
 
 #. module: event
 #: model:ir.model,name:event.model_res_partner
@@ -2682,6 +2682,12 @@ msgstr "행사 등록"
 #: model:ir.model,name:event.model_event_registration_answer
 msgid "Event Registration Answer"
 msgstr "행사 등록 답변"
+
+#. module: event
+#. odoo-python
+#: code:addons/event/controllers/main.py:0
+msgid "Event Registrations"
+msgstr "행사 등록"
 
 #. module: event
 #: model:ir.model.fields,field_description:event.field_event_registration__event_user_id
@@ -3370,7 +3376,7 @@ msgstr "최근 30일"
 #. module: event
 #: model:ir.model.fields,field_description:event.field_event_mail__last_registration_id
 msgid "Last Attendee"
-msgstr ""
+msgstr "마지막 참석자"
 
 #. module: event
 #: model:ir.model.fields,field_description:event.field_event_event__write_uid
@@ -3769,7 +3775,7 @@ msgstr "설정하지 않은 경우 온라인"
 #. odoo-javascript
 #: code:addons/event/static/src/js/tours/event_tour.js:0
 msgid "Open date range picker.<br/>Pick a Start and End date for your event."
-msgstr ""
+msgstr "날짜 범위 선택창을 엽니다. <br/>행사 시작일을 선택하세요."
 
 #. module: event
 #: model_terms:event.event,description:event.event_0
@@ -3877,12 +3883,6 @@ msgstr "POS(Point of Sale), 보고서 사용자 정의 소개."
 #: code:addons/event/static/src/client_action/event_registration_summary_dialog.xml:0
 msgid "Print"
 msgstr "인쇄"
-
-#. module: event
-#. odoo-javascript
-#: code:addons/event/static/src/client_action/event_registration_summary_dialog.js:0
-msgid "Printing badge on %s..."
-msgstr ""
 
 #. module: event
 #: model_terms:event.event,description:event.event_0
@@ -4004,8 +4004,6 @@ msgid "Registration Date"
 msgstr "등록 날짜"
 
 #. module: event
-#. odoo-python
-#: code:addons/event/controllers/main.py:0
 #: model:ir.actions.client,name:event.event_action_install_kiosk_pwa
 #: model:ir.ui.menu,name:event.menu_event_registration_desk
 #: model:res.groups,name:event.group_event_registration_desk
@@ -4144,8 +4142,8 @@ msgstr "SMS 전송 오류"
 #. module: event
 #. odoo-javascript
 #: code:addons/event/static/src/client_action/event_barcode.xml:0
-msgid "Scan a badge"
-msgstr "배지 스캔"
+msgid "Scan or Tap"
+msgstr ""
 
 #. module: event
 #: model_terms:ir.ui.view,arch_db:event.res_config_settings_view_form
@@ -4175,6 +4173,11 @@ msgid "Scheduled Time"
 msgstr "예약 시간"
 
 #. module: event
+#: model:ir.model.fields,field_description:event.field_event_registration__mail_registration_ids
+msgid "Scheduler Emails"
+msgstr ""
+
+#. module: event
 #: model_terms:event.event,description:event.event_5
 msgid "Seasoned Hockey Fans and curious people, this tournament is for you!"
 msgstr "열렬한 하키 팬 및 관심 있는 모든 분들을 위한 토너먼트 경기입니다!"
@@ -4194,7 +4197,7 @@ msgstr "참가자 선택"
 #. odoo-javascript
 #: code:addons/event/static/src/client_action/event_registration_summary_dialog.xml:0
 msgid "Select printer..."
-msgstr ""
+msgstr "프린터 선택..."
 
 #. module: event
 #: model_terms:ir.ui.view,arch_db:event.event_registration_answer_view_tree
@@ -4787,6 +4790,12 @@ msgstr "이 기술 메뉴에서 행사와 관련된 전체 커뮤니케이션 �
 #: model_terms:event.event,description:event.event_2
 msgid "Understand the various modules;"
 msgstr "다양한 모듈 이해 ;"
+
+#. module: event
+#. odoo-javascript
+#: code:addons/event/static/src/client_action/event_registration_summary_dialog.xml:0
+msgid "Undo"
+msgstr "취소"
 
 #. module: event
 #: model:ir.model.fields,field_description:event.field_event_mail__interval_unit

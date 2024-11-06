@@ -174,7 +174,7 @@
         <field name="name">stock.picking.type.kanban</field>
         <field name="model">stock.picking.type</field>
         <field name="arch" type="xml">
-            <kanban highlight_color="color" class="o_stock_kanban" js_class="stock_dashboard_kanban" create="0" group_create="false" can_open="0">
+            <kanban highlight_color="color" class="o_stock_kanban" js_class="stock_dashboard_kanban" records_draggable="0" create="0" group_create="false" can_open="0">
                 <field name="color"/>
                 <field name="code" readonly="1"/>
                 <field name="count_move_ready"/>
@@ -243,7 +243,7 @@
                                 </div>
                                 <div class="col-6 stock-overview-links">
                                     <div t-if="record.count_picking_waiting.raw_value > 0" class="row">
-                                        <a class="col-8 offset-4 text-truncate" name="get_action_picking_tree_waiting" type="object">
+                                        <a class="col-8 offset-4 pe-0 text-truncate" name="get_action_picking_tree_waiting" type="object">
                                             <div class="row">
                                                 <span class="col-6">Waiting</span>
                                                 <field class="col-2 text-end" name="count_picking_waiting"/>
@@ -252,7 +252,7 @@
                                     </div>
 
                                     <div t-if="record.count_picking_late.raw_value > 0" class="row">
-                                        <a class="col-8 offset-4 text-truncate" name="get_action_picking_tree_late" type="object">
+                                        <a class="col-8 offset-4 pe-0 text-truncate" name="get_action_picking_tree_late" type="object">
                                             <div class="row">
                                                 <span class="col-6">Late</span>
                                                 <field class="col-2 text-end" name="count_picking_late"/>
@@ -261,7 +261,7 @@
                                     </div>
 
                                     <div t-if="record.count_picking_backorders.raw_value > 0" class="row" name="picking_type_backorder_count">
-                                        <a class="col-8 offset-4 text-truncate" name="get_action_picking_tree_backorder" type="object">
+                                        <a class="col-8 offset-4 pe-0 text-truncate" name="get_action_picking_tree_backorder" type="object">
                                             <div class="row">
                                                 <span class="col-6">Back Orders</span>
                                                 <field class="col-2 text-end" name="count_picking_backorders"/>
@@ -270,7 +270,7 @@
                                     </div>
 
                                     <div t-if="record.count_move_ready.raw_value > 0" class="row">
-                                        <a class="col-8 offset-4 text-truncate" name="get_action_picking_type_ready_moves" type="object">
+                                        <a class="col-8 offset-4 pe-0 text-truncate" name="get_action_picking_type_ready_moves" type="object">
                                             <div class="row">
                                                 <span class="col-6">Operations</span>
                                                 <field class="col-2 text-end" name="count_move_ready"/>

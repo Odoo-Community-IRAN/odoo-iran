@@ -10,7 +10,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-09-25 08:39+0000\n"
+"POT-Creation-Date: 2024-10-25 07:48+0000\n"
 "PO-Revision-Date: 2024-09-25 09:41+0000\n"
 "Last-Translator: Erwin van der Ploeg <erwin@odooexperts.nl>, 2024\n"
 "Language-Team: Dutch (https://app.transifex.com/odoo/teams/41243/nl/)\n"
@@ -55,7 +55,7 @@ msgid ""
 msgstr ""
 "Een deelnemer met deze gegevens is al geregistreerd op je netwerk. Als je al"
 " geregistreerd bent bij een andere Peppol-dienst, meld je dan af bij die "
-"dienst of vraag een migratiesleutel aan voordat je het opnieuw probeert."
+"dienst of vraag een migratiesleutel aan voordat je het opnieuw probeert"
 
 #. module: account_peppol
 #. odoo-python
@@ -88,6 +88,18 @@ msgstr "Wizard account verplaatsen verzenden"
 #: model:ir.model.fields,field_description:account_peppol.field_account_journal__is_peppol_journal
 msgid "Account used for Peppol"
 msgstr "Account gebruikt voor Peppol"
+
+#. module: account_peppol
+#: model:ir.model.fields,field_description:account_peppol.field_res_partner__available_peppol_edi_formats
+#: model:ir.model.fields,field_description:account_peppol.field_res_users__available_peppol_edi_formats
+msgid "Available Peppol Edi Formats"
+msgstr ""
+
+#. module: account_peppol
+#: model:ir.model.fields,field_description:account_peppol.field_res_partner__available_peppol_sending_methods
+#: model:ir.model.fields,field_description:account_peppol.field_res_users__available_peppol_sending_methods
+msgid "Available Peppol Sending Methods"
+msgstr ""
 
 #. module: account_peppol
 #: model_terms:ir.ui.view,arch_db:account_peppol.peppol_registration_form
@@ -157,7 +169,7 @@ msgstr "Controleer relatie(s)"
 #. module: account_peppol
 #: model_terms:ir.ui.view,arch_db:account_peppol.peppol_registration_form
 msgid "Check this box if you also need to receive vendor bills"
-msgstr "Vink dit aan als je ook leveranciersfacturen wilt ontvangen."
+msgstr "Vink dit aan als je ook leveranciersfacturen wilt ontvangen"
 
 #. module: account_peppol
 #: model:ir.model.fields,help:account_peppol.field_peppol_registration__peppol_eas
@@ -276,7 +288,7 @@ msgstr "Documentnaam"
 #. module: account_peppol
 #: model:ir.model.fields.selection,name:account_peppol.selection__account_move__peppol_move_state__done
 msgid "Done"
-msgstr "Afgehandeld"
+msgstr "Gereed"
 
 #. module: account_peppol
 #: model_terms:ir.ui.view,arch_db:account_peppol.peppol_registration_form
@@ -285,7 +297,6 @@ msgstr "Schema E-Adres"
 
 #. module: account_peppol
 #: model:ir.model.fields,field_description:account_peppol.field_peppol_registration__edi_mode
-#: model_terms:ir.ui.view,arch_db:account_peppol.peppol_registration_form
 msgid "EDI mode"
 msgstr "EDI-modus"
 
@@ -361,6 +372,13 @@ msgid "ID"
 msgstr "ID"
 
 #. module: account_peppol
+#. odoo-python
+#: code:addons/account_peppol/controllers/portal.py:0
+msgid ""
+"If you want to be invoiced by Peppol, your configuration must be valid."
+msgstr ""
+
+#. module: account_peppol
 #: model_terms:ir.ui.view,arch_db:account_peppol.peppol_registration_form
 msgid ""
 "In demo mode sending invoices is simulated.\n"
@@ -384,12 +402,6 @@ msgstr "Dagboek binnenkomende facturen"
 #: model:ir.model.fields,field_description:account_peppol.field_res_users__invoice_sending_method
 msgid "Invoice sending"
 msgstr "Factuur verzenden"
-
-#. module: account_peppol
-#: model:ir.model.fields,field_description:account_peppol.field_res_partner__is_peppol_edi_format
-#: model:ir.model.fields,field_description:account_peppol.field_res_users__is_peppol_edi_format
-msgid "Is Peppol Edi Format"
-msgstr "Is Peppol Edi-formaat"
 
 #. module: account_peppol
 #: model:ir.model.fields,help:account_peppol.field_account_peppol_service_wizard__service_json
@@ -514,6 +526,7 @@ msgstr "In afwachting van ontvangst"
 #: model:ir.model.fields,field_description:account_peppol.field_peppol_registration__peppol_endpoint
 #: model:ir.model.fields,field_description:account_peppol.field_res_company__peppol_endpoint
 #: model:ir.model.fields,field_description:account_peppol.field_res_config_settings__account_peppol_endpoint
+#: model_terms:ir.ui.view,arch_db:account_peppol.portal_my_details_fields
 msgid "Peppol Endpoint"
 msgstr "Eindpunt Peppol"
 
@@ -554,6 +567,11 @@ msgstr ""
 "(Eindpunt verzender: %(endpoint)s)"
 
 #. module: account_peppol
+#: model_terms:ir.ui.view,arch_db:account_peppol.portal_my_details_fields
+msgid "Peppol e-Address (EAS)"
+msgstr ""
+
+#. module: account_peppol
 #: model:ir.model.fields,field_description:account_peppol.field_peppol_registration__peppol_eas
 #: model:ir.model.fields,field_description:account_peppol.field_res_company__peppol_eas
 #: model:ir.model.fields,field_description:account_peppol.field_res_config_settings__account_peppol_eas
@@ -564,7 +582,7 @@ msgstr "Peppol e-address (EAS)"
 #: model:ir.model.fields,field_description:account_peppol.field_res_partner__peppol_verification_state
 #: model:ir.model.fields,field_description:account_peppol.field_res_users__peppol_verification_state
 msgid "Peppol endpoint verification"
-msgstr ""
+msgstr "Peppol eindpuntverificatie"
 
 #. module: account_peppol
 #. odoo-python
@@ -576,7 +594,7 @@ msgstr "Peppol foutmelding: %s"
 #. odoo-python
 #: code:addons/account_peppol/models/account_move_send.py:0
 msgid "Peppol is in testing/demo mode."
-msgstr ""
+msgstr "Peppol staat in de test/demomodus."
 
 #. module: account_peppol
 #: model_terms:ir.ui.view,arch_db:account_peppol.res_config_settings_view_form
@@ -824,6 +842,12 @@ msgid ""
 msgstr ""
 "De testmodus maakt het mogelijk om e-facturen te versturen via het Peppol-testnetwerk.\n"
 "                                Door op onderstaande knop te klikken accepteer ik dat Odoo mijn e-facturen eventueel verwerkt."
+
+#. module: account_peppol
+#. odoo-python
+#: code:addons/account_peppol/controllers/portal.py:0
+msgid "That country is not available for Peppol."
+msgstr ""
 
 #. module: account_peppol
 #. odoo-python
@@ -1083,9 +1107,11 @@ msgid "Your registration should be activated within a day."
 msgstr "Je registratie moet binnen de dag geactiveerd zijn."
 
 #. module: account_peppol
+#. odoo-python
+#: code:addons/account_peppol/controllers/portal.py:0
 #: model:ir.model.fields.selection,name:account_peppol.selection__res_partner__invoice_sending_method__peppol
 msgid "by Peppol"
-msgstr ""
+msgstr "door Peppol"
 
 #. module: account_peppol
 #: model_terms:ir.ui.view,arch_db:account_peppol.peppol_registration_form

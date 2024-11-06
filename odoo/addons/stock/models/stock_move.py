@@ -211,9 +211,12 @@ class StockMove(models.Model):
                 location_dest = move.picking_id.location_dest_id
             elif move.picking_type_id:
                 location_dest = move.picking_type_id.default_location_dest_id
-            customer_loc, __ = self.env['stock.warehouse']._get_partner_locations()
-            if location_dest and move.location_final_id and (move.location_final_id._child_of(location_dest) or
-               (location_dest._child_of(customer_loc) and move.partner_id and move.location_final_id._child_of(move.partner_id.property_stock_customer))):
+            is_move_to_interco_transit = False
+            if self.env.user.has_group('base.group_multi_company') and location_dest:
+                customer_loc, __ = self.env['stock.warehouse']._get_partner_locations()
+                inter_comp_location = self.env.ref('stock.stock_location_inter_company', raise_if_not_found=False)
+                is_move_to_interco_transit = location_dest._child_of(customer_loc) and move.location_final_id == inter_comp_location
+            if location_dest and move.location_final_id and (move.location_final_id._child_of(location_dest) or is_move_to_interco_transit):
                 # Force the location_final as dest in the following cases:
                 # - The location_final is a sublocation of destination -> Means we reached the end
                 # - The location dest is an out location (i.e. Customers) but the final dest is different (e.g. Inter-Company transfers)
@@ -560,21 +563,23 @@ Please change the quantity done or the rounding precision of your unit of measur
             ls = move.move_line_ids.lot_id
             for lot in move.lot_ids:
                 if lot not in ls:
+                    sml_location_id = lot.location_id.id \
+                        if lot.location_id and lot.location_id._child_of(move.location_id) \
+                        else move.location_id.id
+                    sml_lot_vals = {
+                        'location_id': sml_location_id,
+                        'lot_name': lot.name,
+                        'lot_id': lot.id,
+                        'product_uom_id': move.product_id.uom_id.id,
+                        'quantity': 1,
+                    }
                     if mls_without_lots[:1]:  # Updates an existing line without serial number.
                         move_line = mls_without_lots[:1]
-                        move_lines_commands.append(Command.update(move_line.id, {
-                            'lot_name': lot.name,
-                            'lot_id': lot.id,
-                            'product_uom_id': move.product_id.uom_id.id,
-                            'quantity': 1,
-                        }))
+                        move_lines_commands.append(Command.update(move_line.id, sml_lot_vals))
                         mls_without_lots -= move_line
                     else:  # No line without serial number, creates a new one.
                         move_line_vals = self._prepare_move_line_vals(quantity=0)
-                        move_line_vals['lot_id'] = lot.id
-                        move_line_vals['lot_name'] = lot.name
-                        move_line_vals['product_uom_id'] = move.product_id.uom_id.id
-                        move_line_vals['quantity'] = 1
+                        move_line_vals.update(**sml_lot_vals)
                         move_lines_commands.append((0, 0, move_line_vals))
                 else:
                     move_line = move.move_line_ids.filtered(lambda line: line.lot_id.id == lot.id)

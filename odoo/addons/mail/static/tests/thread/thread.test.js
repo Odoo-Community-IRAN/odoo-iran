@@ -19,7 +19,6 @@ import {
 } from "@mail/../tests/mail_test_helpers";
 
 import { describe, expect, test } from "@odoo/hoot";
-import { queryFirst } from "@odoo/hoot-dom";
 import { Deferred, mockDate, tick } from "@odoo/hoot-mock";
 import { Command, makeKwArgs, onRpc, serverState, withUser } from "@web/../tests/web_test_helpers";
 
@@ -136,9 +135,7 @@ test("auto-scroll to last read message on thread load", async () => {
     await start();
     await openDiscuss(channelId);
     await contains(".o-mail-Thread-newMessage ~ .o-mail-Message", { text: "message 100" });
-    const thread = document.querySelector(".o-mail-Thread");
-    const message = queryFirst(".o-mail-Message:contains(message 100)");
-    expect(isInViewportOf(thread, message)).toBe(true);
+    await isInViewportOf(".o-mail-Message:contains(message 100)", ".o-mail-Thread");
 });
 
 test("display day separator before first message of the day", async () => {
@@ -266,7 +263,7 @@ test("mention a channel with space in the name", async () => {
     await click(".o-mail-Composer-suggestion");
     await contains(".o-mail-Composer-input", { value: "#General good boy " });
     await click(".o-mail-Composer-send:enabled");
-    await contains(".o-mail-Message-body .o_channel_redirect", { text: "#General good boy" });
+    await contains(".o-mail-Message-body .o_channel_redirect", { text: "General good boy" });
 });
 
 test('mention a channel with "&" in the name', async () => {
@@ -278,7 +275,7 @@ test('mention a channel with "&" in the name', async () => {
     await click(".o-mail-Composer-suggestion");
     await contains(".o-mail-Composer-input", { value: "#General & good " });
     await click(".o-mail-Composer-send:enabled");
-    await contains(".o-mail-Message-body .o_channel_redirect", { text: "#General & good" });
+    await contains(".o-mail-Message-body .o_channel_redirect", { text: "General & good" });
 });
 
 test("mark channel as fetched when a new message is loaded", async () => {
@@ -571,7 +568,7 @@ test("mention a channel on a second line when the first line contains #", async 
     await click(".o-mail-Composer-suggestion");
     await contains(".o-mail-Composer-input", { value: "#blabla\n#General good " });
     await click(".o-mail-Composer-send:enabled");
-    await contains(".o-mail-Message-body .o_channel_redirect", { text: "#General good" });
+    await contains(".o-mail-Message-body .o_channel_redirect", { text: "General good" });
 });
 
 test("mention a channel when replacing the space after the mention by another char", async () => {
@@ -586,7 +583,7 @@ test("mention a channel when replacing the space after the mention by another ch
     $(".o-mail-Composer-input").val(text.slice(0, -1));
     await insertText(".o-mail-Composer-input", ", test");
     await click(".o-mail-Composer-send:enabled");
-    await contains(".o-mail-Message-body .o_channel_redirect", { text: "#General good" });
+    await contains(".o-mail-Message-body .o_channel_redirect", { text: "General good" });
 });
 
 test("mention 2 different channels that have the same name", async () => {
@@ -613,11 +610,11 @@ test("mention 2 different channels that have the same name", async () => {
     await click(".o-mail-Composer-send:enabled");
     await contains(
         `.o-mail-Message-body .o_channel_redirect[data-oe-id="${channelId_1}"][data-oe-model="discuss.channel"]`,
-        { text: "#my channel" }
+        { text: "my channel" }
     );
     await contains(
         `.o-mail-Message-body .o_channel_redirect[data-oe-id="${channelId_2}"][data-oe-model="discuss.channel"]`,
-        { text: "#my channel" }
+        { text: "my channel" }
     );
 });
 

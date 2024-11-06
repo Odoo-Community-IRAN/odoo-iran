@@ -120,8 +120,10 @@ class AccountMove(models.Model):
             and not self.l10n_es_edi_facturae_xml_id \
             and not self.l10n_es_is_simplified \
             and self.is_invoice(include_receipts=True) \
+            and (self.partner_id.is_company or self.partner_id.vat) \
             and self.company_id.country_code == 'ES' \
-            and self.company_id.currency_id.name == 'EUR'
+            and self.company_id.currency_id.name == 'EUR' \
+            and self.company_id.sudo().l10n_es_edi_facturae_certificate_ids  # We only enable Facturae if a certificate is valid or has been valid (which will raise an error)
 
     def _l10n_es_edi_facturae_get_filename(self):
         self.ensure_one()

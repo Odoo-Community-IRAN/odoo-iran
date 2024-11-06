@@ -2,6 +2,7 @@
 from odoo import Command
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 from odoo.tests import Form, tagged
+from unittest.mock import patch
 
 
 @tagged('post_install', '-at_install')
@@ -39,6 +40,20 @@ class TestAccountPayment(AccountTestInvoicingCommon):
             'partner_id': cls.env.company.partner_id.id,
             'acc_type': 'bank',
         })
+
+        cls.pay_term_epd = cls.env['account.payment.term'].create([{
+            'name': "test",
+            'early_discount': True,
+            'discount_percentage': 10,
+            'discount_days': 10,
+            'line_ids': [
+                Command.create({
+                    'value': 'percent',
+                    'value_amount': 100,
+                    'nb_days': 30,
+                }),
+            ],
+        }])
 
     def test_payment_move_sync_create_write(self):
         copy_receivable = self.copy_account(self.company_data['default_account_receivable'])
@@ -512,3 +527,64 @@ class TestAccountPayment(AccountTestInvoicingCommon):
 
         self.assertEqual(duplicate_payment_1.amount, payment_1.amount)
         self.assertEqual(duplicate_payment_2.amount, payment_2.amount)
+
+    def test_payments_epd_eligible_on_move_with_payment(self):
+        """ Ensures that even if a move has a payment registered, the epd will still be eligible if no outstanding account is set on the payment method"""
+        invoice1 = self.env['account.move'].create([{
+            'move_type': 'out_invoice',
+            'partner_id': self.partner_a.id,
+            'date': '2024-01-01',
+            'invoice_payment_term_id': self.pay_term_epd.id,
+            'invoice_line_ids': [Command.create({
+                'name': 'test',
+                'quantity': 1,
+                'price_unit': 1000,
+            })],
+        }])
+        invoice1.action_post()
+        # By default, an outstanding account is set on the bank journal, which will result in a journal entry generation
+        self.env['account.payment.register'].with_context(active_model='account.move', active_ids=invoice1.ids).create({})._create_payments()
+        self.assertFalse(invoice1._is_eligible_for_early_payment_discount(invoice1.currency_id, invoice1.invoice_date))
+        # Remove the outstanding account on the payment method line to avoid generating a journal entry on the payment
+        self.company_data['default_journal_bank'].inbound_payment_method_line_ids.payment_account_id = self.env['account.account']
+        invoice2 = invoice1.copy()
+        invoice2.action_post()
+        self.env['account.payment.register'].with_context(active_model='account.move', active_ids=invoice2.ids).create({})._create_payments()
+        self.assertTrue(invoice2._is_eligible_for_early_payment_discount(invoice2.currency_id, invoice2.invoice_date))
+
+    def test_payments_invoice_payment_state_without_outstanding_accounts(self):
+        """ Ensures that, without outstanding accounts set on the bank journal payment method,
+            the payment of the invoice still gets a journal entry in community edition """
+        def register_payment_and_assert_state(move, amount, is_community):
+            def patched_get_invoice_in_payment_state(self):
+                return 'paid' if is_community else 'in_payment'
+
+            with patch.object(self.env.registry['account.move'], '_get_invoice_in_payment_state', patched_get_invoice_in_payment_state):
+                payment = self.env['account.payment.register'].with_context(
+                    active_model='account.move',
+                    active_ids=move.ids
+                ).create({'amount': amount})._create_payments()
+
+                self.assertEqual(payment.state, 'paid' if is_community else 'in_process')
+
+        # Remove the outstanding account on the payment method line to avoid generating a journal entry on the payment
+        self.company_data['default_journal_bank'].inbound_payment_method_line_ids.payment_account_id = self.env['account.account']
+
+        invoice_1 = self.env['account.move'].create([{
+            'move_type': 'out_invoice',
+            'partner_id': self.partner_a.id,
+            'date': '2024-01-01',
+            'invoice_line_ids': [Command.create({
+                'name': 'test',
+                'quantity': 1,
+                'price_unit': 100.0,
+            })],
+        }])
+        invoice_1.action_post()
+        register_payment_and_assert_state(invoice_1, 100.0, is_community=True)
+        self.assertTrue(invoice_1.matched_payment_ids.move_id)
+
+        invoice_2 = invoice_1.copy()
+        invoice_2.action_post()
+        register_payment_and_assert_state(invoice_2, 100.0, is_community=False)
+        self.assertFalse(invoice_2.matched_payment_ids.move_id)

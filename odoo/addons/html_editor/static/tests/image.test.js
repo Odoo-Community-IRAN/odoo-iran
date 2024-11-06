@@ -1,5 +1,5 @@
 import { expect, test } from "@odoo/hoot";
-import { click, queryOne, waitFor, waitUntil } from "@odoo/hoot-dom";
+import { click, press, queryOne, waitFor, waitUntil } from "@odoo/hoot-dom";
 import { animationFrame } from "@odoo/hoot-mock";
 import { setupEditor } from "./_helpers/editor";
 import { contains } from "@web/../tests/web_test_helpers";
@@ -205,34 +205,34 @@ test("Can change the padding of an image", async () => {
 
     await click(".o-we-toolbar div[name='image_padding'] button");
     await animationFrame();
-    await click(".o_popover div:contains('Small')");
+    await click(".o_popover span:contains('Small')");
     await animationFrame();
     expect("img").toHaveClass("p-1");
 
     await click(".o-we-toolbar div[name='image_padding'] button");
     await animationFrame();
-    await click(".o_popover div:contains('Medium')");
+    await click(".o_popover span:contains('Medium')");
     await animationFrame();
     expect("img").not.toHaveClass("p-1");
     expect("img").toHaveClass("p-2");
 
     await click(".o-we-toolbar div[name='image_padding'] button");
     await animationFrame();
-    await click(".o_popover div:contains('Large')");
+    await click(".o_popover span:contains('Large')");
     await animationFrame();
     expect("img").not.toHaveClass("p-2");
     expect("img").toHaveClass("p-3");
 
     await click(".o-we-toolbar div[name='image_padding'] button");
     await animationFrame();
-    await click(".o_popover div:contains('XL')");
+    await click(".o_popover span:contains('XL')");
     await animationFrame();
     expect("img").not.toHaveClass("p-3");
     expect("img").toHaveClass("p-5");
 
     await click(".o-we-toolbar div[name='image_padding'] button");
     await animationFrame();
-    await click(".o_popover div:contains('None')");
+    await click(".o_popover span:contains('None')");
     await animationFrame();
     expect("img").not.toHaveClass("p-5");
 });
@@ -246,7 +246,7 @@ test("Can undo the image padding", async () => {
 
     await click(".o-we-toolbar div[name='image_padding'] button");
     await animationFrame();
-    await click(".o_popover div:contains('Small')");
+    await click(".o_popover span:contains('Small')");
     await animationFrame();
     expect("img").toHaveClass("p-1");
 
@@ -306,6 +306,26 @@ test("Image transformation dissapear when selection change", async () => {
     for (const transfoContainer of transfoContainers) {
         transfoContainer.remove();
     }
+});
+
+test("Image transformation disappear on escape", async () => {
+    await setupEditor(`
+        <img class="img-fluid test-image" src="${base64Img}">
+    `);
+    click("img.test-image");
+    await waitFor(".o-we-toolbar");
+    let toolbar = document.querySelectorAll(".o-we-toolbar");
+    expect(toolbar.length).toBe(1);
+    click(".o-we-toolbar button[name='image_transform']");
+    await animationFrame();
+    toolbar = document.querySelectorAll(".o-we-toolbar");
+    expect(toolbar.length).toBe(0);
+    let transfoContainers = document.querySelectorAll(".transfo-container");
+    expect(transfoContainers.length).toBe(1);
+    press("escape");
+    await animationFrame();
+    transfoContainers = document.querySelectorAll(".transfo-container");
+    expect(transfoContainers.length).toBe(0);
 });
 
 test("Can delete an image", async () => {

@@ -46,17 +46,40 @@ patch(ControlButtons.prototype, {
         });
     },
     clickTransferOrder() {
-        this.pos.orderToTransferUuid = this.pos.get_order().uuid;
+        this.dialog.closeAll();
+        this.pos.isOrderTransferMode = true;
+        const orderUuid = this.pos.get_order().uuid;
         this.pos.get_order().setBooked(true);
         this.pos.showScreen("FloorScreen");
+        document.addEventListener(
+            "click",
+            async (ev) => {
+                if (this.pos.isOrderTransferMode) {
+                    this.pos.isOrderTransferMode = false;
+                    const tableElement = ev.target.closest(".table");
+                    if (!tableElement) {
+                        return;
+                    }
+                    const table = this.pos.getTableFromElement(tableElement);
+                    await this.pos.transferOrder(orderUuid, table);
+                    this.pos.setTableFromUi(table);
+                }
+            },
+            { once: true }
+        );
     },
-    clickTakeAway() {
+    async clickTakeAway() {
         const isTakeAway = !this.currentOrder.takeaway;
         const defaultFp = this.pos.config?.default_fiscal_position_id ?? false;
         const takeawayFp = this.pos.config.takeaway_fp_id;
 
         this.currentOrder.takeaway = isTakeAway;
         this.currentOrder.update({ fiscal_position_id: isTakeAway ? takeawayFp : defaultFp });
+        if (typeof this.currentOrder.id == "number") {
+            this.pos.data.write("pos.order", [this.currentOrder.id], {
+                takeaway: isTakeAway ? true : false,
+            });
+        }
     },
     editFloatingOrderName(order) {
         this.dialog.add(TextInputPopup, {

@@ -2,7 +2,6 @@ import { registry } from "@web/core/registry";
 import { click, contains, inputFiles } from "@web/../tests/utils";
 
 registry.category("web_tour.tours").add("discuss_channel_public_tour.js", {
-    test: true,
     steps: () => [
         {
             trigger: ".o-mail-Discuss",
@@ -105,8 +104,8 @@ registry.category("web_tour.tours").add("discuss_channel_public_tour.js", {
             trigger: '.o-mail-Message .o-mail-AttachmentCard:contains("text.txt")',
         },
         {
-            trigger: ".o-mail-Message [title='Add a Reaction']",
-            run: "click",
+            trigger: ".o-mail-Message-textContent:contains(cheese)",
+            run: "hover && click .o-mail-Message [title='Add a Reaction']",
         },
         {
             trigger: ".o-EmojiPicker .o-Emoji:contains('🙂')",
@@ -136,8 +135,8 @@ registry.category("web_tour.tours").add("discuss_channel_public_tour.js", {
         },
         {
             content: "Click on more menu",
-            trigger: ".o-mail-Message [title='Expand']",
-            run: "click",
+            trigger: ".o-mail-Message-textContent:contains(cheese)",
+            run: "hover && click .o-mail-Message [title='Expand']",
         },
         {
             content: "Click on edit",
@@ -151,12 +150,10 @@ registry.category("web_tour.tours").add("discuss_channel_public_tour.js", {
         },
         {
             content: "Add one more file in composer",
-            trigger: ".o-mail-Message .o-mail-Composer button[aria-label='Attach files']",
+            trigger: ".o-mail-Message button[aria-label='Attach files']",
             async run() {
                 const extratxt = new File(["hello 2"], "extra.txt", { type: "text/plain" });
-                await inputFiles(".o-mail-Message .o-mail-Composer-coreMain .o_input_file", [
-                    extratxt,
-                ]);
+                await inputFiles(".o-mail-Message .o_input_file", [extratxt]);
             },
         },
         {

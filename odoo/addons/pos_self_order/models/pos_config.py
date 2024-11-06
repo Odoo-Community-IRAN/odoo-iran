@@ -260,7 +260,7 @@ class PosConfig(models.Model):
         return ['pos.session', 'pos.order', 'pos.order.line', 'pos.payment', 'pos.payment.method', 'res.currency', 'pos.category', 'product.product', 'product.combo', 'product.combo.item',
             'res.company', 'account.tax', 'account.tax.group', 'pos.printer', 'res.country', 'product.pricelist', 'product.pricelist.item', 'account.fiscal.position', 'account.fiscal.position.tax',
             'res.lang', 'product.attribute', 'product.attribute.custom.value', 'product.template.attribute.line', 'product.template.attribute.value',
-            'decimal.precision', 'uom.uom', 'pos.printer', 'pos_self_order.custom_link', 'restaurant.floor', 'restaurant.table']
+            'decimal.precision', 'uom.uom', 'pos.printer', 'pos_self_order.custom_link', 'restaurant.floor', 'restaurant.table', 'account.cash.rounding']
 
     def load_self_data(self):
         # Init our first record, in case of self_order is pos_config
@@ -272,6 +272,7 @@ class PosConfig(models.Model):
             }
         }
         response['pos.config']['data'][0]['_self_ordering_image_home_ids'] = self._get_self_ordering_attachment(self.self_ordering_image_home_ids)
+        response['pos.config']['data'][0]['_pos_special_products_ids'] = self._get_special_products().ids
         self.env['pos.session']._load_pos_data_relations('pos.config', response)
 
         # Classic data loading
@@ -323,6 +324,7 @@ class PosConfig(models.Model):
         self.ensure_one()
 
         if not self.current_session_id:
+            self._check_before_creating_new_session()
             session = self.env['pos.session'].create({'user_id': self.env.uid, 'config_id': self.id})
             session.set_opening_control(0, "")
             self._notify('STATUS', {'status': 'open'})
@@ -346,10 +348,10 @@ class PosConfig(models.Model):
             return False
 
         journal, payment_methods_ids = self._create_journal_and_payment_methods()
-        restaurant_categories = [
-            self.env.ref('pos_restaurant.food').id,
-            self.env.ref('pos_restaurant.drinks').id,
-        ]
+        restaurant_categories = self.get_categories([
+            'pos_restaurant.food',
+            'pos_restaurant.drinks',
+        ])
         not_cash_payment_methods_ids = self.env['pos.payment.method'].search([
             ('is_cash_count', '=', False),
             ('id', 'in', payment_methods_ids),

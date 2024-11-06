@@ -173,7 +173,7 @@ export class ClosePosPopup extends Component {
         return true;
     }
     async closeSession() {
-        sessionStorage.removeItem("connected_cashier");
+        this.pos._resetConnectedCashier();
         if (this.pos.config.customer_display_type === "proxy") {
             const proxyIP = this.pos.getDisplayDeviceIP();
             fetch(`${deduceUrl(proxyIP)}/hw_proxy/customer_facing_display`, {
@@ -292,6 +292,7 @@ export class ClosePosPopup extends Component {
                     this.closeSession();
                 }
             },
+            dismiss: async () => {},
         });
 
         if (response.redirect) {

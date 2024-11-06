@@ -7,7 +7,7 @@
     'category': 'Sales/Point of Sale',
     'sequence': 40,
     'summary': 'User-friendly PoS interface for shops and restaurants',
-    'depends': ['stock_account', 'barcodes', 'web_editor', 'digest'],
+    'depends': ['stock_account', 'barcodes', 'web_editor', 'digest', 'phone_validation'],
     'uninstall_hook': 'uninstall_hook',
     'data': [
         'security/point_of_sale_security.xml',
@@ -78,6 +78,7 @@
             'point_of_sale/static/src/app/utils/hooks.js',
         ],
         'web.assets_tests': [
+            'barcodes/static/tests/helpers.js',
             'point_of_sale/static/tests/tours/**/*',
         ],
         'web.assets_unit_tests': [
@@ -203,6 +204,9 @@
         'point_of_sale.customer_display_assets_test': [
             ('include', 'point_of_sale.base_tests'),
             "point_of_sale/static/tests/tours/**/*",
+            "barcodes/static/tests/helpers.js",
+            "web/static/tests/legacy/helpers/utils.js",
+            "web/static/tests/legacy/helpers/cleanup.js",
         ],
     },
     'license': 'LGPL-3',

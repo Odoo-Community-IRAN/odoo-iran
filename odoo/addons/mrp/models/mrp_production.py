@@ -2050,6 +2050,15 @@ class MrpProduction(models.Model):
                 'state': 'done',
             })
 
+        # It is prudent to reserve any quantity that has become available to the backorder
+        # production's move_raw_ids after the production which spawned them has been marked done.
+        backorders_to_assign = backorders.filtered(
+            lambda order:
+            order.picking_type_id.reservation_method == 'at_confirm'
+        )
+        for backorder in backorders_to_assign:
+            backorder.action_assign()
+
         report_actions = self._get_autoprint_done_report_actions()
         if self.env.context.get('skip_redirection'):
             if report_actions:
@@ -2129,7 +2138,9 @@ class MrpProduction(models.Model):
         productions_auto = set()
         for production in self:
             if not float_is_zero(production.qty_producing, precision_rounding=production.product_uom_id.rounding):
-                production.move_raw_ids.filtered('manual_consumption').picked = True
+                production.move_raw_ids.filtered(
+                    lambda move: move.manual_consumption and not move.picked
+                ).picked = True
                 continue
             if production._auto_production_checks():
                 productions_auto.add(production.id)
@@ -2422,7 +2433,8 @@ class MrpProduction(models.Model):
                    any(att_val.id in product_attribute_ids for att_val in record.bom_product_template_attribute_value_ids)
 
         ratio = self._get_ratio_between_mo_and_bom_quantities(bom)
-        bom_lines_by_id = {(bom_line.id, bom_line.product_id.id): bom_line for bom_line in bom.bom_line_ids.filtered(filter_by_attributes)}
+        _dummy, bom_lines = bom.explode(self.product_id, bom.product_qty)
+        bom_lines_by_id = {(line.id, line.product_id.id): line for line, _dummy in bom_lines if filter_by_attributes(line)}
         bom_byproducts_by_id = {byproduct.id: byproduct for byproduct in bom.byproduct_ids.filtered(filter_by_attributes)}
         operations_by_id = {operation.id: operation for operation in bom.operation_ids.filtered(filter_by_attributes)}
 

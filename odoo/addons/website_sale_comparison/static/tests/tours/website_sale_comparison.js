@@ -4,14 +4,13 @@
     import * as tourUtils from "@website_sale/js/tours/tour_utils";
 
     registry.category("web_tour.tours").add('product_comparison', {
-        test: true,
         url: "/shop",
         steps: () => [
     // test from shop page
     {
         content: "add first product 'Warranty' in a comparison list",
-        trigger: '.oe_product_cart:contains("Warranty") .o_add_compare',
-        run: "click",
+        trigger: ".oe_product_cart:contains(Warranty)",
+        run: "hover && click .oe_product_cart:contains(Warranty) .o_add_compare",
     },
     {
         content: "check compare button contains one product",
@@ -23,8 +22,8 @@
     },
     {
         content: "add second product 'Conference Chair' in a comparison list",
-        trigger: '.oe_product_cart:contains("Conference Chair") .o_add_compare',
-        run: "click",
+        trigger: ".oe_product_cart:contains(Conference Chair)",
+        run: "hover && click .oe_product_cart:contains(Conference Chair) .o_add_compare",
     },
     {
         trigger: ".comparator-popover",

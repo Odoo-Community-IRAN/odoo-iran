@@ -4281,12 +4281,39 @@ class TestMrpOrder(TestMrpCommon):
         self.assertRecordValues(move_2.move_line_ids, [{'quantity': 0.5, 'lot_id': False}])
         self.assertRecordValues(move_1.move_line_ids, [{'quantity': 1, 'lot_id': False}])
 
+    def test_batch_production_04(self):
+        """ Test that splitting a MO correctly computes the duration of the workorders. """
+        self.product_5.tracking = 'serial'
+        self.bom_2.bom_line_ids.unlink()
+        self.bom_2.operation_ids.write({
+            'workcenter_id': self.workcenter_2.id,
+            'time_cycle_manual': 60,
+        })
+        mo_form = Form(self.env['mrp.production'])
+        mo_form.bom_id = self.bom_2
+        mo_form.product_qty = 2
+        mo = mo_form.save()
+        mo.action_confirm()
+        mo.button_plan()
+        self.assertEqual(mo.workorder_ids.duration_expected, 120)
+
+        batch_produce_action = mo.button_mark_done()
+        batch_produce = Form(self.env['mrp.batch.produce'].with_context(**batch_produce_action['context']))
+        batch_produce.lot_name = "00001"
+        batch_produce = batch_produce.save()
+        batch_produce.action_generate_production_text()
+        batch_produce.action_prepare()
+
+        productions = mo.procurement_group_id.mrp_production_ids
+        self.assertListEqual(productions.workorder_ids.mapped('duration_expected'), [60, 60])
+
     def test_multi_edit_start_date_wo(self):
         """
         Test setting the start date for multiple workorders, checking if the finish date
         will be set too. As if the finish date is not set the planned workorder will not
         be shown in planning gantt view
         """
+        self.env.company.resource_calendar_id.tz = 'Europe/Brussels'
         mo = self.env['mrp.production'].create({
             'product_id': self.product.id,
             'product_uom_id': self.bom_1.product_uom_id.id,
@@ -4746,6 +4773,33 @@ class TestMrpOrder(TestMrpCommon):
         self._verify_report_main_decorators(mo, sum_mo_cost='danger', comp_mo_cost='danger', op_real_cost='danger')
         mo.button_mark_done()
         self._verify_report_main_decorators(mo, op_real_cost='danger', sum_real_cost='danger')
+
+    def test_update_mo_from_bom_with_kit(self):
+        """
+        Test that an MO can be updated from BoM when the finished product has a kit as a component.
+        """
+        # Test that the finished product has a kit as a component
+        kit_bom_line = self.bom_3.bom_line_ids.filtered(lambda line: line.product_id.is_kits)
+        self.assertEqual(len(kit_bom_line), 1)
+        kit_bom = kit_bom_line.product_id.bom_ids
+        self.assertEqual(len(kit_bom.bom_line_ids), 2)
+        # Check that other components are present in the BoM
+        self.assertEqual(len(self.bom_3.bom_line_ids), 3)
+        # Create a MO
+        mo = self.env['mrp.production'].create({
+            'bom_id': self.bom_3.id,
+        })
+        mo.action_confirm()
+        self.assertEqual(mo.state, 'confirmed')
+        self.assertEqual(len(mo.move_raw_ids), 4)
+        # keep only the kit as component
+        (self.bom_3.bom_line_ids - kit_bom_line).unlink()
+        self.assertEqual(self.bom_3.bom_line_ids, kit_bom_line)
+        mo.action_update_bom()
+        self.assertRecordValues(mo.move_raw_ids, [
+            {'product_id': kit_bom.bom_line_ids[0].product_id.id, 'product_uom_qty': 2, 'product_uom': kit_bom.bom_line_ids[0].product_id.uom_id.id},
+            {'product_id': kit_bom.bom_line_ids[1].product_id.id, 'product_uom_qty': 3, 'product_uom': kit_bom.bom_line_ids[1].product_id.uom_id.id},
+        ])
 
 
 @tagged('-at_install', 'post_install')

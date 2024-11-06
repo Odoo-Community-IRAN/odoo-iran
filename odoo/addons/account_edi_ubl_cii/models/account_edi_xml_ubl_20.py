@@ -206,8 +206,23 @@ class AccountEdiXmlUBL20(models.AbstractModel):
                 tax_totals_vals['tax_subtotal_vals'].append(subtotal)
 
         if epd_tax_to_discount:
-            # early payment discounts: hence, need to recompute the total tax amount
+            # early payment discounts: hence, need to recompute the total tax amount...
             tax_totals_vals['tax_amount'] = sum([subtot['tax_amount'] for subtot in tax_totals_vals['tax_subtotal_vals']])
+            # ... and add a subtotal section
+            tax_totals_vals['tax_subtotal_vals'].append({
+                'currency': invoice.currency_id,
+                'currency_dp': invoice.currency_id.decimal_places,
+                'taxable_amount': sum(epd_tax_to_discount.values()),
+                'tax_amount': 0.0,
+                'tax_category_vals': {
+                    'id': 'E',
+                    'percent': 0.0,
+                    'tax_scheme_vals': {
+                        'id': "VAT",
+                    },
+                    'tax_exemption_reason': "Exempt from tax",
+                },
+            })
         return [tax_totals_vals]
 
     def _get_invoice_line_item_vals(self, line, taxes_vals):
@@ -225,7 +240,7 @@ class AccountEdiXmlUBL20(models.AbstractModel):
         customer = line.move_id.commercial_partner_id
         supplier = line.move_id.company_id.partner_id.commercial_partner_id
         tax_category_vals_list = self._get_tax_category_list(customer, supplier, taxes)
-        description = line.name and line.name.replace('\n', ', ')
+        description = line.name and line.name.replace('\n', ' ')
         return {
             'description': description,
             'name': product.name or description,
@@ -480,7 +495,7 @@ class AccountEdiXmlUBL20(models.AbstractModel):
         # Compute values for invoice lines.
         line_extension_amount = 0.0
 
-        invoice_lines = invoice.invoice_line_ids.filtered(lambda line: line.display_type not in ('line_note', 'line_section'))
+        invoice_lines = invoice.invoice_line_ids.filtered(lambda line: line.display_type not in ('line_note', 'line_section') and line._check_edi_line_tax_required())
         document_allowance_charge_vals_list = self._get_document_allowance_charge_vals_list(invoice)
         invoice_line_vals_list = []
         for line_id, line in enumerate(invoice_lines):

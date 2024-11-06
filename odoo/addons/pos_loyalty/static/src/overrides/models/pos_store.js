@@ -26,10 +26,9 @@ function inverted(fn) {
 
 patch(PosStore.prototype, {
     async setup() {
-        await super.setup(...arguments);
-
         this.couponByLineUuidCache = {};
         this.rewardProductByLineUuidCache = {};
+        await super.setup(...arguments);
 
         effect(
             batched((orders) => {
@@ -678,8 +677,8 @@ patch(PosStore.prototype, {
      * IMPROVEMENT: It would be better to update the local order object instead of creating a new one.
      *   - This way, we don't need to remember the lines linked to negative coupon ids and relink them after pushing the order.
      */
-    preSyncAllOrders(orders) {
-        super.preSyncAllOrders(orders);
+    async preSyncAllOrders(orders) {
+        await super.preSyncAllOrders(orders);
 
         for (const order of orders) {
             Object.assign(

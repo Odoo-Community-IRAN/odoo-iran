@@ -231,6 +231,9 @@ class PurchaseOrder(models.Model):
     def _compute_tax_totals(self):
         AccountTax = self.env['account.tax']
         for order in self:
+            if not order.company_id:
+                order.tax_totals = False
+                continue
             order_lines = order.order_line.filtered(lambda x: not x.display_type)
             base_lines = [line._prepare_base_line_for_taxes_computation() for line in order_lines]
             AccountTax._add_tax_details_in_base_lines(base_lines, order.company_id)
@@ -632,7 +635,10 @@ class PurchaseOrder(models.Model):
             for i, line_val in enumerate(line_vals, start=1)
         ]
         downpayment_lines = self.env['purchase.order.line'].create(vals)
-        self.order_line += downpayment_lines
+        self.order_line = [
+            Command.link(line_id)
+            for line_id in downpayment_lines.ids
+        ]  # a simple concatenation would cause all order_line to recompute, we do not want it to happen
         return downpayment_lines
 
     def action_create_invoice(self):

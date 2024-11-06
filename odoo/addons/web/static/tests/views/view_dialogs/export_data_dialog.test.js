@@ -3,7 +3,6 @@ import {
     check,
     dblclick,
     pointerDown,
-    pointerUp,
     queryAll,
     queryAllTexts,
     queryFirst,
@@ -32,7 +31,6 @@ const openExportDialog = async () => {
     if (getMockEnv().isSmall) {
         await pointerDown(".o_data_row:nth-child(1)");
         await runAllTimers();
-        await pointerUp(".o_data_row:nth-child(1)");
     } else {
         await contains(".o_list_record_selector input[type='checkbox']").click();
     }
@@ -1084,4 +1082,28 @@ test("Export dialog: disable button during export", async () => {
     def.resolve();
     await animationFrame();
     expect(".o_select_button").toBeEnabled();
+});
+
+test("Export dialog: no column_invisible fields in default export list", async () => {
+    onRpc("/web/export/formats", () => {
+        return Promise.resolve([{ tag: "xls", label: "Excel" }]);
+    });
+    onRpc("/web/export/get_fields", () => {
+        return Promise.resolve(fetchedFields.root);
+    });
+
+    await mountView({
+        type: "list",
+        resModel: "partner",
+        arch: `
+            <list>
+                <field name="foo"/>
+                <field name="bar" column_invisible="1"/>
+            </list>`,
+        actionMenus: {},
+    });
+
+    await openExportDialog();
+    expect(".modal .o_export_field").toHaveCount(1);
+    expect(".modal .o_export_field").toHaveText("Foo");
 });

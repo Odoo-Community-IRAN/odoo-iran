@@ -430,7 +430,7 @@ class MailTestComposerMixin(models.Model):
 
     name = fields.Char('Name')
     author_id = fields.Many2one('res.partner')
-    description = fields.Html('Description', render_engine="qweb", render_options={"post_process": True}, sanitize=False)
+    description = fields.Html('Description', render_engine="qweb", render_options={"post_process": True}, sanitize='email_outgoing')
     source_ids = fields.Many2many('mail.test.composer.source', string='Invite source')
 
     def _compute_render_model(self):
@@ -470,3 +470,14 @@ class MailTestMailTrackingDuration(models.Model):
 
     def _mail_get_partner_fields(self, introspect_fields=False):
         return ['customer_id']
+
+
+class MailTestPublicThread(models.Model):
+    """A model inheriting from mail.thread with public read and write access
+    to test some public and guest interactions."""
+
+    _description = "Portal Public Thread"
+    _name = "mail.test.public"
+    _inherit = ["mail.thread"]
+
+    name = fields.Char("Name")

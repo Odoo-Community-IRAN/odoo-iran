@@ -70,8 +70,10 @@ export class OdooPivotModel extends PivotModel {
     updateMeasures(measures) {
         for (const measure of this.definition.measures) {
             const updatedMeasure = measures.find((m) => m.id === measure.id);
+            if (!updatedMeasure || updatedMeasure.computedBy) {
+                continue;
+            }
             if (
-                !updatedMeasure ||
                 updatedMeasure.fieldName !== measure.fieldName ||
                 updatedMeasure.aggregator !== measure.aggregator
             ) {
@@ -102,6 +104,9 @@ export class OdooPivotModel extends PivotModel {
      * @param {PivotDomain} domain
      */
     getPivotCellValue(measure, domain) {
+        if (domain.some((node) => node.value === NO_RECORD_AT_THIS_POSITION)) {
+            return "";
+        }
         const { cols, rows } = this._getColsRowsValuesFromDomain(domain);
         const group = JSON.stringify([rows, cols]);
         const values = this.data.measurements[group];
@@ -186,6 +191,9 @@ export class OdooPivotModel extends PivotModel {
      * @param {PivotDomain} domain
      */
     getPivotCellDomain(domain) {
+        if (domain.some((node) => node.value === NO_RECORD_AT_THIS_POSITION)) {
+            return undefined;
+        }
         const { cols, rows } = this._getColsRowsValuesFromDomain(domain);
         const key = JSON.stringify([rows, cols]);
         const domains = this.data.groupDomains[key];

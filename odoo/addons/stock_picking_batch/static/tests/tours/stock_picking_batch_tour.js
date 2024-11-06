@@ -4,7 +4,6 @@ import { registry } from "@web/core/registry";
 import { stepUtils } from '@web_tour/tour_service/tour_utils';
 
 registry.category("web_tour.tours").add('test_stock_picking_batch_sm_to_sml_synchronization', {
-    test: true,
     steps: () => [
         {
             trigger: ".btn-primary[name=action_confirm]",
@@ -98,7 +97,7 @@ registry.category("web_tour.tours").add('test_stock_picking_batch_sm_to_sml_sync
             run: "click",
         },
         {
-            trigger: ".o_form_button_save",
+            trigger: ".modal .o_form_button_save",
             run: "click",
         },
         ...stepUtils.saveForm(),

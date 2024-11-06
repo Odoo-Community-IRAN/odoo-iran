@@ -416,6 +416,24 @@ test("Close emoji picker in chat window with ESCAPE does not also close the chat
     await contains(".o-mail-ChatWindow");
 });
 
+test("Close active thread action in chatwindow on ESCAPE", async () => {
+    const pyEnv = await startServer();
+    pyEnv["discuss.channel"].create({
+        name: "General",
+        channel_member_ids: [
+            Command.create({ partner_id: serverState.partnerId, fold_state: "open" }),
+        ],
+    });
+    await start();
+    await contains(".o-mail-ChatWindow");
+    await click(".o-mail-ChatWindow-command", { text: "General" });
+    await click(".o-dropdown-item", { text: "Invite People" });
+    await contains(".o-discuss-ChannelInvitation");
+    triggerHotkey("Escape");
+    await contains(".o-discuss-ChannelInvitation", { count: 0 });
+    await contains(".o-mail-ChatWindow");
+});
+
 test("open 2 different chat windows: enough screen width [REQUIRE FOCUS]", async () => {
     const pyEnv = await startServer();
     pyEnv["discuss.channel"].create([{ name: "Channel_1" }, { name: "Channel_2" }]);
@@ -994,7 +1012,7 @@ test("Notification settings rendering in chatwindow", async () => {
     await contains("button", { text: "All Messages" });
     await contains("button", { text: "Mentions Only", count: 2 }); // the extra is in the Use Default as subtitle
     await contains("button", { text: "Nothing" });
-    await click("button", { text: "Mute Channel" });
+    await click("button", { text: "Mute Conversation" });
     await contains("button", { text: "For 15 minutes" });
     await contains("button", { text: "For 1 hour" });
     await contains("button", { text: "For 3 hours" });

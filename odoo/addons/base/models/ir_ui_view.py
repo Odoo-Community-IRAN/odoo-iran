@@ -286,11 +286,13 @@ actual arch.
             arch = False
             if mode == 'soft':
                 arch = view.arch_prev
+                write_dict = {'arch_db': arch}
             elif mode == 'hard' and view.arch_fs:
                 arch = view.with_context(read_arch_from_file=True, lang=None).arch
+                write_dict = {'arch_db': arch, 'arch_prev': False, 'arch_updated': False}
             if arch:
                 # Don't save current arch in previous since we reset, this arch is probably broken
-                view.with_context(no_save_prev=True, lang=None).write({'arch_db': arch})
+                view.with_context(no_save_prev=True, lang=None).write(write_dict)
 
     @api.depends('write_date')
     def _compute_model_data_id(self):
@@ -408,14 +410,16 @@ actual arch.
                     ))
                     err.context = e.context
                     raise err.with_traceback(e.__traceback__) from None
-                elif err.__context__:
+                elif e.__context__:
                     err = ValidationError(_(
                         "Error while validating view (%(view)s):\n\n%(error)s", view=view.key or view.id, error=e.__context__,
                     ))
                     err.context = {'name': 'invalid view'}
                     raise err.with_traceback(e.__context__.__traceback__) from None
                 else:
-                    raise
+                    raise ValidationError(_(
+                        "Error while validating view (%(view)s):\n\n%(error)s", view=view.key or view.id, error=e,
+                    ))
 
         return True
 

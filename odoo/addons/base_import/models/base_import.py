@@ -332,7 +332,7 @@ class Import(models.TransientModel):
                         definition_type == 'separator' or
                         (
                             definition_type in ('many2one', 'many2many')
-                            and definition['comodel'] not in Model.env
+                            and definition.get('comodel') not in Model.env
                         )
                     ):
                         continue
@@ -1108,7 +1108,7 @@ class Import(models.TransientModel):
                 'advanced_mode': advanced_mode,
                 'debug': self.env.user.has_group('base.group_no_one'),
                 'batch': batch,
-                'file_length': file_length
+                'file_length': len(rows),
             }
         except Exception as error:
             # Due to lazy generators, UnicodeDecodeError (for

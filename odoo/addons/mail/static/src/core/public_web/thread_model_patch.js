@@ -48,9 +48,11 @@ patch(Thread.prototype, {
                         (channel_notifications === "mentions" &&
                             message.recipients?.includes(this.store.self)))))
         ) {
-            const chatWindow = this.store.ChatWindow.get({ thread: this });
-            if (!chatWindow) {
-                this.store.ChatWindow.insert({ thread: this }).fold();
+            if (this.model === "discuss.channel") {
+                const chatWindow = this.store.ChatWindow.get({ thread: this });
+                if (!chatWindow) {
+                    this.store.ChatWindow.insert({ thread: this }).fold();
+                }
             }
             this.store.env.services["mail.out_of_focus"].notify(message, this);
         }
@@ -70,7 +72,11 @@ patch(Thread.prototype, {
         if (pushState) {
             this.setActiveURL();
         }
-        if (this.store.env.services.ui.isSmall && this.model !== "mail.box") {
+        if (
+            this.store.env.services.ui.isSmall &&
+            this.model !== "mail.box" &&
+            !this.store.shouldDisplayWelcomeViewInitially
+        ) {
             this.open();
         }
     },
@@ -79,6 +85,14 @@ patch(Thread.prototype, {
         const activeId =
             typeof this.id === "string" ? `mail.box_${this.id}` : `discuss.channel_${this.id}`;
         router.pushState({ active_id: activeId });
+        if (
+            this.store.action_discuss_id &&
+            this.store.env.services.action?.currentController?.action.id ===
+                this.store.action_discuss_id
+        ) {
+            // Keep the action stack up to date (used by breadcrumbs).
+            this.store.env.services.action.currentController.action.context.active_id = activeId;
+        }
     },
     open(options) {
         if (this.store.env.services.ui.isSmall) {

@@ -342,6 +342,53 @@ test("user context is combined with pivot context to fetch data", async function
     expect.verifySteps(["read_group", "read_group", "read_group", "read_group"]);
 });
 
+test("Context is purged from PivotView related keys", async function (assert) {
+    const spreadsheetData = {
+        sheets: [
+            {
+                id: "sheet1",
+                cells: {
+                    A1: { content: `=ODOO.PIVOT(1, "probability")` },
+                },
+            },
+        ],
+        pivots: {
+            1: {
+                type: "ODOO",
+                columns: [{ fieldName: "foo" }],
+                rows: [{ fieldName: "bar" }],
+                domain: [],
+                measures: [{ fieldName: "probability" }],
+                model: "partner",
+                context: {
+                    pivot_measures: ["__count"],
+                    // inverse row and col group bys
+                    pivot_row_groupby: ["test"],
+                    pivot_column_groupby: ["check"],
+                    dummyKey: "true",
+                },
+            },
+        },
+    };
+
+    const model = await createModelWithDataSource({
+        spreadsheetData,
+        mockRPC: function (route, { model, method, kwargs }) {
+            if (model === "partner" && method === "read_group") {
+                expect.step(`pop`);
+                const hasBadKeys = [
+                    "pivot_measures",
+                    "pivot_row_groupby",
+                    "pivot_column_groupby",
+                ].some((val) => val in (kwargs.context || {}));
+                expect(hasBadKeys).not.toBe(true);
+            }
+        },
+    });
+    await waitForDataLoaded(model);
+    expect.verifySteps(["pop", "pop", "pop", "pop"]);
+});
+
 test("fetch metadata only once per model", async function () {
     const spreadsheetData = {
         sheets: [
@@ -1594,6 +1641,48 @@ test("changing measure aggregates", async () => {
     });
     await animationFrame();
     expect.verifySteps(["foo_sum_id:sum(foo)"]);
+});
+
+test("Manipulating a computed measure does not trigger a RPC", async () => {
+    const { model, pivotId } = await createSpreadsheetWithPivot({
+        arch: /* xml */ `
+                <pivot>
+                    <field name="probability" type="measure"/>
+                </pivot>`,
+        mockRPC: async function (route, args) {
+            if (args.method === "read_group") {
+                expect.step(args.kwargs.fields.join());
+            }
+        },
+    });
+    const sheetId = model.getters.getActiveSheetId();
+    expect.verifySteps(["probability_avg_id:avg(probability)"]);
+    model.dispatch("UPDATE_PIVOT", {
+        pivotId,
+        pivot: {
+            ...model.getters.getPivotCoreDefinition(pivotId),
+            measures: [
+                { id: "probability:avg", fieldName: "probability", aggregator: "avg" },
+                {
+                    id: "probability*2",
+                    fieldName: "probability*2",
+                    aggregator: "avg",
+                    computedBy: { sheetId, formula: "=probability*2" },
+                },
+            ],
+        },
+    });
+    await animationFrame();
+    expect.verifySteps([]);
+    model.dispatch("UPDATE_PIVOT", {
+        pivotId,
+        pivot: {
+            ...model.getters.getPivotCoreDefinition(pivotId),
+            measures: [{ id: "probability:avg", fieldName: "probability", aggregator: "avg" }],
+        },
+    });
+    await animationFrame();
+    expect.verifySteps([]);
 });
 
 test("many2one measures are aggregated with count_distinct by default", async () => {

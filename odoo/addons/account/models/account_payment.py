@@ -396,17 +396,18 @@ class AccountPayment(models.Model):
 
     @api.depends('invoice_ids.payment_state')
     def _compute_state(self):
+        accounting_installed = self.env['account.move']._get_invoice_in_payment_state() == 'in_payment'
         for payment in self:
             if not payment.state:
                 payment.state = 'draft'
             if (
-                not payment.move_id
+                (not payment.outstanding_account_id or not accounting_installed)
                 and payment.invoice_ids
                 and all(invoice.payment_state == 'paid' for invoice in payment.invoice_ids)
             ):
                 payment.state = 'paid'
 
-    @api.depends('move_id.line_ids.amount_residual', 'move_id.line_ids.amount_residual_currency', 'move_id.line_ids.account_id')
+    @api.depends('move_id.line_ids.amount_residual', 'move_id.line_ids.amount_residual_currency', 'move_id.line_ids.account_id', 'state')
     def _compute_reconciliation_status(self):
         ''' Compute the field indicating if the payments are already reconciled with something.
         This field is used for display purpose (e.g. display the 'reconcile' button redirecting to the reconciliation
@@ -415,7 +416,10 @@ class AccountPayment(models.Model):
         for pay in self:
             liquidity_lines, counterpart_lines, writeoff_lines = pay._seek_for_lines()
 
-            if not pay.currency_id or not pay.id or not pay.move_id:
+            if not pay.outstanding_account_id:
+                pay.is_reconciled = False
+                pay.is_matched = pay.state == 'paid'
+            elif not pay.currency_id or not pay.id or not pay.move_id:
                 pay.is_reconciled = False
                 pay.is_matched = False
             elif pay.currency_id.is_zero(pay.amount):
@@ -852,7 +856,15 @@ class AccountPayment(models.Model):
 
         payments = super().create(vals_list)
 
+        # Outstanding account should be set on the payment in community edition to force the generation of journal entries on the payment
+        # This is required because no reconciliation is possible in community, which would prevent the user to reconcile the bank statement with the invoice
+        accounting_installed = self.env['account.move']._get_invoice_in_payment_state() == 'in_payment'
+
         for i, (pay, vals) in enumerate(zip(payments, vals_list)):
+            if not accounting_installed and not pay.outstanding_account_id:
+                outstanding_account = pay._get_outstanding_account(pay.payment_type)
+                pay.outstanding_account_id = outstanding_account.id
+
             if (
                 write_off_line_vals_list[i] is not None
                 or force_balance_vals_list[i] is not None
@@ -871,6 +883,17 @@ class AccountPayment(models.Model):
                 }:
                     pay.move_id.write(move_vals)
         return payments
+
+    def _get_outstanding_account(self, payment_type):
+        account_ref = 'account_journal_payment_debit_account_id' if payment_type == 'inbound' else 'account_journal_payment_credit_account_id'
+        chart_template = self.with_context(allowed_company_ids=self.company_id.root_id.ids).env['account.chart.template']
+        outstanding_account = (
+            chart_template.ref(account_ref, raise_if_not_found=False)
+            or self.company_id.transfer_account_id
+        )
+        if not outstanding_account:
+            raise UserError(_("No outstanding account could be found to make the payment"))
+        return outstanding_account
 
     def write(self, vals):
         if vals.get('state') == 'in_process' and not vals.get('move_id'):
@@ -1022,8 +1045,9 @@ class AccountPayment(models.Model):
                     method_name=self.payment_method_line_id.name,
                     partner=payment.partner_id.display_name,
                 ))
-
-        self.state = 'in_process'
+        # Avoid going back one state when clicking on the confirm action in the payment list view and having paid expenses selected
+        # We need to set values to each payment to avoid recomputation later
+        self.filtered(lambda pay: pay.state in {False, 'draft', 'in_process'}).state = 'in_process'
 
     def action_validate(self):
         self.state = 'paid'

@@ -158,6 +158,7 @@ export class LinkPlugin extends Plugin {
         powerboxCategory: withSequence(50, { id: "navigation", name: _t("Navigation") }),
         powerboxItems: [
             {
+                id: "link",
                 name: _t("Link"),
                 description: _t("Add a link"),
                 category: "navigation",
@@ -179,9 +180,10 @@ export class LinkPlugin extends Plugin {
         onSelectionChange: this.handleSelectionChange.bind(this),
         split_element_block: this.handleSplitBlock.bind(this),
         handle_insert_line_break_element: this.handleInsertLineBreak.bind(this),
+        powerButtons: ["link"],
     };
     setup() {
-        this.overlay = this.shared.createOverlay(LinkPopover, {}, { sequence: 40 });
+        this.overlay = this.shared.createOverlay(LinkPopover, {}, { sequence: 50 });
         this.addDomListener(this.editable, "click", (ev) => {
             if (ev.target.tagName === "A" && ev.target.isContentEditable) {
                 ev.preventDefault();

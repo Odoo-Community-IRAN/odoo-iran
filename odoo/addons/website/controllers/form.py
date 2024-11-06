@@ -268,7 +268,7 @@ class WebsiteForm(http.Controller):
 
         authenticate_message = False
         email_field_name = request.env[model_name]._mail_get_primary_email_field()
-        if email_field_name and hasattr(record, '_message_log'):
+        if email_field_name and hasattr(record, '_message_log') and email_field_name in values:
             warning_icon = ""
             if request.session.uid:
                 user_email = request.env.user.email
@@ -276,10 +276,10 @@ class WebsiteForm(http.Controller):
                 if user_email != form_email:
                     authenticate_message = _("This %(model_name)s was submitted by %(user_name)s (%(user_email)s) on behalf of %(form_email)s",
                         model_name=model.name, user_name=request.env.user.name, user_email=user_email, form_email=form_email)
-            else:
+            elif self._should_log_authenticate_message(record):
                 warning_icon = "/!\\ "
                 authenticate_message = _("EXTERNAL SUBMISSION - Customer not verified")
-            if authenticate_message and self._should_log_authenticate_message(record):
+            if authenticate_message:
                 record._message_log(
                     body=Markup('<div class="alert alert-info" role="alert">{warning_icon}{message}</div>').format(warning_icon=warning_icon, message=authenticate_message),
                 )

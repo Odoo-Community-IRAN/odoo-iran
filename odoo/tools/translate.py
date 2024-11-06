@@ -134,7 +134,7 @@ _LOCALE2WIN32 = {
     'sv_SE': 'Swedish_Sweden',
     'ta_IN': 'English_Australia',
     'th_TH': 'Thai_Thailand',
-    'tr_TR': 'Turkish_Turkey',
+    'tr_TR': 'Turkish_Türkiye',
     'uk_UA': 'Ukrainian_Ukraine',
     'vi_VN': 'Vietnamese_Viet Nam',
     'tlh_TLH': 'Klingon',
@@ -1114,11 +1114,6 @@ def extract_spreadsheet_terms(fileobj, keywords, comment_tags, options):
                         terms.append(axes.get('title', {}).get('text', ''))
                 if 'baselineDescr' in figure['data']:
                     terms.append(figure['data']['baselineDescr'])
-    pivots = data.get('pivots', {}).values()
-    lists = data.get('lists', {}).values()
-    for data_source in itertools.chain(lists, pivots):
-        if 'name' in data_source:
-            terms.append(data_source['name'])
     for global_filter in data.get('globalFilters', []):
         terms.append(global_filter['label'])
     return (

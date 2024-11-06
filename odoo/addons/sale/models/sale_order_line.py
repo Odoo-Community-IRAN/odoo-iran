@@ -289,7 +289,7 @@ class SaleOrderLine(models.Model):
         compute='_compute_untaxed_amount_to_invoice',
         store=True)
     amount_to_invoice = fields.Monetary(
-        string="Amount to invoice",
+        string="Un-invoiced Balance",
         compute='_compute_amount_to_invoice')
 
     # Technical computed fields for UX purposes (hide/make fields readonly, ...)
@@ -1521,4 +1521,11 @@ class SaleOrderLine(models.Model):
         ) or self.env['sale.order.line']
 
     def _sellable_lines_domain(self):
-        return [('is_downpayment', '=', False)]
+        discount_products_ids = self.env.companies.sale_discount_product_id.ids
+        domain = [('is_downpayment', '=', False)]
+        if discount_products_ids:
+            domain = expression.AND([
+                domain,
+                [('product_id', 'not in', discount_products_ids)],
+            ])
+        return domain

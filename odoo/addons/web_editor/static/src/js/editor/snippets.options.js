@@ -4818,8 +4818,9 @@ registry.sizing = SnippetOptionWidget.extend({
                         // Find the first element behind the overlay.
                         const sameCoordinatesEls = self.ownerDocument
                             .elementsFromPoint(ev.pageX, ev.pageY);
+                        // Check toBeClickEl has native JS `click` function
                         const toBeClickedEl = sameCoordinatesEls
-                            .find(el => !el.closest("#oe_manipulators"));
+                            .find(el => !el.closest("#oe_manipulators") && typeof el.click === "function");
                         if (toBeClickedEl) {
                             toBeClickedEl.click();
                         }
@@ -6655,7 +6656,7 @@ registry.ImageTools = ImageHandlerOption.extend({
         restoreCursor();
         this.trigger_up("enable_loading_effect");
         if (!widgetValue) {
-            this._onImageCropped();
+            await this._onImageCropped();
         }
         this.options.wysiwyg.odooEditor.historyUnpauseSteps();
     },
@@ -6818,7 +6819,7 @@ registry.ImageTools = ImageHandlerOption.extend({
         // Re-rendering the options after selecting a "cropping" shape.
         if (this.isImageCropped && previewMode === "reset") {
             delete this.isImageCropped;
-            this._onImageCropped();
+            await this._onImageCropped();
         }
 
         const saveData = previewMode === false;
@@ -8277,7 +8278,10 @@ registry.BackgroundImage = SnippetOptionWidget.extend({
             return src.searchParams.has(params.colorName);
         } else if (widgetName === 'main_color_opt') {
             const src = new URL(getBgImageURL(this.$target[0]), window.location.origin);
-            return src.origin === window.location.origin && src.pathname.startsWith('/web_editor/shape/');
+            return src.origin === window.location.origin && (
+                src.pathname.startsWith('/html_editor/shape/') ||
+                src.pathname.startsWith('/web_editor/shape/')
+            );
         }
         return this._super(...arguments);
     },
@@ -9447,7 +9451,7 @@ registry.SnippetSave = SnippetOptionWidget.extend({
                     this.trigger_up('context_get', {
                         callback: ctx => context = ctx,
                     });
-                    if (this.$target[0].matches("[data-snippet=s_popup]")) {
+                    if (this.$target[0].matches(".s_popup")) {
                         // Do not "cleanForSave" the popup before copying the
                         // HTML, otherwise the popup will be saved invisible and
                         // therefore not visible in the "add snippet" dialog.
@@ -9580,7 +9584,7 @@ registry.DynamicSvg = SnippetOptionWidget.extend({
      * @override
      */
     _computeVisibility(methodName, params) {
-        return this.$target.is("img[src^='/web_editor/shape/']");
+        return this.$target.is("img[src^='/html_editor/shape/'], img[src^='/web_editor/shape/']");
     },
 
     //--------------------------------------------------------------------------
@@ -9874,16 +9878,17 @@ registry.CarouselHandler = registry.GalleryHandler.extend({
             : this.$target[0].querySelector(".carousel");
         carouselEl.classList.remove("slide");
         $(carouselEl).carousel(position);
-        for (const indicatorEl of this.$target[0].querySelectorAll(".carousel-indicators button")) {
-            indicatorEl.classList.remove("active");
-        }
-        this.$target[0].querySelector(`.carousel-indicators button[data-bs-slide-to="${position}"]`)
-                    .classList.add("active");
+        const indicatorEls = this.$target[0].querySelectorAll(".carousel-indicators > *");
+        indicatorEls.forEach((indicatorEl, i) => {
+            indicatorEl.classList.toggle("active", i === position);
+        });
         this.trigger_up("activate_snippet", {
             $snippet: $(this.$target[0].querySelector(".carousel-item.active img")),
             ifInactiveOptions: true,
         });
         carouselEl.classList.add("slide");
+        // Prevent the carousel from automatically sliding afterwards.
+        $(carouselEl).carousel("pause");
     },
 });
 

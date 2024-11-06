@@ -4,10 +4,8 @@ import { _t } from "@web/core/l10n/translation";
 import { formatDate, formatDateTime, serializeDateTime } from "@web/core/l10n/dates";
 import { omit } from "@web/core/utils/objects";
 import { parseUTCString, qrCodeSrc, random5Chars, uuidv4 } from "@point_of_sale/utils";
-import { renderToElement } from "@web/core/utils/render";
 import { floatIsZero, roundPrecision } from "@web/core/utils/numbers";
 import { computeComboItems } from "./utils/compute_combo_items";
-import { changesToOrder } from "./utils/order_change";
 
 const { DateTime } = luxon;
 const formatCurrency = registry.subRegistries.formatters.content.monetary[1];
@@ -33,6 +31,7 @@ export class PosOrder extends Base {
             : {
                   lines: {},
                   generalNote: "",
+                  sittingMode: "dine in",
               };
         this.general_note = vals.general_note || "";
         this.tracking_number =
@@ -91,6 +90,10 @@ export class PosOrder extends Base {
     get isUnsyncedPaid() {
         return this.finalized && typeof this.id === "string";
     }
+
+    get originalSplittedOrder() {
+        return this.models["pos.order"].find((o) => o.uuid === this.uiState.splittedOrderUuid);
+    }
     getEmailItems() {
         return [_t("the receipt")].concat(this.is_to_invoice() ? [_t("the invoice")] : []);
     }
@@ -115,7 +118,7 @@ export class PosOrder extends Base {
             name: this.pos_reference,
             generalNote: this.general_note || "",
             invoice_id: null, //TODO
-            cashier: this.employee_id?.name || this.user_id?.name,
+            cashier: this.getCashierName(),
             date: formatDateTime(parseUTCString(this.date_order)),
             pos_qr_code:
                 this.company.point_of_sale_use_ticket_qr_code &&
@@ -125,14 +128,16 @@ export class PosOrder extends Base {
             base_url: baseUrl,
             footer: this.config.receipt_footer,
             // FIXME: isn't there a better way to handle this date?
-            shippingDate:
-                this.shipping_date && formatDate(DateTime.fromJSDate(new Date(this.shipping_date))),
+            shippingDate: this.shipping_date && formatDate(DateTime.fromSQL(this.shipping_date)),
             headerData: {
                 ...headerData,
                 trackingNumber: this.tracking_number,
             },
             screenName: "ReceiptScreen",
         };
+    }
+    getCashierName() {
+        return this.user_id?.name;
     }
     canPay() {
         return this.lines.length;
@@ -148,80 +153,8 @@ export class PosOrder extends Base {
         });
     }
 
-    // NOTE args added [unwatchedPrinter]
-    async printChanges(skipped = false, orderPreparationCategories, cancelled, unwatchedPrinter) {
-        const orderChange = changesToOrder(this, skipped, orderPreparationCategories, cancelled);
-        const d = new Date();
-
-        let isPrintSuccessful = true;
-
-        let hours = "" + d.getHours();
-        hours = hours.length < 2 ? "0" + hours : hours;
-
-        let minutes = "" + d.getMinutes();
-        minutes = minutes.length < 2 ? "0" + minutes : minutes;
-
-        orderChange.new.sort((a, b) => {
-            const sequenceA = a.pos_categ_sequence;
-            const sequenceB = b.pos_categ_sequence;
-            if (sequenceA === 0 && sequenceB === 0) {
-                return a.pos_categ_id - b.pos_categ_id;
-            }
-
-            return sequenceA - sequenceB;
-        });
-
-        for (const printer of unwatchedPrinter) {
-            const changes = this._getPrintingCategoriesChanges(
-                printer.config.product_categories_ids,
-                orderChange
-            );
-            if (changes["new"].length > 0 || changes["cancelled"].length > 0) {
-                const printingChanges = {
-                    new: changes["new"],
-                    cancelled: changes["cancelled"],
-                    table_name: this.table_id?.name,
-                    floor_name: this.table_id?.floor_id?.name,
-                    name: this.pos_reference || "unknown order",
-                    time: {
-                        hours,
-                        minutes,
-                    },
-                    tracking_number: this.tracking_number,
-                };
-                const receipt = renderToElement("point_of_sale.OrderChangeReceipt", {
-                    changes: printingChanges,
-                });
-                const result = await printer.printReceipt(receipt);
-                if (!result.successful) {
-                    isPrintSuccessful = false;
-                }
-            }
-        }
-
-        return isPrintSuccessful;
-    }
-
     get isBooked() {
         return Boolean(this.uiState.booked || !this.is_empty() || typeof this.id === "number");
-    }
-
-    _getPrintingCategoriesChanges(categories, currentOrderChange) {
-        const filterFn = (change) => {
-            const product = this.models["product.product"].get(change["product_id"]);
-            const categoryIds = product.parentPosCategIds;
-
-            for (const categoryId of categoryIds) {
-                if (categories.includes(categoryId)) {
-                    return true;
-                }
-            }
-        };
-
-        return {
-            new: currentOrderChange["new"].filter(filterFn),
-            cancelled: currentOrderChange["cancelled"].filter(filterFn),
-        };
     }
 
     get hasChange() {
@@ -244,27 +177,33 @@ export class PosOrder extends Base {
                         line.get_quantity();
                 } else {
                     this.last_order_preparation_change.lines[line.preparationKey] = {
-                        attribute_value_ids: line.attribute_value_ids.map((a) =>
-                            a.serialize({ orm: true })
-                        ),
+                        attribute_value_ids: line.attribute_value_ids.map((a) => ({
+                            ...a.serialize({ orm: true }),
+                            name: a.name,
+                        })),
                         uuid: line.uuid,
+                        isCombo: line.combo_item_id?.id,
                         product_id: line.get_product().id,
                         name: line.get_full_product_name(),
+                        basic_name: line.get_product().name,
                         note: line.getNote(),
                         quantity: line.get_quantity(),
                     };
                 }
                 line.setHasChange(false);
+                line.saved_quantity = line.get_quantity();
             }
         });
 
         // Checks whether an orderline has been deleted from the order since it
-        // was last sent to the preparation tools. If so we delete it to the changes.
+        // was last sent to the preparation tools or updated. If so we delete older changes.
         for (const [key, change] of Object.entries(this.last_order_preparation_change.lines)) {
-            if (!this.models["pos.order.line"].getBy("uuid", change.uuid)) {
+            const orderline = this.models["pos.order.line"].getBy("uuid", change.uuid);
+            if (!orderline || change.note.trim() !== orderline.note.trim()) {
                 delete this.last_order_preparation_change.lines[key];
             }
         }
+        this.last_order_preparation_change.sittingMode = this.takeaway ? "takeaway" : "dine in";
         this.last_order_preparation_change.generalNote = this.general_note;
     }
 
@@ -609,12 +548,20 @@ export class PosOrder extends Base {
     }
 
     get_total_with_tax() {
-        return this.get_total_without_tax() + this.get_total_tax();
+        return this.get_total_with_tax_of_lines(this.lines);
+    }
+
+    get_total_with_tax_of_lines(lines) {
+        return this.get_total_without_tax_of_lines(lines) + this.get_total_tax_of_lines(lines);
     }
 
     get_total_without_tax() {
+        return this.get_total_without_tax_of_lines(this.lines);
+    }
+
+    get_total_without_tax_of_lines(lines) {
         return roundPrecision(
-            this.lines.reduce(function (sum, line) {
+            lines.reduce(function (sum, line) {
                 return sum + line.get_price_without_tax();
             }, 0),
             this.currency.rounding
@@ -642,9 +589,8 @@ export class PosOrder extends Base {
             this.lines.reduce((sum, orderLine) => {
                 if (!ignored_product_ids.includes(orderLine.product_id.id)) {
                     sum +=
-                        orderLine.getUnitDisplayPriceBeforeDiscount() *
-                        (orderLine.get_discount() / 100) *
-                        orderLine.get_quantity();
+                        orderLine.get_all_prices().priceWithTaxBeforeDiscount -
+                        orderLine.get_all_prices().priceWithTax;
                     if (orderLine.display_discount_policy() === "without_discount") {
                         sum +=
                             (orderLine.get_taxed_lst_unit_price() -
@@ -659,13 +605,17 @@ export class PosOrder extends Base {
     }
 
     get_total_tax() {
+        return this.get_total_tax_of_lines(this.lines);
+    }
+
+    get_total_tax_of_lines(lines) {
         if (this.company.tax_calculation_rounding_method === "round_globally") {
             // As always, we need:
             // 1. For each tax, sum their amount across all order lines
             // 2. Round that result
             // 3. Sum all those rounded amounts
             const groupTaxes = {};
-            this.lines.forEach(function (line) {
+            lines.forEach(function (line) {
                 const taxDetails = line.get_tax_details();
                 const taxIds = Object.keys(taxDetails);
                 for (const taxId of taxIds) {
@@ -686,7 +636,7 @@ export class PosOrder extends Base {
             return sum;
         } else {
             return roundPrecision(
-                this.lines.reduce(function (sum, orderLine) {
+                lines.reduce(function (sum, orderLine) {
                     return sum + orderLine.get_tax();
                 }, 0),
                 this.currency.rounding
@@ -711,8 +661,12 @@ export class PosOrder extends Base {
     }
 
     get_tax_details() {
+        return this.get_tax_details_of_lines(this.lines);
+    }
+
+    get_tax_details_of_lines(lines) {
         const taxDetails = {};
-        for (const line of this.lines) {
+        for (const line of lines) {
             for (const taxData of line.get_all_prices().taxesData) {
                 const taxId = taxData.id;
                 if (!taxDetails[taxId]) {

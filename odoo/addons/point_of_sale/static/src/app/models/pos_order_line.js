@@ -15,6 +15,10 @@ export class PosOrderline extends Base {
 
     setup(vals) {
         super.setup(vals);
+        if (!this.product_id) {
+            this.delete();
+            return;
+        }
         this.uuid = vals.uuid ? vals.uuid : uuidv4();
         this.skip_change = vals.skip_change || false;
         this.set_full_product_name();
@@ -185,7 +189,6 @@ export class PosOrderline extends Base {
 
         const disc = Math.min(Math.max(parsed_discount || 0, 0), 100);
         this.discount = disc;
-        this.discountStr = "" + disc;
         this.setDirty();
     }
 
@@ -589,6 +592,15 @@ export class PosOrderline extends Base {
         return Boolean(this.combo_parent_id || this.combo_line_ids?.length);
     }
 
+    getComboTotalPrice() {
+        const allLines = this.getAllLinesInCombo();
+        return allLines.reduce((total, line) => total + line.get_all_prices(1).priceWithTax, 0);
+    }
+    getComboTotalPriceWithoutTax() {
+        const allLines = this.getAllLinesInCombo();
+        return allLines.reduce((total, line) => total + line.get_all_prices(1).priceWithoutTax, 0);
+    }
+
     get_old_unit_display_price() {
         return (
             this.display_discount_policy() === "without_discount" &&
@@ -673,7 +685,7 @@ export class PosOrderline extends Base {
         this.uiState.hasChange = isChange;
     }
     get_discount_str() {
-        return this.discountStr;
+        return this.discount ? this.discount.toString() : "";
     }
     get_quantity() {
         return this.qty;

@@ -824,6 +824,7 @@ export class OdooEditor extends EventTarget {
                 if (this.options.useResponsiveFontSizes) {
                     const fontSizeClassName = optionEl.dataset.applyClass;
                     this.execCommand("setFontSize", undefined);
+                    this.historyResetLatestComputedSelection(true);
                     this.execCommand("setFontSizeClassName", fontSizeClassName);
                 } else {
                     applyFontSizeREM(optionEl.dataset.value);
@@ -3861,7 +3862,8 @@ export class OdooEditor extends EventTarget {
                     }
                     setSelection(textNode, offset);
                     const textHasTwoTicks = /`.*`/.test(textNode.textContent);
-                    if (textHasTwoTicks) {
+                    // We don't apply the code tag if there is no content between the two `
+                    if (textHasTwoTicks && textNode.textContent.replace(/`/g, '').length) {
                         this.historyStep();
                         const insertedBacktickIndex = offset - 1;
                         const textBeforeInsertedBacktick = textNode.textContent.substring(0, insertedBacktickIndex - 1);
@@ -4026,8 +4028,8 @@ export class OdooEditor extends EventTarget {
         }
         const dataHtmlElement = document.createElement('data');
         dataHtmlElement.append(rangeContent);
-        const odooHtml = dataHtmlElement.innerHTML;
-        const odooText = selection.toString();
+        const odooHtml = dataHtmlElement.innerHTML.replace(/\uFEFF/g, "");
+        const odooText = selection.toString().replace(/\uFEFF/g, "");
         clipboardEvent.clipboardData.setData('text/plain', odooText);
         clipboardEvent.clipboardData.setData('text/html', odooHtml);
         clipboardEvent.clipboardData.setData('text/odoo-editor', odooHtml);
@@ -4038,6 +4040,10 @@ export class OdooEditor extends EventTarget {
     _onKeyDown(ev) {
         const selection = this.document.getSelection();
         if (selection.anchorNode && isProtected(selection.anchorNode)) {
+            return;
+        }
+        if (this.document.querySelector(".transfo-container")){
+            ev.preventDefault();
             return;
         }
         this.keyboardType =
