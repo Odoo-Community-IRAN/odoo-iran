@@ -2,6 +2,7 @@
 from __future__ import annotations
 from typing import List, Dict
 from odoo import api, models, fields
+from odoo.osv.expression import AND
 
 
 class ProductTemplate(models.Model):
@@ -46,13 +47,18 @@ class ProductProduct(models.Model):
         params = super()._load_pos_self_data_fields(config_id)
         params += ['public_description']
         return params
+    
+    @api.model
+    def _load_pos_self_data_domain(self, data):
+        domain = super()._load_pos_self_data_domain(data)
+        return AND([domain, [('self_order_available', '=', True)]])
 
     def _load_pos_self_data(self, data):
         domain = self._load_pos_data_domain(data)
         config_id = data['pos.config']['data'][0]['id']
 
         # Add custom fields for 'formula' taxes.
-        fields = set(self._load_pos_data_fields(config_id))
+        fields = set(self._load_pos_self_data_fields(config_id))
         taxes = self.env['account.tax'].search(self.env['account.tax']._load_pos_data_domain(data))
         product_fields = taxes._eval_taxes_computation_prepare_product_fields()
         fields = list(fields.union(product_fields))
@@ -83,6 +89,8 @@ class ProductProduct(models.Model):
         product_objs = self.env['product.product'].browse(product_ids)
 
         product_map = {product.id: product for product in product_objs}
+        loaded_product_tmpl_ids = list({p['product_tmpl_id'] for p in products})
+        archived_combinations = self._get_archived_combinations_per_product_tmpl_id(loaded_product_tmpl_ids)
 
         for product in products:
             product_obj = product_map.get(product['id'])
@@ -90,6 +98,8 @@ class ProductProduct(models.Model):
                 product['lst_price'] = pricelist._get_product_price(
                     product_obj, 1.0, currency=config.currency_id
                 )
+            if archived_combinations.get(product['product_tmpl_id']):
+                product['_archived_combinations'] = archived_combinations[product['product_tmpl_id']]
 
     def _filter_applicable_attributes(self, attributes_by_ptal_id: Dict) -> List[Dict]:
         """

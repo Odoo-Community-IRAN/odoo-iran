@@ -18,9 +18,11 @@ class TestHrAttendanceOvertime(TransactionCase):
             'overtime_company_threshold': 10,
             'overtime_employee_threshold': 10,
         })
+        cls.company.resource_calendar_id.tz = 'Europe/Brussels'
         cls.company_1 = cls.env['res.company'].create({
             'name': 'Overtime Inc.',
         })
+        cls.company_1.resource_calendar_id.tz = 'Europe/Brussels'
         cls.user = new_test_user(cls.env, login='fru', groups='base.group_user,hr_attendance.group_hr_attendance_manager', company_id=cls.company.id).with_company(cls.company)
         cls.employee = cls.env['hr.employee'].create({
             'name': "Marie-Edouard De La Court",
@@ -43,16 +45,23 @@ class TestHrAttendanceOvertime(TransactionCase):
             'company_id': cls.company.id,
             'tz': 'Pacific/Honolulu',
         })
-        cls.europe_employee = cls.env['hr.employee'].create({
+        cls.europe_employee = cls.env['hr.employee'].with_company(cls.company_1).create({
             'name': 'Schmitt',
             'company_id': cls.company_1.id,
             'tz': 'Europe/Brussels',
+        })
+        cls.calendar_flex_40h = cls.env['resource.calendar'].create({
+            'name': 'Flexible 40 hours/week',
+            'company_id': cls.company.id,
+            'hours_per_day': 8,
+            'flexible_hours': True,
+            'full_time_required_hours': 40,
         })
         cls.flexible_employee = cls.env['hr.employee'].create({
             'name': 'Flexi',
             'company_id': cls.company.id,
             'tz': 'UTC',
-            'resource_calendar_id': cls.env.ref('resource.resource_calendar_flex_40h').id,
+            'resource_calendar_id': cls.calendar_flex_40h.id,
         })
 
     def test_overtime_company_settings(self):
@@ -390,6 +399,12 @@ class TestHrAttendanceOvertime(TransactionCase):
             'employee_id': self.employee.id,
             'check_in': datetime(2024, 2, 1, 14, 0)
         })
+        
+        # Based on the employee's working calendar, they should be within the allotted hours.
+        attendance_utc_pending_within_allotted_hours = self.env['hr.attendance'].create({
+            'employee_id': self.europe_employee.id,
+            'check_in': datetime(2024, 2, 1, 20, 0, 0)
+        })
 
         attendance_utc_done = self.env['hr.attendance'].create({
             'employee_id': self.other_employee.id,
@@ -403,12 +418,14 @@ class TestHrAttendanceOvertime(TransactionCase):
         })
 
         self.assertEqual(attendance_utc_pending.check_out, False)
+        self.assertEqual(attendance_utc_pending_within_allotted_hours.check_out, False)
         self.assertEqual(attendance_utc_done.check_out, datetime(2024, 2, 1, 17, 0))
         self.assertEqual(attendance_jpn_pending.check_out, False)
 
         self.env['hr.attendance']._cron_auto_check_out()
 
         self.assertEqual(attendance_utc_pending.check_out, datetime(2024, 2, 1, 19, 0))
+        self.assertEqual(attendance_utc_pending_within_allotted_hours.check_out, False)
         self.assertEqual(attendance_utc_done.check_out, datetime(2024, 2, 1, 17, 0))
         self.assertEqual(attendance_jpn_pending.check_out, datetime(2024, 2, 1, 21, 0))
 

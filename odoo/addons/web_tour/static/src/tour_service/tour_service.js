@@ -16,6 +16,7 @@ import {
     TourRecorder,
 } from "@web_tour/tour_service/tour_recorder/tour_recorder";
 import { redirect } from "@web/core/utils/urls";
+import { tourRecorderState } from "@web_tour/tour_service/tour_recorder/tour_recorder_state";
 
 const StepSchema = {
     id: { type: [String], optional: true },
@@ -44,7 +45,6 @@ const StepSchema = {
 const TourSchema = {
     checkDelay: { type: Number, optional: true },
     name: { type: String, optional: true },
-    saveAs: { type: String, optional: true },
     steps: Function,
     url: { type: String, optional: true },
     wait_for: { type: [Function, Object], optional: true },
@@ -76,39 +76,11 @@ export const tourService = {
             sequence: 30,
         }));
 
-        function endTour({ name }) {
-            if (tourState.getCurrentTourOnError()) {
-                console.error("tour not succeeded");
-            } else {
-                // Used to signal the python test runner that the tour finished without error.
-                browser.console.log("tour succeeded");
-                // Used to see easily in the python console and to know which tour has been succeeded in suite tours case.
-                const succeeded = `║ TOUR ${name} SUCCEEDED ║`;
-                const msg = [succeeded];
-                msg.unshift("╔" + "═".repeat(succeeded.length - 2) + "╗");
-                msg.push("╚" + "═".repeat(succeeded.length - 2) + "╝");
-                browser.console.log(`\n\n${msg.join("\n")}\n`);
-            }
-            tourState.clear();
-        }
-
         function getTourFromRegistry(tourName) {
-            let tour = null;
-            if (tourRegistry.contains(tourName)) {
-                tour = tourRegistry.get(tourName);
-            }
-            const tourFromSaveAs = tourRegistry
-                .getEntries()
-                .findLast(([n, t]) => t.saveAs == tourName);
-            if (tourFromSaveAs) {
-                tourName = tourFromSaveAs[0];
-                tour = tourFromSaveAs[1];
-            }
-
-            if (!tour) {
+            if (!tourRegistry.contains(tourName)) {
                 return;
             }
-
+            const tour = tourRegistry.get(tourName);
             return {
                 ...tour,
                 steps: tour.steps(),
@@ -158,6 +130,7 @@ export const tourService = {
             }
 
             let tourConfig = {
+                delayToCheckUndeterminisms: 0,
                 stepDelay: 0,
                 keepWatchBrowser: false,
                 mode: "auto",
@@ -170,11 +143,6 @@ export const tourService = {
             tourState.setCurrentConfig(tourConfig);
             tourState.setCurrentTour(tour.name);
             tourState.setCurrentIndex(0);
-            if (tourConfig.debug !== false) {
-                // Starts the tour with a debugger to allow you to choose devtools configuration.
-                // eslint-disable-next-line no-debugger
-                debugger;
-            }
 
             const willUnload = callWithUnloadCheck(() => {
                 if (tour.url && tourConfig.startUrl != tour.url && tourConfig.redirect) {
@@ -190,13 +158,10 @@ export const tourService = {
             const tourName = tourState.getCurrentTour();
             const tourConfig = tourState.getCurrentConfig();
 
-            let tour;
+            let tour = getTourFromRegistry(tourName);
             if (tourConfig.fromDB) {
                 tour = await getTourFromDB(tourName);
-            } else if (tourRegistry.contains(tourName)) {
-                tour = getTourFromRegistry(tourName);
             }
-
             if (!tour) {
                 return;
             }
@@ -214,14 +179,12 @@ export const tourService = {
             );
 
             if (tourConfig.mode === "auto") {
-                new TourAutomatic(tour).start(pointer, () => {
-                    pointer.stop();
-                    endTour(tour);
-                });
+                new TourAutomatic(tour).start(pointer);
             } else {
                 new TourInteractive(tour).start(pointer, async () => {
                     pointer.stop();
-                    endTour(tour);
+                    tourState.clear();
+                    browser.console.log("tour succeeded");
                     let message = tourConfig.rainbowManMessage || tour.rainbowManMessage;
                     if (message) {
                         message = window.DOMPurify.sanitize(tourConfig.rainbowManMessage);
@@ -251,6 +214,7 @@ export const tourService = {
                         onClose: () => {
                             remove();
                             browser.localStorage.removeItem(TOUR_RECORDER_ACTIVE_LOCAL_STORAGE_KEY);
+                            tourRecorderState.clear();
                         },
                     },
                     { sequence: 99999 }
@@ -289,6 +253,7 @@ export const tourService = {
                         onClose: () => {
                             remove();
                             browser.localStorage.removeItem(TOUR_RECORDER_ACTIVE_LOCAL_STORAGE_KEY);
+                            tourRecorderState.clear();
                         },
                     },
                     { sequence: 99999 }

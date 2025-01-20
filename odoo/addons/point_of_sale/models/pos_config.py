@@ -25,7 +25,7 @@ class PosConfig(models.Model):
         return warehouse
 
     def _default_picking_type_id(self):
-        return self.env['stock.warehouse'].with_context(active_test=False).search(self.env['stock.warehouse']._check_company_domain(self.env.company), limit=1).pos_type_id.id
+        return self.env['stock.warehouse'].search(self.env['stock.warehouse']._check_company_domain(self.env.company), limit=1).pos_type_id.id
 
     def _default_sale_journal(self):
         journal = self.env['account.journal']._ensure_company_account_journal()
@@ -201,6 +201,19 @@ class PosConfig(models.Model):
     orderlines_sequence_in_cart_by_category = fields.Boolean(string="Order cart by category's sequence", default=False,
         help="When active, orderlines will be sorted based on product category and sequence in the product screen's order cart.")
 
+    def dispatch_record_ids(self, session_id, records, login_number):
+        self._notify('SYNCHRONISATION', {
+            'records': records,
+            'session_id': session_id,
+            'login_number': login_number
+        })
+
+    def get_records(self, data):
+        records = {}
+        for model, ids in data.items():
+            records[model] = self.env[model].browse(ids).read(self.env[model]._load_pos_data_fields(self.id), load=False)
+        return records
+
     @api.model
     def _load_pos_data_domain(self, data):
         return [('id', '=', data['pos.session']['data'][0]['config_id'])]
@@ -287,21 +300,6 @@ class PosConfig(models.Model):
                 pos_config.pos_session_state = False
                 pos_config.pos_session_duration = 0
                 pos_config.current_user_id = False
-
-    @api.constrains('rounding_method')
-    def _check_rounding_method_strategy(self):
-        for config in self:
-            if config.cash_rounding and config.rounding_method.strategy != 'add_invoice_line':
-                selection_value = "Add a rounding line"
-                for key, val in self.env["account.cash.rounding"]._fields["strategy"]._description_selection(config.env):
-                    if key == "add_invoice_line":
-                        selection_value = val
-                        break
-                raise ValidationError(_(
-                    "The cash rounding strategy of the point of sale %(pos)s must be: '%(value)s'",
-                    pos=config.name,
-                    value=selection_value,
-                ))
 
     def _check_profit_loss_cash_journal(self):
         if self.cash_control and self.payment_method_ids:
@@ -676,7 +674,7 @@ class PosConfig(models.Model):
             return {
                 'name': _('Rescue Sessions'),
                 'res_model': 'pos.session',
-                'view_mode': 'tree,form',
+                'view_mode': 'list,form',
                 'domain': [('id', 'in', rescue_session_ids.ids)],
                 'type': 'ir.actions.act_window',
             }
@@ -853,13 +851,23 @@ class PosConfig(models.Model):
     def _create_cash_payment_method(self, cash_journal_vals=None):
         if cash_journal_vals is None:
             cash_journal_vals = {}
-
-        cash_journal = self.env['account.journal'].create({
+        journal_vals = {
             'name': _('Cash'),
             'type': 'cash',
             'company_id': self.env.company.id,
             **cash_journal_vals,
-        })
+        }
+
+        default_cash_account = self.env['account.account'].search([
+            ('account_type', '=', 'asset_cash'),
+            ('name', '=', 'Cash'),
+            ('company_ids', 'in', self.env.company.root_id.id)
+        ], limit=1)
+
+        if default_cash_account:
+            journal_vals['default_account_id'] = default_cash_account.id
+
+        cash_journal = self.env['account.journal'].create(journal_vals)
         return self.env['pos.payment.method'].create({
             'name': _('Cash'),
             'journal_id': cash_journal.id,
@@ -1045,3 +1053,7 @@ class PosConfig(models.Model):
         pos_restaurant_module = self.env['ir.module.module'].search([('name', '=', 'pos_restaurant')])
         pos_restaurant_module.button_immediate_install()
         return {'installed_with_demo': pos_restaurant_module.demo}
+    
+    def _get_available_pricelists(self):
+        self.ensure_one()
+        return self.available_pricelist_ids if self.use_pricelist else self.pricelist_id

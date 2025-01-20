@@ -242,7 +242,7 @@ def html_normalize(src, filter_callback=None, output_method="html"):
         return src
 
     # html: remove encoding attribute inside tags
-    src = re.sub(r'(<[^>]*\s)(encoding=(["\'][^"\']*?["\']|[^\s\n\r>]+)(\s[^>]*|/)?>)', "", src, re.IGNORECASE | re.DOTALL)
+    src = re.sub(r'(<[^>]*\s)(encoding=(["\'][^"\']*?["\']|[^\s\n\r>]+)(\s[^>]*|/)?>)', "", src, flags=re.IGNORECASE | re.DOTALL)
 
     src = src.replace('--!>', '-->')
     src = re.sub(r'(<!-->|<!--->)', '<!-- -->', src)
@@ -367,6 +367,7 @@ def is_html_empty(html_content):
     tag_re = r'<\s*\/?(?:p|div|section|span|br|b|i|font)\b(?:(\s+[A-Za-z_-][A-Za-z0-9-_]*(\s*=\s*[\'"][^"\']*[\'"]))*)(?:\s*>|\s*\/\s*>)'
     return not bool(re.sub(tag_re, '', html_content).strip()) and not re.search(icon_re, html_content)
 
+
 def html_keep_url(text):
     """ Transform the url into clickable link with <a/> tag """
     idx = 0
@@ -374,7 +375,7 @@ def html_keep_url(text):
     link_tags = re.compile(r"""(?<!["'])((ftp|http|https):\/\/(\w+:{0,1}\w*@)?([^\s<"']+)(:[0-9]+)?(\/|\/([^\s<"']))?)(?![^\s<"']*["']|[^\s<"']*</a>)""")
     for item in re.finditer(link_tags, text):
         final += text[idx:item.start()]
-        final += '<a href="%s" target="_blank" rel="noreferrer noopener">%s</a>' % (item.group(0), item.group(0))
+        final += create_link(item.group(0), item.group(0))
         idx = item.end()
     final += text[idx:]
     return final
@@ -396,10 +397,16 @@ def html_to_inner_content(html):
     return processed
 
 
-def html2plaintext(html, body_id=None, encoding='utf-8'):
+def create_link(url, label):
+    return f'<a href="{url}" target="_blank" rel="noreferrer noopener">{label}</a>'
+
+
+def html2plaintext(html, body_id=None, encoding='utf-8', include_references=True):
     """ From an HTML text, convert the HTML to plain text.
     If @param body_id is provided then this is the tag where the
     body (not necessarily <body>) starts.
+    :param include_references: If False, numbered references and
+        URLs for links and images will not be included.
     """
     ## (c) Fry-IT, www.fry-it.com, 2007
     ## <peter@fry-it.com>
@@ -423,18 +430,19 @@ def html2plaintext(html, body_id=None, encoding='utf-8'):
 
     url_index = []
     linkrefs = itertools.count(1)
-    for link in tree.findall('.//a'):
-        if url := link.get('href'):
-            link.tag = 'span'
-            link.text = f'{link.text} [{next(linkrefs)}]'
-            url_index.append(url)
+    if include_references:
+        for link in tree.findall('.//a'):
+            if url := link.get('href'):
+                link.tag = 'span'
+                link.text = f'{link.text} [{next(linkrefs)}]'
+                url_index.append(url)
 
-    for img in tree.findall('.//img'):
-        if src := img.get('src'):
-            img.tag = 'span'
-            img_name = re.search(r'[^/]+(?=\.[a-zA-Z]+(?:\?|$))', src)
-            img.text = '%s [%s]' % (img_name[0] if img_name else 'Image', next(linkrefs))
-            url_index.append(src)
+        for img in tree.findall('.//img'):
+            if src := img.get('src'):
+                img.tag = 'span'
+                img_name = re.search(r'[^/]+(?=\.[a-zA-Z]+(?:\?|$))', src)
+                img.text = '%s [%s]' % (img_name[0] if img_name else 'Image', next(linkrefs))
+                url_index.append(src)
 
     html = etree.tostring(tree, encoding="unicode")
     # \r char is converted into &#13;, must remove it
@@ -644,6 +652,14 @@ def email_split_and_format(text):
         return []
     return [formataddr((name, email)) for (name, email) in email_split_tuples(text)]
 
+def email_split_and_format_normalize(text):
+    """ Same as 'email_split_and_format' but normalizing email. """
+    return [
+        formataddr(
+            (name, _normalize_email(email))
+        ) for (name, email) in email_split_tuples(text)
+    ]
+
 def email_normalize(text, strict=True):
     """ Sanitize and standardize email address entries. As of rfc5322 section
     3.4.1 local-part is case-sensitive. However most main providers do consider
@@ -679,15 +695,7 @@ def email_normalize(text, strict=True):
     if not emails or (strict and len(emails) != 1):
         return False
 
-    local_part, at, domain = emails[0].rpartition('@')
-    try:
-        local_part.encode('ascii')
-    except UnicodeEncodeError:
-        pass
-    else:
-        local_part = local_part.lower()
-
-    return local_part + at + domain.lower()
+    return _normalize_email(emails[0])
 
 def email_normalize_all(text):
     """ Tool method allowing to extract email addresses from a text input and returning
@@ -701,7 +709,37 @@ def email_normalize_all(text):
     if not text:
         return []
     emails = email_split(text)
-    return list(filter(None, [email_normalize(email) for email in emails]))
+    return list(filter(None, [_normalize_email(email) for email in emails]))
+
+def _normalize_email(email):
+    """ As of rfc5322 section 3.4.1 local-part is case-sensitive. However most
+    main providers do consider the local-part as case insensitive. With the
+    introduction of smtp-utf8 within odoo, this assumption is certain to fall
+    short for international emails. We now consider that
+
+      * if local part is ascii: normalize still 'lower' ;
+      * else: use as it, SMTP-UF8 is made for non-ascii local parts;
+
+    Concerning domain part of the address, as of v14 international domain (IDNA)
+    are handled fine. The domain is always lowercase, lowering it is fine as it
+    is probably an error. With the introduction of IDNA, there is an encoding
+    that allow non-ascii characters to be encoded to ascii ones, using 'idna.encode'.
+
+    A normalized email is considered as :
+    - having a left part + @ + a right part (the domain can be without '.something')
+    - having no name before the address. Typically, having no 'Name <>'
+    Ex:
+    - Possible Input Email : 'Name <NaMe@DoMaIn.CoM>'
+    - Normalized Output Email : 'name@domain.com'
+    """
+    local_part, at, domain = email.rpartition('@')
+    try:
+        local_part.encode('ascii')
+    except UnicodeEncodeError:
+        pass
+    else:
+        local_part = local_part.lower()
+    return local_part + at + domain.lower()
 
 def email_domain_extract(email):
     """ Extract the company domain to be used by IAP services notably. Domain
@@ -784,7 +822,6 @@ def formataddr(pair, charset='utf-8'):
             return f'"{name}" <{local}@{domain}>'
     return f"{local}@{domain}"
 
-
 def encapsulate_email(old_email, new_email):
     """Change the FROM of the message and use the old one as name.
 
@@ -838,3 +875,14 @@ def parse_contact_from_email(text):
         name, email_normalized = text, ''
 
     return name, email_normalized
+
+def unfold_references(msg_references):
+    """ As it declared in [RFC2822] long header bodies can be "folded" using
+    CRLF+WSP. Some mail clients split References header body which contains
+    Message Ids by "\n ".
+
+    RFC2882: https://tools.ietf.org/html/rfc2822#section-2.2.3 """
+    return [
+        re.sub(r'[\r\n\t ]+', r'', ref)  # "Unfold" buggy references
+        for ref in mail_header_msgid_re.findall(msg_references)
+    ]
