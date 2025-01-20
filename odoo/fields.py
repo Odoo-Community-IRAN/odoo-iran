@@ -1851,7 +1851,9 @@ class _String(Field):
             translation_dictionary = self.get_translation_dictionary(from_lang_value, old_translations)
             text2terms = defaultdict(list)
             for term in new_terms:
-                text2terms[self.get_text_content(term)].append(term)
+                term_text = self.get_text_content(term)
+                if term_text:
+                    text2terms[term_text].append(term)
 
             is_text = self.translate.is_text if hasattr(self.translate, 'is_text') else lambda term: True
             term_adapter = self.translate.term_adapter if hasattr(self.translate, 'term_adapter') else None
@@ -4426,11 +4428,12 @@ class One2many(_RelationalMulti):
                 raise UserError(_("No inverse field %r found for %r") % (self.inverse_name, self.comodel_name))
 
     def get_domain_list(self, records):
-        comodel = records.env.registry[self.comodel_name]
-        inverse_field = comodel._fields[self.inverse_name]
-        domain = super(One2many, self).get_domain_list(records)
-        if inverse_field.type == 'many2one_reference':
-            domain = domain + [(inverse_field.model_field, '=', records._name)]
+        domain = super().get_domain_list(records)
+        if self.comodel_name and self.inverse_name:
+            comodel = records.env.registry[self.comodel_name]
+            inverse_field = comodel._fields[self.inverse_name]
+            if inverse_field.type == 'many2one_reference':
+                domain = domain + [(inverse_field.model_field, '=', records._name)]
         return domain
 
     def __get__(self, records, owner):

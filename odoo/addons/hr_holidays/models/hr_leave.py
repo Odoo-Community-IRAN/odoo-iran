@@ -1321,6 +1321,8 @@ Attempting to double-book your time off won't magically make your vacation 2x be
 
         split_leaves.filtered(lambda l: l.state in 'validate')._validate_leave_request()
 
+        return split_leaves
+
     def action_validate(self):
         current_employee = self.env.user.employee_id
         leaves = self._get_leaves_on_public_holiday()
@@ -1539,7 +1541,7 @@ Attempting to double-book your time off won't magically make your vacation 2x be
     def _get_responsible_for_approval(self):
         self.ensure_one()
 
-        responsible = self.env.user
+        responsible = self.env['res.users']
 
         if self.holiday_type != 'employee':
             return responsible
@@ -1556,6 +1558,9 @@ Attempting to double-book your time off won't magically make your vacation 2x be
         return responsible
 
     def activity_update(self):
+        if self.env.context.get('mail_activity_automation_skip'):
+            return False
+
         to_clean, to_do, to_do_confirm_activity = self.env['hr.leave'], self.env['hr.leave'], self.env['hr.leave']
         activity_vals = []
         today = fields.Date.today()
@@ -1581,7 +1586,7 @@ Attempting to double-book your time off won't magically make your vacation 2x be
                             leave_type=holiday.holiday_status_id.name,
                         )
                         to_do_confirm_activity |= holiday
-                    user_ids = holiday.sudo()._get_responsible_for_approval().ids or self.env.user.ids
+                    user_ids = holiday.sudo()._get_responsible_for_approval().ids
                     for user_id in user_ids:
                         date_deadline = (
                             (holiday.date_from -

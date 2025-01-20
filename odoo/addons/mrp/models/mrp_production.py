@@ -14,7 +14,7 @@ from odoo import api, fields, models, _, Command
 from odoo.addons.web.controllers.utils import clean_action
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import float_compare, float_round, float_is_zero, format_datetime
-from odoo.tools.misc import OrderedSet, format_date, groupby as tools_groupby
+from odoo.tools.misc import OrderedSet, format_date, groupby as tools_groupby, topological_sort
 
 from odoo.addons.stock.models.stock_move import PROCUREMENT_PRIORITIES
 
@@ -610,7 +610,7 @@ class MrpProduction(models.Model):
             if production.state in ('draft', 'done', 'cancel'):
                 production.reservation_state = False
                 continue
-            relevant_move_state = production.move_raw_ids._get_relevant_state_among_moves()
+            relevant_move_state = production.move_raw_ids.filtered(lambda m: not m.picked)._get_relevant_state_among_moves()
             # Compute reservation state according to its component's moves.
             if relevant_move_state == 'partially_available':
                 if production.workorder_ids.operation_id and production.bom_id.ready_to_produce == 'asap':
@@ -867,7 +867,18 @@ class MrpProduction(models.Model):
                 if production.state == 'draft' and picking_type != production.picking_type_id:
                     production.name = picking_type.sequence_id.next_by_id()
 
-        res = super(MrpProduction, self).write(vals)
+        date_start_map = dict()
+        if 'date_start' in vals:
+            date_start_map = {
+                prod: vals['date_start'] - datetime.timedelta(days=prod.bom_id.produce_delay)
+                if prod.bom_id else vals['date_start']
+                for prod in self
+            }
+            res = True
+            for production in self:
+                res &= super(MrpProduction, production).write({**vals, 'date_start': date_start_map[production]})
+        else:
+            res = super().write(vals)
 
         for production in self:
             if 'date_start' in vals and not self.env.context.get('force_date', False):
@@ -891,10 +902,8 @@ class MrpProduction(models.Model):
                     finished_move_lines.write({'lot_id': vals.get('lot_producing_id')})
                 if 'qty_producing' in vals:
                     finished_move.quantity = vals.get('qty_producing')
-                    if production.product_tracking == 'lot':
-                        finished_move.move_line_ids.lot_id = production.lot_producing_id
             if self._has_workorders() and not production.workorder_ids.operation_id and vals.get('date_start') and not vals.get('date_finished'):
-                new_date_start = fields.Datetime.to_datetime(vals.get('date_start'))
+                new_date_start = fields.Datetime.to_datetime(production.date_start)
                 if not production.date_finished or new_date_start >= production.date_finished:
                     production.date_finished = new_date_start + datetime.timedelta(hours=1)
         return res
@@ -1306,7 +1315,9 @@ class MrpProduction(models.Model):
         self.ensure_one()
         procurement_moves = self.procurement_group_id.stock_move_ids
         child_moves = procurement_moves.move_orig_ids
-        return (procurement_moves | child_moves).created_production_id.procurement_group_id.mrp_production_ids.filtered(lambda p: p.origin != self.origin) - self
+        return ((procurement_moves | child_moves).created_production_id.procurement_group_id.mrp_production_ids\
+                | child_moves.production_id)\
+                .filtered(lambda p: p.origin != self.origin) - self
 
     def _get_sources(self):
         self.ensure_one()
@@ -1963,7 +1974,7 @@ class MrpProduction(models.Model):
             # Adapt quantities produced
             for workorder in production.workorder_ids.sorted('id'):
                 initial_workorder_remaining_qty.append(max(initial_qty - workorder.qty_reported_from_previous_wo - workorder.qty_produced, 0))
-                if workorder.production_id.id not in self.env.context.get('mo_ids_to_backorder', []):
+                if workorder.production_id.id not in (self.env.context.get('mo_ids_to_backorder') or []):
                     workorder.qty_produced = min(workorder.qty_produced, workorder.qty_production)
             workorders_len = len(production.workorder_ids)
             for index, workorder in enumerate(bo.workorder_ids):
@@ -2815,3 +2826,9 @@ class MrpProduction(models.Model):
                 'context': {'default_production_ids': self.ids},
             }
         return self.action_open_label_layout()
+
+    def _track_get_fields(self):
+        res = super()._track_get_fields()
+        if res:
+            res = OrderedSet(topological_sort(self.fields_get(res, ('depends'))))
+        return res

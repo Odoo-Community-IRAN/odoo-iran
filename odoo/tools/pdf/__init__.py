@@ -38,7 +38,7 @@ else:
     raise ImportError("pypdf implementation not found") from error
 del error
 
-PdfReader, PdfWriter, filters, generic, errors, create_string_object =\
+PdfReaderBase, PdfWriter, filters, generic, errors, create_string_object =\
     pypdf.PdfReader, pypdf.PdfWriter, pypdf.filters, pypdf.generic, pypdf.errors, pypdf.create_string_object
 # because they got re-exported
 ArrayObject, BooleanObject, ByteStringObject, DecodedStreamObject, DictionaryObject, IndirectObject, NameObject, NumberObject =\
@@ -59,18 +59,17 @@ pypdf.filters.decompress = lambda data: decompressobj().decompress(data)
 
 
 # monkey patch to discard unused arguments as the old arguments were not discarded in the transitional class
+# This keep the old default value of the `strict` argument
+# https://github.com/py-pdf/pypdf/blob/1.26.0/PyPDF2/pdf.py#L1061
 # https://pypdf2.readthedocs.io/en/2.0.0/_modules/PyPDF2/_reader.html#PdfReader
-class PdfFileReader(PdfReader):
-    def __init__(self, *args, **kwargs):
-        if "strict" not in kwargs and len(args) < 2:
-            kwargs["strict"] = True  # maintain the default
-        kwargs = {k: v for k, v in kwargs.items() if k in ('strict', 'stream')}
-        super().__init__(*args, **kwargs)
+class PdfReader(PdfReaderBase):
+    def __init__(self, stream, strict=True, *args, **kwargs):
+        super().__init__(stream, strict)
 
 
-if 'PyPDF2' in sys.modules:
-    pypdf.PdfFileReader = PdfFileReader
-    pypdf.PdfFileWriter = PdfWriter
+# Ensure that PdfFileReader and PdfFileWriter are available in case it's still used somewhere
+PdfFileReader = pypdf.PdfFileReader = PdfReader
+pypdf.PdfFileWriter = PdfWriter
 
 _logger = getLogger(__name__)
 DEFAULT_PDF_DATETIME_FORMAT = "D:%Y%m%d%H%M%S+00'00'"
@@ -177,9 +176,12 @@ def fill_form_fields_pdf(writer, form_fields):
         for raw_annot in page.get('/Annots', []):
             annot = raw_annot.getObject()
             for field in form_fields:
-                # Mark filled fields as readonly to avoid the blue overlay:
+                # Modifying the form flags to force  all text fields read-only
                 if annot.get('/T') == field:
-                    annot.update({NameObject("/Ff"): NumberObject(1)})
+                    form_flags = annot.get('/Ff', 0)
+                    readonly_flag = 1  # 1st bit sets readonly
+                    new_flags = form_flags | readonly_flag
+                    annot.update({NameObject("/Ff"): NumberObject(new_flags)})
 
 
 def rotate_pdf(pdf):
@@ -232,6 +234,7 @@ def add_banner(pdf_stream, text=None, logo=False, thickness=2 * cm):
         width = float(abs(page.mediaBox.getWidth()))
         height = float(abs(page.mediaBox.getHeight()))
 
+        can.setPageSize((width, height))
         can.translate(width, height)
         can.rotate(-45)
 
@@ -419,7 +422,7 @@ class OdooPdfFileWriter(PdfFileWriter):
         # bytes, each of whose encoded byte values shall have a decimal value greater than 127 "
         self._header = b"%PDF-1.7\n"
         if submod == '._pypdf2_1':
-            self._header += b"\xDE\xAD\xBE\xEF"
+            self._header += b"%\xDE\xAD\xBE\xEF"
 
         # Add a document ID to the trailer. This is only needed when using encryption with regular PDF, but is required
         # when using PDF/A

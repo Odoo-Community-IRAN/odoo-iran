@@ -509,17 +509,17 @@ class AccountMoveLine(models.Model):
             elif line.journal_id.type == 'purchase':
                 if product.description_purchase:
                     values.append(product.description_purchase)
-            return '\n'.join(values)
+            return '\n'.join(values) if values else False
 
         term_by_move = (self.move_id.line_ids | self).filtered(lambda l: l.display_type == 'payment_term').sorted(lambda l: l.date_maturity or date.max).grouped('move_id')
         for line in self.filtered(lambda l: l.move_id.inalterable_hash is False):
             if line.display_type == 'payment_term':
                 term_lines = term_by_move.get(line.move_id, self.env['account.move.line'])
                 n_terms = len(line.move_id.invoice_payment_term_id.line_ids)
-                name = line.move_id.payment_reference or ''
+                name = line.move_id.payment_reference or False
                 if n_terms > 1:
                     index = term_lines._ids.index(line.id) if line in term_lines else len(term_lines)
-                    name = _('%s installment #%s', name, index + 1).lstrip()
+                    name = _('%s installment #%s', name if name else '', index + 1).lstrip()
                 if n_terms > 1 or not line.name or line._origin.name == line._origin.move_id.payment_reference:
                     line.name = name
             if not line.product_id or line.display_type in ('line_section', 'line_note'):
@@ -897,7 +897,7 @@ class AccountMoveLine(models.Model):
             if line.display_type in ('line_section', 'line_note', 'payment_term'):
                 continue
             # /!\ Don't remove existing taxes if there is no explicit taxes set on the account.
-            if line.product_id or line.account_id.tax_ids or not line.tax_ids:
+            if line.product_id or (line.display_type != 'discount' and (line.account_id.tax_ids or not line.tax_ids)):
                 line.tax_ids = line._get_computed_taxes()
 
     def _get_computed_taxes(self):
@@ -1760,16 +1760,30 @@ class AccountMoveLine(models.Model):
 
         return res
 
+    @api.model
+    def _format_aml_name(self, line_name, move_ref, move_name=None):
+        ''' Format the display of an account.move.line record. As its very costly to fetch the account.move.line
+        records, only line_name, move_ref, move_name are passed as parameters to deal with sql-queries more easily.
+
+        :param line_name:   The name of the account.move.line record.
+        :param move_ref:    The reference of the account.move record.
+        :param move_name:   The name of the account.move record.
+        :return:            The formatted name of the account.move.line record.
+        '''
+        names = []
+        if move_name and move_name != '/':
+            names.append(move_name)
+        if move_ref and move_ref != '/':
+            names.append(f"({move_ref})")
+        if line_name and line_name != move_name and line_name != '/':
+            names.append(line_name)
+        name = ' '.join(names)
+        return name or _('Draft Entry')
+
     @api.depends('move_id', 'ref', 'product_id')
     def _compute_display_name(self):
         for line in self:
-            line.display_name = " ".join(
-                element for element in (
-                    line.move_id.name,
-                    line.ref and f"({line.ref})",
-                    line.name or line.product_id.display_name,
-                ) if element
-            )
+            line.display_name = line._format_aml_name(line.name or line.product_id.display_name, line.ref, line.move_id.name)
 
     def copy_data(self, default=None):
         data_list = super().copy_data(default=default)
@@ -2589,7 +2603,7 @@ class AccountMoveLine(models.Model):
                 # If we are fully reversing the entry, no need to fix anything since the journal entry
                 # is exactly the mirror of the source journal entry.
                 caba_lines_to_reconcile = None
-                if is_cash_basis_needed(involved_amls.account_id) and not self._context.get('move_reverse_cancel'):
+                if is_cash_basis_needed(involved_amls.account_id) and not self._context.get('move_reverse_cancel') and not self._context.get('no_cash_basis'):
                     caba_lines_to_reconcile = involved_amls._add_exchange_difference_cash_basis_vals(exchange_diff_values)
 
                 # Prepare the exchange difference.

@@ -5,7 +5,7 @@
 # Translators:
 # Martin Trigaux, 2024
 # Wil Odoo, 2024
-# Thi Huong Nguyen, 2024
+# Thi Huong Nguyen, 2025
 # 
 msgid ""
 msgstr ""
@@ -13,7 +13,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2024-08-13 10:26+0000\n"
 "PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Thi Huong Nguyen, 2024\n"
+"Last-Translator: Thi Huong Nguyen, 2025\n"
 "Language-Team: Vietnamese (https://app.transifex.com/odoo/teams/41243/vi/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -1234,7 +1234,7 @@ msgstr "Chỉ định tất cả"
 #. module: stock
 #: model:ir.model.fields,field_description:stock.field_stock_picking__owner_id
 msgid "Assign Owner"
-msgstr "Chỉ định người phụ trách"
+msgstr "Chỉ định bên sở hữu"
 
 #. module: stock
 #: model:ir.actions.act_window,name:stock.act_assign_serial_numbers
@@ -1388,28 +1388,28 @@ msgstr "Đơn hàng trậm trễ"
 #. module: stock
 #: model:ir.model,name:stock.model_stock_backorder_confirmation
 msgid "Backorder Confirmation"
-msgstr "Xác nhận đơn hàng chậm trễ"
+msgstr "Xác nhận đơn hàng tách kiện"
 
 #. module: stock
 #: model:ir.model,name:stock.model_stock_backorder_confirmation_line
 msgid "Backorder Confirmation Line"
-msgstr "Dòng xác nhận đơn hàng chậm trễ"
+msgstr "Dòng xác nhận đơn hàng tách kiện"
 
 #. module: stock
 #: model:ir.model.fields,field_description:stock.field_stock_backorder_confirmation__backorder_confirmation_line_ids
 msgid "Backorder Confirmation Lines"
-msgstr "Chi tiết xác nhận đơn hàng chậm trễ"
+msgstr "Chi tiết xác nhận đơn hàng tách kiện"
 
 #. module: stock
 #: model_terms:ir.ui.view,arch_db:stock.view_backorder_confirmation
 msgid "Backorder creation"
-msgstr "Tạo đơn hàng chậm trễ"
+msgstr "Tạo đơn hàng tách kiện"
 
 #. module: stock
 #: model:ir.actions.act_window,name:stock.action_picking_tree_backorder
 #: model_terms:ir.ui.view,arch_db:stock.view_picking_internal_search
 msgid "Backorders"
-msgstr "Đơn hàng chậm trễ"
+msgstr "Đơn hàng tách kiện"
 
 #. module: stock
 #: model:ir.model.fields,field_description:stock.field_stock_location__barcode
@@ -1635,6 +1635,17 @@ msgstr "Dịch chuyển dạng chuỗi đã tồn tại"
 #: model:ir.model,name:stock.model_stock_change_product_qty
 msgid "Change Product Quantity"
 msgstr "Thay đổi số lượng sản phẩm"
+
+#. module: stock
+#. odoo-python
+#: code:addons/stock/models/stock_move_line.py:0
+#, python-format
+msgid ""
+"Changing the Lot/Serial number for move lines with different products is not"
+" allowed."
+msgstr ""
+"Không được phép thay đổi số lô/sê-ri cho các dòng điều chuyển có sản phẩm "
+"khác nhau."
 
 #. module: stock
 #. odoo-python
@@ -1976,7 +1987,7 @@ msgstr "Lấy hàng theo số lượng"
 #. module: stock
 #: model:ir.model.fields,field_description:stock.field_stock_picking_type__count_picking_backorders
 msgid "Count Picking Backorders"
-msgstr "Lấy hàng theo số lượng Đơn hàng chậm trễ"
+msgstr "Lấy hàng theo số lượng Đơn hàng tách kiện"
 
 #. module: stock
 #: model:ir.model.fields,field_description:stock.field_stock_picking_type__count_picking_draft
@@ -2021,14 +2032,14 @@ msgstr "Địa điểm đối ứng"
 #: model:ir.model.fields,field_description:stock.field_stock_picking_type__create_backorder
 #: model_terms:ir.ui.view,arch_db:stock.view_backorder_confirmation
 msgid "Create Backorder"
-msgstr "Tạo đơn hàng chậm trễ"
+msgstr "Tạo đơn hàng tách kiện"
 
 #. module: stock
 #. odoo-python
 #: code:addons/stock/models/stock_picking.py:0
 #, python-format
 msgid "Create Backorder?"
-msgstr "Tạo đơn hàng chậm trễ?"
+msgstr "Tạo đơn hàng tách kiện?"
 
 #. module: stock
 #: model_terms:ir.ui.view,arch_db:stock.view_picking_type_form
@@ -2054,8 +2065,8 @@ msgid ""
 "                            products later. Do not create a backorder if you will not\n"
 "                            process the remaining products."
 msgstr ""
-"Tạo đơn hàng chậm trễ nếu bạn dự kiến sẽ xử lý các sản phẩm\n"
-"                          còn lại sau. Không tạo đơn hàng chậm trễ nếu bạn không\n"
+"Tạo đơn hàng tách kiện nếu bạn dự kiến sẽ xử lý các sản phẩm\n"
+"                          còn lại sau. Không tạo đơn hàng tách kiện nếu bạn không\n"
 "                          xử lý các sản phẩm còn lại. "
 
 #. module: stock
@@ -2263,7 +2274,7 @@ msgstr "Khách hàng"
 #: model:ir.model.fields,field_description:stock.field_product_product__sale_delay
 #: model:ir.model.fields,field_description:stock.field_product_template__sale_delay
 msgid "Customer Lead Time"
-msgstr "Thời gian giao hàng"
+msgstr "Thời gian hoàn thành"
 
 #. module: stock
 #: model:ir.model.fields,field_description:stock.field_res_partner__property_stock_customer
@@ -2288,7 +2299,7 @@ msgstr "Bàn điều chỉnh được"
 #. module: stock
 #: model_terms:ir.ui.view,arch_db:stock.view_location_form
 msgid "Cyclic Counting"
-msgstr "Đếm theo chu kỳ"
+msgstr "Kiểm kho theo chu kỳ"
 
 #. module: stock
 #: model_terms:ir.ui.view,arch_db:stock.report_reception_body
@@ -2677,8 +2688,8 @@ msgid ""
 "Delivery lead time, in days. It's the number of days, promised to the "
 "customer, between the confirmation of the sales order and the delivery."
 msgstr ""
-"Thời gian giao hàng, tính theo ngày. Đây là số ngày đã hẹn với khách hàng và"
-" là khoảng thời gian từ khi xác nhận đơn bán hàng đến ngày giao hàng."
+"Thời gian hoàn thành, tính theo ngày. Đây là số ngày đã hẹn với khách hàng "
+"và là khoảng thời gian từ khi xác nhận đơn bán hàng đến ngày giao hàng."
 
 #. module: stock
 #: model:ir.model.fields,field_description:stock.field_stock_lot__delivery_count
@@ -2757,7 +2768,7 @@ msgstr "Mô tả phiếu xuất kho"
 #. module: stock
 #: model_terms:ir.ui.view,arch_db:stock.view_template_property_form
 msgid "Description for Internal Transfers"
-msgstr "Mô tả phiếu lệnh chuyển hàng nội bộ"
+msgstr "Mô tả lệnh chuyển hàng nội bộ"
 
 #. module: stock
 #: model_terms:ir.ui.view,arch_db:stock.view_template_property_form
@@ -4092,7 +4103,7 @@ msgstr "Ngày hàng về"
 #: code:addons/stock/static/src/stock_forecasted/forecasted_details.xml:0
 #, python-format
 msgid "Incoming Draft Transfer"
-msgstr "Lệnh chuyển hàng nhập hàng nháp"
+msgstr "Lệnh chuyển hàng vào nháp"
 
 #. module: stock
 #: model:ir.model.fields,field_description:stock.field_stock_location__incoming_move_line_ids
@@ -4703,19 +4714,19 @@ msgstr "Lead Days Date"
 #: model:ir.model.fields,field_description:stock.field_stock_replenishment_option__lead_time
 #: model:ir.model.fields,field_description:stock.field_stock_rule__delay
 msgid "Lead Time"
-msgstr "Thời gian giao hàng"
+msgstr "Thời gian hoàn thành"
 
 #. module: stock
 #. odoo-javascript
 #: code:addons/stock/static/src/widgets/json_widget.xml:0
 #, python-format
 msgid "Lead Times"
-msgstr "Thời gian nhập kho"
+msgstr "Thời gian hoàn thành"
 
 #. module: stock
 #: model:product.removal,name:stock.removal_least_packages
 msgid "Least Packages"
-msgstr "Kiện hàng tối thiểu"
+msgstr "Ít kiện hàng nhất"
 
 #. module: stock
 #: model:ir.model.fields.selection,name:stock.selection__stock_request_count__set_count__empty
@@ -5436,7 +5447,7 @@ msgstr "Không có %s được chọn hoặc một phiếu xuất kho đã đư�
 #. module: stock
 #: model_terms:ir.ui.view,arch_db:stock.view_backorder_confirmation
 msgid "No Backorder"
-msgstr "Không có đơn hàng chậm trễ"
+msgstr "Không có đơn hàng tách kiện"
 
 #. module: stock
 #: model:ir.model.fields.selection,name:stock.selection__res_partner__picking_warn__no-message
@@ -5571,7 +5582,7 @@ msgstr "Không có tồn kho để hiển thị"
 #: model_terms:ir.actions.act_window,help:stock.stock_picking_action_picking_type
 msgid "No transfer found. Let's create one!"
 msgstr ""
-"Không tìm thấy lệnh chuyển hàng hàng nào. Hãy tạo một lệnh chuyển hàng mới!"
+"Không tìm thấy lệnh chuyển hàng nào. Hãy tạo một lệnh chuyển hàng mới!"
 
 #. module: stock
 #: model:ir.model.fields.selection,name:stock.selection__stock_move__priority__0
@@ -5971,7 +5982,7 @@ msgstr "Xuất hàng"
 #: code:addons/stock/static/src/stock_forecasted/forecasted_details.xml:0
 #, python-format
 msgid "Outgoing Draft Transfer"
-msgstr "Lệnh chuyển hàng xuất hàng nháp"
+msgstr "Lệnh chuyển hàng ra nháp"
 
 #. module: stock
 #: model:ir.model.fields,field_description:stock.field_stock_location__outgoing_move_line_ids
@@ -8406,7 +8417,7 @@ msgstr "Đã ký"
 #. module: stock
 #: model_terms:ir.ui.view,arch_db:stock.stock_package_type_form
 msgid "Size"
-msgstr "Quy mô"
+msgstr "Kích thước"
 
 #. module: stock
 #: model_terms:ir.ui.view,arch_db:stock.stock_package_type_form
@@ -8880,6 +8891,13 @@ msgstr ""
 #. odoo-python
 #: code:addons/stock/models/stock_quant.py:0
 #, python-format
+msgid "The Lot/Serial number (%s) is linked to another product."
+msgstr "Số lô/sê-ri (%s) này đã liên kết với một sản phẩm khác."
+
+#. module: stock
+#. odoo-python
+#: code:addons/stock/models/stock_quant.py:0
+#, python-format
 msgid ""
 "The Serial Number (%s) is already used in these location(s): %s.\n"
 "\n"
@@ -8894,7 +8912,7 @@ msgstr ""
 #: code:addons/stock/models/stock_picking.py:0
 #, python-format
 msgid "The backorder %s has been created."
-msgstr "Đơn hàng chậm trễ %s đã được tạo."
+msgstr "Đơn hàng tách kiện %s đã được tạo."
 
 #. module: stock
 #: model:ir.model.constraint,message:stock.constraint_stock_location_barcode_company_uniq
@@ -8944,7 +8962,7 @@ msgid ""
 "lead time."
 msgstr ""
 "Ngày dự kiến của lệnh chuyển hàng hàng đã tạo sẽ được tính dựa trên thời "
-"gian giao hàng này."
+"gian hoàn thành này."
 
 #. module: stock
 #: model:ir.model.fields,help:stock.field_stock_package_type__sequence
@@ -9271,9 +9289,9 @@ msgid ""
 "moves affects the product reservation, and should be done with care."
 msgstr ""
 "Đây là số lượng sản phẩm được lên kế hoạch dịch chuyển. Việc giảm số lượng "
-"này sẽ không tạo ra một đơn hàng chậm trễ. Tuy nhiên, việc thay đổi số lượng"
-" này trên những dịch chuyển đã chỉ định sẽ ảnh hưởng đến dự trữ sản phẩm và "
-"cần được thực hiện cẩn thận."
+"này sẽ không tạo ra một đơn hàng tách kiện. Tuy nhiên, việc thay đổi số "
+"lượng này trên những dịch chuyển đã chỉ định sẽ ảnh hưởng đến dự trữ sản "
+"phẩm và cần được thực hiện cẩn thận."
 
 #. module: stock
 #: model:ir.model.fields,help:stock.field_stock_location__child_internal_location_ids
@@ -9509,7 +9527,7 @@ msgstr "Cần áp dụng"
 #. module: stock
 #: model:ir.model.fields,field_description:stock.field_stock_backorder_confirmation_line__to_backorder
 msgid "To Backorder"
-msgstr "Cần lập đơn hàng chậm trễ"
+msgstr "Cần lập đơn hàng tách kiện"
 
 #. module: stock
 #: model_terms:ir.ui.view,arch_db:stock.quant_search_view
@@ -9522,7 +9540,7 @@ msgstr "Cần kiểm đếm"
 #: model_terms:ir.ui.view,arch_db:stock.view_move_search
 #: model_terms:ir.ui.view,arch_db:stock.view_picking_internal_search
 msgid "To Do"
-msgstr "Cần làm"
+msgstr "Việc cần làm"
 
 #. module: stock
 #: model_terms:ir.ui.view,arch_db:stock.stock_quant_relocate_view_form
@@ -9779,7 +9797,7 @@ msgstr "Kích hoạt thủ công"
 #: code:addons/stock/static/src/stock_forecasted/stock_forecasted.js:0
 #, python-format
 msgid "Try to add some incoming or outgoing transfers."
-msgstr "Cố gắng thêm một số lệnh chuyển hàng nhập hàng hoặc xuất hàng."
+msgstr "Cố gắng thêm một số lệnh chuyển hàng vào hoặc ra."
 
 #. module: stock
 #: model:ir.model.fields,field_description:stock.field_barcode_rule__type
@@ -10470,8 +10488,8 @@ msgid ""
 " * Never: remaining products are cancelled"
 msgstr ""
 "Khi xác nhận một lệnh chuyển hàng:\n"
-"* Hỏi: người dùng được chọn nếu họ muốn tạo đơn hàng chậm trễ cho các sản phẩm còn lại\n"
-"* Luôn luôn: đơn hàng chậm trễ được tạo tự động cho các sản phẩm còn lại\n"
+"* Hỏi: người dùng được chọn nếu họ muốn tạo đơn hàng tách kiện cho các sản phẩm còn lại\n"
+"* Luôn luôn: đơn hàng tách kiện được tạo tự động cho các sản phẩm còn lại\n"
 "* Không bao giờ: các sản phẩm còn lại sẽ bị hủy"
 
 #. module: stock
@@ -10479,16 +10497,14 @@ msgstr ""
 msgid ""
 "When validating the transfer, the products will be assigned to this owner."
 msgstr ""
-"Khi xác nhận lệnh chuyển hàng hàng, sản phẩm sẽ được giao cho người phụ "
-"trách này."
+"Khi xác nhận lệnh chuyển hàng, sản phẩm sẽ được giao cho bên sở hữu này."
 
 #. module: stock
 #: model:ir.model.fields,help:stock.field_stock_move_line__owner_id
 msgid ""
 "When validating the transfer, the products will be taken from this owner."
 msgstr ""
-"Khi xác nhận lệnh chuyển hàng hàng, sản phẩm sẽ được lấy từ người phụ trách "
-"này."
+"Khi xác nhận lệnh chuyển hàng, sản phẩm sẽ được lấy từ bên sở hữu này."
 
 #. module: stock
 #: model:ir.model.fields,field_description:stock.field_stock_move__additional
@@ -10645,7 +10661,7 @@ msgstr ""
 #: code:addons/stock/models/stock_move.py:0
 #, python-format
 msgid "You can not delete moves linked to another operation"
-msgstr "Bạn không thể xoá các dịch chuyển được liên kết với hoạt động khác"
+msgstr "Bạn không thể xoá các điều chuyển được liên kết với hoạt động khác"
 
 #. module: stock
 #. odoo-python
@@ -10833,6 +10849,13 @@ msgstr ""
 "Bạn không thể trực tiếp đóng gói hàng hoá từ các lệnh chuyển hàng khác nhau "
 "vào cùng một kiện hàng thông qua chế độ xem này. Hãy thử thêm chúng vào một "
 "loạt lấy hàng và đóng gói tại đó."
+
+#. module: stock
+#. odoo-python
+#: code:addons/stock/models/stock_quant.py:0
+#, python-format
+msgid "You cannot duplicate stock quants."
+msgstr "Bạn không thể sao chép quant tồn kho."
 
 #. module: stock
 #. odoo-python
