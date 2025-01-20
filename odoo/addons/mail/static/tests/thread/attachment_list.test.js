@@ -36,10 +36,10 @@ test("simplest layout", async () => {
     await start();
     await openDiscuss(channelId);
     await contains(".o-mail-Message .o-mail-AttachmentList");
-    expect($(".o-mail-AttachmentCard")[0]).toHaveAttribute("title", "test.txt");
+    expect(".o-mail-AttachmentCard:first").toHaveAttribute("title", "test.txt");
     await contains(".o-mail-AttachmentCard-image");
-    expect($(".o-mail-AttachmentCard-image")[0]).toHaveClass("o_image"); // required for mimetype.scss style
-    expect($(".o-mail-AttachmentCard-image")[0]).toHaveAttribute("data-mimetype", "text/plain"); // required for mimetype.scss style
+    expect(".o-mail-AttachmentCard-image:first").toHaveClass("o_image"); // required for mimetype.scss style
+    expect(".o-mail-AttachmentCard-image:first").toHaveAttribute("data-mimetype", "text/plain"); // required for mimetype.scss style
     await contains(".o-mail-AttachmentCard-aside button", { count: 2 });
     await contains(".o-mail-AttachmentCard-unlink");
     await contains(".o-mail-AttachmentCard-aside button[title='Download']");
@@ -161,6 +161,36 @@ test("view attachment", async () => {
     await contains(".o-mail-AttachmentImage img");
     await click(".o-mail-AttachmentImage");
     await contains(".o-FileViewer");
+});
+
+test("can view pdf url", async () => {
+    const pyEnv = await startServer();
+    const channelId = pyEnv["discuss.channel"].create({
+        channel_type: "channel",
+        name: "channel1",
+    });
+    const attachmentId = pyEnv["ir.attachment"].create({
+        name: "url.pdf.example",
+        mimetype: "application/pdf",
+        type: "url",
+        url: "https://pdfobject.com/pdf/sample.pdf",
+    });
+    pyEnv["mail.message"].create({
+        attachment_ids: [attachmentId],
+        body: "<p>Test</p>",
+        model: "discuss.channel",
+        res_id: channelId,
+        message_type: "comment",
+    });
+    await start();
+    await openDiscuss(channelId);
+    await click(".o-mail-AttachmentCard", { text: "url.pdf.example" });
+    await contains(".o-FileViewer");
+    await contains(
+        `iframe.o-FileViewer-view[data-src="/web/static/lib/pdfjs/web/viewer.html?file=${encodeURIComponent(
+            `${getOrigin()}/web/content/${attachmentId}?filename=url.pdf.example`
+        )}#pagemode=none"]`
+    );
 });
 
 test("close attachment viewer", async () => {
@@ -373,5 +403,30 @@ test("img file has proper src in discuss.channel", async () => {
     await openDiscuss(channelId);
     await contains(
         `.o-mail-AttachmentImage[title='test.png'] img[data-src*='${getOrigin()}/discuss/channel/${channelId}/image/${attachmentId}?filename=test.png']`
+    );
+});
+
+test("download url of non-viewable binary file", async () => {
+    const pyEnv = await startServer();
+    const channelId = pyEnv["discuss.channel"].create({
+        channel_type: "channel",
+        name: "channel1",
+    });
+    const attachmentId = pyEnv["ir.attachment"].create({
+        name: "test.o",
+        mimetype: "application/octet-stream",
+        type: "binary",
+    });
+    pyEnv["mail.message"].create({
+        attachment_ids: [attachmentId],
+        body: "<p>Test</p>",
+        model: "discuss.channel",
+        res_id: channelId,
+        message_type: "comment",
+    });
+    await start();
+    await openDiscuss(channelId);
+    await contains(
+        `button[data-download-url="${getOrigin()}/web/content/${attachmentId}?filename=test.o&download=true"]`
     );
 });
