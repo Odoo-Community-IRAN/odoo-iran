@@ -916,7 +916,6 @@ class ChromeBrowser:
 
         self.chrome, self.devtools_port = self._chrome_start(
             user_data_dir=self.user_data_dir,
-            window_size=test_class.browser_size,
             touch_enabled=test_class.touch_enabled,
             headless=headless,
         )
@@ -945,6 +944,15 @@ class ChromeBrowser:
         self._websocket_send('Runtime.enable')
         self._logger.info('Chrome headless enable page notifications')
         self._websocket_send('Page.enable')
+        self._websocket_send('Emulation.setFocusEmulationEnabled', params={'enabled': True})
+        emulated_device = {
+            'mobile': False,
+            'width': None,
+            'height': None,
+            'deviceScaleFactor': 1,
+        }
+        emulated_device['width'], emulated_device['height'] = [int(size) for size in test_class.browser_size.split(",")]
+        self._websocket_request('Emulation.setDeviceMetricsOverride', params=emulated_device)
 
     @property
     def screencasts_frames_dir(self):
@@ -1023,7 +1031,7 @@ class ChromeBrowser:
     def _chrome_start(
             self,
             user_data_dir: str,
-            window_size: str, touch_enabled: bool,
+            touch_enabled: bool,
             headless=True
     ):
         headless_switches = {
@@ -1051,7 +1059,6 @@ class ChromeBrowser:
             '--remote-debugging-address': HOST,
             '--remote-debugging-port': str(self.remote_debugging_port),
             '--user-data-dir': user_data_dir,
-            '--window-size': window_size,
             '--no-first-run': '',
             # '--enable-precise-memory-info': '',  # uncomment to debug memory leaks in unit tests
             # FIXME: the next flag is temporarily uncommented to allow client
@@ -1384,9 +1391,13 @@ which leads to stray network requests and inconsistencies."""
 
     def take_screenshot(self, prefix='sc_'):
         def handler(f):
-            base_png = f.result(timeout=0)['data']
+            try:
+                base_png = f.result(timeout=0)['data']
+            except Exception as e:
+                self._logger.runbot("Couldn't capture screenshot: %s", e)
+                return
             if not base_png:
-                self._logger.warning("Couldn't capture screenshot: expected image data, got ?? error ??")
+                self._logger.runbot("Couldn't capture screenshot: expected image data, got %r", base_png)
                 return
             decoded = base64.b64decode(base_png, validate=True)
             save_test_file(self.test_class.__name__, decoded, prefix, logger=self._logger)

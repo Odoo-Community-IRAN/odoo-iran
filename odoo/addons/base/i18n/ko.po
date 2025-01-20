@@ -5,9 +5,9 @@
 # Translators:
 # JH CHOI <hwangtog@gmail.com>, 2023
 # Martin Trigaux, 2024
-# Sarah Park, 2024
 # Wil Odoo, 2024
-# Daye Jeong, 2024
+# Sarah Park, 2024
+# Daye Jeong, 2025
 # 
 msgid ""
 msgstr ""
@@ -15,7 +15,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2024-02-26 12:42+0000\n"
 "PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Daye Jeong, 2024\n"
+"Last-Translator: Daye Jeong, 2025\n"
 "Language-Team: Korean (https://app.transifex.com/odoo/teams/41243/ko/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -639,6 +639,9 @@ msgid ""
 "        ZATCA E-Invoicing, support for PoS\n"
 "    "
 msgstr ""
+"\n"
+"        ZATCA 전자 청구서, PoS 지원\n"
+"    "
 
 #. module: base
 #: model:ir.module.module,description:base.module_l10n_ar_reports
@@ -2959,6 +2962,15 @@ msgstr ""
 "    - Regional State listings\n"
 
 #. module: base
+#: model:ir.module.module,description:base.module_l10n_tr_nilvera
+msgid ""
+"\n"
+"Base module containing core functionalities required by other Nilvera modules.\n"
+msgstr ""
+"\n"
+"다른 Nilvera 모듈에 필요한 필수 기능을 포함하는 기본 모듈.\n"
+
+#. module: base
 #: model:ir.module.module,description:base.module_l10n_bo_reports
 msgid ""
 "\n"
@@ -4453,6 +4465,8 @@ msgid ""
 "\n"
 "E-invoice implementation for the Kingdom of Saudi Arabia (PoS)\n"
 msgstr ""
+"\n"
+"사우디아라비아의 전자 청구서 기능 구현 (PoS)\n"
 
 #. module: base
 #: model:ir.module.module,description:base.module_hr_skills_slides
@@ -4950,6 +4964,15 @@ msgid ""
 msgstr ""
 "\n"
 "조정 위젯에서 재고 내역을 필터링합니다.\n"
+
+#. module: base
+#: model:ir.module.module,description:base.module_l10n_tr_nilvera_einvoice
+msgid ""
+"\n"
+"For sending and receiving electronic invoices to Nilvera.\n"
+msgstr ""
+"\n"
+"Nilvera에 전자 청구서를 보내고 받기 위한 모듈.\n"
 
 #. module: base
 #: model:ir.module.module,description:base.module_l10n_fr_hr_payroll
@@ -9130,6 +9153,33 @@ msgstr ""
 "Source: https://www.paragraf.rs/propisi/pravilnik-o-kontnom-okviru-sadrzini-racuna-za-privredna-drustva-zadruge.html\n"
 
 #. module: base
+#: model:ir.module.module,description:base.module_l10n_bh
+msgid ""
+"\n"
+"This is the base module to manage the accounting chart for Bahrain in Odoo.\n"
+"===========================================================================\n"
+"Bahrain accounting basic charts and localization.\n"
+"\n"
+"Activates:\n"
+" - Chart of Accounts\n"
+" - Taxes\n"
+" - Tax reports\n"
+" - Fiscal Positions\n"
+" - States\n"
+msgstr ""
+"\n"
+"바레인의 회계 계정과목표를 관리하기 위한 Odoo 기본 모듈입니다..\n"
+"===========================================================================\n"
+"바레인 회계 기본 계정과목표 및 현지화.\n"
+"\n"
+"Activates:\n"
+" - Chart of Accounts\n"
+" - Taxes\n"
+" - Tax reports\n"
+" - Fiscal Positions\n"
+" - States\n"
+
+#. module: base
 #: model:ir.module.module,description:base.module_l10n_be
 msgid ""
 "\n"
@@ -9262,6 +9312,27 @@ msgstr ""
 "Agrega una nomenclatura contable para Honduras. También incluye impuestos y la\n"
 "moneda Lempira. -- Adds accounting chart for Honduras. It also includes taxes\n"
 "and the Lempira currency."
+
+#. module: base
+#: model:ir.module.module,description:base.module_l10n_lb_account
+msgid ""
+"\n"
+"This is the base module to manage the accounting chart for Lebanon in Odoo.\n"
+"==============================================================================\n"
+"Lebanon accounting basic charts,taxes and localization.\n"
+"Activates:\n"
+"* Chart of Accounts\n"
+"* Taxes\n"
+"* Fiscal Positions\n"
+msgstr ""
+"\n"
+"이것은 Odoo에서 레바논의 계정과목표를 관리하는 데 사용되는 기본 모듈입니다. \n"
+"==============================================================================\n"
+"레바논 계정과목표, 세금 및 현지화..\n"
+"활성화:\n"
+"* 계정과목표\n"
+"* 세금\n"
+"* 재정 위치\n"
 
 #. module: base
 #: model:ir.module.module,description:base.module_l10n_lu
@@ -10513,6 +10584,54 @@ msgstr ""
 
 #. module: base
 #: model:ir.module.module,description:base.module_account_sepa_direct_debit
+msgid ""
+"\n"
+"This module enables the generation of SEPA Direct Debit (SDD)-compliant XML files (consistent\n"
+"with pain.008.001.02 specification) to send to your bank in order to\n"
+"collect a set of payments.\n"
+"\n"
+"To be eligible for this payment method, a customer must have first\n"
+"returned a mandate to the company, giving their consent to use direct debit.\n"
+"This consent must have been encoded as a 'customer mandate' in Odoo.\n"
+"\n"
+"You also need to meet the following requirements in order to properly\n"
+"generate an SDD file:\n"
+"- Your company account must be set to a valid IBAN number\n"
+"- Your company must have been given a creditor identifier (this can be done in Settings - General Settings - Accounting section)\n"
+"- Your company must have defined a journal to receive SDD payments (again, in 'settings' of accounting module)\n"
+"- Every customer for whom you generate a payment must have a valid IBAN account number.\n"
+"\n"
+"Odoo will let you know if any of these requirements are not satisfied.\n"
+"\n"
+"To register a payment for open invoices, you can use the dedicated\n"
+"'SEPA Direct Debit' option by selecting a bank account in the 'Register\n"
+"Payment' wizard. An error message will appear if no valid mandate is\n"
+"available for generating a payment on the selected invoice.\n"
+msgstr ""
+"\n"
+"이 모듈을 사용하면 일련의 결제를 수금하기 위해 은행에 전송할 SEPA 자동 이체(SDD)\n"
+"호환 XML 파일(pain.008.001.02 사양과 일치)을\n"
+"생성할 수 있습니다.\n"
+"\n"
+"이 결제 방법을 사용하려면 먼저 고객이 회사에 자동 이체 사용에 동의하는\n"
+"위임장을 제출해야 합니다.\n"
+"이 동의는 Odoo에 '고객 위임장'으로 인코딩되어 있어야 합니다.\n"
+"\n"
+"또한 SDD 파일을 올바르게 생성하려면 다음 요구 사항을\n"
+"충족해야 합니다:\n"
+"- 회사 계정은 유효한 IBAN 번호로 설정되어 있어야 합니다.\n"
+"- 회사에 채권자 식별자가 부여되어야 합니다. (설정 - 일반 설정 - 계정 섹션에서 이 작업을 수행할 수 있습니다).\n"
+"- 회사에서 SDD 지급을 받으려면 저널을 정의해야 합니다. (마찬가지로, 회계 모듈의 '설정'에서 정의할 수 있습니다.)\n"
+"- 결제를 생성하는 모든 고객에게는 유효한 IBAN 계좌 번호가 있어야 합니다.\n"
+"\n"
+"이러한 요구사항 중 하나라도 충족되지 않을 경우, Odoo에서 알림을 보내드립니다.\n"
+"\n"
+"미결 청구서에 대한 결제를 등록하려면\n"
+"'결제 등록' 마법사에서 은행 계좌를 선택하여 전용 'SEPA 자동 이체' 옵션을 사용할 수 있습니다.\n"
+"선택한 청구서에 대한 결제를 생성할 수 있는 유효한 위임장이 없는 경우\n"
+"오류 메시지가 표시됩니다.\n"
+
+#. module: base
 msgid ""
 "\n"
 "This module enables the generation of SEPA Direct Debit (SDD)-compliant XML files (consistent\n"
@@ -15770,6 +15889,11 @@ msgid "Bahamas"
 msgstr "바하마"
 
 #. module: base
+#: model:ir.module.module,shortdesc:base.module_l10n_bh
+msgid "Bahrain - Accounting"
+msgstr "바레인 - 회계"
+
+#. module: base
 #: model:res.country,name:base.bh
 msgid "Bahrain"
 msgstr "바레인"
@@ -21006,8 +21130,8 @@ msgstr "주 연방은 국가에 속해 있으며 연락처에 있는 주소의 �
 
 #. module: base
 #: model:ir.module.module,shortdesc:base.module_delivery_fedex
-msgid "Fedex Shipping"
-msgstr "페덱스 배송"
+msgid "Fedex Shipping (Legacy)"
+msgstr "Fedex 배송 (레거시)"
 
 #. module: base
 #: model:ir.module.module,summary:base.module_l10n_fr_fec
@@ -25090,6 +25214,11 @@ msgstr "추가 정보"
 #: model:res.country,name:base.lb
 msgid "Lebanon"
 msgstr "레바논"
+
+#. module: base
+#: model:ir.module.module,shortdesc:base.module_l10n_lb_account
+msgid "Lebanon - Accounting"
+msgstr "레바논 - 회계"
 
 #. module: base
 #: model:ir.model.fields.selection,name:base.selection__report_paperformat__format__ledger
@@ -33455,7 +33584,7 @@ msgstr "사우디 아라비아 - 전자 청구서"
 #. module: base
 #: model:ir.module.module,shortdesc:base.module_l10n_sa_edi_pos
 msgid "Saudi Arabia - E-invoicing (Simplified)"
-msgstr ""
+msgstr "사우디아라비아 - 전자 청구서 (간이 버전)"
 
 #. module: base
 #: model:ir.module.module,shortdesc:base.module_l10n_sa_pos
@@ -33873,8 +34002,13 @@ msgstr "DHL을 통한 상품 운송 및 온라인 물류 정보 추적"
 
 #. module: base
 #: model:ir.module.module,description:base.module_delivery_fedex
-msgid "Send your shippings through Fedex and track them online"
-msgstr "Fedex를 통한 물품 운송 및 온라인 물류 정보 추적"
+msgid ""
+"This is the legacy integration with FedEx that is no longer supported.Please"
+" install the new \"Fedex Shipping\" module and uninstall this one as soon as"
+" possible. This integration will stop working in 2024"
+msgstr ""
+"더 이상 지원되지 않는 FedEx 통합 레거시 버전입니다. 새로운 'FedEx 배송' 모듈을 설치 후 최대한 빠른 시일 내에 해당 모듈을"
+" 제거하시기 바랍니다. 통합 버전은 2024년에 작동이 중단됩니다."
 
 #. module: base
 #: model:ir.module.module,summary:base.module_delivery_ups_rest
@@ -35819,6 +35953,15 @@ msgid "The %s of a subsidiary must be the same as it's root company."
 msgstr "지점은 회사와 동일한 %s 항목을 사용해야 합니다."
 
 #. module: base
+#. odoo-python
+#: code:addons/base/models/res_users.py:0
+#, python-format
+msgid ""
+"The action \"%s\" cannot be set as the home action because it requires a "
+"record to be selected beforehand."
+msgstr "\"%s\" 작업은 먼저 레코드를 선택해야 하므로 홈 작업으로 설정할 수 없습니다."
+
+#. module: base
 #: model:ir.model.fields,help:base.field_res_country__code
 #: model:ir.model.fields,help:base.field_res_partner__country_code
 #: model:ir.model.fields,help:base.field_res_users__country_code
@@ -37583,12 +37726,22 @@ msgstr "튀르키예"
 #. module: base
 #: model:ir.module.module,shortdesc:base.module_l10n_tr
 msgid "Türkiye - Accounting"
-msgstr ""
+msgstr "터키 - 회계"
 
 #. module: base
 #: model:ir.module.module,shortdesc:base.module_l10n_tr_reports
 msgid "Türkiye - Accounting Reports"
-msgstr ""
+msgstr "터키 - 회계 보고서"
+
+#. module: base
+#: model:ir.module.module,shortdesc:base.module_l10n_tr_nilvera
+msgid "Türkiye - Nilvera"
+msgstr "튀르키예 - Nilvera"
+
+#. module: base
+#: model:ir.module.module,shortdesc:base.module_l10n_tr_nilvera_einvoice
+msgid "Türkiye - Nilvera E-Invoice"
+msgstr "튀르키예 - Nilvera 전자 인보이스"
 
 #. module: base
 #: model:res.country,name:base.tm
@@ -40377,13 +40530,6 @@ msgstr "l10n_be_pos_sale"
 #: model:ir.model.fields.selection,name:base.selection__ir_model_fields__ttype__many2many
 msgid "many2many"
 msgstr "many2many"
-
-#. module: base
-#. odoo-python
-#: code:addons/base/models/ir_actions.py:0
-#, python-format
-msgid "many2many fields cannot be evaluated by reference"
-msgstr "many2many 필드를 참조 사항으로 평가할 수 없습니다"
 
 #. module: base
 #: model:ir.model.fields.selection,name:base.selection__ir_model_fields__ttype__many2one

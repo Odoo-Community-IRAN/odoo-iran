@@ -5,8 +5,8 @@
 # Translators:
 # 山西清水欧度(QQ:54773801) <54773801@qq.com>, 2023
 # Jeffery CHEN <jeffery9@gmail.com>, 2024
-# Chloe Wang, 2024
 # Wil Odoo, 2024
+# Chloe Wang, 2025
 # 
 msgid ""
 msgstr ""
@@ -14,7 +14,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2024-08-13 10:27+0000\n"
 "PO-Revision-Date: 2023-10-26 23:09+0000\n"
-"Last-Translator: Wil Odoo, 2024\n"
+"Last-Translator: Chloe Wang, 2025\n"
 "Language-Team: Chinese (China) (https://app.transifex.com/odoo/teams/41243/zh_CN/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -98,7 +98,7 @@ msgstr "您希望在销售订单和销售确认电子邮件中与客户沟通的
 #. module: delivery
 #: model:ir.model.fields,help:delivery.field_delivery_carrier__integration_level
 msgid "Action while validating Delivery Orders"
-msgstr "确认发货时触发"
+msgstr "确认交货时触发"
 
 #. module: delivery
 #: model:ir.model.fields,field_description:delivery.field_delivery_carrier__active
@@ -116,7 +116,7 @@ msgstr "添加"
 #: code:addons/delivery/wizard/choose_delivery_carrier.py:0
 #, python-format
 msgid "Add a shipping method"
-msgstr "添加送货方式"
+msgstr "添加交货方式"
 
 #. module: delivery
 #: model_terms:ir.ui.view,arch_db:delivery.view_order_form_with_carrier
@@ -138,7 +138,7 @@ msgstr "金额"
 msgid ""
 "Amount of the order to benefit from a free shipping, expressed in the "
 "company currency"
-msgstr "免费送货的订单金额，按公司本位货币显示"
+msgstr "免费交货的订单金额，按公司本位货币显示"
 
 #. module: delivery
 #: model_terms:ir.ui.view,arch_db:delivery.view_delivery_carrier_form
@@ -263,7 +263,7 @@ msgstr "运输成本"
 #: model:ir.model.fields,field_description:delivery.field_choose_delivery_carrier__delivery_message
 #: model:ir.model.fields,field_description:delivery.field_sale_order__delivery_message
 msgid "Delivery Message"
-msgstr "发货消息"
+msgstr "交货消息"
 
 #. module: delivery
 #: model:ir.model.fields,field_description:delivery.field_delivery_carrier__name
@@ -301,7 +301,7 @@ msgstr "设置运货方式"
 #. module: delivery
 #: model:ir.model,name:delivery.model_delivery_zip_prefix
 msgid "Delivery Zip Prefix"
-msgstr "发货邮编前缀"
+msgstr "交货邮编前缀"
 
 #. module: delivery
 #: model:ir.model.fields,field_description:delivery.field_sale_order__recompute_delivery_price
@@ -372,7 +372,7 @@ msgstr "错误：此交货方式不适用于该地址。"
 #: code:addons/delivery/models/delivery_carrier.py:0
 #, python-format
 msgid "Error: this delivery method is not available."
-msgstr "错误：此交付方式不适用。"
+msgstr "错误：此交货方式不适用。"
 
 #. module: delivery
 #: model:ir.model.fields,help:delivery.field_delivery_carrier__invoice_policy
@@ -381,7 +381,7 @@ msgid ""
 "Real Cost: the customer will be invoiced the real cost of the shipping, the cost of theshipping will be updated on the SO after the delivery."
 msgstr ""
 "预估成本：客户将收到预估运费的发票。\n"
-"实际费用：客户将收到实际运费的发票，运费将在发货后更新到 SO 上。"
+"实际费用：客户将收到实际运费的发票，运费将在交货后更新到 SO 上。"
 
 #. module: delivery
 #: model:ir.model.fields.selection,name:delivery.selection__delivery_carrier__invoice_policy__estimated
@@ -389,16 +389,30 @@ msgid "Estimated cost"
 msgstr "预估运费"
 
 #. module: delivery
+#. odoo-python
+#: code:addons/delivery/models/stock_picking.py:0
+#, python-format
+msgid "Exception occurred with respect to carrier on the transfer"
+msgstr "承运商在转运时发生异常"
+
+#. module: delivery
+#. odoo-python
+#: code:addons/delivery/models/stock_picking.py:0
+#, python-format
+msgid "Exception:"
+msgstr "例外："
+
+#. module: delivery
 #: model:ir.model.fields,help:delivery.field_sale_order__carrier_id
 msgid "Fill this field if you plan to invoice the shipping based on picking."
-msgstr "如果计划根据发货的实际数量开具发票，请填写此字段。"
+msgstr "如果计划根据交货的实际数量开具发票，请填写此字段。"
 
 #. module: delivery
 #: model_terms:ir.ui.view,arch_db:delivery.view_delivery_carrier_form
 msgid ""
 "Filling this form allows you to filter delivery carriers according to the "
 "delivery address of your customer."
-msgstr "填写此表后，您可以根据客户的送货地址筛选送货承运商。"
+msgstr "填写此表后，您可以根据客户的交货地址筛选交货承运商。"
 
 #. module: delivery
 #: model:ir.model.fields,field_description:delivery.field_delivery_carrier__fixed_margin
@@ -416,7 +430,7 @@ msgstr "固定价格"
 #: code:addons/delivery/models/sale_order.py:0
 #, python-format
 msgid "Free Shipping"
-msgstr "免费送货"
+msgstr "免费交货"
 
 #. module: delivery
 #: model:ir.model.fields,field_description:delivery.field_delivery_carrier__free_over
@@ -456,7 +470,7 @@ msgstr "ID"
 msgid ""
 "If the order total amount (shipping excluded) is above or equal to this "
 "value, the customer benefits from a free shipping"
-msgstr "如果订单总额（不包括运费）高于或等于此值，客户可享受免费送货服务"
+msgstr "如果订单总额（不包括运费）高于或等于此值，客户可享受免费交货服务"
 
 #. module: delivery
 #: model_terms:ir.ui.view,arch_db:delivery.view_delivery_carrier_form
@@ -508,7 +522,7 @@ msgstr "上次更新日期"
 #: model:delivery.carrier,name:delivery.delivery_local_delivery
 #: model:product.template,name:delivery.product_product_local_delivery_product_template
 msgid "Local Delivery"
-msgstr "本地送货"
+msgstr "本地交货"
 
 #. module: delivery
 #: model:ir.model.fields,help:delivery.field_delivery_carrier__debug_logging
@@ -519,6 +533,13 @@ msgstr "记录请求以便于调试"
 #: model_terms:ir.actions.act_window,help:delivery.action_delivery_zip_prefix_list
 msgid "Manage delivery zip prefixes"
 msgstr "管理递送邮政编码前缀"
+
+#. module: delivery
+#. odoo-python
+#: code:addons/delivery/models/stock_picking.py:0
+#, python-format
+msgid "Manual actions might be needed."
+msgstr "可能需要手动操作。"
 
 #. module: delivery
 #: model:ir.model.fields,field_description:delivery.field_delivery_carrier__margin
@@ -685,7 +706,7 @@ msgstr "如果您的证书已通过生产认证，请设置为 True。"
 #: model:ir.model.fields,field_description:delivery.field_choose_delivery_carrier__carrier_id
 #: model_terms:ir.ui.view,arch_db:delivery.view_delivery_carrier_form
 msgid "Shipping Method"
-msgstr "送货方式"
+msgstr "交货方式"
 
 #. module: delivery
 #: model:ir.actions.act_window,name:delivery.action_delivery_carrier_form
@@ -693,7 +714,7 @@ msgstr "送货方式"
 #: model:ir.ui.menu,name:delivery.sale_menu_action_delivery_carrier_form
 #: model_terms:ir.ui.view,arch_db:delivery.res_config_settings_view_form
 msgid "Shipping Methods"
-msgstr "送货方式"
+msgstr "交货方式"
 
 #. module: delivery
 #: model:ir.model.fields,field_description:delivery.field_sale_order__shipping_weight
@@ -712,13 +733,13 @@ msgstr "运输保险服务，可为包裹在运输途中丢失、被盗和/或�
 msgid ""
 "Shipping method details to be included at bottom sales orders and their "
 "confirmation emails. E.g. Instructions for customers to follow."
-msgstr "送货方式详细信息将包含在底部销售订单及其确认电子邮件中。例如，客户要遵循的指示。"
+msgstr "交货方式详细信息将包含在底部销售订单及其确认电子邮件中。例如，客户要遵循的指示。"
 
 #. module: delivery
 #: model:delivery.carrier,name:delivery.free_delivery_carrier
 #: model:product.template,name:delivery.product_product_delivery_product_template
 msgid "Standard delivery"
-msgstr "标准送货"
+msgstr "标准交货"
 
 #. module: delivery
 #: model:ir.model.fields,field_description:delivery.field_delivery_carrier__state_ids
@@ -745,7 +766,7 @@ msgstr "客户可以从客户门户下载退货单。"
 #. module: delivery
 #: model:ir.model.fields,help:delivery.field_delivery_carrier__return_label_on_delivery
 msgid "The return label is automatically generated at the delivery."
-msgstr "退货单在发货时自动生成。"
+msgstr "退货单在交货时自动生成。"
 
 #. module: delivery
 #: model:ir.model.constraint,message:delivery.constraint_delivery_carrier_shipping_insurance_is_percentage

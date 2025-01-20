@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import ast
@@ -462,17 +461,31 @@ class Project(models.Model):
             for vals in vals_list:
                 if 'label_tasks' in vals and not vals['label_tasks']:
                     vals['label_tasks'] = task_label
-        if len(self.env.companies) > 1 and self.env.user.has_group('project.group_project_stages'):
-            # Select the stage whether the default_stage_id field is set in context (quick create) or if it is not (normal create)
-            stage = self.env['project.project.stage'].browse(self._context['default_stage_id']) if 'default_stage_id' in self._context else self._default_stage_id()
-            # The project's company_id must be the same as the stage's company_id
-            if stage.company_id:
+        if self.env.user.has_group('project.group_project_stages'):
+            if 'default_stage_id' in self._context:
+                stage = self.env['project.project.stage'].browse(self._context['default_stage_id'])
+                # The project's company_id must be the same as the stage's company_id
+                if stage.company_id:
+                    for vals in vals_list:
+                        vals['company_id'] = stage.company_id.id
+            else:
+                companies_ids = [vals.get('company_id', False) for vals in vals_list] + [False]
+                stages = self.env['project.project.stage'].search([('company_id', 'in', companies_ids)])
                 for vals in vals_list:
-                    vals['company_id'] = stage.company_id.id
+                    # Pick the stage with the lowest sequence with no company or project's company
+                    stage_domain = [False] if 'company_id' not in vals else [False, vals.get('company_id')]
+                    stage = stages.filtered(lambda s: s.company_id.id in stage_domain)[:1]
+                    vals['stage_id'] = stage.id
+
         projects = super().create(vals_list)
         return projects
 
     def write(self, vals):
+        if vals.get('access_token'):
+            self.ensure_one()  # We are not supposed to add a single access token to multiple project
+            if self.privacy_visibility != 'portal':
+                vals['access_token'] = ''
+
         # Here we modify the project's stage according to the selected company (selecting the first
         # stage in sequence that is linked to the company).
         company_id = vals.get('company_id')
@@ -977,6 +990,9 @@ class Project(models.Model):
                 portal_users = project.message_partner_ids.user_ids.filtered('share')
                 project.message_unsubscribe(partner_ids=portal_users.partner_id.ids)
                 project.tasks._unsubscribe_portal_users()
+                # revoke access_token since the project and its tasks are no longer accessible for portal/public users
+                project.tasks.access_token = ''
+                project.access_token = ''
 
     # ---------------------------------------------------
     # Project sharing
