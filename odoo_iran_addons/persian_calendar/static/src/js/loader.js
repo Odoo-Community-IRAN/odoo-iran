@@ -11,7 +11,7 @@ patch(WebClient.prototype, {
     setup() {
         super.setup();
         onWillStart(async () => {
-            if(luxon.DateTime.now().locale == 'fa-IR'){
+            if(luxon.DateTime.now().locale.startsWith('fa')){
                 await loadBundle("persian_calendar.calendar_persian");
             }
         });
