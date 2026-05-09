@@ -9,9 +9,9 @@
     'author': "Odoo Community Iran",
     'website': "https://odoo-community.ir/",
     'category': 'Localization/Iran',
-    'version': '1.0.0',
+    'version': '19.0.1.0.0',
     'license': 'LGPL-3',
-    'depends': ['base', 'web',],
+    'depends': ['base', 'web'],
     'assets': {
         'web.assets_backend': [
             'persian_calendar/static/src/js/persian-date.js',
