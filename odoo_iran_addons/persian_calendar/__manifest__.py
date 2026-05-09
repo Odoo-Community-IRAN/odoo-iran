@@ -19,7 +19,6 @@
             'persian_calendar/static/src/js/format_utils.js',
             'persian_calendar/static/src/js/list.js',
             'persian_calendar/static/src/js/datetime_field.js',
-            'persian_calendar/static/src/js/jalali_picker.js',
         ],
     }
 }
