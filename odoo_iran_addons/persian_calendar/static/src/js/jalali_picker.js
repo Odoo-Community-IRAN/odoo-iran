@@ -12,10 +12,6 @@ const PERSIAN_MONTHS = [
     'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'
 ];
 
-// Persian weekday names starting from Saturday
-const PERSIAN_WEEKDAYS_SHORT = ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'];
-const PERSIAN_WEEKDAYS_LONG = ['شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه'];
-
 function isPersianLocale() {
     const loc = localization.locale || '';
     return loc.startsWith('fa');
@@ -28,37 +24,31 @@ function gregToPersian(year, month, day) {
     return [year, month, day];
 }
 
-// ============================================================
-// Patch DateTimePicker to show Persian labels in the picker
-// ============================================================
+// ============================================
+// Save original getter BEFORE patching
+// ============================================
+const originalDescriptor = Object.getOwnPropertyDescriptor(DateTimePicker.prototype, 'activePrecisionLevel');
+const originalGetter = originalDescriptor && originalDescriptor.get;
 
+// ============================================
+// Patch activePrecisionLevel to show Persian titles
+// ============================================
 patch(DateTimePicker.prototype, {
-    /**
-     * Override to show Persian month/year title
-     */
     get activePrecisionLevel() {
-        const precision = this.state.precision;
-        const self = this;
-        
-        // Get original precision level
-        const _super = DateTimePicker.prototype.activePrecisionLevel;
-        let original;
-        try {
-            // Try to get the original getter's value
-            const descriptor = Object.getOwnPropertyDescriptor(DateTimePicker.prototype, 'activePrecisionLevel');
-            if (descriptor && descriptor.get) {
-                original = descriptor.get.call(this);
-            }
-        } catch (e) {
-            // Fallback: the original getter might have been patched already
-            return null;
+        // Call original getter first
+        if (!originalGetter) {
+            return undefined;
         }
         
-        if (!original || !isPersianLocale()) {
+        const original = originalGetter.call(this);
+        
+        // Only modify if Persian locale and we have a result
+        if (!isPersianLocale() || !original) {
             return original;
         }
         
-        // Only modify days precision (month grid view)
+        const precision = this.state ? this.state.precision : null;
+        
         if (precision === "days") {
             return {
                 ...original,
@@ -70,7 +60,6 @@ patch(DateTimePicker.prototype, {
             };
         }
         
-        // For months precision (month selector)
         if (precision === "months") {
             return {
                 ...original,
@@ -82,7 +71,6 @@ patch(DateTimePicker.prototype, {
             };
         }
         
-        // For years/decades precision
         if (precision === "years") {
             return {
                 ...original,
