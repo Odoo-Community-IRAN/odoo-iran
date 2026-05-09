@@ -403,40 +403,6 @@ const NULLABLE_DATETIME_PROPERTY = [DateTime, { value: false }, { value: null }]
 
 
 patch(DateTimePicker.prototype, {
-      
-    props : {
-        focusedDateIndex: { type: Number, optional: true },
-        showWeekNumbers: { type: Boolean, optional: true },
-        daysOfWeekFormat: { type: String, optional: true },
-        maxDate: { type: [NULLABLE_DATETIME_PROPERTY, { value: "today" }], optional: true },
-        maxPrecision: {
-            type: [...PRECISION_LEVELS.keys()].map((value) => ({ value })),
-            optional: true,
-        },
-        minDate: { type: [NULLABLE_DATETIME_PROPERTY, { value: "today" }], optional: true },
-        minPrecision: {
-            type: [...PRECISION_LEVELS.keys()].map((value) => ({ value })),
-            optional: true,
-        },
-        onSelect: { type: Function, optional: true },
-        range: { type: Boolean, optional: true },
-        rounding: { type: Number, optional: true },
-        slots: {
-            type: Object,
-            shape: { buttons: { type: Object, optional: true } },
-            optional: true,
-        },
-        type: { type: [{ value: "date" }, { value: "datetime" }], optional: true },
-        value: {
-            type: [
-                NULLABLE_DATETIME_PROPERTY,
-                { type: Array, element: NULLABLE_DATETIME_PROPERTY },
-            ],
-            optional: true,
-        },
-        isDateValid: { type: Function, optional: true },
-        dayCellClass: { type: Function, optional: true },
-    },
     get activePrecisionLevel() {
         return PRECISION_LEVELS.get(this.state.precision);
     },
@@ -469,7 +435,6 @@ patch(DateTimePicker.prototype, {
         }else{
             this.state.focusDate = this.clamp(dateToFocus.startOf("month"));
         }
-        // this.state.focusDate = this.clamp(dateToFocus.startOf("month"));
     }
 });
 

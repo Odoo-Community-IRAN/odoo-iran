@@ -541,6 +541,9 @@ export const datetimePickerService = {
                         }
                         return () => cleanups.forEach((cleanup) => cleanup());
                     },
+                    disable() {
+                        saveAndClose();
+                    },
                     get isOpen() {
                         return popover.isOpen;
                     },
