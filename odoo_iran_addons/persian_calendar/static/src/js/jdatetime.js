@@ -195,7 +195,7 @@ const PERSIAN_WEEKDAYS = {
 function jtoWeekItem(weekDayItems) {
     const date = weekDayItems[3].range[0];
     const jdate = farvardin.gregorianToSolar(date.year, date.month, date.day);
-    const jday = new persianDate([jdate[0], jdate[1], jdate[2]]).toCalendar('persian').locale('fa');
+    const jday = new persianDate([jdate[0], jdate[1], jdate[2]]).toCalendar('persian');
     return ({
         number: `هفته ${jday.format('w')}`,
         days: weekDayItems,
@@ -223,7 +223,7 @@ const PRECISION_LEVELS = new Map()
                 date = DateTime.now();
             }
             const jdate = farvardin.gregorianToSolar(date.year, date.month, date.day);
-            const jday = new persianDate([jdate[0], jdate[1], jdate[2]]).toCalendar('persian').locale('fa');
+            const jday = new persianDate([jdate[0], jdate[1], jdate[2]]).toCalendar('persian');
             const titles = [`${jday.format('MMMM')} ${jday.format('YYYY')}`];
             if (additionalMonth) {
                 const jnext = jday.add('months', 1);
