@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="persian_calendar.JalaliDatePicker">
+        <div class="o_jalali_picker">
+            <div class="o_jalali_header">
+                <button class="btn btn-sm" t-on-click="prevMonth">&lt;</button>
+                <span t-out="monthName"/> <span t-out="state.year"/>
+                <button class="btn btn-sm" t-on-click="nextMonth">&gt;</button>
+            </div>
+            <div class="o_jalali_weekdays">
+                <span>ش</span><span>ی</span><span>د</span><span>س</span><span>چ</span><span>پ</span><span>ج</span>
+            </div>
+            <div class="o_jalali_days">
+                <t t-foreach="days" t-as="day" t-key="day.id">
+                    <span t-att-class="day.isSelected ? 'selected' : ''" t-on-click="() => selectDay(day)" t-out="day.persianDay"/>
+                </t>
+            </div>
+        </div>
+    </t>
+
+</templates>
