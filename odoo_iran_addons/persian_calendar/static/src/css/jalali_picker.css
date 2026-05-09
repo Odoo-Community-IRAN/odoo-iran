@@ -1,0 +1,81 @@
+.o_jalali_picker {
+    font-family: Tahoma, Arial, sans-serif;
+    direction: rtl;
+    width: 280px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    padding: 10px;
+}
+.o_jalali_header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    border-bottom: 1px solid #e0e0e0;
+    margin-bottom: 8px;
+}
+.o_jalali_title {
+    font-weight: bold;
+    font-size: 14px;
+    cursor: pointer;
+}
+.o_jalali_weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-bottom: 4px;
+}
+.o_jalali_weekdays span {
+    text-align: center;
+    font-size: 12px;
+    color: #666;
+    padding: 4px;
+    font-weight: bold;
+}
+.o_jalali_days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+.o_jalali_day {
+    text-align: center;
+    padding: 6px 4px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 13px;
+}
+.o_jalali_day:hover {
+    background: #e3f2fd;
+}
+.o_jalali_day.o_jalali_selected {
+    background: #1976d2;
+    color: white;
+}
+.o_jalali_day.o_jalali_today {
+    background: #fff3e0;
+    border: 1px solid #ff9800;
+}
+.o_jalali_day.o_jalali_other_month {
+    color: #bbb;
+}
+.o_jalali_footer {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px;
+    border-top: 1px solid #e0e0e0;
+    margin-top: 8px;
+}
+.o_jalali_month_selector {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: white;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    padding: 10px;
+    z-index: 100;
+}
