@@ -206,7 +206,7 @@ const PRECISION_LEVELS = new Map()
         nextTitle: _t("Next month"),
         prevTitle: _t("Previous month"),
         step: { month: 1 },
-        getTitle: (date, { additionalMonth }) => {
+        getTitle: (date, { additionalMonth } = {}) => {
             if (!date){
                 date = DateTime.now();
             }
@@ -222,7 +222,7 @@ const PRECISION_LEVELS = new Map()
         },
         getItems: (
             date,
-            { additionalMonth, maxDate, minDate, showWeekNumbers, isDateValid, dayCellClass }
+            { additionalMonth, maxDate, minDate, showWeekNumbers, isDateValid, dayCellClass } = {}
         ) => {
             if (!date){
                 date = DateTime.now();
@@ -301,7 +301,7 @@ const PRECISION_LEVELS = new Map()
         prevTitle: _t("Previous year"),
         step: { year: 1 },
         getTitle: (date) => String(date.reconfigure({ outputCalendar: 'persian', locale: 'fa' }).toLocaleString({ year: 'numeric' })),
-        getItems: (date, { maxDate, minDate }) => {
+        getItems: (date, { maxDate, minDate } = {}) => {
             const startOfYear = date.startOf("year");
             return numberRange(0, 12).map((i) => {
                 const startOfMonth = startOfYear.plus({ month: i });
@@ -320,7 +320,7 @@ const PRECISION_LEVELS = new Map()
         prevTitle: _t("Previous decade"),
         step: { year: 10 },
         getTitle: (date) => `${jgetStartOfDecade(date) - 2} - ${jgetStartOfDecade(date) + 9}`,
-        getItems: (date, { maxDate, minDate }) => {
+        getItems: (date, { maxDate, minDate } = {}) => {
             const startOfDecade = date.startOf("year").set({ year: getStartOfDecade(date) });
             return numberRange(-GRID_MARGIN, GRID_COUNT + GRID_MARGIN).map((i) => {
                 const startOfYear = startOfDecade.plus({ year: i });
@@ -342,7 +342,7 @@ const PRECISION_LEVELS = new Map()
         prevTitle: _t("Previous century"),
         step: { year: 100 },
         getTitle: (date) => `${jgetStartOfCentury(date) - 32} - ${jgetStartOfCentury(date) + 78}`,
-        getItems: (date, { maxDate, minDate }) => {
+        getItems: (date, { maxDate, minDate } = {}) => {
             const startOfCentury = date.startOf("year").set({ year: getStartOfCentury(date) });
             return numberRange(-GRID_MARGIN, GRID_COUNT + GRID_MARGIN).map((i) => {
                 const startOfDecade = startOfCentury.plus({ year: i * 10 });
