@@ -337,7 +337,7 @@ export const datetimePickerService = {
                     }
                     const [formattedValue] = safeConvert("format", value);
 
-                    if(luxon.DateTime.now().locale == 'fa-IR'){
+                    if(luxon.DateTime.now().locale.startsWith('fa')){
                         let jressult_str = ""
                         if(formattedValue.split(' ')[1]){
                             if(formattedValue.split(' ')[0].split('/')[2]){

@@ -180,12 +180,24 @@ const toWeekItem = (weekDayItems) => ({
 });
 
 
+const PERSIAN_MONTHS = [
+    'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
+    'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'
+];
+
+const PERSIAN_WEEKDAYS = {
+    short: ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'],
+    long: ['شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه'],
+    narrow: ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'],
+};
+
+// Persian week starts on Saturday (0=Saturday, 6=Friday)
 function jtoWeekItem(weekDayItems) {
     const date = weekDayItems[3].range[0];
     const jdate = farvardin.gregorianToSolar(date.year, date.month, date.day);
-    const jday = new persianDate([jdate[0], jdate[1], jdate[2]]).toCalendar('persian');
+    const jday = new persianDate([jdate[0], jdate[1], jdate[2]]).toCalendar('persian').locale('fa');
     return ({
-        number: jday.format('w'),
+        number: `هفته ${jday.format('w')}`,
         days: weekDayItems,
     })
 };
@@ -211,12 +223,12 @@ const PRECISION_LEVELS = new Map()
                 date = DateTime.now();
             }
             const jdate = farvardin.gregorianToSolar(date.year, date.month, date.day);
-            const jday = new persianDate([jdate[0], jdate[1], jdate[2]]).toCalendar('persian');
-            const titles = [`${jday.format('MMMM')} ${jday.toLocale('en').format('YYYY')}`];
+            const jday = new persianDate([jdate[0], jdate[1], jdate[2]]).toCalendar('persian').locale('fa');
+            const titles = [`${jday.format('MMMM')} ${jday.format('YYYY')}`];
             if (additionalMonth) {
                 const jnext = jday.add('months', 1);
                 const next = date.plus({ month: 1 });
-                titles.push(`${jnext.format('MMMM')} ${jnext.toLocale('en').format('YYYY')}`);
+                titles.push(`${jnext.format('MMMM')} ${jnext.format('YYYY')}`);
             }
             return titles;
         },
@@ -277,14 +289,22 @@ const PRECISION_LEVELS = new Map()
                     weeks.push(jtoWeekItem(weekDayItems));
                     // weeks.push(toWeekItem(weekDayItems));
                 }
-                // Generate days of week labels
-                const daysOfWeek = weeks[0].days.map((d) => [
-                    d.range[0].weekdayShort,
-                    d.range[0].weekdayLong,
-                    Info.weekdays("narrow", { locale: d.range[0].locale })[d.range[0].weekday - 1],
-                ]);
+                // Generate days of week labels (Persian)
+                const persianDayIndex = (luxonWeekday) => {
+                    // luxon: 1=Monday...7=Sunday, Persian: 0=Saturday...6=Friday
+                    const mapping = { 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 0, 7: 1 };
+                    return mapping[luxonWeekday];
+                };
+                const daysOfWeek = weeks[0].days.map((d) => {
+                    const idx = persianDayIndex(d.range[0].weekday);
+                    return [
+                        PERSIAN_WEEKDAYS.short[idx],
+                        PERSIAN_WEEKDAYS.long[idx],
+                        PERSIAN_WEEKDAYS.narrow[idx],
+                    ];
+                });
                 if (showWeekNumbers) {
-                    daysOfWeek.unshift(["#", _t("Week numbers"), "#"]);
+                    daysOfWeek.unshift(["#", "هفته", "#"]);
                 }
                 return {
                     id: `__month__${i}`,
@@ -302,14 +322,31 @@ const PRECISION_LEVELS = new Map()
         step: { year: 1 },
         getTitle: (date) => String(date.reconfigure({ outputCalendar: 'persian', locale: 'fa' }).toLocaleString({ year: 'numeric' })),
         getItems: (date, { maxDate, minDate } = {}) => {
-            const startOfYear = date.startOf("year");
+            // Convert current date to Persian year
+            const jdate = farvardin.gregorianToSolar(date.year, date.month, date.day);
+            const persianYear = jdate[0];
             return numberRange(0, 12).map((i) => {
-                const startOfMonth = startOfYear.plus({ month: i });
-                const range = [startOfMonth, startOfMonth.endOf("month")];
-                return toDateItem({
+                // Generate each Persian month (1-12) = Farvardin-Esfand
+                const jmonthStart = new persianDate([persianYear, i + 1, 1]).toCalendar('persian');
+                const jmonthEnd = jmonthStart.endOf("month");
+                const gregStart = jmonthStart.toCalendar('gregorian');
+                const gregEnd = jmonthEnd.toCalendar('gregorian');
+                const startOfMonth = luxon.DateTime.local().set({
+                    year: gregStart.year(),
+                    month: gregStart.month(),
+                    day: gregStart.date(),
+                });
+                const endOfMonth = luxon.DateTime.local().set({
+                    year: gregEnd.year(),
+                    month: gregEnd.month(),
+                    day: gregEnd.date(),
+                });
+                const range = [startOfMonth, endOfMonth];
+                return jtoDateItem({
                     isValid: isInRange(range, [minDate, maxDate]),
                     label: "monthShort",
                     range,
+                    jlable: PERSIAN_MONTHS[i],
                 });
             });
         },
