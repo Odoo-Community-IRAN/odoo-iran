@@ -16,14 +16,9 @@
         'web.assets_backend': [
             'persian_calendar/static/src/js/persian-date.js',
             'persian_calendar/static/src/js/farvardin.js',
-            'persian_calendar/static/src/js/datetimepicker_service.js',
-            'persian_calendar/static/src/js/loader.js',
-        ],
-        'persian_calendar.calendar_persian':[
             'persian_calendar/static/src/js/format_utils.js',
             'persian_calendar/static/src/js/list.js',
             'persian_calendar/static/src/js/datetime_field.js',
-            'persian_calendar/static/src/js/jdatetime.js',
-        ]
+        ],
     }
 }
